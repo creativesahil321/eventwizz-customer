@@ -17,6 +17,7 @@ import {
   Phone,
   Calendar,
   Building2,
+  CalendarDays,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -121,6 +122,16 @@ export default function ViewLocationDialog({
                 <p className="text-sm font-medium">Contact Number</p>
                 <p className="text-sm text-muted-foreground break-words">
                   {location.contact_number || "No contact number provided"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <CalendarDays className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Active Events</p>
+                <p className="text-sm text-muted-foreground tabular-nums">
+                  {location.active_events_count ?? 0}
                 </p>
               </div>
             </div>

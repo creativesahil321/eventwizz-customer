@@ -235,15 +235,9 @@ export default function PublishTab() {
               : "Draft saved successfully.",
           );
           router.push("/vendor/events");
-        } else {
-          toast.error(
-            response?.message ||
-              "Could not save this event. Please try again.",
-          );
         }
       } catch (error) {
         console.error("Error saving publish settings:", error);
-        toast.error("Could not save this event. Please try again.");
       } finally {
         setIsLoading(false);
       }

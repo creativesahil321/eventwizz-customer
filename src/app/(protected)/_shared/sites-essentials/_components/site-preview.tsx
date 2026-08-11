@@ -1,45 +1,58 @@
 "use client";
 
-import { SiteEssentialsFormValues } from "../_lib/schema";
-// // ThemeSchema import removed - no longer needed
-
-import CommonHeader from "@/components/shared/common-header";
-import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
-import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
-import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
-import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
-import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
+import type { RefObject } from "react";
+import { LocationPageView } from "@/app/(public)/vendor/_components/LocationPage/location-page-view";
+import type { LocationData } from "@/services/common/events/type";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
+import { SiteEssentialsFormValues } from "../_lib/schema";
+import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
 import { pickPreviewEventsFromSiteEssentials } from "../_lib/site-essentials-preview-events";
 import {
   buildSiteEssentialsContactTheme,
   resolveSiteEssentialsPreviewContact,
 } from "../_lib/preview-contact";
-import {
-  LocationPageHeroSearch,
-  useLocationPageSearch,
-} from "@/app/(public)/vendor/_components/LocationPage/location-page-hero-search";
-import { LocationEventSearchResults } from "@/app/(public)/vendor/_components/LocationPage/location-event-search-results";
-// ServerContext removed - already provided at layout level
 
 interface SitePreviewProps {
   formValues: SiteEssentialsFormValues;
+  /** Onboarding preview scroll root for sticky header parity. */
+  scrollContainerRef?: RefObject<HTMLElement | null>;
 }
 
-export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
+function getPreviewUrl(
+  value: string | File | null | undefined,
+): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (value instanceof File) return URL.createObjectURL(value);
+  return null;
+}
+
+function resolvePreviewCity(
+  formValues: SiteEssentialsFormValues,
+  locationSlug: string,
+): string | undefined {
+  const locations = formValues.locations ?? [];
+  const match = locations.find(
+    (loc) => typeof loc?.slug === "string" && loc.slug === locationSlug,
+  );
+  if (typeof match?.city === "string" && match.city.trim()) {
+    return match.city.trim();
+  }
+  if (typeof formValues.city === "string" && formValues.city.trim()) {
+    return formValues.city.trim();
+  }
+  return undefined;
+}
+
+/**
+ * Location homepage preview for Site Essentials + onboarding.
+ * Uses the same `LocationPageView` shell as the live `/{locationSlug}` page.
+ */
+export function SitePreview({
+  formValues,
+  scrollContainerRef,
+}: Readonly<SitePreviewProps>) {
   const previewStyles = siteEssentialsToPreviewRootStyle(formValues);
-
-  // Helper function to convert File objects to blob URLs for preview
-  const getPreviewUrl = (
-    value: string | File | null | undefined,
-  ): string | undefined => {
-    if (!value) return undefined;
-    if (typeof value === "string") return value;
-    if (value instanceof File) return URL.createObjectURL(value);
-    return undefined;
-  };
-
-  // ServerContext already provided at layout level - no need to create context value
 
   const useGradientBg =
     formValues.colors?.background?.includes("linear-gradient");
@@ -58,44 +71,50 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
   const { latestEvents, upcomingEvents, galleryImages, locationSlug } =
     pickPreviewEventsFromSiteEssentials(formValues);
 
-  const {
-    filters,
-    setFilters,
-    isSearchMode,
-    searchResults,
-    filteredLatest,
-    filteredUpcoming,
-    scrollToEvents,
-    clearSearch,
-  } = useLocationPageSearch({
-    locationSlug: locationSlug || "preview",
-    latestEvents,
-    upcomingEvents,
-    lockedCity: formValues.name?.trim() || null,
-    previewMode: true,
-  });
+  const slug = locationSlug || "preview";
+  const city = resolvePreviewCity(formValues, slug);
+  const logoUrl = getPreviewUrl(formValues.logo);
+  const coverImage =
+    formValues.cover_image === null
+      ? null
+      : getPreviewUrl(formValues.cover_image);
+  const coverVideo =
+    formValues.cover_video === null
+      ? null
+      : getPreviewUrl(formValues.cover_video);
+
+  const locationData: LocationData = {
+    latitude: "",
+    longitude: "",
+    address: "",
+    slug,
+    city,
+    cover_image: coverImage,
+    cover_video: coverVideo,
+    banner_heading: formValues.banner_heading ?? null,
+    banner_sub_heading: formValues.banner_sub_heading ?? null,
+    about_title: formValues.about_title ?? null,
+    about_cta_link: null,
+    about_description: formValues.about_description ?? null,
+    about_link_title: null,
+    event_title_1: formValues.event_title_1 ?? "Popular Events",
+    latest_events: latestEvents,
+    event_title_2: formValues.event_title_2 ?? "Upcoming Events",
+    upcoming_events: upcomingEvents,
+    event_gallery_title:
+      formValues.event_gallery_title ?? "Recent Events Glimpse",
+    event_gallery: galleryImages,
+  };
 
   const contactOverride = resolveSiteEssentialsPreviewContact(
     formValues,
-    locationSlug,
+    slug,
   );
   const contactTheme = buildSiteEssentialsContactTheme(formValues);
   const headerPhone =
     contactOverride?.phone?.trim() ||
     formValues.company_phone?.trim() ||
     undefined;
-
-  const cityLabel = formValues.name?.trim() || null;
-  const searchBar = (
-    <LocationPageHeroSearch
-      cityLabel={cityLabel}
-      locationSlug={locationSlug}
-      filters={filters}
-      onFiltersChange={setFilters}
-      onSearch={scrollToEvents}
-      enableAvailability={false}
-    />
-  );
 
   return (
     <div
@@ -109,80 +128,29 @@ export function SitePreview({ formValues }: Readonly<SitePreviewProps>) {
         bodyStack={formValues.typography?.fontFamily?.body}
         customStylesheetUrls={formValues.typography?.customFontStylesheetUrls}
       />
-      {/* ServerContext already provided at layout level - no need to wrap again */}
-      <CommonHeader
-        logo={getPreviewUrl(formValues.logo) || null}
-        contact_number={headerPhone}
-        variant="preview"
-        locationSlug={locationSlug || undefined}
-      />
-
-      {isSearchMode ? (
-        <>
-          <div className="sticky top-0 z-30 border-b border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 px-2.5 py-2 backdrop-blur-md sm:px-4 sm:py-3">
-            <div className="mx-auto w-full max-w-3xl">{searchBar}</div>
-          </div>
-          <LocationEventSearchResults
-            events={searchResults}
-            locationSlug={locationSlug}
-            locationLabel={cityLabel}
-            filters={filters}
-            onClear={clearSearch}
-          />
-        </>
-      ) : (
-        <>
-          <HeroBanner
-            locationName={formValues.name}
-            // Pass `null` for explicit Remove so HeroBanner does not fall back to
-            // the live theme cover video/image during Preview.
-            coverImage={
-              formValues.cover_image === null
-                ? null
-                : getPreviewUrl(formValues.cover_image) ?? undefined
-            }
-            coverVideo={
-              formValues.cover_video === null
-                ? null
-                : getPreviewUrl(formValues.cover_video) ?? undefined
-            }
-            bannerHeading={formValues.banner_heading}
-            bannerSubHeading={formValues.banner_sub_heading}
-            bannerHeadingAccent={formValues.banner_heading_accent}
-            headingEmphasis={formValues.typography?.headingEmphasis}
-            bannerHeadingAlign={formValues.banner_heading_align}
-            bannerHeadingValign={formValues.banner_heading_valign}
-            heroFooter={searchBar}
-          />
-          <LocationMarketingBody
-            className={mainBandClass}
-            style={mainBandStyle}
-            experience={
-              <ExperienceSection
-                aboutTitle={formValues.about_title || null}
-                aboutDescription={formValues.about_description || null}
-              />
-            }
-            latestEvents={filteredLatest}
-            upcomingEvents={filteredUpcoming}
-            popularSectionTitle={formValues.event_title_1 || "Popular Events"}
-            upcomingSectionTitle={formValues.event_title_2 || "Upcoming Events"}
-            galleryTitle={
-              formValues.event_gallery_title || "Recent Events Glimpse"
-            }
-            galleryImages={galleryImages}
-            locationSlug={locationSlug}
-            locationLabel={cityLabel}
-          />
-        </>
-      )}
-
-      <FooterSection
-        copyright={formValues.copyright}
-        logo={getPreviewUrl(formValues.logo) || null}
-        locationSlug={locationSlug || undefined}
-        contactTheme={contactTheme}
-        socialLinksOverride={formValues.socialLinks}
+      <LocationPageView
+        locationData={locationData}
+        locationSlug={slug}
+        settings={{
+          name: formValues.name,
+          copyright: formValues.copyright,
+          logo: logoUrl,
+          banner_heading_accent: formValues.banner_heading_accent,
+          banner_heading_align: formValues.banner_heading_align,
+          banner_heading_valign: formValues.banner_heading_valign,
+          typography: formValues.typography,
+        }}
+        headerVariant="preview"
+        headerLogo={logoUrl}
+        headerPhone={headerPhone}
+        scrollContainerRef={scrollContainerRef}
+        forcePreviewSearch
+        marketingClassName={mainBandClass}
+        marketingStyle={mainBandStyle}
+        galleryImages={galleryImages}
+        footerContactOverride={contactOverride}
+        footerContactTheme={contactTheme}
+        footerSocialLinksOverride={formValues.socialLinks}
       />
     </div>
   );

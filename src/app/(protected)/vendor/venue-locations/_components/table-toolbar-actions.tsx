@@ -22,6 +22,7 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
       "Address",
       "Headquarters",
       "In use",
+      "Active Events",
       "Created At",
     ];
 
@@ -35,6 +36,7 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
           `"${item.address || ""}"`,
           item.is_headquarters ? "Yes" : "No",
           item.is_default ? "Yes" : "No",
+          item.active_events_count ?? 0,
           item.created_at || "",
         ].join(","),
       ),

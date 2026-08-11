@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import type {
   BannerHeadingAlign,
@@ -8,6 +8,7 @@ import type {
 } from "@/lib/banner-heading-align";
 import type { GalleryImage, LocationData } from "@/services/common/events/type";
 import type { ThemeSchema } from "@/types/theme.types";
+import type { VenueContactOverride } from "@/lib/resolve-venue-contact";
 import CommonHeader from "@/components/shared/common-header";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import HeroBanner from "../EventListPage/hero-banner";
@@ -35,26 +36,45 @@ type LocationPageViewProps = {
     | "typography"
   > | null;
   headerVariant?: "default" | "preview";
+  /** Override logo (Site Essentials / onboarding draft). */
+  headerLogo?: string | File | null;
+  headerPhone?: string | null;
+  /** Onboarding preview scroll root for sticky header. */
+  scrollContainerRef?: RefObject<HTMLElement | null>;
   experience?: ReactNode;
   /** Extra class/style for marketing body (preview gradients). */
   marketingClassName?: string;
-  marketingStyle?: React.CSSProperties;
+  marketingStyle?: CSSProperties;
   galleryImages?: GalleryImage[];
+  /** Force client search (editor drafts) — skip public search API. */
+  forcePreviewSearch?: boolean;
+  footerContactOverride?: VenueContactOverride | null;
+  footerContactTheme?: Pick<ThemeSchema, "contactDetails" | "locations"> | null;
+  footerSocialLinksOverride?: Partial<
+    Record<"facebook" | "twitter" | "instagram" | "linkedin" | "youtube", string>
+  > | null;
 };
 
 /**
  * Shared single-location / `/{slug}` page shell.
- * Browse mode = full marketing page; search mode = sticky search + API results.
+ * Live + Site Essentials + onboarding location previews all use this.
  */
 export function LocationPageView({
   locationData,
   locationSlug,
   settings = null,
   headerVariant = "default",
+  headerLogo,
+  headerPhone,
+  scrollContainerRef,
   experience,
   marketingClassName = "bg-[var(--color-background)] text-[var(--color-text)]",
   marketingStyle,
   galleryImages,
+  forcePreviewSearch = false,
+  footerContactOverride,
+  footerContactTheme,
+  footerSocialLinksOverride,
 }: LocationPageViewProps) {
   const latestEvents = locationData.latest_events || [];
   const upcomingEvents = locationData.upcoming_events || [];
@@ -76,12 +96,13 @@ export function LocationPageView({
     latestEvents,
     upcomingEvents,
     lockedCity: locationData.city ?? null,
+    previewMode: forcePreviewSearch,
   });
 
   const cityLabel = locationData.city || settings?.name || "";
   const searchBar = (
     <LocationPageHeroSearch
-      cityLabel={locationData.city}
+      cityLabel={locationData.city || cityLabel || null}
       locationSlug={locationSlug}
       filters={filters}
       onFiltersChange={setFilters}
@@ -103,7 +124,14 @@ export function LocationPageView({
 
   return (
     <>
-      <CommonHeader variant={headerVariant} locationSlug={locationSlug} />
+      <CommonHeader
+        variant={headerVariant}
+        locationSlug={locationSlug}
+        logo={headerLogo === undefined ? undefined : headerLogo}
+        contact_number={headerPhone ?? undefined}
+        scrollContainerRef={scrollContainerRef}
+        previewBackButtonOffset={headerVariant === "preview" ? false : undefined}
+      />
 
       {isSearchMode ? (
         <div className="min-h-screen bg-[var(--color-background)] pt-[4.5rem]">
@@ -122,7 +150,7 @@ export function LocationPageView({
             <LocationEventSearchResults
               events={searchResults}
               locationSlug={locationSlug}
-              locationLabel={locationData.city ?? null}
+              locationLabel={locationData.city ?? cityLabel ?? null}
               filters={filters}
               onClear={clearSearch}
             />
@@ -165,15 +193,18 @@ export function LocationPageView({
             }
             galleryImages={galleryImages ?? locationData.event_gallery ?? []}
             locationSlug={locationSlug}
-            locationLabel={locationData.city ?? null}
+            locationLabel={locationData.city ?? cityLabel ?? null}
           />
         </>
       )}
 
       <FooterSection
         copyright={settings?.copyright}
-        logo={settings?.logo}
+        logo={typeof headerLogo === "string" ? headerLogo : settings?.logo}
         locationSlug={locationSlug}
+        contactOverride={footerContactOverride}
+        contactTheme={footerContactTheme}
+        socialLinksOverride={footerSocialLinksOverride}
       />
     </>
   );

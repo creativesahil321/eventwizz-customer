@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { VendorPublicLocationBookNow } from "@/components/shared/vendor-public-location-book-now";
 import { addCacheBusting } from "@/lib/image-utils";
-import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useSession } from "next-auth/react";
 import { logout } from "@/lib/auth/logout";
 import { cn } from "@/lib/utils";
@@ -28,8 +27,9 @@ export default function LocationSelectionHeader({
   const isPreviewMode = useIsPreviewModeFromProvider();
   const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
   const isPreviewNarrow = usePreviewNarrowLayout();
-  const { mediaVersion } = useTheme();
-  const logoSrc = logo ? addCacheBusting(logo, mediaVersion) : "";
+  // Deterministic URL (no time-based `?v=`) so SSR and client match — matches the
+  // public header/footer logos and avoids a re-download blink after hydration.
+  const logoSrc = logo ? addCacheBusting(logo) : "";
   /** Guest CTAs only in framed onboarding — `/preview/site` mirrors live auth. */
   const forceGuestAuthChrome = isPreviewMode && deviceFramesEnabled;
   /**

@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useSession } from "next-auth/react";
 import type { VenueLocation } from "@/types/api.types";
+import { LocationActiveEventsCount } from "@/components/location-selector/active-events-count";
 
 type LocationSelectorProps = {
   /**
@@ -138,7 +139,7 @@ export function LocationSelector({
           <ChevronDown className="ml-1 h-4 w-4 shrink-0" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[260px] max-w-[260px]">
+      <DropdownMenuContent align="end" className="w-[320px] max-w-[320px]">
         <div className="border-b px-4 py-2.5">
           <span className="text-xs font-medium text-muted-foreground">
             Select location
@@ -149,7 +150,7 @@ export function LocationSelector({
             key={location.id}
             onClick={() => handleLocationChange(location.id)}
             className={cn(
-              "cursor-pointer px-4 py-2.5",
+              "cursor-pointer items-start px-4 py-2.5",
               selectedLocation.id === location.id ? "bg-accent" : "",
             )}
             disabled={isPending || selectedLocation.id === location.id}
@@ -203,15 +204,21 @@ function LocationOptionContent({
   location: VenueLocation;
   selected: boolean;
 }) {
+  const activeEventsCount = location.active_events_count ?? 0;
+
   return (
-    <div className="flex w-full min-w-0 items-center justify-between gap-3">
-      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+    <div className="flex w-full min-w-0 items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <MapPin className="h-3.5 w-3.5 shrink-0 text-[var(--color-primary)]" />
         <span className="truncate text-sm font-medium">
           {toTitleCase(location.city || location.name || "")}
         </span>
+        <LocationActiveEventsCount
+          count={activeEventsCount}
+          variant="compact"
+        />
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1.5">
         {location.is_headquarters ? (
           <span className="whitespace-nowrap text-xs font-medium text-[var(--color-primary)]">
             (Head office)

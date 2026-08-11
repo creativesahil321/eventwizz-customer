@@ -98,7 +98,7 @@ export function getFriendlyLogoOptimizeErrorMessage(error: unknown): string {
   const lower = error.message.toLowerCase();
 
   if (lower.includes("logo url must use http")) {
-    return "Save your logo first, then try Optimize for header again.";
+    return "Save your logo first, then upload it again.";
   }
 
   if (lower.includes("no logo available")) {

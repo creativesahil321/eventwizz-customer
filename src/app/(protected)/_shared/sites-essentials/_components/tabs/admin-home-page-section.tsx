@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
-import { Loader2, MapPin, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, MapPin, Plus, Trash2 } from "lucide-react";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
 import {
   HOME_BODY_MAX_TEXT_CHARS,
@@ -59,11 +59,7 @@ import {
   LOGO_SUPPORTED_FORMATS_LABEL,
   LOGO_UPLOAD_HINT,
 } from "@/lib/logo/supported-formats";
-import {
-  isLocalLogoUrl,
-  optimizeLogoFromSources,
-} from "@/lib/logo/optimize-logo-from-sources";
-import { getFriendlyLogoOptimizeErrorMessage } from "@/lib/logo/logo-process-notices";
+import { isLocalLogoUrl } from "@/lib/logo/optimize-logo-from-sources";
 
 /** Character-counted single-line text field. */
 function TextField({
@@ -408,13 +404,14 @@ function PartnerLogoField({
   index: number;
   readOnly?: boolean;
 }) {
-  const { watch, setValue, getValues } = useFormContext<SiteEssentialsFormValues>();
+  const { watch, setValue } = useFormContext<SiteEssentialsFormValues>();
   const rawValue = watch(name);
   const existingUrl =
     typeof rawValue === "string" && rawValue.trim() ? rawValue.trim() : "";
   const [files, setFiles] = useState<File[]>([]);
-  const { processUpload, reprocessExistingUrl, isProcessing } =
-    useLogoUploadProcessor({ headerBackgroundColor: PARTNER_LOGO_PREVIEW_BG });
+  const { processUpload, isProcessing } = useLogoUploadProcessor({
+    headerBackgroundColor: PARTNER_LOGO_PREVIEW_BG,
+  });
 
   const handleChange = async (next: File[]) => {
     if (!next[0]) return;
@@ -423,34 +420,6 @@ function PartnerLogoField({
     revokeFilePreview(files[0]);
     setFiles([fileWithPreview]);
     setValue(name, fileWithPreview, { shouldDirty: true });
-  };
-
-  const handleOptimize = async () => {
-    if (readOnly || isProcessing) return;
-    const formValue = getValues(name);
-    const logoFile =
-      files[0] ?? (formValue instanceof File ? formValue : null);
-    if (!logoFile && !existingUrl) return;
-
-    try {
-      const processed = await optimizeLogoFromSources({
-        logoUrl: existingUrl || undefined,
-        logoFile,
-        processUpload,
-        reprocessExistingUrl,
-      });
-      if (!processed) return;
-      revokeFilePreview(files[0]);
-      const fileWithPreview = ensureFilePreview(processed);
-      setFiles([fileWithPreview]);
-      setValue(name, fileWithPreview, { shouldDirty: true });
-    } catch (error) {
-      console.error("Partner logo optimize failed:", error);
-      const { toast } = await import("sonner");
-      toast.message("Could not optimize logo", {
-        description: getFriendlyLogoOptimizeErrorMessage(error),
-      });
-    }
   };
 
   const handleRemove = () => {
@@ -493,27 +462,14 @@ function PartnerLogoField({
                 className="h-14 w-full object-contain"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                disabled={readOnly || isProcessing}
-                onClick={() => void handleOptimize()}
-              >
-                <Sparkles className="mr-1 h-3 w-3" />
-                Optimize
-              </Button>
-              <button
-                type="button"
-                disabled={readOnly}
-                onClick={handleRemove}
-                className="text-red-500 text-xs underline disabled:pointer-events-none disabled:opacity-50"
-              >
-                Remove
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={handleRemove}
+              className="text-red-500 text-xs underline disabled:pointer-events-none disabled:opacity-50"
+            >
+              Remove
+            </button>
           </div>
         ) : (
           <FileUploader

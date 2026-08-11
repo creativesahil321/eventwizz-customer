@@ -36,7 +36,10 @@ type DuplicateLocationFieldsProps = {
 };
 
 function formatLocationOptionLabel(location: VenueLocation): string {
-  return location.city?.trim() || location.name?.trim() || `Location ${location.id}`;
+  const label =
+    location.city?.trim() || location.name?.trim() || `Location ${location.id}`;
+  const count = location.active_events_count ?? 0;
+  return `${label} · ${count} active`;
 }
 
 function applyExistingLocation(

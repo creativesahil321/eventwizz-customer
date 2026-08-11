@@ -41,12 +41,10 @@ import {
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
 import { useSiteEssentialsQuery } from "../../_lib/queries";
 import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
 import { ensureFilePreview, revokeFilePreview } from "@/lib/file-preview";
-import { Button } from "@/components/ui/button";
-import { optimizeLogoFromSources, isLocalLogoUrl } from "@/lib/logo/optimize-logo-from-sources";
-import { getFriendlyLogoOptimizeErrorMessage } from "@/lib/logo/logo-process-notices";
+import { isLocalLogoUrl } from "@/lib/logo/optimize-logo-from-sources";
 import {
   LOGO_SUPPORTED_ACCEPT,
   LOGO_SUPPORTED_FORMATS_LABEL,
@@ -168,7 +166,7 @@ export function BrandingTab({
   const headerBackgroundColor =
     useWatch({ control: form.control, name: "colors.header" }) ??
     defaultThemeConstants.colors.header;
-  const { processUpload: processLogoUpload, reprocessExistingUrl, isProcessing: isProcessingLogo } =
+  const { processUpload: processLogoUpload, isProcessing: isProcessingLogo } =
     useLogoUploadProcessor({ headerBackgroundColor });
 
   // File objects for new uploads
@@ -320,39 +318,6 @@ export function BrandingTab({
     setLogoFiles([fileWithPreview]);
     setLogoUrl("");
     form.setValue("logo", fileWithPreview);
-  };
-
-  const handleOptimizeExistingLogo = async () => {
-    if (readOnly || isProcessingLogo) return;
-
-    const formLogo = form.getValues("logo");
-    const logoFile =
-      logoFiles[0] ?? (formLogo instanceof File ? formLogo : null);
-
-    if (!logoFile && !logoUrl) return;
-
-    try {
-      const processed = await optimizeLogoFromSources({
-        logoUrl: logoUrl || undefined,
-        logoFile,
-        processUpload: processLogoUpload,
-        reprocessExistingUrl,
-      });
-
-      if (!processed) return;
-
-      revokeFilePreview(logoFiles[0]);
-      const fileWithPreview = ensureFilePreview(processed);
-      setLogoFiles([fileWithPreview]);
-      setLogoUrl("");
-      form.setValue("logo", fileWithPreview);
-    } catch (error) {
-      console.error("Logo optimize failed:", error);
-      const { toast } = await import("sonner");
-      toast.message("Could not optimize logo", {
-        description: getFriendlyLogoOptimizeErrorMessage(error),
-      });
-    }
   };
 
   const handleFaviconFileChange = (files: File[]) => {
@@ -678,26 +643,14 @@ export function BrandingTab({
                           className="max-h-40 w-full object-contain"
                         />
                       </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={readOnly || isProcessingLogo}
-                          onClick={() => void handleOptimizeExistingLogo()}
-                        >
-                          <Sparkles className="mr-1.5 h-4 w-4" />
-                          Optimize for header
-                        </Button>
-                        <button
-                          type="button"
-                          disabled={readOnly}
-                          onClick={handleRemoveLogo}
-                          className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
-                        >
-                          Remove Logo
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        disabled={readOnly}
+                        onClick={handleRemoveLogo}
+                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        Remove Logo
+                      </button>
                     </div>
                   ) : logoFiles.length > 0 ? (
                     <div className="space-y-2">
@@ -714,26 +667,14 @@ export function BrandingTab({
                           className="max-h-40 w-full object-contain"
                         />
                       </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={readOnly || isProcessingLogo}
-                          onClick={() => void handleOptimizeExistingLogo()}
-                        >
-                          <Sparkles className="mr-1.5 h-4 w-4" />
-                          Optimize for header
-                        </Button>
-                        <button
-                          type="button"
-                          disabled={readOnly}
-                          onClick={handleRemoveLogo}
-                          className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
-                        >
-                          Remove Logo
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        disabled={readOnly}
+                        onClick={handleRemoveLogo}
+                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        Remove Logo
+                      </button>
                     </div>
                   ) : (
                     <FileUploader

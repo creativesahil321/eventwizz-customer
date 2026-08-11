@@ -7,7 +7,6 @@ import React, {
   lazy,
   Suspense,
   useRef,
-  type CSSProperties,
 } from "react";
 import { useFormContext } from "../form-provider";
 import { OnboardingFormData, type StepFiveType } from "../form-provider/schema";
@@ -21,16 +20,13 @@ import {
 import { OnboardingPreviewHeader } from "./onboarding-preview-header";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
-import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
-import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
-import { LocationPageHeroSearchPreview } from "@/app/(public)/vendor/_components/LocationPage/location-page-hero-search";
+import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview";
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { EventHeroBand } from "@/components/public/event-hero-band";
 import { EventRoomChooser } from "@/components/public/event-room-chooser";
 import { RoomContentTransition } from "@/components/public/room-content-transition";
-import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { Image as ImageIcon } from "lucide-react";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { normalizeSlug } from "@/lib/utils";
@@ -751,119 +747,34 @@ export default function FormPreview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formState.stepNine?.faqs, formTick]);
 
-  // Render homepage preview (step 2) — same structure as `/[locationSlug]` + Site Essentials preview
+  // Homepage preview (step 2) — same LocationPageView shell as live + Site Essentials
   const renderStepTwoPreview = () => {
     const tv = tryThemePreviewValues;
     if (!tv) return null;
 
-    const useGradientBg = Boolean(
-      tv.colors?.background?.includes("linear-gradient"),
-    );
-    const mainBandStyle: CSSProperties = useGradientBg
-      ? { background: tv.colors?.background }
-      : {};
-    const mainBandClass = useGradientBg
-      ? "bg-none text-[var(--color-text)] font-body"
-      : "bg-[var(--color-background)] text-[var(--color-text)] font-body";
-
-    const sectionPopular =
-      (typeof tv.event_title_1 === "string" && tv.event_title_1.trim()) ||
-      "Popular Events";
-    const sectionUpcoming =
-      (typeof tv.event_title_2 === "string" && tv.event_title_2.trim()) ||
-      "Upcoming Events";
-    const galleryTitle =
-      (typeof tv.event_gallery_title === "string" &&
-        tv.event_gallery_title.trim()) ||
-      "Recent Events Glimpse";
-
-    const getMediaPreviewUrl = (
-      value: string | File | null | undefined,
-    ): string | null => {
-      if (!value) return null;
-      if (typeof value === "string") return value;
-      if (value instanceof File) return URL.createObjectURL(value);
-      return null;
-    };
-
-    const venueLabel = formState.stepOne?.name?.trim() || null;
+    const heroHighlight =
+      activeField &&
+      (activeField.includes("cover_image") ||
+        activeField.includes("banner_heading") ||
+        activeField.includes("banner_sub_heading"));
+    const aboutHighlight =
+      activeField &&
+      (activeField.includes("about_title") ||
+        activeField.includes("about_description"));
 
     return (
-      <div className="event-detail-page">
-        <OnboardingPreviewHeader
+      <div
+        className={`event-detail-page transition-all duration-300 ${
+          heroHighlight || aboutHighlight
+            ? "ring-2 ring-primary ring-opacity-50"
+            : ""
+        }`}
+      >
+        <div ref={heroRef} className="contents" />
+        <div ref={aboutRef} className="contents" />
+        <SitePreview
+          formValues={tv}
           scrollContainerRef={previewContainerRef}
-          contact_number={formState.stepOne?.contact_number || ""}
-          logo={formState.stepTwo?.logo || null}
-        />
-
-        <div
-          ref={heroRef}
-          className={`transition-all duration-300 ${
-            activeField &&
-            (activeField.includes("cover_image") ||
-              activeField.includes("banner_heading") ||
-              activeField.includes("banner_sub_heading"))
-              ? "ring-2 ring-primary ring-opacity-50"
-              : ""
-          }`}
-        >
-          <HeroBanner
-            locationName={venueLabel || undefined}
-            coverImage={getMediaPreviewUrl(formState.stepTwo?.cover_image)}
-            coverVideo={null}
-            bannerHeading={formState.stepTwo?.banner_heading ?? undefined}
-            bannerSubHeading={
-              formState.stepTwo?.banner_sub_heading ?? undefined
-            }
-            bannerHeadingAccent={tryHeroPreviewProps?.bannerHeadingAccent}
-            headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
-            bannerHeadingAlign={
-              tryHeroPreviewProps?.bannerHeadingAlign ?? undefined
-            }
-            bannerHeadingValign={
-              tryHeroPreviewProps?.bannerHeadingValign ?? undefined
-            }
-            heroFooter={
-              <LocationPageHeroSearchPreview cityLabel={venueLabel} />
-            }
-          />
-        </div>
-
-        <LocationMarketingBody
-          className={mainBandClass}
-          style={mainBandStyle}
-          experience={
-            <div
-              ref={aboutRef}
-              className={`transition-all duration-300 ${
-                activeField &&
-                (activeField.includes("about_title") ||
-                  activeField.includes("about_description"))
-                  ? "ring-2 ring-primary ring-opacity-50"
-                  : ""
-              }`}
-            >
-              <ExperienceSection
-                aboutTitle={formState.stepTwo?.about_title || ""}
-                aboutDescription={formState.stepTwo?.about_description || ""}
-              />
-            </div>
-          }
-          latestEvents={[]}
-          upcomingEvents={[]}
-          popularSectionTitle={sectionPopular}
-          upcomingSectionTitle={sectionUpcoming}
-          galleryTitle={galleryTitle}
-          galleryImages={[]}
-          locationSlug=""
-          locationLabel={venueLabel}
-        />
-
-        <FooterSection
-          copyright={tv.copyright}
-          logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
-          contactOverride={onboardingFooterContact}
-          socialLinksOverride={onboardingFooterSocialLinks}
         />
       </div>
     );

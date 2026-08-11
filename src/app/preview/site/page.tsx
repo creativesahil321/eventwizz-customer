@@ -903,8 +903,9 @@ export default function SitePreviewPage() {
           : undefined
       }
     >
-      <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-[var(--color-background)] pb-[9.5rem] sm:pb-28">
-        {/* Overlay only — do not pad the site down (that made the preview feel smaller than live). */}
+      <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-[var(--color-background)]">
+        {/* Top/bottom chrome overlays the site — clearance lives on the footer (footer bg)
+            so we never leave a light gap under a dark footer. */}
         <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex items-start px-4 pt-4 sm:px-6">
           <Button
             variant="event-primary"
@@ -969,6 +970,7 @@ export default function SitePreviewPage() {
             brandName={resolvedGlobalData.name?.trim() || "Site preview"}
             onSaveTheme={handleSaveTheme}
             isSavingTheme={isSaving}
+            showHeroLayoutControls={effectiveReviewStep === "location"}
             sheetDescription={
               previewRequiresSave
                 ? "Adjust colors or fonts. Approve each location page, then save."

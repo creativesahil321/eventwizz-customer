@@ -31,6 +31,8 @@ export interface Location {
   slug: string;
   is_default: boolean;
   is_headquarters?: boolean;
+  /** Live/active events currently tied to this location */
+  active_events_count?: number;
   created_at?: string;
   updated_at?: string;
 }

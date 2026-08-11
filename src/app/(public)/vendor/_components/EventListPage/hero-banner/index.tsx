@@ -19,8 +19,6 @@ import {
   type BannerHeadingAlign,
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
-import { addCacheBusting } from "@/lib/image-utils";
-import { useTheme } from "@/providers/theme-provider/ThemeContext";
 // Default fallback media
 // const FALLBACK_VIDEO_URL =
 //   "https://www.bestpartiesever.com/wp-content/uploads/2025/03/Website-video-combined-edit-online-video-cutter.com-1.mp4";
@@ -76,8 +74,6 @@ export default function HeroBanner({
 }: HeroBannerProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
   const vendorTheme = theme as ThemeSchema | null;
-  // Same storage path is often reused after save — bust browser cache like logo/favicon.
-  const { mediaVersion } = useTheme();
 
   // Get banner content from theme or use defaults - with API data taking priority
   const bannerHeading =
@@ -129,8 +125,9 @@ export default function HeroBanner({
       !imageExplicitlyCleared);
 
   const finalVideoUrl = apiVideoUrl || themeVideoUrl || FALLBACK_VIDEO_URL;
-  const rawImageUrl = apiImageUrl || themeImageUrl || DEFAULT_IMAGE_URL;
-  const finalImageUrl = addCacheBusting(rawImageUrl, mediaVersion);
+  // LCP hero: deterministic URL (no time-based `?v=`) so SSR and client match and the
+  // <img>/preload is not re-downloaded after hydration (that swap is the flash).
+  const finalImageUrl = apiImageUrl || themeImageUrl || DEFAULT_IMAGE_URL;
 
   const textAlign = normalizeBannerHeadingAlign(
     bannerHeadingAlignProp !== undefined && bannerHeadingAlignProp !== null

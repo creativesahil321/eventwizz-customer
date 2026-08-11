@@ -3,8 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "nextjs-toploader/app";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
-import { addCacheBusting } from "@/lib/image-utils";
-import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useThemeQuery } from "@/hooks/use-theme-query";
 import { SingleLocationHome } from "./_components/single-location-home";
 import { VendorMainLandingView } from "./_components/LocationPage/vendor-main-landing-view";
@@ -14,8 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function VendorSiteHomePage() {
   const router = useRouter();
   const { domain, settings, isLoading: isDomainLoading } = useDomain();
-  // Backend often overwrites cover at the same path — version the URL like logo/favicon.
-  const { mediaVersion } = useTheme();
   const { data: liveTheme } = useThemeQuery(domain, settings);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -33,8 +29,12 @@ export default function VendorSiteHomePage() {
       settings?.main_landing_cover_image ??
       liveTheme?.cover_image ??
       settings?.cover_image;
+    // LCP hero: keep the URL deterministic so SSR HTML and the client render match.
+    // A time-based `?v=` (query dataUpdatedAt) differs between server and client and
+    // forces the <img>/preload to re-download after hydration = a visible flash.
+    // Any backend-provided version query in `cover` is preserved as-is.
     if (typeof cover === "string" && cover.trim().length > 0) {
-      return addCacheBusting(cover.trim(), mediaVersion);
+      return cover.trim();
     }
     return "/assets/images/Homepage/Homepage-Banner.png";
   }, [
@@ -42,7 +42,6 @@ export default function VendorSiteHomePage() {
     liveTheme?.cover_image,
     settings?.main_landing_cover_image,
     settings?.cover_image,
-    mediaVersion,
   ]);
 
   const heroHeading = useMemo(() => {

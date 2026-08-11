@@ -10,6 +10,15 @@ export const LOGO_WHITE_THRESHOLD = 235;
 /** Extra tolerance when matching flat bright backgrounds. */
 export const LOGO_WHITE_FUZZ = 18;
 
+/**
+ * Max RGB Euclidean distance when flood-filling a sampled solid border color
+ * (cream, beige, light grey, etc.).
+ */
+export const LOGO_BORDER_COLOR_DISTANCE = 48;
+
+/** Min share of border pixels that must agree on one color bucket. */
+export const LOGO_BORDER_COLOR_CONFIDENCE = 0.55;
+
 /** Pixels at or below this RGB value are treated as flat black background. */
 export const LOGO_BLACK_THRESHOLD = 20;
 

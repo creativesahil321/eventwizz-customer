@@ -14,7 +14,10 @@ import {
 type UsePublicSearchFiltersOptions = {
   /** Sync q/city/date to the URL (live pages). Off for Site Essentials previews. */
   syncUrl?: boolean;
-  /** When set, city is locked and never written to the URL. */
+  /**
+   * Location pages: city is shown as a locked chip only.
+   * Must NOT count as an active search filter (or browse mode never shows).
+   */
   lockedCity?: string | null;
 };
 
@@ -26,6 +29,7 @@ export function usePublicSearchFilters(
   options: UsePublicSearchFiltersOptions = {},
 ) {
   const { syncUrl = false, lockedCity = null } = options;
+  const cityIsLocked = Boolean(lockedCity);
 
   const [urlState, setUrlState] = useQueryStates(
     {
@@ -41,22 +45,25 @@ export function usePublicSearchFilters(
 
   const filters: LocationSearchFilters = useMemo(() => {
     if (!syncUrl) {
-      return lockedCity
-        ? { ...localFilters, city: lockedCity }
-        : localFilters;
+      return {
+        ...localFilters,
+        // Locked city is UI chrome only — keep filter city null so search mode
+        // activates on query/date, not merely opening a location page.
+        city: cityIsLocked ? null : localFilters.city,
+      };
     }
     return {
       query: urlState.q ?? "",
-      city: lockedCity ?? urlState.city,
+      city: cityIsLocked ? null : urlState.city,
       date: parseSearchDateParam(urlState.date),
     };
-  }, [syncUrl, localFilters, urlState, lockedCity]);
+  }, [syncUrl, localFilters, urlState, cityIsLocked]);
 
   const setFilters = useCallback(
     (next: LocationSearchFilters) => {
       const normalized: LocationSearchFilters = {
         query: next.query,
-        city: lockedCity ?? next.city,
+        city: cityIsLocked ? null : next.city,
         date: next.date,
       };
 
@@ -67,11 +74,11 @@ export function usePublicSearchFilters(
 
       void setUrlState({
         q: normalized.query.trim() ? normalized.query : null,
-        city: lockedCity ? null : normalized.city,
+        city: cityIsLocked ? null : normalized.city,
         date: toSearchDateParam(normalized.date) ?? null,
       });
     },
-    [lockedCity, setUrlState, syncUrl],
+    [cityIsLocked, setUrlState, syncUrl],
   );
 
   const clearFilters = useCallback(() => {

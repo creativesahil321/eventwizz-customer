@@ -109,11 +109,15 @@ function isLocationArray(value: unknown): value is ApiVenueLocation[] {
 // Shared function to normalize location data
 const normalizeLocation = (location: unknown): ApiVenueLocation => {
   const loc = location as Record<string, unknown>;
+  const activeEventsCount = Number(loc.active_events_count);
   return {
     ...loc,
     is_default: Boolean(loc.is_default),
     is_headquarters: Boolean(loc.is_headquarters),
     status: loc.status !== undefined ? Boolean(loc.status) : undefined,
+    active_events_count: Number.isFinite(activeEventsCount)
+      ? activeEventsCount
+      : 0,
     deleted_at: loc.deleted_at || undefined,
   } as unknown as ApiVenueLocation;
 };

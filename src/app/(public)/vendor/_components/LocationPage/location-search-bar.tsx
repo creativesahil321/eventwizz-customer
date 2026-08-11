@@ -40,6 +40,8 @@ export type SearchAvailabilityScope = {
 
 export type LocationSearchBarProps = {
   cities?: string[];
+  /** Optional event counts keyed by city name (same labels as `cities`). */
+  cityEventCounts?: Record<string, number>;
   id?: string;
   className?: string;
   value: LocationSearchFilters;
@@ -75,6 +77,7 @@ function clampAvailabilityRange(month: Date): { from: string; to: string } {
  */
 export function LocationSearchBar({
   cities = [],
+  cityEventCounts,
   id,
   className,
   value,
@@ -256,7 +259,7 @@ export function LocationSearchBar({
                 </PopoverTrigger>
                 <PopoverContent
                   align="start"
-                  className="w-56 p-1.5"
+                  className="w-64 p-1.5"
                   style={{
                     background: "var(--color-surface)",
                     color: "var(--color-text)",
@@ -276,6 +279,7 @@ export function LocationSearchBar({
                     <CityOption
                       key={option}
                       label={option}
+                      eventCount={cityEventCounts?.[option]}
                       selected={value.city === option}
                       onSelect={() => {
                         patch({ city: option });
@@ -401,13 +405,20 @@ export function LocationSearchBar({
 
 function CityOption({
   label,
+  eventCount,
   selected,
   onSelect,
 }: {
   label: string;
+  eventCount?: number;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const showCount = typeof eventCount === "number" && Number.isFinite(eventCount);
+  const eventLabel = showCount
+    ? `${eventCount} event${eventCount === 1 ? "" : "s"}`
+    : null;
+
   return (
     <button
       type="button"
@@ -420,6 +431,11 @@ function CityOption({
       )}
     >
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {eventLabel ? (
+        <span className="shrink-0 rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--color-primary-foreground)]">
+          {eventLabel}
+        </span>
+      ) : null}
       {selected ? (
         <Check className="h-3.5 w-3.5 shrink-0 text-[var(--color-primary)]" />
       ) : null}

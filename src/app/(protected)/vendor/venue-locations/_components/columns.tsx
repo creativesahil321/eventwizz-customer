@@ -175,6 +175,28 @@ export const getColumns = ({
     },
   },
   {
+    accessorKey: "active_events_count",
+    header: ({ column }) => (
+      <DataTableColumnHeader
+        className="text-foreground"
+        column={column}
+        title="Active Events"
+      />
+    ),
+    cell: ({ row }) => {
+      const count = row.original.active_events_count ?? 0;
+      return (
+        <span className="text-sm tabular-nums text-foreground">{count}</span>
+      );
+    },
+    enableSorting: true,
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.active_events_count ?? 0;
+      const b = rowB.original.active_events_count ?? 0;
+      return a - b;
+    },
+  },
+  {
     accessorKey: "created_at",
     header: ({ column }) => (
       <DataTableColumnHeader

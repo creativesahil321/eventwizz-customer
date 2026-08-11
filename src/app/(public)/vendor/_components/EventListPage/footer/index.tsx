@@ -261,7 +261,14 @@ export default function FooterSection({
     (singleContact.phone || singleContact.address || singleContact.email);
 
   return (
-    <footer className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)] bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
+    <footer
+      className={cn(
+        "border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)] bg-[color:var(--color-footer)] text-[var(--color-on-footer)]",
+        // Site preview review chrome is fixed at the bottom — pad with footer color
+        // so copyright stays readable and no light strip shows under the footer.
+        isPreviewMode && "pb-[9.5rem] sm:pb-28",
+      )}
+    >
       <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-8">
         <div className="flex flex-col items-center text-center">
           <FooterBrand

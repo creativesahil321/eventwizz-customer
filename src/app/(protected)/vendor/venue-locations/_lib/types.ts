@@ -41,6 +41,8 @@ export interface VenueLocation {
   /** Fixed head office — does not change when switching working location */
   is_headquarters?: boolean;
   status?: boolean; // Dynamic status field: true = Active, false = Inactive
+  /** Live/active events currently tied to this location */
+  active_events_count?: number;
   created_at?: string;
   updated_at?: string;
 }

@@ -22,6 +22,7 @@ import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { LocationActiveEventsCount } from "@/components/location-selector/active-events-count";
 
 interface LocationSelectorModalProps {
   isOpen: boolean;
@@ -189,8 +190,10 @@ export function LocationSelectorModal({
                     <div className="text-sm text-gray-500 mt-1">
                       {location.city || ""}
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      ID: {location.id}
+                    <div className="mt-1.5">
+                      <LocationActiveEventsCount
+                        count={location.active_events_count}
+                      />
                     </div>
                   </div>
                 ))

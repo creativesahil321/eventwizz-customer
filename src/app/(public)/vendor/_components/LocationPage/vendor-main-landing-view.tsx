@@ -165,6 +165,18 @@ export function VendorMainLandingView({
     ? locations.length
     : filteredLocations.length;
 
+  const cityEventCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const location of locations) {
+      const city = location.city?.trim();
+      if (!city) continue;
+      const next =
+        typeof location.total_events === "number" ? location.total_events : 0;
+      counts[city] = (counts[city] ?? 0) + next;
+    }
+    return counts;
+  }, [locations]);
+
   useEffect(() => {
     const checkCompact = () => {
       const compact = window.innerWidth < 1280;
@@ -295,6 +307,7 @@ export function VendorMainLandingView({
             <LocationSearchBar
               className="w-full max-w-3xl px-0"
               cities={locations.map((location) => location.city)}
+              cityEventCounts={cityEventCounts}
               value={filters}
               onChange={setFilters}
               onSearch={scrollToResults}

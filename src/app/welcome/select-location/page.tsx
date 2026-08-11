@@ -34,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { logout } from "@/lib/auth/logout";
 import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
+import { LocationActiveEventsCount } from "@/components/location-selector/active-events-count";
 
 export default function WelcomeLocationSelectionPage() {
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
@@ -188,7 +189,13 @@ export default function WelcomeLocationSelectionPage() {
                     <p className="text-white text-sm font-medium truncate leading-tight">
                       {selectedLocation.city || selectedLocation.name}
                     </p>
-                    <p className="text-white/50 text-xs">currently selected</p>
+                    <p className="text-white/50 text-xs">
+                      currently selected ·{" "}
+                      {selectedLocation.active_events_count ?? 0} active event
+                      {(selectedLocation.active_events_count ?? 0) === 1
+                        ? ""
+                        : "s"}
+                    </p>
                   </div>
                 </div>
               )}
@@ -433,10 +440,10 @@ export default function WelcomeLocationSelectionPage() {
                           <p className="text-xs text-muted-foreground truncate mb-2">
                             {location.address || location.name || "—"}
                           </p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              # {location.slug}
-                            </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <LocationActiveEventsCount
+                              count={location.active_events_count}
+                            />
                             {isSelected && (
                               <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--color-primary)]">
                                 <CheckCircle2 className="h-3.5 w-3.5" />

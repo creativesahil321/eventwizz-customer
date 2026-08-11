@@ -121,6 +121,11 @@ type PreviewThemeCustomizerProps = {
   /** Event preview: write Try theme → Site Essentials (API). Renders “Save theme” in this panel. */
   onSaveTheme?: () => void | Promise<void>;
   isSavingTheme?: boolean;
+  /**
+   * Location-page hero align/valign only — hide on multi-location main Home.
+   * Default true so single-location / event previews keep the controls.
+   */
+  showHeroLayoutControls?: boolean;
   /** Rendered at the bottom of the panel — e.g. the editor injects Restore default theme here. */
   footerSlot?: ReactNode;
 };
@@ -147,6 +152,7 @@ export function PreviewThemeCustomizer({
   sheetDescription,
   onSaveTheme,
   isSavingTheme = false,
+  showHeroLayoutControls = true,
   footerSlot,
 }: PreviewThemeCustomizerProps) {
   const canPersistSiteEssentials = usePermission("update-site-essential");
@@ -484,89 +490,101 @@ export function PreviewThemeCustomizer({
 
           <ScrollArea className="flex-1 min-h-0">
             <div className="space-y-6 px-4 py-4 pb-8">
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Hero horizontal
-                </h3>
-                <div
-                  className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
-                  role="group"
-                  aria-label="Hero text alignment"
-                >
-                  {(
-                    [
-                      { v: "left" as const, Icon: AlignLeft, label: "Left" },
-                      {
-                        v: "center" as const,
-                        Icon: AlignCenter,
-                        label: "Center",
-                      },
-                      { v: "right" as const, Icon: AlignRight, label: "Right" },
-                    ] as const
-                  ).map(({ v, Icon, label }) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => applyHeroAlign(v)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        currentHeroAlign === v
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-600 hover:text-slate-900",
-                      )}
+              {showHeroLayoutControls ? (
+                <>
+                  <div>
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Hero horizontal
+                    </h3>
+                    <div
+                      className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
+                      role="group"
+                      aria-label="Hero text alignment"
                     >
-                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      {(
+                        [
+                          {
+                            v: "left" as const,
+                            Icon: AlignLeft,
+                            label: "Left",
+                          },
+                          {
+                            v: "center" as const,
+                            Icon: AlignCenter,
+                            label: "Center",
+                          },
+                          {
+                            v: "right" as const,
+                            Icon: AlignRight,
+                            label: "Right",
+                          },
+                        ] as const
+                      ).map(({ v, Icon, label }) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => applyHeroAlign(v)}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                            currentHeroAlign === v
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-600 hover:text-slate-900",
+                          )}
+                        >
+                          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Hero vertical
-                </h3>
-                <div
-                  className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
-                  role="group"
-                  aria-label="Hero vertical position"
-                >
-                  {(
-                    [
-                      {
-                        v: "top" as const,
-                        Icon: AlignVerticalJustifyStart,
-                        label: "Top",
-                      },
-                      {
-                        v: "center" as const,
-                        Icon: AlignVerticalJustifyCenter,
-                        label: "Middle",
-                      },
-                      {
-                        v: "bottom" as const,
-                        Icon: AlignVerticalJustifyEnd,
-                        label: "Bottom",
-                      },
-                    ] as const
-                  ).map(({ v, Icon, label }) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => applyHeroValign(v)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        currentHeroValign === v
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-600 hover:text-slate-900",
-                      )}
+                  <div>
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Hero vertical
+                    </h3>
+                    <div
+                      className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
+                      role="group"
+                      aria-label="Hero vertical position"
                     >
-                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      {(
+                        [
+                          {
+                            v: "top" as const,
+                            Icon: AlignVerticalJustifyStart,
+                            label: "Top",
+                          },
+                          {
+                            v: "center" as const,
+                            Icon: AlignVerticalJustifyCenter,
+                            label: "Middle",
+                          },
+                          {
+                            v: "bottom" as const,
+                            Icon: AlignVerticalJustifyEnd,
+                            label: "Bottom",
+                          },
+                        ] as const
+                      ).map(({ v, Icon, label }) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => applyHeroValign(v)}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                            currentHeroValign === v
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-600 hover:text-slate-900",
+                          )}
+                        >
+                          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : null}
 
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -608,127 +626,22 @@ export function PreviewThemeCustomizer({
               </div>
 
               <div>
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Try other fonts
-                  </h3>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-slate-500"
-                    onClick={handleReset}
-                    title="Reset to when you opened this panel"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Accordion
-                  type="multiple"
-                  defaultValue={["modern", "classic"]}
-                  className="w-full"
-                >
-                  {groupedFontGridOptions.map((group) => (
-                    <AccordionItem
-                      key={group.key}
-                      value={group.key}
-                      className="border-slate-200/80"
-                    >
-                      <AccordionTrigger className="py-2 text-xs text-slate-700 hover:no-underline">
-                        <span className="flex w-full items-center justify-between gap-3">
-                          <span className="font-semibold">{group.label}</span>
-                          <span className="shrink-0 text-[10px] font-medium text-slate-500">
-                            {group.items.length}
-                          </span>
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="pt-0 pb-3">
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                          {group.items.map((opt) => {
-                            const active =
-                              currentFontKey ===
-                              siteEssentialsFontPairKey({
-                                fontFamily: {
-                                  heading: opt.headingStack,
-                                  body: opt.bodyStack,
-                                },
-                              });
-                            const pinned =
-                              tryThemeFontGridOptionStorageKey(opt) ===
-                              lastFontKey;
-                            const showRecent = pinned && !active;
-                            return (
-                              <button
-                                key={
-                                  opt.source === "preset"
-                                    ? opt.id
-                                    : `extra-${opt.key}`
-                                }
-                                type="button"
-                                aria-current={active ? "true" : undefined}
-                                onClick={() => applyFontGridOption(opt)}
-                                className={cn(
-                                  "relative flex min-h-[5.75rem] flex-col items-center justify-center rounded-xl border p-2 text-center transition-all duration-200",
-                                  active ? "pt-6" : "",
-                                  active
-                                    ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
-                                    : "border-slate-200/90 bg-slate-50/80 hover:border-slate-300 hover:bg-white hover:shadow-sm",
-                                )}
-                                title={
-                                  opt.tagline
-                                    ? `${opt.headingFontLabel} / ${opt.bodyFontLabel}\n\n${opt.tagline}`
-                                    : `${opt.headingFontLabel} / ${opt.bodyFontLabel}`
-                                }
-                              >
-                                {active ? (
-                                  <span className="absolute left-1/2 top-1.5 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-2 py-0.5 text-[9px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-                                    <span
-                                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
-                                      aria-hidden
-                                    />
-                                    In use
-                                  </span>
-                                ) : null}
-                                {showRecent ? (
-                                  <span
-                                    className="absolute right-1 top-1 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
-                                    title="Last picked this session"
-                                  >
-                                    Recent
-                                  </span>
-                                ) : null}
-                                <span
-                                  className="text-lg font-semibold leading-none text-slate-800"
-                                  style={{ fontFamily: opt.headingStack }}
-                                >
-                                  Aa
-                                </span>
-                                <span
-                                  className="mt-1 line-clamp-1 px-0.5 text-[9px] font-medium text-slate-600"
-                                  style={{ fontFamily: opt.bodyStack }}
-                                >
-                                  {opt.bodyFontLabel}
-                                </span>
-                                {opt.tagline ? (
-                                  <span className="mt-0.5 line-clamp-2 px-0.5 text-[7px] leading-tight text-slate-400">
-                                    {opt.tagline}
-                                  </span>
-                                ) : null}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
-
-              <div>
                 <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Try other colors
-                  </h3>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Try other colors
+                    </h3>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-slate-500"
+                      onClick={handleReset}
+                      title="Reset to when you opened this panel"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <div
                     className="flex flex-wrap gap-1"
                     role="group"
@@ -875,6 +788,111 @@ export function PreviewThemeCustomizer({
                                 <span className="line-clamp-2 w-full text-center text-[8px] leading-snug text-slate-500">
                                   {opt.tagline}
                                 </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Try other fonts
+                </h3>
+                <Accordion
+                  type="multiple"
+                  defaultValue={["modern", "classic"]}
+                  className="w-full"
+                >
+                  {groupedFontGridOptions.map((group) => (
+                    <AccordionItem
+                      key={group.key}
+                      value={group.key}
+                      className="border-slate-200/80"
+                    >
+                      <AccordionTrigger className="py-2 text-xs text-slate-700 hover:no-underline">
+                        <span className="flex w-full items-center justify-between gap-3">
+                          <span className="font-semibold">{group.label}</span>
+                          <span className="shrink-0 text-[10px] font-medium text-slate-500">
+                            {group.items.length}
+                          </span>
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-0 pb-3">
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                          {group.items.map((opt) => {
+                            const active =
+                              currentFontKey ===
+                              siteEssentialsFontPairKey({
+                                fontFamily: {
+                                  heading: opt.headingStack,
+                                  body: opt.bodyStack,
+                                },
+                              });
+                            const pinned =
+                              tryThemeFontGridOptionStorageKey(opt) ===
+                              lastFontKey;
+                            const showRecent = pinned && !active;
+                            return (
+                              <button
+                                key={
+                                  opt.source === "preset"
+                                    ? opt.id
+                                    : `extra-${opt.key}`
+                                }
+                                type="button"
+                                aria-current={active ? "true" : undefined}
+                                onClick={() => applyFontGridOption(opt)}
+                                className={cn(
+                                  "relative flex min-h-[5.75rem] flex-col items-center justify-center rounded-xl border p-2 text-center transition-all duration-200",
+                                  active ? "pt-6" : "",
+                                  active
+                                    ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
+                                    : "border-slate-200/90 bg-slate-50/80 hover:border-slate-300 hover:bg-white hover:shadow-sm",
+                                )}
+                                title={
+                                  opt.tagline
+                                    ? `${opt.headingFontLabel} / ${opt.bodyFontLabel}\n\n${opt.tagline}`
+                                    : `${opt.headingFontLabel} / ${opt.bodyFontLabel}`
+                                }
+                              >
+                                {active ? (
+                                  <span className="absolute left-1/2 top-1.5 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-2 py-0.5 text-[9px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+                                    <span
+                                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+                                      aria-hidden
+                                    />
+                                    In use
+                                  </span>
+                                ) : null}
+                                {showRecent ? (
+                                  <span
+                                    className="absolute right-1 top-1 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
+                                    title="Last picked this session"
+                                  >
+                                    Recent
+                                  </span>
+                                ) : null}
+                                <span
+                                  className="text-lg font-semibold leading-none text-slate-800"
+                                  style={{ fontFamily: opt.headingStack }}
+                                >
+                                  Aa
+                                </span>
+                                <span
+                                  className="mt-1 line-clamp-1 px-0.5 text-[9px] font-medium text-slate-600"
+                                  style={{ fontFamily: opt.bodyStack }}
+                                >
+                                  {opt.bodyFontLabel}
+                                </span>
+                                {opt.tagline ? (
+                                  <span className="mt-0.5 line-clamp-2 px-0.5 text-[7px] leading-tight text-slate-400">
+                                    {opt.tagline}
+                                  </span>
+                                ) : null}
                               </button>
                             );
                           })}
