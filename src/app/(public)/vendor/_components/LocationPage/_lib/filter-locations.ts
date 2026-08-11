@@ -1,11 +1,15 @@
 import { isSameDay, isValid, parseISO } from "date-fns";
 import type { LocationData } from "@/types/theme.types";
+import type { LocationSearchFilters } from "./search-filters";
 
-export type LocationSearchFilters = {
-  query: string;
-  city: string | null;
-  date: Date | null;
-};
+export type { LocationSearchFilters } from "./search-filters";
+export {
+  EMPTY_SEARCH_FILTERS,
+  isSearchActive,
+  toSearchDateParam,
+  parseSearchDateParam,
+  resolveLocationSlugForCity,
+} from "./search-filters";
 
 function normalize(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
@@ -34,10 +38,8 @@ function matchesQuery(location: LocationData, query: string): boolean {
 }
 
 /**
- * Temporary client-side filter until a search API is wired.
- * City + date always apply. Free-text only narrows the list when it matches
- * real location data — otherwise it stays UI-only so unmatched queries don’t
- * wipe the grid.
+ * Client-side location filter — preview / offline fallback only.
+ * Live multi-location home uses `GET /domain/{domain}/search`.
  */
 export function filterLocations(
   locations: LocationData[],
@@ -63,11 +65,10 @@ export function filterLocations(
     matchesQuery(location, query),
   );
 
-  // Soft match: keep city/date results when the keyword has no local hits yet.
   return byQuery.length > 0 ? byQuery : byCityAndDate;
 }
 
-/** True when city/date filters can produce a hard empty state. */
+/** @deprecated Prefer `isSearchActive` — kept for older call sites. */
 export function hasHardSearchFilters(filters: LocationSearchFilters): boolean {
   return Boolean(filters.city || filters.date);
 }

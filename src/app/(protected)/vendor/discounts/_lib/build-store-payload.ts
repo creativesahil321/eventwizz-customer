@@ -4,7 +4,6 @@ import type {
   DiscountDateEntry,
   DiscountFormPayload,
   DiscountOfferPayload,
-  FlatDiscountMode,
 } from "./types";
 import {
   defaultDiscountDateEntry,
@@ -12,28 +11,23 @@ import {
   type DiscountDateFormEntry,
   type DiscountFormValues,
 } from "./schema";
+import {
+  discountOfferRows,
+  normalizeFlatMode,
+  resolveOfferIsLive,
+  resolveShowOnEventPage,
+} from "./offers";
 
-/** Normalize API / legacy flat_mode into store contract values */
-export function normalizeFlatMode(
-  mode: string | null | undefined,
-): FlatDiscountMode | null {
-  if (!mode) return null;
-  if (mode === "per_person" || mode === "flat_per_person") return "per_person";
-  if (
-    mode === "total" ||
-    mode === "on_total" ||
-    mode === "flat_on_total"
-  ) {
-    return "total";
-  }
-  return null;
-}
+/** Re-export for existing list/format imports. */
+export { normalizeFlatMode } from "./offers";
 
 function toOfferStatus(isLive: boolean | undefined): "active" | "inactive" {
   return isLive === false ? "inactive" : "active";
 }
 
-function mapDateEntryToOffer(entry: DiscountDateFormEntry): DiscountOfferPayload {
+function mapDateEntryToOffer(
+  entry: DiscountDateFormEntry,
+): DiscountOfferPayload {
   const payload: DiscountOfferPayload = {
     date_id: Number(entry.date_id) || 0,
     discount_type: entry.value_type,
@@ -57,37 +51,6 @@ function mapDateEntryToOffer(entry: DiscountDateFormEntry): DiscountOfferPayload
   return payload;
 }
 
-function offerShowOnEventPage(
-  entry: DiscountDateEntry,
-  fallback = true,
-): boolean {
-  if (typeof entry.show_on_event_page === "boolean") {
-    return entry.show_on_event_page;
-  }
-  if (typeof entry.show_on_banner === "boolean") {
-    return entry.show_on_banner;
-  }
-  return fallback;
-}
-
-function resolveDateIsLive(
-  entry: DiscountDateEntry,
-  fallbackLive: boolean,
-): boolean {
-  if (entry.is_live != null) return entry.is_live !== false;
-  if (entry.status != null) {
-    const s = String(entry.status).toLowerCase();
-    if (s === "inactive" || s === "paused" || s === "expired") return false;
-    if (s === "active") return true;
-  }
-  if (entry.stored_status != null) {
-    const s = String(entry.stored_status).toLowerCase();
-    if (s === "inactive" || s === "paused" || s === "expired") return false;
-    if (s === "active") return true;
-  }
-  return fallbackLive;
-}
-
 function apiOfferToFormEntry(
   entry: DiscountDateEntry,
   fallbackShowOnEventPage = true,
@@ -105,36 +68,16 @@ function apiOfferToFormEntry(
     valid_from: entry.valid_from ?? "",
     original_valid_from: entry.valid_from ?? "",
     expires_at: entry.expires_at ?? "",
-    show_on_banner: offerShowOnEventPage(entry, fallbackShowOnEventPage),
-    is_live: resolveDateIsLive(entry, fallbackLive),
+    show_on_banner: resolveShowOnEventPage(entry, fallbackShowOnEventPage),
+    is_live: resolveOfferIsLive(entry, fallbackLive),
   };
-}
-
-function discountOfferRows(discount: Discount): DiscountDateEntry[] {
-  if (Array.isArray(discount.offers) && discount.offers.length > 0) {
-    return discount.offers;
-  }
-  if (Array.isArray(discount.dates) && discount.dates.length > 0) {
-    return discount.dates;
-  }
-  return [];
-}
-
-function couponShowOnEventPage(discount: Discount): boolean {
-  if (typeof discount.show_on_event_page === "boolean") {
-    return discount.show_on_event_page;
-  }
-  if (typeof discount.show_on_banner === "boolean") {
-    return discount.show_on_banner;
-  }
-  return true;
 }
 
 function couponBannerSubheading(discount: Discount): string {
   return discount.banner_subheading ?? discount.dynamic_text ?? "";
 }
 
-/** Map API discount → form values (supports `offers[]`, legacy `dates[]`, or single date). */
+/** Map API discount → form values (`offers[]`, legacy `dates[]`, or single date). */
 export function discountToFormValues(discount: Discount): DiscountFormValues {
   const audience =
     discount.customer_audience === "selected" ? "selected" : "all_active";
@@ -142,7 +85,7 @@ export function discountToFormValues(discount: Discount): DiscountFormValues {
 
   const legacyLive =
     discount.status !== "inactive" && discount.status !== "expired";
-  const legacyShowOnEventPage = couponShowOnEventPage(discount);
+  const legacyShowOnEventPage = resolveShowOnEventPage(discount);
 
   let dates: DiscountDateFormEntry[] = [];
   if (!isCoupon) {
@@ -174,7 +117,6 @@ export function discountToFormValues(discount: Discount): DiscountFormValues {
   }
 
   const flatMode = normalizeFlatMode(discount.flat_mode);
-  // Coupons only support percentage or flat off total.
   const couponFlatMode =
     isCoupon && flatMode === "per_person" ? "total" : flatMode;
 
@@ -205,6 +147,10 @@ export function discountToFormValues(discount: Discount): DiscountFormValues {
 /**
  * Map wizard form values → POST /vendor/discounts/store|update body.
  * Location is sent via header `x-venue-location-id` (axios interceptor).
+ *
+ * Form aliases → API:
+ * - dates / value_type / discount_value / show_on_banner / is_live / dynamic_text
+ * → offers / discount_type / amount / show_on_event_page / status / banner_subheading
  */
 export function buildDiscountStorePayload(
   data: DiscountFormValues,
@@ -213,24 +159,20 @@ export function buildDiscountStorePayload(
   const name =
     data.name?.trim() ||
     (isCoupon ? data.coupon_code?.trim() || null : null);
-
   const eventId = Number(data.event_id) || 0;
 
   if (!isCoupon) {
-    const offers = (data.dates ?? [])
-      .filter((entry) => !isDiscountDateOfferBlank(entry))
-      .map(mapDateEntryToOffer);
-
     return {
       category: "discount",
       vendor_event_id: eventId,
       name,
-      offers,
+      offers: (data.dates ?? [])
+        .filter((entry) => !isDiscountDateOfferBlank(entry))
+        .map(mapDateEntryToOffer),
     };
   }
 
   const showOnEventPage = data.show_on_banner !== false;
-
   const payload: DiscountFormPayload = {
     category: "coupon_code",
     vendor_event_id: eventId,
@@ -253,7 +195,6 @@ export function buildDiscountStorePayload(
   };
 
   if (data.value_type === "flat") {
-    // Coupons: flat off total only (ignore legacy per_person).
     payload.flat_mode =
       data.flat_mode === "per_person" ? "total" : data.flat_mode ?? "total";
   }

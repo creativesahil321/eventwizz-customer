@@ -1,86 +1,160 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Percent, Tag, X } from "lucide-react";
+import { Check, Lock, Percent, Tag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-
-/** Dummy auto-applied event discount — replace with API later. */
-export const DUMMY_AUTO_DISCOUNT = {
-  id: "auto-midweek",
-  label: "Midweek offer",
-  detail: "10% off · selected date",
-  amount: 6,
-} as const;
-
-/** Dummy coupon codes accepted in this UI-only preview. */
-export const DUMMY_COUPONS: Record<
-  string,
-  { label: string; amount: number; kind: "percentage" | "flat" }
-> = {
-  TEA50: { label: "50% off afternoon tea", amount: 25, kind: "percentage" },
-  SAVE10: { label: "£10 off", amount: 10, kind: "flat" },
-  WELCOME: { label: "Welcome £5 off", amount: 5, kind: "flat" },
-};
+import type { CouponStripSource } from "@/lib/coupon-strip-props";
+import { parseRoomDateKey } from "../_lib/cart-calculations";
+import type { CartDateDiscountRow } from "../_lib/cart-calculations";
 
 export type CheckoutPromoApplied = {
-  autoDiscountOn: boolean;
+  /** Customer applied the event coupon code (matches `event.coupon`). */
   couponCode: string | null;
 };
 
-export function resolveCheckoutPromoTotals(promo: CheckoutPromoApplied): {
+export const DEFAULT_CHECKOUT_PROMO: CheckoutPromoApplied = {
+  couponCode: null,
+};
+
+function roundMoney(n: number): number {
+  return Math.round(Math.max(0, n) * 100) / 100;
+}
+
+/** Resolve percentage / flat amount from cart API coupon fields (+ label fallback). */
+export function computeCouponDiscountAmount(
+  coupon: CouponStripSource | null | undefined,
+  subtotal: number,
+): number {
+  if (!coupon || !(subtotal > 0)) return 0;
+
+  const type = (coupon.value_type ?? coupon.discount_type ?? "")
+    .toString()
+    .toLowerCase();
+  const rawAmount = Number(coupon.discount_value ?? coupon.amount ?? NaN);
+
+  if (type === "percentage" && Number.isFinite(rawAmount) && rawAmount > 0) {
+    return roundMoney(Math.min(subtotal, (subtotal * rawAmount) / 100));
+  }
+
+  if (type === "flat" && Number.isFinite(rawAmount) && rawAmount > 0) {
+    return roundMoney(Math.min(subtotal, rawAmount));
+  }
+
+  const label = coupon.value_label?.trim() ?? "";
+  const pctMatch = label.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (pctMatch) {
+    return roundMoney(
+      Math.min(subtotal, (subtotal * Number(pctMatch[1])) / 100),
+    );
+  }
+  const flatMatch = label.match(/(?:£|gbp\s*)?(\d+(?:\.\d+)?)\s*(?:off)?/i);
+  if (flatMatch && /off/i.test(label)) {
+    return roundMoney(Math.min(subtotal, Number(flatMatch[1])));
+  }
+
+  return 0;
+}
+
+export function isCheckoutCouponApplied(
+  promo: CheckoutPromoApplied,
+  eventCoupon: CouponStripSource | null | undefined,
+): boolean {
+  const apiCode = eventCoupon?.coupon_code?.trim().toUpperCase() ?? "";
+  const applied = promo.couponCode?.trim().toUpperCase() ?? "";
+  return Boolean(apiCode && applied && apiCode === applied);
+}
+
+export function resolveCheckoutPromoTotals(
+  promo: CheckoutPromoApplied,
+  eventCoupon: CouponStripSource | null | undefined,
+  subtotal: number,
+  /** Automatic date-offer savings (ignored when a coupon is applied — no stacking). */
+  dateOfferAmount = 0,
+): {
   autoDiscountAmount: number;
   couponAmount: number;
   totalDiscount: number;
   couponLabel: string | null;
+  usingCoupon: boolean;
 } {
-  const autoDiscountAmount = promo.autoDiscountOn
-    ? DUMMY_AUTO_DISCOUNT.amount
-    : 0;
-  const couponMeta = promo.couponCode
-    ? DUMMY_COUPONS[promo.couponCode]
-    : null;
-  const couponAmount = couponMeta?.amount ?? 0;
+  const usingCoupon = isCheckoutCouponApplied(promo, eventCoupon);
+  if (usingCoupon) {
+    const couponAmount = computeCouponDiscountAmount(eventCoupon, subtotal);
+    return {
+      autoDiscountAmount: 0,
+      couponAmount,
+      totalDiscount: couponAmount,
+      couponLabel: eventCoupon?.value_label?.trim() || null,
+      usingCoupon: true,
+    };
+  }
+
+  const autoDiscountAmount = roundMoney(dateOfferAmount);
   return {
     autoDiscountAmount,
-    couponAmount,
-    totalDiscount: autoDiscountAmount + couponAmount,
-    couponLabel: couponMeta?.label ?? null,
+    couponAmount: 0,
+    totalDiscount: autoDiscountAmount,
+    couponLabel: null,
+    usingCoupon: false,
   };
 }
 
-export const DEFAULT_CHECKOUT_PROMO: CheckoutPromoApplied = {
-  autoDiscountOn: true,
-  couponCode: null,
-};
+function formatOfferDate(dateKey: string): string {
+  try {
+    const { date } = parseRoomDateKey(dateKey);
+    return new Date(date).toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+  } catch {
+    return dateKey;
+  }
+}
 
 type CheckoutPromoPanelProps = {
   formatMoney: (n: number) => string;
+  /** Event-level coupon from GET /customer/event. */
+  eventCoupon?: CouponStripSource | null;
+  /** Date-level offers with eligibility + savings. */
+  dateDiscounts?: CartDateDiscountRow[];
   value: CheckoutPromoApplied;
   onChange: (promo: CheckoutPromoApplied) => void;
+  /** Jump to the matching date accordion in the cart (scroll + expand). */
+  onDateOfferClick?: (dateKey: string) => void;
   className?: string;
   disabled?: boolean;
 };
 
 /**
- * Dummy customer-facing coupon + discount UI for checkout Order Summary.
- * Controlled local UI only — wire to cart/checkout API when ready.
+ * Customer-facing offers panel — clear savings, locked rules, and coupon entry.
  */
 export function CheckoutPromoPanel({
   formatMoney,
+  eventCoupon,
+  dateDiscounts = [],
   value,
   onChange,
+  onDateOfferClick,
   className,
   disabled = false,
 }: CheckoutPromoPanelProps) {
   const [codeInput, setCodeInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const totals = resolveCheckoutPromoTotals(value);
-  const couponMeta = value.couponCode
-    ? DUMMY_COUPONS[value.couponCode]
-    : null;
+  const apiCode = eventCoupon?.coupon_code?.trim().toUpperCase() ?? "";
+  const couponValueLabel = eventCoupon?.value_label?.trim() || null;
+  const couponHeading =
+    eventCoupon?.banner_heading?.trim() ||
+    eventCoupon?.banner_subheading?.trim() ||
+    null;
+
+  const appliedMatchesApi =
+    Boolean(value.couponCode) &&
+    Boolean(apiCode) &&
+    value.couponCode === apiCode;
 
   const handleApply = () => {
     const normalized = codeInput.trim().toUpperCase();
@@ -88,7 +162,11 @@ export function CheckoutPromoPanel({
       setError("Enter a coupon code");
       return;
     }
-    if (!DUMMY_COUPONS[normalized]) {
+    if (!apiCode) {
+      setError("No coupon is available for this event");
+      return;
+    }
+    if (normalized !== apiCode) {
       setError("That code isn’t valid for this booking");
       return;
     }
@@ -96,6 +174,23 @@ export function CheckoutPromoPanel({
     setCodeInput("");
     setError(null);
   };
+
+  const appliedDateOffers = dateDiscounts.filter(
+    (row) => row.status === "applied" && row.amount > 0,
+  );
+  const lockedDateOffers = dateDiscounts.filter(
+    (row) => row.status === "locked" || row.status === "expired",
+  );
+  const hasCouponOffer = Boolean(apiCode);
+
+  if (
+    appliedDateOffers.length === 0 &&
+    lockedDateOffers.length === 0 &&
+    !hasCouponOffer &&
+    !value.couponCode
+  ) {
+    return null;
+  }
 
   return (
     <div className={cn("min-w-0 space-y-3", className)}>
@@ -106,56 +201,83 @@ export function CheckoutPromoPanel({
         </p>
       </div>
 
-      {value.autoDiscountOn ? (
-        <div
-          className={cn(
-            "flex items-start gap-2.5 rounded-xl border px-3 py-2.5",
-            "border-emerald-200/80 bg-emerald-50/70",
-          )}
-        >
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-            <Percent className="h-3.5 w-3.5" aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-emerald-950">
-              {DUMMY_AUTO_DISCOUNT.label} applied
-            </p>
-            <p className="text-xs text-emerald-800/80">
-              {DUMMY_AUTO_DISCOUNT.detail}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className="text-sm font-semibold tabular-nums text-emerald-800">
-              −{formatMoney(DUMMY_AUTO_DISCOUNT.amount)}
-            </span>
-            <button
-              type="button"
-              onClick={() => onChange({ ...value, autoDiscountOn: false })}
-              disabled={disabled}
-              className="rounded-md p-1 text-emerald-700/70 transition-colors hover:bg-emerald-100 hover:text-emerald-900 disabled:opacity-50"
-              aria-label="Remove automatic discount"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange({ ...value, autoDiscountOn: true })}
-          className={cn(
-            "w-full rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2.5 text-left text-xs",
-            "text-[color:var(--checkout-muted-foreground)] transition-colors",
-            "hover:border-[color:var(--checkout-brand-primary)]/30 hover:bg-[color:var(--checkout-brand-primary)]/5",
-            "disabled:opacity-50",
-          )}
-        >
-          Re-apply midweek offer (−{formatMoney(DUMMY_AUTO_DISCOUNT.amount)})
-        </button>
-      )}
+      {appliedMatchesApi ? (
+        <p className="text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
+          Coupon applied — date offers are not combined with coupon codes.
+        </p>
+      ) : null}
 
-      {value.couponCode && couponMeta ? (
+      {!appliedMatchesApi && appliedDateOffers.length > 0 ? (
+        <div className="space-y-1.5">
+          {appliedDateOffers.map((row) => (
+            <button
+              key={row.dateKey}
+              type="button"
+              onClick={() => onDateOfferClick?.(row.dateKey)}
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors",
+                "border-emerald-200/80 bg-emerald-50/70",
+                onDateOfferClick &&
+                  "cursor-pointer hover:border-emerald-300 hover:bg-emerald-50 active:scale-[0.99]",
+              )}
+              aria-label={`Show ${formatOfferDate(row.dateKey)} booking details`}
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                <Percent className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-emerald-950">
+                  {formatOfferDate(row.dateKey)}
+                </p>
+                <p className="truncate text-xs text-emerald-800/85">
+                  {row.valueLabel}
+                </p>
+              </div>
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-emerald-800">
+                −{formatMoney(row.amount)}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {!appliedMatchesApi && lockedDateOffers.length > 0 ? (
+        <div className="space-y-1.5">
+          {lockedDateOffers.map((row) => (
+            <button
+              key={row.dateKey}
+              type="button"
+              onClick={() => onDateOfferClick?.(row.dateKey)}
+              className={cn(
+                "flex w-full items-start gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors",
+                "border-amber-200/70 bg-amber-50/50",
+                onDateOfferClick &&
+                  "cursor-pointer hover:border-amber-300 hover:bg-amber-50 active:scale-[0.99]",
+              )}
+              aria-label={`Go to ${formatOfferDate(row.dateKey)} to unlock this offer`}
+            >
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                <Lock className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-amber-950">
+                  {formatOfferDate(row.dateKey)} · {row.valueLabel}
+                </p>
+                <p className="mt-0.5 text-xs leading-snug text-amber-800/90">
+                  {row.unlockHint || "Offer not available yet"}
+                  {onDateOfferClick ? (
+                    <span className="mt-0.5 block font-medium text-amber-900/80">
+                      Tap to open this date
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {appliedMatchesApi ? (
         <div
           className={cn(
             "flex items-start gap-2.5 rounded-xl border px-3 py-2.5",
@@ -178,25 +300,20 @@ export function CheckoutPromoPanel({
               </span>
             </p>
             <p className="text-xs text-[color:var(--checkout-muted-foreground)]">
-              {couponMeta.label}
+              {couponHeading || couponValueLabel || "Coupon applied"}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className="text-sm font-semibold tabular-nums text-[color:var(--checkout-brand-primary)]">
-              −{formatMoney(couponMeta.amount)}
-            </span>
-            <button
-              type="button"
-              onClick={() => onChange({ ...value, couponCode: null })}
-              disabled={disabled}
-              className="rounded-md p-1 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-white hover:text-[color:var(--checkout-foreground)] disabled:opacity-50"
-              aria-label="Remove coupon"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onChange({ ...value, couponCode: null })}
+            disabled={disabled}
+            className="rounded-md p-1 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-white hover:text-[color:var(--checkout-foreground)] disabled:opacity-50"
+            aria-label="Remove coupon"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
-      ) : (
+      ) : hasCouponOffer ? (
         <div className="space-y-1.5">
           <label
             htmlFor="checkout-coupon-code"
@@ -218,7 +335,7 @@ export function CheckoutPromoPanel({
                   handleApply();
                 }
               }}
-              placeholder="e.g. SAVE10"
+              placeholder="Enter code"
               maxLength={40}
               disabled={disabled}
               autoCapitalize="characters"
@@ -242,18 +359,12 @@ export function CheckoutPromoPanel({
           </div>
           {error ? (
             <p className="text-xs text-red-600">{error}</p>
-          ) : (
+          ) : couponValueLabel ? (
             <p className="text-[11px] text-[color:var(--checkout-muted-foreground)]">
-              Try TEA50, SAVE10, or WELCOME (demo codes)
+              Available: {couponValueLabel}
             </p>
-          )}
+          ) : null}
         </div>
-      )}
-
-      {totals.totalDiscount > 0 ? (
-        <p className="text-xs font-medium text-emerald-800">
-          You’re saving {formatMoney(totals.totalDiscount)} on this booking
-        </p>
       ) : null}
     </div>
   );

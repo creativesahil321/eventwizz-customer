@@ -7,6 +7,7 @@
 import { CART_METADATA_KEYS_SET } from "@/lib/constants/cart-meta-keys";
 import {
   ApiEventCartData,
+  ApiEventCartDateBucket,
   ApiDateData,
   ApiTableData,
   ApiRoomCartData,
@@ -1028,6 +1029,185 @@ export function getApiDateData(
   }
   return (eventData[dateKey] as ApiDateData | undefined) ?? null;
 }
+
+/** Per-date automatic discount from GET /customer/event (flat or room cart). */
+export function getApiDateDiscount(
+  eventData: ApiEventCartData | null | undefined,
+  dateKey: string,
+) {
+  if (!eventData) return null;
+  const bucket = getApiDateData(eventData, dateKey) as
+    | (ApiDateData & {
+        discount?: ApiEventCartDateBucket["discount"];
+      })
+    | null;
+  return bucket?.discount ?? null;
+}
+
+export type CartDateDiscountStatus = "applied" | "locked" | "expired";
+
+export type CartDateDiscountRow = {
+  dateKey: string;
+  valueLabel: string;
+  amount: number;
+  status: CartDateDiscountStatus;
+  guestCount: number;
+  minPeople: number | null;
+  unlockHint: string | null;
+  dateSubtotal: number;
+};
+
+function roundDiscountMoney(n: number): number {
+  return Math.round(Math.max(0, n) * 100) / 100;
+}
+
+function isApiDateDiscountExpired(
+  expiresAt: string | null | undefined,
+): boolean {
+  const raw = expiresAt?.trim();
+  if (!raw) return false;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? `${raw}T23:59:59`
+    : raw;
+  const end = new Date(normalized);
+  if (Number.isNaN(end.getTime())) return false;
+  return Date.now() > end.getTime();
+}
+
+export function getDateDiscountMinPeople(
+  discount: ApiEventCartDateBucket["discount"] | null | undefined,
+): number | null {
+  const n = Number(discount?.min_people);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Whether a date offer can reduce the price for the current party size. */
+export function isDateDiscountEligible(
+  discount: ApiEventCartDateBucket["discount"] | null | undefined,
+  guestCount: number,
+): boolean {
+  if (!discount) return false;
+  if (isApiDateDiscountExpired(discount.expires_at)) return false;
+  const amount = Number(discount.amount);
+  if (!Number.isFinite(amount) || !(amount > 0)) return false;
+
+  if (
+    discount.discount_type === "flat" &&
+    discount.flat_mode === "per_person"
+  ) {
+    const minPeople = getDateDiscountMinPeople(discount);
+    if (minPeople != null && guestCount < minPeople) return false;
+    if (guestCount <= 0) return false;
+  }
+
+  return true;
+}
+
+export function computeDateDiscountAmount(
+  discount: ApiEventCartDateBucket["discount"] | null | undefined,
+  dateSubtotal: number,
+  guestCount: number,
+): number {
+  if (!discount || !(dateSubtotal > 0)) return 0;
+  if (!isDateDiscountEligible(discount, guestCount)) return 0;
+
+  const amount = Number(discount.amount);
+  if (!Number.isFinite(amount) || !(amount > 0)) return 0;
+
+  if (discount.discount_type === "percentage") {
+    return roundDiscountMoney(
+      Math.min(dateSubtotal, (dateSubtotal * amount) / 100),
+    );
+  }
+
+  if (discount.discount_type === "flat") {
+    if (discount.flat_mode === "per_person") {
+      return roundDiscountMoney(
+        Math.min(dateSubtotal, amount * guestCount),
+      );
+    }
+    return roundDiscountMoney(Math.min(dateSubtotal, amount));
+  }
+
+  return 0;
+}
+
+/**
+ * Resolve every date offer in the cart with eligibility + savings amount.
+ * `getEditableDate` should return live cart-edit store data for guest counts.
+ */
+export function resolveCartDateDiscounts(
+  eventData: ApiEventCartData | null | undefined,
+  getEditableDate: (dateKey: string) => EditableDateData | null | undefined,
+): CartDateDiscountRow[] {
+  if (!eventData) return [];
+  const rows: CartDateDiscountRow[] = [];
+
+  for (const dateKey of getApiCartDateKeys(eventData)) {
+    const discount = getApiDateDiscount(eventData, dateKey);
+    const label = discount?.value_label?.trim();
+    if (!discount || !label) continue;
+
+    const editable = getEditableDate(dateKey) ?? null;
+    const dateSubtotal = editable ? calculateEditableDateTotal(editable) : 0;
+    const guestCount = editable ? getDateGuestCount(editable) : 0;
+    const minPeople = getDateDiscountMinPeople(discount);
+    const expired = isApiDateDiscountExpired(discount.expires_at);
+
+    let status: CartDateDiscountStatus = "applied";
+    let unlockHint: string | null = null;
+
+    if (expired) {
+      status = "expired";
+      unlockHint = "This offer has expired";
+    } else if (
+      discount.discount_type === "flat" &&
+      discount.flat_mode === "per_person" &&
+      minPeople != null &&
+      guestCount < minPeople
+    ) {
+      status = "locked";
+      const needed = minPeople - guestCount;
+      unlockHint =
+        guestCount <= 0
+          ? `Book at least ${minPeople} guests to unlock this offer`
+          : `Add ${needed} more guest${needed === 1 ? "" : "s"} (min ${minPeople}) to unlock`;
+    } else if (
+      discount.discount_type === "flat" &&
+      discount.flat_mode === "per_person" &&
+      guestCount <= 0
+    ) {
+      status = "locked";
+      unlockHint = minPeople
+        ? `Book at least ${minPeople} guests to unlock this offer`
+        : "Add guests to unlock this offer";
+    }
+
+    const amount =
+      status === "applied"
+        ? computeDateDiscountAmount(discount, dateSubtotal, guestCount)
+        : 0;
+
+    // Hide zero-savings "applied" rows when the date has no billable total yet.
+    if (status === "applied" && !(dateSubtotal > 0) && amount <= 0) {
+      continue;
+    }
+
+    rows.push({
+      dateKey,
+      valueLabel: label,
+      amount,
+      status,
+      guestCount,
+      minPeople,
+      unlockHint,
+      dateSubtotal,
+    });
+  }
+
+  return rows;
+}
+
 
 /** All cart date keys — composite `roomId:date` for room carts, ISO dates otherwise. */
 export function getApiCartDateKeys(

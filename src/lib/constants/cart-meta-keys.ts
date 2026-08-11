@@ -20,6 +20,8 @@ export const CART_METADATA_KEYS = [
   "location_name",
   "event_location",
   "city",
+  // Event-level coupon from cart GET (must NOT be treated as a date key)
+  "coupon",
 ] as const;
 
 export const CART_METADATA_KEYS_SET = new Set<string>(CART_METADATA_KEYS);

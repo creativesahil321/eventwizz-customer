@@ -13,11 +13,13 @@ import LocationSelectionHeader from "./location-selection-header";
 import LocationGrid from "./location-grid";
 import GoogleLocationMap from "./location-map-google";
 import { LocationSearchBar } from "./location-search-bar";
+import { PublicSearchResults } from "./public-search-results";
 import {
   filterLocations,
-  hasHardSearchFilters,
-  type LocationSearchFilters,
+  resolveLocationSlugForCity,
+  toSearchDateParam,
 } from "./_lib/filter-locations";
+import { usePublicSearchFilters } from "./_lib/use-public-search-filters";
 import SubscribeSection from "../EventListPage/subscribe";
 import FooterSection from "../EventListPage/footer";
 import { SiteHeading } from "@/components/public/site-heading";
@@ -38,13 +40,9 @@ import type { LocationData } from "@/types/theme.types";
 import type { ThemeSchema } from "@/types/theme.types";
 import type { VenueContactOverride } from "@/lib/resolve-venue-contact";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
-import { useDebounce } from "@/hooks/data-table/use-debounce";
-
-const EMPTY_SEARCH_FILTERS: LocationSearchFilters = {
-  query: "",
-  city: null,
-  date: null,
-};
+import { useIsPreviewMode } from "@/contexts/preview-context";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { usePublicSearch } from "@/services/common/public-search";
 
 export type VendorMainLandingViewProps = {
   brandName: string;
@@ -107,34 +105,65 @@ export function VendorMainLandingView({
 }: VendorMainLandingViewProps) {
   const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [isCompactViewport, setIsCompactViewport] = useState(false);
-  const [searchFilters, setSearchFilters] =
-    useState<LocationSearchFilters>(EMPTY_SEARCH_FILTERS);
   const isPreviewNarrow = usePreviewNarrowLayout();
+  const isPreviewMode = useIsPreviewMode();
+  const { domain } = useDomain();
+  const useApi = !isPreviewMode;
+
+  const { filters, apiFilters, setFilters, clearFilters, isSearchMode } =
+    usePublicSearchFilters({ syncUrl: useApi });
+
   /**
    * Map chrome only from xl (1280px)+ — small desktops keep grid and avoid
    * CTA / toggle collisions in the hero fade.
    */
   const hideMapView = isPreviewNarrow || isCompactViewport;
 
-  const debouncedQuery = useDebounce(searchFilters.query, 250);
-  const activeFilters = useMemo(
-    () => ({ ...searchFilters, query: debouncedQuery }),
-    [searchFilters, debouncedQuery],
+  const locationSlugForCity = useMemo(
+    () => resolveLocationSlugForCity(apiFilters.city, locations),
+    [apiFilters.city, locations],
   );
-  const filteredLocations = useMemo(
-    () => filterLocations(locations, activeFilters),
-    [locations, activeFilters],
-  );
-  /** Empty state only for city/date — free-text stays soft until the API. */
-  const showEmptySearchState =
-    hasHardSearchFilters(searchFilters) && filteredLocations.length === 0;
 
-  const totalEvents = filteredLocations.reduce(
+  const searchParams = useMemo(
+    () => ({
+      q: apiFilters.query.trim() || undefined,
+      // Prefer slug when unique; otherwise exact city label for the API.
+      location_slug: locationSlugForCity,
+      city: locationSlugForCity ? undefined : apiFilters.city ?? undefined,
+      date: toSearchDateParam(apiFilters.date),
+      mode: "auto" as const,
+      per_page: 40,
+    }),
+    [apiFilters.query, apiFilters.city, apiFilters.date, locationSlugForCity],
+  );
+
+  const searchQuery = usePublicSearch(domain, searchParams, {
+    enabled: useApi && isSearchMode,
+  });
+
+  /** Preview / browse: location cards. Live search: API event/date results. */
+  const filteredLocations = useMemo(
+    () =>
+      useApi && isSearchMode
+        ? locations
+        : filterLocations(locations, apiFilters),
+    [useApi, isSearchMode, locations, apiFilters],
+  );
+
+  const showApiResults = useApi && isSearchMode;
+  const showEmptySearchState =
+    !showApiResults &&
+    isSearchMode &&
+    filteredLocations.length === 0;
+
+  const totalEvents = (showApiResults ? locations : filteredLocations).reduce(
     (sum, loc) =>
       sum + (typeof loc.total_events === "number" ? loc.total_events : 0),
     0,
   );
-  const totalLocations = filteredLocations.length;
+  const totalLocations = showApiResults
+    ? locations.length
+    : filteredLocations.length;
 
   useEffect(() => {
     const checkCompact = () => {
@@ -158,7 +187,7 @@ export function VendorMainLandingView({
   };
 
   const clearSearchFilters = () => {
-    setSearchFilters(EMPTY_SEARCH_FILTERS);
+    clearFilters();
   };
 
   const heroAlign = "center" as const;
@@ -186,19 +215,38 @@ export function VendorMainLandingView({
         {/*
           Soft hero image band — no CSS blur:
           absolute top band · opacity-50 · mask-image: linear-gradient(#000 50%, #00000057 98%)
+          User-uploaded cover: native <img> + cache busting (see CACHE_BUSTING_CHANGES.md).
+          Preload + fetchPriority so LCP is not delayed like a late CSS background-image.
         */}
+        {heroImageSrc ? (
+          <link
+            rel="preload"
+            as="image"
+            href={heroImageSrc}
+            fetchPriority="high"
+          />
+        ) : null}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-[520px] opacity-50 sm:h-[580px]"
           style={{
-            backgroundImage: `url(${heroImageSrc})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center center",
             WebkitMaskImage:
               "linear-gradient(#000000 50%, #00000057 98%)",
             maskImage: "linear-gradient(#000000 50%, #00000057 98%)",
           }}
-        />
+        >
+          {heroImageSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element -- user-uploaded; cache-bust via ?v=
+            <img
+              src={heroImageSrc}
+              alt=""
+              fetchPriority="high"
+              loading="eager"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+          ) : null}
+        </div>
 
         <div
           className={cn(
@@ -247,15 +295,22 @@ export function VendorMainLandingView({
             <LocationSearchBar
               className="w-full max-w-3xl px-0"
               cities={locations.map((location) => location.city)}
-              value={searchFilters}
-              onChange={setSearchFilters}
+              value={filters}
+              onChange={setFilters}
               onSearch={scrollToResults}
+              availability={{
+                domain,
+                q: filters.query,
+                city: locationSlugForCity ? undefined : filters.city,
+                location_slug: locationSlugForCity,
+                enabled: useApi,
+              }}
             />
           </motion.div>
         </div>
       </section>
 
-      {!hideMapView ? (
+      {!hideMapView && !showApiResults ? (
         <section
           className={cn(
             "relative z-20 flex justify-center bg-transparent px-4 pb-5 pt-0 sm:px-6",
@@ -316,6 +371,7 @@ export function VendorMainLandingView({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.12 }}
         >
+          {!showApiResults ? (
           <div
             className={cn(
               "mx-auto mb-3 max-w-2xl text-center md:mb-7",
@@ -351,8 +407,9 @@ export function VendorMainLandingView({
               {locationsListSubtitle}
             </p>
           </div>
+          ) : null}
 
-          {locations.length > 0 ? (
+          {!showApiResults && locations.length > 0 ? (
             <div
               className={cn(
                 "mx-auto mb-4 flex max-w-md items-center justify-center gap-2 md:mb-8",
@@ -432,7 +489,17 @@ export function VendorMainLandingView({
             </div>
           ) : null}
 
-          {showEmptySearchState ? (
+          {showApiResults ? (
+            <PublicSearchResults
+              filters={filters}
+              data={searchQuery.data}
+              isLoading={searchQuery.isFetching}
+              isError={searchQuery.isError}
+              onClear={clearSearchFilters}
+              sectionId={`${exploreCitiesSectionId}-results`}
+              className="!px-0 !pt-0"
+            />
+          ) : showEmptySearchState ? (
             <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-6 py-10 text-center">
               <p className="text-base font-semibold text-[var(--color-text)]">
                 No locations match your search

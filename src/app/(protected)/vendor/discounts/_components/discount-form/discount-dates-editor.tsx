@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { UseFormReturn } from "react-hook-form";
+import type { FieldPath, UseFormReturn } from "react-hook-form";
 import {
   CalendarDays,
   Check,
@@ -25,11 +25,18 @@ import { cn } from "@/lib/utils";
 import {
   defaultDiscountDateEntry,
   formatGuideDate,
+  isDiscountDateOfferReady,
   todayIsoDate,
   type DiscountFormValues,
 } from "../../_lib/schema";
 import type { DiscountEventWithDates } from "../../_lib/types";
 import { DISCOUNT_OFFER_KIND_LABELS } from "../../_lib/types";
+import {
+  buildCustomerPreviewItems,
+  buildEventCatalogSlots,
+  slotKey,
+  type EventCatalogSlot,
+} from "../../_lib/offers";
 import {
   DiscountCustomerDatesPreview,
   formatDiscountPreviewBadge,
@@ -60,30 +67,15 @@ function applyOfferKind(
   return { value_type: "flat", flat_mode: "total", min_people: null };
 }
 
-function slotKey(dateId: number, roomId: number) {
-  return `${dateId}:${roomId > 0 ? roomId : 0}`;
-}
-
-function firstOfferIndex(
-  rows: DiscountFormValues["dates"],
-): number {
+function firstOfferIndex(rows: DiscountFormValues["dates"]): number {
   const incomplete = rows.findIndex(
-    (d) =>
-      d.date_id > 0 &&
-      (!(Number(d.discount_value) > 0) || !d.expires_at?.trim()),
+    (d) => d.date_id > 0 && !isDiscountDateOfferReady(d),
   );
   if (incomplete >= 0) return incomplete;
   return rows.findIndex((d) => d.date_id > 0);
 }
 
-/** One pickable slot: a date, or a date+room when the date has rooms. */
-type CatalogSlot = {
-  key: string;
-  dateId: number;
-  date: string;
-  roomId: number;
-  roomName: string | null;
-};
+type CatalogSlot = EventCatalogSlot;
 
 type DiscountDatesEditorProps = {
   form: UseFormReturn<DiscountFormValues>;
@@ -130,37 +122,10 @@ export function DiscountDatesEditor({
     if (!hasOffers) setPickerOpen(true);
   }, [hasOffers]);
 
-  const catalogSlots = useMemo((): CatalogSlot[] => {
-    const slots: CatalogSlot[] = [];
-    for (const d of selectedEvent?.dates ?? []) {
-      if (d?.date_id == null || !d?.date) continue;
-      const rooms = (d.rooms ?? []).filter((r) => r?.id != null);
-      if (rooms.length > 0) {
-        for (const room of rooms) {
-          slots.push({
-            key: slotKey(d.date_id, room.id),
-            dateId: d.date_id,
-            date: d.date,
-            roomId: room.id,
-            roomName: room.name,
-          });
-        }
-      } else {
-        slots.push({
-          key: slotKey(d.date_id, 0),
-          dateId: d.date_id,
-          date: d.date,
-          roomId: 0,
-          roomName: null,
-        });
-      }
-    }
-    return slots.sort((a, b) => {
-      const byDate = a.date.localeCompare(b.date);
-      if (byDate !== 0) return byDate;
-      return (a.roomName ?? "").localeCompare(b.roomName ?? "");
-    });
-  }, [selectedEvent]);
+  const catalogSlots = useMemo(
+    () => buildEventCatalogSlots(selectedEvent),
+    [selectedEvent],
+  );
 
   /** One calendar day → offer panel can stay visible; multi-day stays preview-first. */
   const isSingleDateEvent = useMemo(() => {
@@ -344,11 +309,18 @@ export function DiscountDatesEditor({
     index: number,
     patch: Partial<DiscountFormValues["dates"][number]>,
   ) => {
-    const next = dates.map((row, i) =>
+    const current = form.getValues("dates") ?? [];
+    const next = current.map((row, i) =>
       i === index ? { ...row, ...patch } : row,
     );
-    // Validate on Next; keep editing quiet until then.
+    // Validate on Next; keep editing quiet until then — but drop stale
+    // field errors for keys the vendor just changed (e.g. after Next failed).
     form.setValue("dates", next, { shouldValidate: false, shouldDirty: true });
+    for (const key of Object.keys(patch)) {
+      form.clearErrors(
+        `dates.${index}.${key}` as FieldPath<DiscountFormValues>,
+      );
+    }
   };
 
   if (!selectedEvent) {
@@ -367,51 +339,18 @@ export function DiscountDatesEditor({
     );
   }
 
-  const completeCount = addedDates.filter(
-    ({ entry }) =>
-      entry.discount_value > 0 && Boolean(entry.expires_at?.trim()),
+  const completeCount = addedDates.filter(({ entry }) =>
+    isDiscountDateOfferReady(entry),
   ).length;
 
   /** Every event date/room — not only rows already in Your offers. */
   const customerPreviewItems = useMemo(
     () =>
-      catalogSlots.map((slot) => {
-        const index = dates.findIndex(
-          (d) =>
-            Number(d.date_id) === Number(slot.dateId) &&
-            (Number(d.room_id) || 0) === Number(slot.roomId),
-        );
-        const entry = index >= 0 ? dates[index] : null;
-        const amount = Number(entry?.discount_value) || 0;
-        const showOnPage = entry ? entry.show_on_banner !== false : false;
-        const ready = Boolean(
-          entry && amount > 0 && entry.expires_at?.trim(),
-        );
-        const offer =
-          ready && entry
-            ? {
-                show_on_page: showOnPage,
-                value_type: entry.value_type,
-                discount_value: amount,
-                flat_mode: entry.flat_mode,
-              }
-            : null;
-        const badge =
-          ready && showOnPage && offer
-            ? formatDiscountPreviewBadge(offer)
-            : "";
-        return {
-          key: `preview-${slot.key}`,
-          formIndex: index,
-          eventDate: slot.date,
-          roomId: slot.roomId,
-          roomName: slot.roomName,
-          badge,
-          ready,
-          showOnPage,
-          offer,
-        };
-      }),
+      buildCustomerPreviewItems(
+        catalogSlots,
+        dates,
+        formatDiscountPreviewBadge,
+      ),
     [catalogSlots, dates],
   );
 
@@ -669,9 +608,7 @@ export function DiscountDatesEditor({
                 ? entry.original_valid_from
                 : todayIsoDate();
             const dateErrors = form.formState.errors.dates?.[index];
-            const isComplete =
-              Number(entry.discount_value) > 0 &&
-              Boolean(entry.expires_at?.trim());
+            const isComplete = isDiscountDateOfferReady(entry);
 
             return (
               <article

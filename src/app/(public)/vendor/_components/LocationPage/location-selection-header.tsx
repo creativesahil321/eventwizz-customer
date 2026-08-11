@@ -112,13 +112,13 @@ export default function LocationSelectionHeader({
   }, [isPreviewNarrow]);
 
   const brandMark = logoSrc ? (
-    <div className="flex h-8 items-center sm:h-9 lg:h-10">
+    <div className="flex h-11 items-center lg:h-12">
       <img
         key={logoSrc}
         src={logoSrc}
         width={200}
         height={116}
-        className="max-h-8 w-auto max-w-[min(100%,8.5rem)] object-contain sm:max-h-9 sm:max-w-[min(100%,10rem)] lg:max-h-10 lg:max-w-[min(100%,11rem)]"
+        className="max-h-11 w-auto max-w-[min(100%,10rem)] object-contain lg:max-h-12 lg:max-w-[min(100%,12rem)]"
         alt={name || "EventWizz"}
       />
     </div>

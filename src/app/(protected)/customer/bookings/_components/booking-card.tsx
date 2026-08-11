@@ -23,6 +23,8 @@ import { formatBookingStatus, getBookingDateRowKey } from "../_lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
+import { resolveBookingAppliedOffers } from "@/lib/booking-applied-offer";
+import { BookingAppliedOffers } from "@/components/bookings/booking-applied-offers";
 
 interface BookingCardProps {
   booking: Booking;
@@ -38,6 +40,7 @@ export default function BookingCard({
   const { symbol, format: formatMoney } = useCurrencyFormat();
   const totalRaw = booking.total || booking.total_amount;
   const totalNum = parseFormattedMoney(String(totalRaw ?? "0"), symbol);
+  const appliedOffers = resolveBookingAppliedOffers(booking);
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] flex flex-col h-full relative !p-0 border-[var(--color-border)]">
@@ -156,6 +159,14 @@ export default function BookingCard({
             </Tooltip>
           </TooltipProvider>
         )}
+
+        {appliedOffers.length > 0 ? (
+          <BookingAppliedOffers
+            offers={appliedOffers}
+            formatMoney={formatMoney}
+            variant="pills"
+          />
+        ) : null}
 
         {/* Price */}
         <div className="flex items-center justify-between py-2 sm:py-2.5 border-t border-b border-[var(--color-border)]">

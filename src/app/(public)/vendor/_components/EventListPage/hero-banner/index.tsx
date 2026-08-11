@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext } from "react";
+import { useContext, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
@@ -54,6 +54,12 @@ interface HeroBannerProps {
   bannerHeadingAlign?: BannerHeadingAlign | null;
   /** When set, overrides theme `banner_heading_valign` */
   bannerHeadingValign?: BannerHeadingValign | null;
+  /**
+   * Fixed chrome at the bottom of the hero (e.g. search).
+   * Rendered outside the heading stack so left/center/right + top/middle/bottom
+   * alignment never moves it.
+   */
+  heroFooter?: ReactNode;
 }
 
 export default function HeroBanner({
@@ -66,6 +72,7 @@ export default function HeroBanner({
   headingEmphasis,
   bannerHeadingAlign: bannerHeadingAlignProp,
   bannerHeadingValign: bannerHeadingValignProp,
+  heroFooter,
 }: HeroBannerProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
   const vendorTheme = theme as ThemeSchema | null;
@@ -171,19 +178,30 @@ export default function HeroBanner({
         </div>
       )}
 
-      {/* Image background — slight scale for edge bleed */}
-      {!useVideo && (
-        <div className="absolute inset-0 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            key={finalImageUrl}
-            src={finalImageUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full scale-105 object-cover"
+      {/* Image background — slight scale for edge bleed; native img + cache busting */}
+      {!useVideo && finalImageUrl ? (
+        <>
+          <link
+            rel="preload"
+            as="image"
+            href={finalImageUrl}
+            fetchPriority="high"
           />
-          <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
-        </div>
-      )}
+          <div className="absolute inset-0 overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded; cache-bust via ?v= */}
+            <img
+              key={finalImageUrl}
+              src={finalImageUrl}
+              alt=""
+              fetchPriority="high"
+              loading="eager"
+              decoding="async"
+              className="absolute inset-0 h-full w-full scale-105 object-cover"
+            />
+            <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
+          </div>
+        </>
+      ) : null}
 
       {/* Soft brand gradient orbs */}
       <div
@@ -197,8 +215,10 @@ export default function HeroBanner({
 
       <div
         className={cn(
-          "relative z-10 max-w-7xl mx-auto w-full overflow-visible px-4",
-          heroBandContentPadClass(heroValign),
+          "relative z-10 mx-auto w-full max-w-7xl overflow-visible px-4",
+          heroBandContentPadClass(heroValign, {
+            withBottomChrome: Boolean(heroFooter),
+          }),
         )}
       >
         <motion.div
@@ -236,6 +256,15 @@ export default function HeroBanner({
           ) : null}
         </motion.div>
       </div>
+
+      {/* Independent of heading align/valign — always bottom-centered */}
+      {heroFooter ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3 pb-4 sm:px-4 sm:pb-5 md:pb-6">
+          <div className="pointer-events-auto mx-auto w-full max-w-3xl">
+            {heroFooter}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

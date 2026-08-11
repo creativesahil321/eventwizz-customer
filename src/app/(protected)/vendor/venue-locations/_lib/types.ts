@@ -47,7 +47,7 @@ export interface VenueLocation {
 
 // Type for row action handling
 export type DataTableRowAction<TData> = {
-  type: "update" | "view" | "setDefault";
+  type: "update" | "view" | "setDefault" | "delete";
   row: Row<TData>;
 };
 

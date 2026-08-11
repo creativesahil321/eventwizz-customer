@@ -1,5 +1,6 @@
 import { Row } from "@tanstack/react-table";
 import { ReactNode } from "react";
+import type { BookingAppliedOffer } from "@/services/customer/bookings/type";
 
 /**
  * Booking date information from API
@@ -33,6 +34,18 @@ export interface Booking {
   total_amount: string; // Alias for total for backward compatibility
   created_date: string;
   booking_dates: BookingDate[];
+  /** @deprecated Prefer structured offer fields from the API. */
+  discount?: string;
+  balance_amount?: string;
+  coupon_code?: string | null;
+  discount_code?: string | null;
+  value_label?: string | null;
+  discount_label?: string | null;
+  discount_amount?: number | string | null;
+  applied_offer?: BookingAppliedOffer | null;
+  coupon?: BookingAppliedOffer | null;
+  offers?: BookingAppliedOffer[] | null;
+  applied_offers?: BookingAppliedOffer[] | null;
 }
 
 export interface SearchParams {

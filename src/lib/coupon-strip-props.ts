@@ -14,6 +14,7 @@ export const COUPON_STRIP_DEFAULT_HEADING = "Limited time offer";
  * (`discount_type` / `amount`).
  */
 export type CouponStripSource = {
+  id?: number | null;
   coupon_code?: string | null;
   /** Small uppercase eyebrow on the strip (e.g. "Limited time offer"). */
   banner_heading?: string | null;
@@ -21,6 +22,8 @@ export type CouponStripSource = {
   banner_subheading?: string | null;
   /** @deprecated Prefer `banner_subheading`. */
   dynamic_text?: string | null;
+  /** Preformatted badge from API (e.g. `50% OFF`). */
+  value_label?: string | null;
   discount_type?: "percentage" | "flat" | string | null;
   value_type?: "percentage" | "flat" | string | null;
   amount?: number | null;
@@ -107,45 +110,25 @@ export function couponToStripProps(
   const code = source.coupon_code?.trim() ?? "";
   if (!code) return null;
 
-  const label = (
-    source.banner_heading?.trim() || COUPON_STRIP_DEFAULT_HEADING
-  ).slice(0, COUPON_BANNER_HEADING_MAX);
+  const heading = source.banner_heading?.trim() ?? "";
+  // Subheading only when the vendor/API set it — never invent a default line.
+  const subheading =
+    source.banner_subheading?.trim() || source.dynamic_text?.trim() || "";
 
-  const headline = (
-    source.banner_subheading?.trim() ||
-    source.dynamic_text?.trim() ||
-    ""
-  ).slice(0, COUPON_BANNER_TEXT_MAX);
+  const label = (heading || COUPON_STRIP_DEFAULT_HEADING).slice(
+    0,
+    COUPON_BANNER_HEADING_MAX,
+  );
+
+  const apiBadge = source.value_label?.trim() ?? "";
 
   return {
     code,
     label,
-    badge: formatCouponStripBadge(source) || undefined,
-    headline: headline || undefined,
+    badge: apiBadge || formatCouponStripBadge(source) || undefined,
+    headline: subheading
+      ? subheading.slice(0, COUPON_BANNER_TEXT_MAX)
+      : undefined,
     endsAt: couponStripEndsAt(source.expires_at),
   };
 }
-
-/**
- * Demo coupon shaped like the API — used on the public event page until
- * banner coupons are returned with the event payload.
- */
-function demoCouponExpiresAt(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 7);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-export const DEMO_EVENT_BANNER_COUPON: CouponStripSource = {
-  coupon_code: "TEA50",
-  banner_heading: COUPON_STRIP_DEFAULT_HEADING,
-  banner_subheading: "Claim Your 50% Off Afternoon Tea",
-  discount_type: "percentage",
-  amount: 50,
-  flat_mode: null,
-  expires_at: demoCouponExpiresAt(),
-  show_on_event_page: true,
-};

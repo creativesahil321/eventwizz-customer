@@ -37,6 +37,10 @@ const SetDefaultLocationDialog = dynamic(
   },
 );
 
+const DeleteLocationDialog = dynamic(() => import("./_location-delete"), {
+  ssr: false,
+});
+
 // Status filters for locations
 const statusFilters = [
   { id: 1, title: "All Locations", value: "all", count: 0 },
@@ -248,6 +252,14 @@ function VenueLocationsDataTable({
           location={rowAction?.row?.original}
         />
       )}
+
+      {rowAction?.type === "delete" && rowAction.row?.original ? (
+        <DeleteLocationDialog
+          open
+          onOpenChange={() => setRowAction(null)}
+          location={rowAction.row.original}
+        />
+      ) : null}
     </section>
   );
 }

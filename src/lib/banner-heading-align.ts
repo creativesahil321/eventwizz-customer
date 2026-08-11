@@ -138,13 +138,27 @@ export function heroBandVerticalClass(v: BannerHeadingValign): string {
  * appropriate breathing room per valign position.
  * Apply this alongside "relative z-* max-w-7xl mx-auto w-full px-4".
  */
-export function heroBandContentPadClass(v: BannerHeadingValign): string {
+export function heroBandContentPadClass(
+  v: BannerHeadingValign,
+  options?: { withBottomChrome?: boolean },
+): string {
+  const withBottomChrome = Boolean(options?.withBottomChrome);
+
   return cn(
-    v === "top" && "pt-20 pb-10 sm:pt-24 sm:pb-12 md:pt-28 md:pb-14",
+    v === "top" &&
+      (withBottomChrome
+        ? "pt-20 pb-28 sm:pt-24 sm:pb-32 md:pt-28 md:pb-36"
+        : "pt-20 pb-10 sm:pt-24 sm:pb-12 md:pt-28 md:pb-14"),
     // Center: modest top so section justify-center handles visual centering.
-    // Too much padding would push the perceived center downward.
-    v === "center" && "pt-20 pb-8 sm:pt-24 sm:pb-10",
-    v === "bottom" && "pt-[4.5rem] pb-16 sm:pb-20 md:pb-24",
+    // Extra bottom pad when a fixed search dock sits on the hero.
+    v === "center" &&
+      (withBottomChrome
+        ? "pt-20 pb-28 sm:pt-24 sm:pb-32"
+        : "pt-20 pb-8 sm:pt-24 sm:pb-10"),
+    v === "bottom" &&
+      (withBottomChrome
+        ? "pt-[4.5rem] pb-32 sm:pb-36 md:pb-40"
+        : "pt-[4.5rem] pb-16 sm:pb-20 md:pb-24"),
   );
 }
 

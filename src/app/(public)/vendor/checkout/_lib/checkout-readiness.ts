@@ -8,6 +8,7 @@ export interface CheckoutDateReadiness {
 
 type DateValidationResult = {
   isValid: boolean;
+  hasTableOrTicket?: boolean;
   errorMessage?: string;
 };
 
@@ -50,6 +51,15 @@ export function assessCheckoutDatesReadiness(
     if (!validation.isValid) {
       hasValidationErrors = true;
       validationErrorMessage ??= validation.errorMessage;
+      continue;
+    }
+
+    // Empty dates in the cart are incomplete — don't push payment until
+    // every cart date has at least one table or ticket.
+    if (!validation.hasTableOrTicket) {
+      hasValidationErrors = true;
+      validationErrorMessage ??=
+        "Add tables or tickets for each date before paying";
     }
   }
 
@@ -72,7 +82,14 @@ export interface CheckoutCtaState {
   disabled: boolean;
   loading: boolean;
   label: string;
+  /** Shorter label for narrow sticky footers (avoids truncation). */
+  mobileLabel: string;
   showGatewayError: boolean;
+  /**
+   * Cart is ready except gateway — CTA stays enabled and should open/focus
+   * the payment-method picker instead of starting checkout.
+   */
+  needsGatewaySelection: boolean;
 }
 
 export function resolveCheckoutCtaState(
@@ -80,33 +97,52 @@ export function resolveCheckoutCtaState(
 ): CheckoutCtaState {
   const loading = input.isLoading;
 
-  const showGatewayError =
+  const needsGatewaySelection =
     !input.hasSelectedGateway &&
+    input.hasPayableTotal &&
     !input.hasValidationErrors &&
-    !input.hasUnsavedEdits &&
+    !input.hasPendingStripePayment &&
     !loading;
 
+  const showGatewayError =
+    needsGatewaySelection && !input.hasUnsavedEdits;
+
+  // Missing gateway must NOT disable the CTA — on mobile the picker lives in
+  // the summary drawer, and a greyed "Select payment method" looks broken.
   const disabled = input.hasPendingStripePayment
     ? loading
-    : loading ||
-      !input.hasPayableTotal ||
-      input.hasValidationErrors ||
-      !input.hasSelectedGateway;
+    : loading || !input.hasPayableTotal || input.hasValidationErrors;
 
   let label: string;
+  let mobileLabel: string;
   if (input.hasPendingStripePayment && input.stripePaymentAmount != null) {
     label = `Complete payment · ${input.formatMoney(input.stripePaymentAmount)}`;
+    // Keep amount; layout stacks full-width on mobile so this won't truncate.
+    // Amount already shown in the sticky total row — keep the CTA short on phones.
+    mobileLabel = "Complete payment";
   } else if (loading) {
     label = "Processing...";
+    mobileLabel = "Processing...";
   } else if (!input.hasPayableTotal) {
     label = "Add items to continue";
+    mobileLabel = "Add items";
   } else if (input.hasValidationErrors) {
     label = "Complete selections";
+    mobileLabel = "Complete selections";
   } else if (!input.hasSelectedGateway) {
     label = "Select payment method";
+    mobileLabel = "Choose payment";
   } else {
     label = `Pay ${input.formatMoney(input.finalTotalWithFee)} now`;
+    mobileLabel = `Pay ${input.formatMoney(input.finalTotalWithFee)}`;
   }
 
-  return { disabled, loading, label, showGatewayError };
+  return {
+    disabled,
+    loading,
+    label,
+    mobileLabel,
+    showGatewayError,
+    needsGatewaySelection,
+  };
 }

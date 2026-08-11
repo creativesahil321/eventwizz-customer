@@ -109,3 +109,18 @@ export function useUpdateDiscountStatus() {
     },
   });
 }
+
+export function useDeleteDiscount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => discountsService.deleteDiscount(id),
+    onSuccess: (_response, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: discountKeys.lists() });
+      queryClient.removeQueries({
+        queryKey: discountKeys.details(),
+        predicate: (query) => query.queryKey.includes(deletedId),
+      });
+    },
+  });
+}

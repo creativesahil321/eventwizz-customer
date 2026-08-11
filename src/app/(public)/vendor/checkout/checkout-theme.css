@@ -2,13 +2,16 @@
 .checkout-page {
   --checkout-radius: 0.75rem;
   --checkout-header-offset: 4.75rem;
-  --checkout-mobile-bar-height: 5.25rem;
+  /* Total row + full-width CTA stacked (avoids side-by-side overlap on phones) */
+  --checkout-mobile-bar-height: 8.75rem;
   --checkout-mobile-pending-extra: 0px;
+  --checkout-mobile-gateway-extra: 0px;
   --checkout-mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
   --checkout-mobile-bar-offset: calc(
     var(--checkout-mobile-bar-height) +
       max(0.75rem, var(--checkout-mobile-safe-bottom)) +
-      var(--checkout-mobile-pending-extra)
+      var(--checkout-mobile-pending-extra) +
+      var(--checkout-mobile-gateway-extra)
   );
   overflow-x: hidden;
   --checkout-background: oklch(0.984 0.003 247.858);
@@ -32,7 +35,12 @@
 
 /* Extra bottom inset when the mobile pending-payment countdown strip is visible */
 .checkout-page[data-pending-payment="true"] {
-  --checkout-mobile-pending-extra: 4rem;
+  --checkout-mobile-pending-extra: 2.75rem;
+}
+
+/* Prompt strip above sticky CTA when payment method still needs choosing */
+.checkout-page[data-mobile-gateway-prompt="true"] {
+  --checkout-mobile-gateway-extra: 2.75rem;
 }
 
 .checkout-page .checkout-trust-badge {

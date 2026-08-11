@@ -23,6 +23,7 @@ import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essent
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
 import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
+import { LocationPageHeroSearchPreview } from "@/app/(public)/vendor/_components/LocationPage/location-page-hero-search";
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
@@ -821,6 +822,9 @@ export default function FormPreview() {
             }
             bannerHeadingValign={
               tryHeroPreviewProps?.bannerHeadingValign ?? undefined
+            }
+            heroFooter={
+              <LocationPageHeroSearchPreview cityLabel={venueLabel} />
             }
           />
         </div>

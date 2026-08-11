@@ -16,7 +16,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DiscountRowsSkeleton } from "./discounts-list-skeleton";
@@ -31,6 +33,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -39,9 +42,11 @@ import {
 } from "@/app/(protected)/_components/page-header-card";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
-import type { DiscountCategory, DiscountStatus } from "../_lib/types";
+import { TypeToConfirmDeleteDialog } from "@/components/modals/type-to-confirm-delete-dialog";
+import type { Discount, DiscountCategory, DiscountStatus } from "../_lib/types";
 import { DISCOUNT_CATEGORY_LABELS } from "../_lib/types";
 import {
+  useDeleteDiscount,
   useDiscounts,
   useUpdateDiscountStatus,
 } from "../_lib/queries";
@@ -51,6 +56,12 @@ import {
   formatDiscountValue,
   getDiscountDisplayName,
 } from "./format";
+
+function discountDeletePhrase(discount: Discount): string {
+  return discount.category === "coupon_code"
+    ? "delete this coupon"
+    : "delete this discount";
+}
 
 const CATEGORY_META: Record<
   DiscountCategory,
@@ -78,6 +89,7 @@ const PER_PAGE = 10;
 
 export function DiscountsList() {
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
   const eventIdParam = searchParams.get("eventId");
   const eventNameParam = searchParams.get("eventName");
 
@@ -86,9 +98,13 @@ export function DiscountsList() {
   const [status, setStatus] = useState<DiscountStatus | "all">("all");
   const [page, setPage] = useState(1);
   const [scopedToEvent, setScopedToEvent] = useState(Boolean(eventIdParam));
+  const [discountToDelete, setDiscountToDelete] = useState<Discount | null>(
+    null,
+  );
 
   const debouncedSearch = useDebounce(search, 400);
   const eventIdNum = eventIdParam ? Number(eventIdParam) : null;
+  const accountEmail = session?.user?.email?.trim() || "";
 
   const queryParams = useMemo(
     () => ({
@@ -110,6 +126,7 @@ export function DiscountsList() {
   const { data, isLoading, isFetching, isError, error, refetch } =
     useDiscounts(queryParams);
   const updateStatus = useUpdateDiscountStatus();
+  const deleteDiscount = useDeleteDiscount();
 
   const items = data?.data ?? [];
   const meta = data?.meta;
@@ -147,6 +164,16 @@ export function DiscountsList() {
       await updateStatus.mutateAsync({ id, status: nextStatus });
     } catch {
       // Mutation state already reflects the failure in the UI
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!discountToDelete) return;
+    try {
+      await deleteDiscount.mutateAsync(discountToDelete.id);
+      setDiscountToDelete(null);
+    } catch {
+      // api-client interceptor surfaces the error toast
     }
   };
 
@@ -366,6 +393,15 @@ export function DiscountsList() {
                               Expired — cannot activate
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600"
+                            disabled={deleteDiscount.isPending}
+                            onClick={() => setDiscountToDelete(discount)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete permanently
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -411,6 +447,45 @@ export function DiscountsList() {
           </>
         )}
       </div>
+
+      {discountToDelete ? (
+        <TypeToConfirmDeleteDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setDiscountToDelete(null);
+          }}
+          title={
+            discountToDelete.category === "coupon_code"
+              ? "Delete coupon"
+              : "Delete discount"
+          }
+          description={
+            <>
+              <p>
+                This will permanently delete{" "}
+                <span className="font-semibold text-foreground">
+                  {getDiscountDisplayName(discountToDelete)}
+                </span>{" "}
+                ({formatDiscountValue(discountToDelete)}) and remove it from
+                this venue.
+              </p>
+              <p>
+                Customers will no longer be able to use this offer at checkout.
+              </p>
+            </>
+          }
+          resourceLabel={getDiscountDisplayName(discountToDelete)}
+          confirmEmail={accountEmail}
+          confirmPhrase={discountDeletePhrase(discountToDelete)}
+          confirmButtonLabel={
+            discountToDelete.category === "coupon_code"
+              ? "Delete coupon"
+              : "Delete discount"
+          }
+          isPending={deleteDiscount.isPending}
+          onConfirm={handleConfirmDelete}
+        />
+      ) : null}
     </div>
   );
 }

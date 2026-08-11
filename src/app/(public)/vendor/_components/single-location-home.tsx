@@ -1,10 +1,6 @@
 "use client";
 
 import CommonHeader from "@/components/shared/common-header";
-import HeroBanner from "./EventListPage/hero-banner";
-import ExperienceSection from "./EventListPage/experience";
-import FooterSection from "./EventListPage/footer";
-import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { useQuery } from "@tanstack/react-query";
 import {
   eventsService,
@@ -15,6 +11,7 @@ import type { LocationData as ThemeLocationData } from "@/types/theme.types";
 import type { LocationData } from "@/services/common/events/type";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ThemeSchema } from "@/types/theme.types";
+import { LocationPageView } from "./LocationPage/location-page-view";
 
 interface SingleLocationHomeProps {
   location: ThemeLocationData;
@@ -60,43 +57,10 @@ export function SingleLocationHome({
   }
 
   return (
-    <>
-      <CommonHeader variant="default" locationSlug={slug} />
-      <HeroBanner
-        locationName={locationData.city || settings?.name || ""}
-        coverImage={locationData.cover_image}
-        coverVideo={locationData.cover_video}
-        bannerHeading={locationData.banner_heading}
-        bannerSubHeading={locationData.banner_sub_heading}
-        bannerHeadingAccent={settings?.banner_heading_accent}
-        headingEmphasis={settings?.typography?.headingEmphasis}
-        bannerHeadingAlign={settings?.banner_heading_align}
-        bannerHeadingValign={settings?.banner_heading_valign}
-      />
-      <LocationMarketingBody
-        className="bg-[var(--color-background)] text-[var(--color-text)]"
-        experience={
-          <ExperienceSection
-            aboutTitle={locationData.about_title}
-            aboutDescription={locationData.about_description}
-          />
-        }
-        latestEvents={locationData.latest_events || []}
-        upcomingEvents={locationData.upcoming_events || []}
-        popularSectionTitle={locationData.event_title_1 || "Popular Events"}
-        upcomingSectionTitle={locationData.event_title_2 || "Upcoming Events"}
-        galleryTitle={
-          locationData.event_gallery_title || "Recent Events Glimpse"
-        }
-        galleryImages={locationData.event_gallery || []}
-        locationSlug={slug}
-        locationLabel={locationData.city ?? null}
-      />
-      <FooterSection
-        copyright={settings?.copyright}
-        logo={settings?.logo}
-        locationSlug={slug}
-      />
-    </>
+    <LocationPageView
+      locationData={locationData}
+      locationSlug={slug}
+      settings={settings}
+    />
   );
 }

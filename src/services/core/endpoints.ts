@@ -19,6 +19,11 @@ export const API_ENDPOINTS = {
       GET_EVENTS_AND_LOCATION_DATA: "/domain/{domain}/locations/{slug}",
       GET_EVENT_BY_SLUG: "/domain/{domain}/events/{slug}",
     },
+    PUBLIC_SEARCH: {
+      SEARCH: "/domain/{domain}/search",
+      AVAILABILITY: "/domain/{domain}/availability",
+      LOCATION_SEARCH: "/domain/{domain}/locations/{location_slug}/search",
+    },
   },
   // Auth Endpoints
   AUTH: {

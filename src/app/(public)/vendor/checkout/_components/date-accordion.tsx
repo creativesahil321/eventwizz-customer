@@ -69,6 +69,12 @@ interface DateAccordionProps {
   drinkTitle?: string;
   /** Server cart event payload for price validation on save. */
   serverEventData?: Record<string, unknown> | null;
+  /** Automatic date discount label from cart API (`discount.value_label`). */
+  discountLabel?: string | null;
+  /** Monetary saving when the date offer is currently eligible. */
+  discountAmount?: number | null;
+  /** Why the offer is locked (e.g. min guests) — shown instead of “applied”. */
+  discountLockedHint?: string | null;
 }
 
 function CheckoutAvailabilityHint({
@@ -111,6 +117,9 @@ export default function DateAccordion({
   roomName,
   drinkTitle = "Drinks",
   serverEventData = null,
+  discountLabel = null,
+  discountAmount = null,
+  discountLockedHint = null,
 }: DateAccordionProps) {
   const { format: formatMoney, formatCompact: formatMoneyUnit } =
     useCurrencyFormat();
@@ -181,6 +190,11 @@ export default function DateAccordion({
   }, [isExpanded, hasChanges, isSaving, isAutoSaving, isPreviewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAmount = calculateEditableDateTotal(dateData);
+  const appliedDiscount =
+    typeof discountAmount === "number" && discountAmount > 0
+      ? discountAmount
+      : 0;
+  const payableAmount = Math.max(0, totalAmount - appliedDiscount);
 
   const handleSaveDate = async (): Promise<boolean> => {
     if (isSavingRef.current || isSaving) {
@@ -468,7 +482,7 @@ export default function DateAccordion({
               <span className="hidden sm:inline">{formatDate(date)}</span>
               <span className="sm:hidden">{formatDateMobile(date)}</span>
             </h3>
-            <p className="mt-0.5 truncate text-[11px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:text-xs">
+            <p className="mt-0.5 line-clamp-2 text-[12px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:line-clamp-1 sm:text-xs">
               {trimmedRoomName ? (
                 <>
                   <span className="font-semibold text-[color:var(--checkout-brand-accent)]">
@@ -498,11 +512,32 @@ export default function DateAccordion({
             </span>
           )}
 
-          {totalAmount > 0 && (
-            <span className="text-sm font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
-              {formatMoney(totalAmount)}
-            </span>
-          )}
+          <div className="flex max-w-[9.5rem] flex-col items-end gap-0.5 sm:max-w-none">
+            {appliedDiscount > 0 && discountLabel?.trim() ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                {discountLabel.trim()}
+              </span>
+            ) : discountLockedHint?.trim() && discountLabel?.trim() ? (
+              <span
+                className="max-w-full truncate rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
+                title={discountLockedHint.trim()}
+              >
+                Unlock: {discountLabel.trim()}
+              </span>
+            ) : null}
+            {totalAmount > 0 && (
+              <div className="flex flex-col items-end">
+                {appliedDiscount > 0 ? (
+                  <span className="text-[11px] tabular-nums text-[color:var(--checkout-muted-foreground)] line-through">
+                    {formatMoney(totalAmount)}
+                  </span>
+                ) : null}
+                <span className="text-sm font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
+                  {formatMoney(payableAmount)}
+                </span>
+              </div>
+            )}
+          </div>
 
           {onRemoveDate && (
             <button

@@ -1,4 +1,5 @@
 import type { DatesSectionType } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
+import { withDateCardOffersFromApi } from "@/components/public/date-card-offer";
 import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 import type { EventDetail, EventDetailRoom } from "@/services/common/events/type";
 import {
@@ -6,6 +7,12 @@ import {
   pickRoomHighlights,
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
+
+function mapPublicDates(
+  dates: DatesSectionType | undefined,
+): DatesSectionType | undefined {
+  return withDateCardOffersFromApi(dates) as DatesSectionType | undefined;
+}
 
 export type PublicEventRoomRef = {
   room_id: number;
@@ -197,7 +204,7 @@ function flatSlicesFromEvent(event: EventDetail): PublicEventActiveSlices {
     package_image: event.package_image ?? "",
     package_details: event.package_details ?? [],
     package_button_name: event.package_button_name ?? "Book Now",
-    dates: event.dates,
+    dates: mapPublicDates(event.dates),
     event_galley: event.event_galley ?? [],
     menu_title: event.menu_title ?? "",
     menu_description: event.menu_description ?? "",
@@ -232,7 +239,7 @@ function roomSlicesFromPayload(
     package_image: payload.package_image ?? "",
     package_details: payload.package_details ?? [],
     package_button_name: event.package_button_name ?? "Book Now",
-    dates: payload.dates,
+    dates: mapPublicDates(payload.dates),
     event_galley: payload.event_galley ?? [],
     menu_title: payload.menu_title ?? "",
     menu_description: payload.menu_description ?? "",

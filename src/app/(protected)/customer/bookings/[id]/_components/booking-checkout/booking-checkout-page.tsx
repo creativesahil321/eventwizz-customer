@@ -77,6 +77,8 @@ import {
   DEFAULT_STRIPE_PAYMENT_GATEWAY,
   normalizeReschedulePaymentGateways,
 } from "@/services/customer/bookings/reschedule-utils";
+import { BookingAppliedOffers } from "@/components/bookings/booking-applied-offers";
+import type { ResolvedBookingAppliedOffer } from "@/lib/booking-applied-offer";
 
 interface CheckoutDate extends BookingDateSource {
   booking_date_id: number;
@@ -224,6 +226,7 @@ interface BookingCheckoutPageProps {
     paid: number;
     outstanding: number;
     depositSelected: number;
+    appliedOffers?: ResolvedBookingAppliedOffer[];
   };
   dates: CheckoutDate[];
   paymentGateways?: Array<{ id: number; slug: string }>;
@@ -793,6 +796,18 @@ export default function BookingCheckoutPage({
 
       {/* Payment summary — scrolls with page on mobile; pay bar is separate sticky strip */}
       <section className="overflow-hidden border-t border-border bg-card lg:border lg:rounded-b-xl">
+        {summary.appliedOffers && summary.appliedOffers.length > 0 ? (
+          <div className="border-b border-border bg-card px-4 py-3 sm:px-6 lg:px-8">
+            <p className="mb-2 text-[10px] font-extrabold tracking-[0.14em] uppercase text-muted-foreground">
+              Applied offers
+            </p>
+            <BookingAppliedOffers
+              offers={summary.appliedOffers}
+              formatMoney={formatCurrency}
+              variant="pills"
+            />
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-3 border-b border-border bg-card p-4 py-3 pr-14 sm:p-6 sm:pr-6 lg:p-8 lg:pr-8 sm:py-3.5">
           <p className="text-[10px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">
             Payment Summary
@@ -828,6 +843,7 @@ export default function BookingCheckoutPage({
                 paid={summary.paid}
                 outstanding={summary.outstanding}
                 formatCurrency={formatCurrency}
+                appliedOffers={summary.appliedOffers}
               />
             </div>
           </div>

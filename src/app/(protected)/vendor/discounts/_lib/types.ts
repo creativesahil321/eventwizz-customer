@@ -47,12 +47,12 @@ export interface DiscountDateEntry {
   value_label?: string | null;
   /** Show badge on public event date picker. */
   show_on_event_page?: boolean | null;
-  /** @deprecated API uses `show_on_event_page`. */
+  /** Legacy alias — form still uses `show_on_banner`; mapped in build-store-payload. */
   show_on_banner?: boolean | null;
   /** Offer live status (`active` | `inactive`). */
   status?: DiscountStatus | string | null;
   stored_status?: DiscountStatus | string | null;
-  /** @deprecated Prefer `status === "active"`. */
+  /** Legacy alias — form still uses `is_live`; mapped to `status` on save. */
   is_live?: boolean | null;
   sort_order?: number | null;
 }
@@ -66,13 +66,13 @@ export interface Discount {
   show_on_event_page?: boolean | null;
   /** Coupon usable at checkout. */
   show_on_checkout?: boolean | null;
-  /** @deprecated API uses `show_on_event_page`. */
+  /** Legacy alias — form still uses `show_on_banner`; mapped in build-store-payload. */
   show_on_banner?: boolean | null;
   /** Small eyebrow on the coupon strip (e.g. "Limited time offer"). */
   banner_heading?: string | null;
   /** Main promo line on the coupon strip. */
   banner_subheading?: string | null;
-  /** @deprecated API uses `banner_subheading`. */
+  /** Legacy alias — form still uses `dynamic_text`; mapped to `banner_subheading`. */
   dynamic_text?: string | null;
   discount_type: DiscountType;
   flat_mode: FlatDiscountMode | string | null;
@@ -94,7 +94,7 @@ export interface Discount {
   room: DiscountRelation | null;
   /** Multi-date Discount offer rows. */
   offers?: DiscountDateEntry[] | null;
-  /** @deprecated API uses `offers`. */
+  /** Legacy alias — hydrate prefers `offers`, falls back to `dates`. */
   dates?: DiscountDateEntry[] | null;
   customers?: DiscountCustomer[];
   valid_from: string | null;
@@ -165,9 +165,6 @@ export interface DiscountOfferPayload {
   /** Immediately live at checkout. */
   status: "active" | "inactive";
 }
-
-/** @deprecated Use `DiscountOfferPayload`. */
-export type DiscountDatePayload = DiscountOfferPayload;
 
 /**
  * POST /vendor/discounts/store

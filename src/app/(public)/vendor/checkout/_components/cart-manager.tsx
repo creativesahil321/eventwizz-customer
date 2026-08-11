@@ -40,6 +40,11 @@ import {
   getRoomDrinkTitle,
   calculateRoomSubtotal,
   getDateGuestCount,
+  getApiDateDiscount,
+  calculateEditableDateTotal,
+  computeDateDiscountAmount,
+  isDateDiscountEligible,
+  getDateDiscountMinPeople,
 } from "../_lib/cart-calculations";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
@@ -52,6 +57,10 @@ import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useCartSync } from "../_lib/hooks/useCartSync";
 import { useLocationSlug } from "../_lib/hooks/useLocationSlug";
 import { generateEventBookingUrl } from "../_lib/utils/event-url";
+import {
+  checkoutDateDomId,
+  subscribeCheckoutDateFocus,
+} from "../_lib/checkout-date-focus";
 import { hasRemainingDatesToAdd } from "../_lib/remaining-dates";
 import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
@@ -211,6 +220,28 @@ export default function CartManager({}: CartManagerProps) {
     hasInitializedExpanded.current = false;
     setExpandedDates(new Set());
   }, [currentEventSlug]);
+
+  // Offers panel → expand + scroll to the matching date accordion.
+  useEffect(() => {
+    return subscribeCheckoutDateFocus((dateKey) => {
+      const { roomId } = parseRoomDateKey(dateKey);
+      if (roomId != null && roomId !== activeRoomId) {
+        setActiveRoomId(roomId);
+      }
+
+      setExpandedDates((prev) => {
+        if (roomMode) return new Set([dateKey]);
+        const next = new Set(prev);
+        next.add(dateKey);
+        return next;
+      });
+
+      window.setTimeout(() => {
+        const el = document.getElementById(checkoutDateDomId(dateKey));
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, roomId != null && roomId !== activeRoomId ? 80 : 40);
+    });
+  }, [activeRoomId, roomMode]);
 
   useEffect(() => {
     if (firstDate && !hasInitializedExpanded.current) {
@@ -410,7 +441,14 @@ export default function CartManager({}: CartManagerProps) {
       if (!dateData) return sum;
       return sum + getDateGuestCount(dateData);
     }, 0);
-  }, [currentEventSlug, currentEventApiData, roomMode, getDateData]);
+    // editingData: guest counts live in the cart edit store, not only API cart.
+  }, [
+    currentEventSlug,
+    currentEventApiData,
+    roomMode,
+    getDateData,
+    editingData,
+  ]);
 
   const handleRemoveDate = async (dateKey: string) => {
     if (removingDateKey || deleteCartDateMutation.isPending) return;
@@ -565,45 +603,59 @@ export default function CartManager({}: CartManagerProps) {
       : "";
 
   const bookingHeader = (
-    <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--checkout-brand-accent)]">
-          Your Booking
-        </p>
-        <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[color:var(--checkout-brand-primary)] sm:text-2xl">
-          {currentEventApiData?.event_name || "Your Booking"}
-        </h1>
-        {locationName ? (
-          <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[color:var(--checkout-muted-foreground)] sm:text-xs">
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-[color:var(--checkout-brand-accent)]" />
-            <span className="truncate">{locationName}</span>
+    <div className="mb-4 space-y-3 sm:mb-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--checkout-brand-accent)]">
+            Your Booking
           </p>
-        ) : null}
-        <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:text-xs">
-          {bookingMetaLine}
-        </p>
+          <h1 className="mt-1 text-xl font-extrabold tracking-tight text-[color:var(--checkout-brand-primary)] sm:text-2xl">
+            {currentEventApiData?.event_name || "Your Booking"}
+          </h1>
+          {locationName ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-[color:var(--checkout-muted-foreground)]">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-[color:var(--checkout-brand-accent)]" />
+              <span className="truncate">{locationName}</span>
+            </p>
+          ) : null}
+          <p className="mt-1 text-xs font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)]">
+            {bookingMetaLine}
+          </p>
+        </div>
+
+        {showClearConfirm ? null : (
+          <button
+            type="button"
+            onClick={() => setShowClearConfirm(true)}
+            aria-label="Clear cart"
+            title="Clear cart"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color:var(--checkout-border)] bg-white text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500 sm:hidden"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+      <div className="flex items-center gap-2">
         {showAddDates && addDatesUrl ? (
           <Link
             href={addDatesUrl}
             className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--checkout-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)] sm:flex-none sm:px-4"
           >
             <CalendarPlus className="h-4 w-4 shrink-0" />
-            <span className="truncate">Add Dates</span>
+            <span>Add Dates</span>
           </Link>
         ) : null}
 
         {showClearConfirm ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-1 items-center gap-1.5 sm:flex-none">
             <button
               type="button"
               onClick={handleClearAllCart}
               disabled={isProcessing || clearAllCartMutation.isPending}
-              className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-600 hover:bg-red-50"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-600 hover:bg-red-50 sm:flex-none"
             >
-              {clearAllCartMutation.isPending ? "Clearing..." : "Confirm"}
+              {clearAllCartMutation.isPending ? "Clearing..." : "Confirm clear"}
             </button>
             <button
               type="button"
@@ -619,10 +671,10 @@ export default function CartManager({}: CartManagerProps) {
             onClick={() => setShowClearConfirm(true)}
             aria-label="Clear cart"
             title="Clear cart"
-            className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-2.5 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500 sm:px-3"
+            className="hidden min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500 sm:inline-flex"
           >
             <Trash2 className="h-4 w-4 shrink-0" />
-            <span className="hidden text-sm font-semibold sm:inline">Clear</span>
+            <span className="text-sm font-semibold">Clear</span>
           </button>
         )}
       </div>
@@ -650,7 +702,11 @@ export default function CartManager({}: CartManagerProps) {
         if (!dateData || !currentEventSlug) return null;
 
         return (
-          <div key={date}>
+          <div
+            key={date}
+            id={checkoutDateDomId(date)}
+            className="scroll-mt-[calc(var(--checkout-header-offset)+0.75rem)]"
+          >
             <DateAccordion
               eventSlug={currentEventSlug}
               date={date}
@@ -667,6 +723,42 @@ export default function CartManager({}: CartManagerProps) {
               }
               drinkTitle={drinkTitle}
               serverEventData={currentEventApiData}
+              {...(() => {
+                const discount = getApiDateDiscount(
+                  currentEventApiData,
+                  date,
+                );
+                const label = discount?.value_label?.trim() || null;
+                if (!discount || !label) {
+                  return {
+                    discountLabel: null,
+                    discountAmount: null as number | null,
+                    discountLockedHint: null as string | null,
+                  };
+                }
+
+                const guests = getDateGuestCount(dateData);
+                const dateTotal = calculateEditableDateTotal(dateData);
+                const eligible = isDateDiscountEligible(discount, guests);
+                const amount = eligible
+                  ? computeDateDiscountAmount(discount, dateTotal, guests)
+                  : 0;
+                const minPeople = getDateDiscountMinPeople(discount);
+                const lockedHint =
+                  !eligible &&
+                  discount.flat_mode === "per_person" &&
+                  minPeople != null
+                    ? `Min ${minPeople} guests`
+                    : !eligible
+                      ? "Offer not available yet"
+                      : null;
+
+                return {
+                  discountLabel: label,
+                  discountAmount: amount > 0 ? amount : null,
+                  discountLockedHint: lockedHint,
+                };
+              })()}
             />
           </div>
         );

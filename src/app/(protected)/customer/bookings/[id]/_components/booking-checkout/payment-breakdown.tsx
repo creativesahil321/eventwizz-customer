@@ -7,6 +7,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
+import { BookingAppliedOffers } from "@/components/bookings/booking-applied-offers";
+import type { ResolvedBookingAppliedOffer } from "@/lib/booking-applied-offer";
 import {
   getAddonCategoryLabel,
   splitAddonsByCategory,
@@ -228,6 +230,7 @@ export function PaymentBreakdownTotals({
   paid,
   outstanding,
   formatCurrency,
+  appliedOffers = [],
 }: {
   subTotal: number;
   /** Unpaid pending add-ons — shown separately from booking subtotal. */
@@ -235,6 +238,8 @@ export function PaymentBreakdownTotals({
   paid: number;
   outstanding: number;
   formatCurrency: (amount: number) => string;
+  /** Coupons / date offers already applied on this booking (read-only). */
+  appliedOffers?: ResolvedBookingAppliedOffer[];
 }) {
   return (
     <div className="space-y-2 rounded-lg border border-border bg-card px-4 py-3">
@@ -244,6 +249,13 @@ export function PaymentBreakdownTotals({
           {formatCurrency(subTotal)}
         </span>
       </div>
+      {appliedOffers.length > 0 ? (
+        <BookingAppliedOffers
+          offers={appliedOffers}
+          formatMoney={formatCurrency}
+          variant="rows"
+        />
+      ) : null}
       {addOns > 0 && (
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Extra add-ons</span>

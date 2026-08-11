@@ -39,8 +39,8 @@ import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
 import { SiteHeading } from "@/components/public/site-heading";
 import {
-  attachDemoDateOffers,
   type DateCardOffer,
+  type PublicEventDateDiscount,
 } from "@/components/public/date-card-offer";
 import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
 import { savePendingBooking } from "@/lib/booking/pending-booking";
@@ -59,8 +59,10 @@ export type DatesSectionType = {
   event_date: string;
   price: number;
   sold_out?: boolean;
-  /** Public date-card offer (API or temporary demo). */
+  /** Mapped for date cards (from API `discount` via room slices). */
   offer?: DateCardOffer | null;
+  /** Raw domain-event API field. */
+  discount?: PublicEventDateDiscount | null;
 }[];
 
 type DatesSectionProps = {
@@ -848,10 +850,7 @@ export default function DatesSection({
     );
   }
 
-  // Temporary demo badges on the customer site until event API returns offers.
-  const displayDates = isOnboarding
-    ? dates
-    : attachDemoDateOffers(dates);
+  const displayDates = dates;
 
   const firstRowCount = Math.min(itemsPerRow, displayDates.length);
   const secondRowCount = Math.min(

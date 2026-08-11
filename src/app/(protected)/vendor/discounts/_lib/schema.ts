@@ -66,13 +66,13 @@ export const discountDateEntrySchema = z.object({
   original_valid_from: z.string().optional().nullable(),
   expires_at: z.string().default(""),
   /**
-   * When true, show this offer’s badge (e.g. 10% OFF) on the public event
-   * date picker. Per-date — discounts only.
+   * Per-date badge on the public event date picker (discounts only).
+   * Form alias for API `offers[].show_on_event_page`.
    */
   show_on_banner: z.boolean().default(true),
   /**
-   * When true, this date’s offer is live for checkout as soon as saved.
-   * Off keeps the row saved but paused.
+   * Per-date live toggle (discounts only).
+   * Form alias for API `offers[].status` (`active` | `inactive`).
    */
   is_live: z.boolean().default(true),
 });
@@ -85,6 +85,14 @@ export function isDiscountDateOfferBlank(entry: {
   expires_at?: string | null;
 }): boolean {
   return !(Number(entry.discount_value) > 0) && !Boolean(entry.expires_at?.trim());
+}
+
+/** Configured offer: has a positive value and an expiry date. */
+export function isDiscountDateOfferReady(entry: {
+  discount_value?: number | null;
+  expires_at?: string | null;
+}): boolean {
+  return Number(entry.discount_value) > 0 && Boolean(entry.expires_at?.trim());
 }
 
 export const defaultDiscountDateEntry = (): DiscountDateFormEntry => ({
@@ -248,8 +256,8 @@ export const discountFormSchema = z
     dates: z.array(discountDateEntrySchema).default([]),
     coupon_code: z.string().optional().nullable(),
     /**
-     * Show on the customer-facing event page (coupon banner strip, or
-     * discount badges). Turn off for private / email-only offers.
+     * Coupon: show event-page banner strip.
+     * Form alias for API `show_on_event_page` (mapped in build-store-payload).
      */
     show_on_banner: z.boolean().default(true),
     /** Small eyebrow on the coupon strip (e.g. Limited time offer). */
@@ -261,7 +269,10 @@ export const discountFormSchema = z
       )
       .optional()
       .nullable(),
-    /** Main promo line (subheading) on the coupon strip. */
+    /**
+     * Coupon strip subheading.
+     * Form alias for API `banner_subheading` (mapped in build-store-payload).
+     */
     dynamic_text: z
       .string()
       .max(

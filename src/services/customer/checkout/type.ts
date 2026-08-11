@@ -67,6 +67,10 @@ export interface CheckoutRequest {
   sub_total: number;
   partial_payment: number | null;
   total: number;
+  /** Applied event coupon code (when customer enters a valid code). */
+  coupon_code?: string | null;
+  /** Monetary discount applied to the booking (client-computed preview). */
+  discount_amount?: number | null;
   dates?: CheckoutDateData[];
   rooms?: CheckoutRoomData[];
 }

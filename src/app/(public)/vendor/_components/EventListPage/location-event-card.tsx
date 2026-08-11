@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Loader2 } from "lucide-react";
+import { Calendar, Loader2, MapPin } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -21,8 +21,10 @@ export type LocationEventCardModel = {
 type LocationEventCardProps = {
   event: LocationEventCardModel;
   locationSlug: string;
-  /** Kept for API compatibility; public cards omit location row in the UI */
+  /** City / venue label — shown when `showLocationChip` is true (cross-location search). */
   locationLabel?: string | null;
+  /** Cross-location search results need a small location chip on the card. */
+  showLocationChip?: boolean;
   isPending: boolean;
   onNavigateStart: () => void;
   imageFallback: string;
@@ -35,6 +37,8 @@ type LocationEventCardProps = {
 export function LocationEventCard({
   event,
   locationSlug,
+  locationLabel = null,
+  showLocationChip = false,
   isPending,
   onNavigateStart,
   imageFallback,
@@ -107,6 +111,12 @@ export function LocationEventCard({
         >
           {event.title}
         </h3>
+        {showLocationChip && locationLabel ? (
+          <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-white/70">
+            <MapPin className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+            <span className="truncate">{locationLabel}</span>
+          </p>
+        ) : null}
       </div>
     </>
   );

@@ -46,7 +46,11 @@ export default function EditDiscountPage() {
       <Shell className="items-start gap-4 pb-4">
         <BackButton href="/vendor/discounts" label="Back to Discounts" />
         <ProtectedPageHeader
-          title="Edit Discount"
+          title={
+            discount.category === "coupon_code"
+              ? "Edit Coupon Code"
+              : "Edit Discount"
+          }
           description="Update the offer scope, value, schedule, status, or customer audience."
         />
         <DiscountFormWizard mode="edit" initialDiscount={discount} />

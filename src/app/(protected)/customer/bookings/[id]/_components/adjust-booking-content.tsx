@@ -14,10 +14,41 @@ import { bookingsService } from "@/services/customer/bookings/bookings.service";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { buildCartDateLookupKey } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import {
+  resolveBookingAppliedOffers,
+  type ResolvedBookingAppliedOffer,
+} from "@/lib/booking-applied-offer";
 import BookingCheckoutPage from "./booking-checkout/booking-checkout-page";
 import type { BookingDateSource } from "./booking-checkout/build-line-items";
-import type { BookingRescheduleRequest } from "@/services/customer/bookings/type";
+import type {
+  BookingDetailsData,
+  BookingRescheduleRequest,
+} from "@/services/customer/bookings/type";
 import { useState } from "react";
+
+function collectBookingAppliedOffers(
+  bookingData: BookingDetailsData,
+): ResolvedBookingAppliedOffer[] {
+  const fromRoot = resolveBookingAppliedOffers(bookingData);
+  const fromSummary = resolveBookingAppliedOffers(bookingData.payment_summary);
+  const fromDates = bookingData.dates.flatMap((dateEntry) =>
+    resolveBookingAppliedOffers({
+      discount: dateEntry.discount ?? null,
+      value_label: dateEntry.value_label,
+      discount_amount: dateEntry.discount_amount,
+    }),
+  );
+
+  const merged: ResolvedBookingAppliedOffer[] = [];
+  const seen = new Set<string>();
+  for (const offer of [...fromRoot, ...fromSummary, ...fromDates]) {
+    const key = `${offer.kind}|${offer.code ?? ""}|${offer.label ?? ""}|${offer.amount ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(offer);
+  }
+  return merged;
+}
 
 interface AdjustBookingContentProps {
   bookingId: string;
@@ -190,6 +221,7 @@ export default function AdjustBookingContent({
             paid: paidAmount,
             outstanding: outstandingAmount,
             depositSelected: depositSelectedAmount,
+            appliedOffers: collectBookingAppliedOffers(bookingData),
           },
           dates,
         };

@@ -11,6 +11,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -292,6 +293,17 @@ export const getColumns = ({
                 </DropdownMenuItem>
               </PermissionGuard>
             )}
+            {!row.original.is_default ? (
+              <PermissionGuard permissionKey="update-event-location">
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-600"
+                  onClick={() => setRowAction({ type: "delete", row })}
+                >
+                  Delete permanently
+                </DropdownMenuItem>
+              </PermissionGuard>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       );

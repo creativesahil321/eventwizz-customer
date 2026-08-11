@@ -6,6 +6,8 @@
 
 import { ApiResponse as BaseApiResponse } from "../../core/api-client";
 import { DatesSectionType } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
+import type { CouponStripSource } from "@/lib/coupon-strip-props";
+import type { PublicEventDateDiscount } from "@/components/public/date-card-offer";
 
 /**
  * Event definition for location pages
@@ -206,6 +208,9 @@ export interface EventDetailRoom {
   brochure_pdf_2: string | null;
 }
 
+/** Re-export for callers typing date-level discounts from the domain event API. */
+export type { PublicEventDateDiscount };
+
 /**
  * Event detail type definition for single event page
  */
@@ -214,6 +219,11 @@ export interface EventDetail {
   is_rooms?: boolean | number | string;
   /** Room-keyed payloads returned by the public event detail API. */
   rooms?: Record<string, EventDetailRoom>;
+  /**
+   * Event-level coupon for the public banner strip
+   * (`show_on_event_page` controls visibility).
+   */
+  coupon?: CouponStripSource | null;
   /** Present on single-room events; room-mode payloads use `rooms` instead. */
   event_schedular_background_image?: string | null;
   menu_background_image?: string | null;

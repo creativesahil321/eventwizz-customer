@@ -30,6 +30,20 @@ export interface BookingDate {
   status: string; // e.g., "Pending", "Confirmed", "confirmed"
 }
 
+/** Coupon / date discount already applied on a saved booking (read-only). */
+export interface BookingAppliedOffer {
+  coupon_code?: string | null;
+  discount_code?: string | null;
+  value_label?: string | null;
+  discount_label?: string | null;
+  label?: string | null;
+  discount_amount?: number | string | null;
+  amount?: number | string | null;
+  discount_type?: string | null;
+  kind?: string | null;
+  category?: string | null;
+}
+
 /**
  * Individual booking item from API response
  */
@@ -46,6 +60,17 @@ export interface BookingItem {
   total: string;
   created_date: string;
   booking_dates: BookingDate[];
+  /** Applied coupon code (when booking used a checkout coupon). */
+  coupon_code?: string | null;
+  discount_code?: string | null;
+  value_label?: string | null;
+  discount_label?: string | null;
+  discount_amount?: number | string | null;
+  discount?: BookingAppliedOffer | null;
+  applied_offer?: BookingAppliedOffer | null;
+  coupon?: BookingAppliedOffer | null;
+  offers?: BookingAppliedOffer[] | null;
+  applied_offers?: BookingAppliedOffer[] | null;
 }
 
 /**
@@ -300,6 +325,10 @@ export interface BookingDetailsDate {
   tables: BookingDetailsTable[];
   addons?: BookingDetailsAddons;
   reschedule_requests?: BookingRescheduleRequest[];
+  /** Per-date automatic offer applied at checkout (read-only). */
+  discount?: BookingAppliedOffer | null;
+  value_label?: string | null;
+  discount_amount?: number | string | null;
 }
 
 /** Top-level payment summary on booking details */
@@ -317,6 +346,16 @@ export interface BookingPaymentSummary {
   /** @deprecated use total_addons_amount */
   addons_amount?: number | null;
   deposit_amount?: number | null;
+  coupon_code?: string | null;
+  discount_code?: string | null;
+  value_label?: string | null;
+  discount_label?: string | null;
+  discount_amount?: number | string | null;
+  discount?: BookingAppliedOffer | null;
+  applied_offer?: BookingAppliedOffer | null;
+  coupon?: BookingAppliedOffer | null;
+  offers?: BookingAppliedOffer[] | null;
+  applied_offers?: BookingAppliedOffer[] | null;
 }
 
 /**
@@ -343,6 +382,16 @@ export interface BookingDetailsData {
   }>;
   dates: BookingDetailsDate[];
   payment_summary: BookingPaymentSummary;
+  coupon_code?: string | null;
+  discount_code?: string | null;
+  value_label?: string | null;
+  discount_label?: string | null;
+  discount_amount?: number | string | null;
+  discount?: BookingAppliedOffer | null;
+  applied_offer?: BookingAppliedOffer | null;
+  coupon?: BookingAppliedOffer | null;
+  offers?: BookingAppliedOffer[] | null;
+  applied_offers?: BookingAppliedOffer[] | null;
 }
 
 /**

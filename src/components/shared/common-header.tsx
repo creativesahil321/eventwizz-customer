@@ -622,9 +622,10 @@ export default function CommonHeader({
   const browseIconVisibilityClass = usePreviewContainerQueries
     ? "h-4 w-4 shrink-0 @xl/preview:hidden"
     : "h-4 w-4 shrink-0 xl:hidden";
+  // Mobile ~44px tall / ~10rem wide keeps long wordmarks readable without crowding nav icons.
   const logoSizeClass = usePreviewContainerQueries
-    ? "max-h-10 max-w-[min(100%,7.5rem)] w-auto object-contain @xl/preview:max-h-12 @xl/preview:max-w-[min(100%,11rem)]"
-    : "max-h-10 max-w-[min(100%,7.5rem)] w-auto object-contain xl:max-h-12 xl:max-w-[min(100%,11rem)]";
+    ? "max-h-11 max-w-[min(100%,10rem)] w-auto object-contain @xl/preview:max-h-12 @xl/preview:max-w-[min(100%,12rem)]"
+    : "max-h-11 max-w-[min(100%,10rem)] w-auto object-contain xl:max-h-12 xl:max-w-[min(100%,12rem)]";
   // Keep actions above the logo column so a wide mark cannot cover/clip the phone pill.
   const desktopActionsRowClass = usePreviewContainerQueries
     ? "relative z-10 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 text-xs @xl/preview:gap-2 @xl/preview:text-sm"

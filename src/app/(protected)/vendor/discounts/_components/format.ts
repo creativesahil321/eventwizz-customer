@@ -3,34 +3,12 @@ import {
   DISCOUNT_CATEGORY_LABELS,
   FLAT_MODE_LABELS,
 } from "../_lib/types";
-import { normalizeFlatMode } from "../_lib/build-store-payload";
+import {
+  discountOfferRows,
+  formatOfferAmountLabel,
+  normalizeFlatMode,
+} from "../_lib/offers";
 import { formatGuideDate } from "../_lib/schema";
-
-function formatAmountLabel(
-  discountType: Discount["discount_type"] | undefined,
-  amount: number,
-  flatMode: string | null | undefined,
-  minPeople?: number | null,
-): string {
-  if (discountType !== "flat") {
-    return `${amount}% off`;
-  }
-  const mode = normalizeFlatMode(flatMode);
-  if (mode === "per_person") {
-    return `£${amount} / person${minPeople ? ` (min ${minPeople})` : ""}`;
-  }
-  return `£${amount} off total`;
-}
-
-function discountOfferRows(discount: Discount) {
-  if (Array.isArray(discount.offers) && discount.offers.length > 0) {
-    return discount.offers;
-  }
-  if (Array.isArray(discount.dates) && discount.dates.length > 0) {
-    return discount.dates;
-  }
-  return [];
-}
 
 export function formatDiscountValue(discount: Discount): string {
   if (discount.value_label?.trim()) return discount.value_label;
@@ -38,7 +16,7 @@ export function formatDiscountValue(discount: Discount): string {
   const offers = discountOfferRows(discount);
   if (offers.length > 1) {
     const labels = offers.map((d) =>
-      formatAmountLabel(
+      formatOfferAmountLabel(
         d.discount_type,
         d.amount,
         d.flat_mode,
@@ -56,11 +34,16 @@ export function formatDiscountValue(discount: Discount): string {
     const d = offers[0];
     return (
       d.value_label?.trim() ||
-      formatAmountLabel(d.discount_type, d.amount, d.flat_mode, d.min_people)
+      formatOfferAmountLabel(
+        d.discount_type,
+        d.amount,
+        d.flat_mode,
+        d.min_people,
+      )
     );
   }
 
-  return formatAmountLabel(
+  return formatOfferAmountLabel(
     discount.discount_type,
     discount.amount,
     discount.flat_mode,

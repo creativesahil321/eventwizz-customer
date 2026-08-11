@@ -21,7 +21,6 @@ import {
 } from "@/components/public/event-coupon-strip";
 import {
   couponToStripProps,
-  DEMO_EVENT_BANNER_COUPON,
   type CouponStripSource,
 } from "@/lib/coupon-strip-props";
 import {
@@ -92,32 +91,9 @@ export default function EventDetailClient({
   });
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
-  /**
-   * Banner coupon for the strip. Prefer event payload coupons when the API
-   * exposes them (`show_on_event_page`); until then use the shared demo source so
-   * props still go through `couponToStripProps`.
-   */
+  /** Event-level coupon from GET /domain/{domain}/events/{slug}. */
   const bannerCouponSource = useMemo((): CouponStripSource | null => {
-    const fromEvent = (
-      eventData as EventDetail & {
-        banner_coupon?: CouponStripSource | null;
-        coupons?: CouponStripSource[] | null;
-      }
-    ).banner_coupon;
-    if (fromEvent) return fromEvent;
-
-    const list = (
-      eventData as EventDetail & {
-        coupons?: CouponStripSource[] | null;
-      }
-    ).coupons;
-    const firstBanner = list?.find((c) => {
-      if (typeof c.show_on_event_page === "boolean") return c.show_on_event_page;
-      return c.show_on_banner !== false;
-    });
-    if (firstBanner) return firstBanner;
-
-    return DEMO_EVENT_BANNER_COUPON;
+    return eventData.coupon ?? null;
   }, [eventData]);
 
   const couponStripProps = useMemo(

@@ -1,6 +1,6 @@
 /**
  * Optional per-date public offer shown on Select-a-Date cards.
- * Until the event API returns real discounts, callers may attach demo data.
+ * Mapped from domain event API `dates[].discount` / `rooms.*.dates[].discount`.
  */
 export type DateCardOffer = {
   /** When false, offer applies at checkout only — card shows list price. */
@@ -10,11 +10,27 @@ export type DateCardOffer = {
   flat_mode?: "total" | "per_person" | null;
 };
 
+/** Raw per-date discount from GET /domain/{domain}/events/{slug}. */
+export type PublicEventDateDiscount = {
+  id?: number;
+  discount_id?: number;
+  discount_type?: "percentage" | "flat" | string | null;
+  flat_mode?: "total" | "per_person" | string | null;
+  amount?: number | null;
+  /** Required guest count for `flat_mode: "per_person"` offers. */
+  min_people?: number | null;
+  value_label?: string | null;
+  show_on_event_page?: boolean | null;
+  expires_at?: string | null;
+};
+
 export type DateWithOptionalOffer = {
   event_date: string;
   price: number;
   sold_out?: boolean;
   offer?: DateCardOffer | null;
+  /** API field — mapped to `offer` for the date cards. */
+  discount?: PublicEventDateDiscount | null;
 };
 
 /** Compact badge, e.g. `20% OFF` / `£10 OFF`. */
@@ -42,41 +58,40 @@ export function isDateCardOfferVisible(
   );
 }
 
-/**
- * Demo offers for customer-facing date cards until API wiring lands.
- * First bookable date gets 20% off; second gets a flat £10 off when priced.
- */
-export function attachDemoDateOffers<T extends DateWithOptionalOffer>(
-  dates: T[],
-): T[] {
-  let bookableIndex = 0;
-  return dates.map((date) => {
-    if (date.sold_out || !(date.price > 0) || date.offer) return date;
-    const slot = bookableIndex;
-    bookableIndex += 1;
-    if (slot === 0) {
-      return {
-        ...date,
-        offer: {
-          show_on_page: true,
-          value_type: "percentage",
-          discount_value: 20,
-        },
-      };
-    }
-    if (slot === 1 && date.price > 10) {
-      return {
-        ...date,
-        offer: {
-          show_on_page: true,
-          value_type: "flat",
-          discount_value: 10,
-          flat_mode: "total",
-        },
-      };
-    }
-    return date;
-  });
+/** Map API `discount` → date-card `offer`. */
+export function mapApiDiscountToDateCardOffer(
+  discount: PublicEventDateDiscount | null | undefined,
+): DateCardOffer | null {
+  if (!discount) return null;
+  const type = discount.discount_type;
+  if (type !== "percentage" && type !== "flat") return null;
+  const amount = Number(discount.amount);
+  if (!Number.isFinite(amount) || !(amount > 0)) return null;
+
+  return {
+    show_on_page: discount.show_on_event_page !== false,
+    value_type: type,
+    discount_value: amount,
+    flat_mode:
+      type === "flat"
+        ? discount.flat_mode === "per_person"
+          ? "per_person"
+          : "total"
+        : null,
+  };
+}
+
+/** Attach `offer` from API `discount` (keeps an existing `offer` if already set). */
+export function withDateCardOffersFromApi(
+  dates: DateWithOptionalOffer[] | null | undefined,
+): DateWithOptionalOffer[] | undefined {
+  if (!dates) return undefined;
+  return dates.map((date) => ({
+    event_date: date.event_date,
+    price: date.price,
+    sold_out: date.sold_out,
+    offer: date.offer ?? mapApiDiscountToDateCardOffer(date.discount),
+  }));
 }
 
 /** Placeholder list price used in the vendor discount wizard preview. */

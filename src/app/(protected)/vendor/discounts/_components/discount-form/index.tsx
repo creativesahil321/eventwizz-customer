@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Search,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,6 +59,11 @@ import {
   buildDiscountStorePayload,
   discountToFormValues,
 } from "../../_lib/build-store-payload";
+import {
+  buildCustomerPreviewItems,
+  buildEventCatalogSlots,
+  formatFormOfferValueLabel,
+} from "../../_lib/offers";
 import {
   useCreateDiscount,
   useDiscountEventsWithDates,
@@ -149,19 +161,9 @@ function ChoiceCards<T extends string>({
   );
 }
 
-function formatDateRowValue(entry: DiscountFormValues["dates"][number]): string {
-  if (entry.value_type === "percentage") {
-    return `${entry.discount_value}% off`;
-  }
-  if (entry.flat_mode === "per_person") {
-    return `£${entry.discount_value} / person${
-      entry.min_people ? ` (min ${entry.min_people})` : ""
-    }`;
-  }
-  return `£${entry.discount_value} off total`;
-}
-
-function eventCatalogSummary(event: DiscountEventWithDates | null): string | null {
+function eventCatalogSummary(
+  event: DiscountEventWithDates | null,
+): string | null {
   if (!event) return null;
   const dateCount = event.dates.length;
   if (dateCount === 0) return "No dates on this event yet";
@@ -187,7 +189,11 @@ export function DiscountFormWizard({
 }: DiscountFormWizardProps) {
   const router = useRouter();
   const { status: sessionStatus } = useSession();
-  const [step, setStep] = useState(1);
+  /** Edit locks category — skip Type and start on Scope / Event. */
+  const firstStep = mode === "edit" ? 2 : 1;
+  const [step, setStep] = useState(firstStep);
+  /** Prevents Next double-click from landing on Create and saving immediately. */
+  const [createArmed, setCreateArmed] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomersMeta, setSelectedCustomersMeta] = useState<
     Record<number, { id: number; name: string; email: string }>
@@ -198,9 +204,7 @@ export function DiscountFormWizard({
         {
           id: customer.id,
           name:
-            customer.full_name ||
-            customer.email ||
-            `Customer #${customer.id}`,
+            customer.full_name || customer.email || `Customer #${customer.id}`,
           email: customer.email ?? "",
         },
       ]),
@@ -248,7 +252,37 @@ export function DiscountFormWizard({
   const selectedLocationId = Number(values.location_id) || 0;
   const selectedEventId = Number(values.event_id) || 0;
   const isDiscountCategory = values.category === "discount";
-  const steps = isDiscountCategory ? DISCOUNT_STEPS : COUPON_STEPS;
+  const allSteps = isDiscountCategory ? DISCOUNT_STEPS : COUPON_STEPS;
+  const lastStep = allSteps[allSteps.length - 1]?.id ?? 4;
+  /** Stepper tabs — Type omitted in edit (category is locked). */
+  const visibleSteps = useMemo(
+    () =>
+      mode === "edit"
+        ? allSteps.filter((s) => s.id !== 1)
+        : [...allSteps],
+    [allSteps, mode],
+  );
+
+  useEffect(() => {
+    if (step !== lastStep) {
+      setCreateArmed(false);
+      return;
+    }
+    setCreateArmed(false);
+    const id = window.setTimeout(() => setCreateArmed(true), 300);
+    return () => window.clearTimeout(id);
+  }, [step, lastStep]);
+
+  // Edit: never show Type; keep category fixed to the saved record.
+  useEffect(() => {
+    if (mode !== "edit" || !initialDiscount) return;
+    const locked =
+      initialDiscount.category === "coupon_code" ? "coupon_code" : "discount";
+    if (form.getValues("category") !== locked) {
+      form.setValue("category", locked, { shouldDirty: false });
+    }
+    if (step < firstStep) setStep(firstStep);
+  }, [mode, initialDiscount, form, step, firstStep]);
 
   const savedValidFrom = values.original_valid_from?.trim() ?? "";
   const minValidFrom =
@@ -350,9 +384,7 @@ export function DiscountFormWizard({
     if (selectedEventId > 0 && !list.some((e) => e.id === selectedEventId)) {
       list.push({
         id: selectedEventId,
-        name:
-          initialDiscount?.event?.name ||
-          `Event #${selectedEventId}`,
+        name: initialDiscount?.event?.name || `Event #${selectedEventId}`,
       });
     }
     return list;
@@ -470,8 +502,8 @@ export function DiscountFormWizard({
           : "—";
       const roomName =
         row.room_id > 0
-          ? (day?.rooms ?? []).find((r) => r.id === row.room_id)?.name ??
-            `Room #${row.room_id}`
+          ? ((day?.rooms ?? []).find((r) => r.id === row.room_id)?.name ??
+            `Room #${row.room_id}`)
           : "Whole date";
       const kind =
         row.value_type === "percentage"
@@ -483,7 +515,7 @@ export function DiscountFormWizard({
         index,
         roomName,
         kind,
-        valueLabel: formatDateRowValue(row),
+        valueLabel: formatFormOfferValueLabel(row),
         validFrom: row.valid_from?.trim()
           ? formatGuideDate(row.valid_from)
           : "—",
@@ -506,79 +538,12 @@ export function DiscountFormWizard({
   /** All event date/room slots — discounted ones overlay the offer; others show list price. */
   const reviewCustomerPreviewItems = useMemo(() => {
     if (!isDiscountCategory || !selectedEvent) return [];
-
-    const offerBySlot = new Map<
-      string,
-      { row: (typeof values.dates)[number]; index: number }
-    >();
-    (values.dates ?? []).forEach((row, index) => {
-      if (!(row.date_id > 0)) return;
-      const key = `${row.date_id}:${Number(row.room_id) || 0}`;
-      offerBySlot.set(key, { row, index });
-    });
-
-    const items: {
-      key: string;
-      formIndex: number;
-      eventDate: string;
-      roomId: number;
-      roomName: string | null;
-      badge: string;
-      ready: boolean;
-      showOnPage: boolean;
-      offer: {
-        show_on_page: boolean;
-        value_type: "percentage" | "flat";
-        discount_value: number;
-        flat_mode?: "total" | "per_person" | null;
-      } | null;
-    }[] = [];
-
-    for (const day of selectedEvent.dates ?? []) {
-      if (day?.date_id == null || !day?.date) continue;
-      const rooms = (day.rooms ?? []).filter((r) => r?.id != null);
-      const slots =
-        rooms.length > 0
-          ? rooms.map((room) => ({
-              roomId: room.id,
-              roomName: room.name as string | null,
-            }))
-          : [{ roomId: 0, roomName: null as string | null }];
-
-      for (const slot of slots) {
-        const offer = offerBySlot.get(`${day.date_id}:${slot.roomId}`);
-        const row = offer?.row;
-        const showOnPage = row ? row.show_on_banner !== false : false;
-        const ready = Boolean(
-          row && row.discount_value > 0 && row.expires_at?.trim(),
-        );
-        const badge =
-          ready && showOnPage && row
-            ? formatDiscountPreviewBadge(row)
-            : "";
-        items.push({
-          key: `review-preview-${day.date_id}-${slot.roomId}`,
-          formIndex: offer?.index ?? -1,
-          eventDate: day.date,
-          roomId: slot.roomId,
-          roomName: slot.roomName,
-          badge,
-          ready,
-          showOnPage,
-          offer:
-            ready && row
-              ? {
-                  show_on_page: showOnPage,
-                  value_type: row.value_type,
-                  discount_value: row.discount_value,
-                  flat_mode: row.flat_mode,
-                }
-              : null,
-        });
-      }
-    }
-
-    return items;
+    return buildCustomerPreviewItems(
+      buildEventCatalogSlots(selectedEvent),
+      values.dates ?? [],
+      formatDiscountPreviewBadge,
+      "review-preview",
+    );
   }, [isDiscountCategory, values.dates, selectedEvent]);
 
   /** Drop auto-filled slots the vendor never configured — offers are optional per date. */
@@ -666,14 +631,14 @@ export function DiscountFormWizard({
   const goNext = async () => {
     const ok = await validateStep(step);
     if (!ok) return;
-    setStep(Math.min(step + 1, steps.length));
+    setStep(Math.min(step + 1, lastStep));
   };
 
-  const goBack = () => setStep((s) => Math.max(s - 1, 1));
+  const goBack = () => setStep((s) => Math.max(s - 1, firstStep));
 
   const goToStep = async (target: number) => {
     if (target === step) return;
-    if (target < 1 || target > steps.length) return;
+    if (target < firstStep || target > lastStep) return;
 
     if (target < step) {
       setStep(target);
@@ -690,7 +655,10 @@ export function DiscountFormWizard({
     setStep(target);
   };
 
-  const onSubmit = async (data: DiscountFormValues) => {
+  /** Persist only when Review Create / Save is clicked (never via form submit / Next). */
+  const saveDiscount = async (data: DiscountFormValues) => {
+    if (step !== lastStep || !createArmed) return;
+
     if (data.category === "discount") {
       const kept = pruneBlankDiscountDates();
       if (kept.length === 0) {
@@ -707,6 +675,7 @@ export function DiscountFormWizard({
         return;
       }
     }
+
     const payload = buildDiscountStorePayload(data);
     try {
       if (mode === "edit" && initialDiscount) {
@@ -718,6 +687,21 @@ export function DiscountFormWizard({
     } catch {
       // Stay on the wizard so the vendor can correct and retry
     }
+  };
+
+  const onCreateClick = () => {
+    if (step !== lastStep || !createArmed) return;
+    void form.handleSubmit(saveDiscount)();
+  };
+
+  const onFormKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== "Enter") return;
+    if ((e.target as HTMLElement).tagName === "TEXTAREA") return;
+    e.preventDefault();
+  };
+
+  const onFormSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
   };
 
   const toggleCustomer = (
@@ -789,9 +773,9 @@ export function DiscountFormWizard({
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <p className="font-medium">This discount belongs to {ownerName}</p>
           <p className="mt-1 text-amber-900/90">
-            You are currently viewing{" "}
-            {headerLocationName || "another location"}. Switch the location in
-            the header to {ownerName} to edit this discount.
+            You are currently viewing {headerLocationName || "another location"}
+            . Switch the location in the header to {ownerName} to edit this
+            discount.
           </p>
           <Button asChild variant="outline" size="sm" className="mt-3">
             <Link href="/vendor/discounts">Back to Discounts</Link>
@@ -812,8 +796,8 @@ export function DiscountFormWizard({
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
             <p className="font-medium">Select a location first</p>
             <p className="mt-1 text-amber-900/90">
-              Choose a location in the header. Discounts and coupons apply to that
-              location only.
+              Choose a location in the header. Discounts and coupons apply to
+              that location only.
             </p>
           </div>
         </div>
@@ -848,7 +832,8 @@ export function DiscountFormWizard({
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={onFormSubmit}
+        onKeyDown={onFormKeyDown}
         className="flex w-full min-w-0 flex-col gap-4"
       >
         <div className={pageCardClassName("min-w-0 overflow-x-hidden")}>
@@ -857,9 +842,10 @@ export function DiscountFormWizard({
             aria-label="Discount steps"
             className="mb-6 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {steps.map((s) => {
+            {visibleSteps.map((s, index) => {
               const isCurrent = step === s.id;
               const isComplete = step > s.id;
+              const displayNum = index + 1;
               return (
                 <button
                   key={s.id}
@@ -892,7 +878,7 @@ export function DiscountFormWizard({
                           : "bg-muted text-muted-foreground",
                     )}
                   >
-                    {isComplete ? <Check className="h-3 w-3" /> : s.id}
+                    {isComplete ? <Check className="h-3 w-3" /> : displayNum}
                   </span>
                   {s.title}
                 </button>
@@ -900,8 +886,8 @@ export function DiscountFormWizard({
             })}
           </div>
 
-          {/* Step 1 — Type */}
-          {step === 1 ? (
+          {/* Step 1 — Type (create only; category is locked when editing) */}
+          {step === 1 && mode === "create" ? (
             <FormField
               control={form.control}
               name="category"
@@ -916,9 +902,7 @@ export function DiscountFormWizard({
                   </FormDescription>
                   <ChoiceCards
                     value={
-                      field.value === "coupon_code"
-                        ? "coupon_code"
-                        : "discount"
+                      field.value === "coupon_code" ? "coupon_code" : "discount"
                     }
                     onChange={(key) => {
                       field.onChange(key);
@@ -979,7 +963,7 @@ export function DiscountFormWizard({
                         field.onChange(Number(v));
                         form.setValue("dates", [], { shouldDirty: true });
                       }}
-                      disabled={eventsLoading}
+                      disabled={eventsLoading || mode === "edit"}
                     >
                       <FormControl>
                         <SelectTrigger className="w-full">
@@ -994,7 +978,11 @@ export function DiscountFormWizard({
                         ))}
                       </SelectContent>
                     </Select>
-                    {selectedEventSummary ? (
+                    {mode === "edit" ? (
+                      <FormDescription>
+                        Event can’t be changed after the discount is created.
+                      </FormDescription>
+                    ) : selectedEventSummary ? (
                       <p className="text-sm text-muted-foreground">
                         {selectedEventSummary}
                       </p>
@@ -1042,7 +1030,7 @@ export function DiscountFormWizard({
                     <Select
                       value={field.value > 0 ? String(field.value) : undefined}
                       onValueChange={(v) => field.onChange(Number(v))}
-                      disabled={eventsLoading}
+                      disabled={eventsLoading || mode === "edit"}
                     >
                       <FormControl>
                         <SelectTrigger className="w-full max-w-full sm:max-w-md">
@@ -1057,6 +1045,11 @@ export function DiscountFormWizard({
                         ))}
                       </SelectContent>
                     </Select>
+                    {mode === "edit" ? (
+                      <FormDescription>
+                        Event can’t be changed after the coupon is created.
+                      </FormDescription>
+                    ) : null}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -1069,8 +1062,9 @@ export function DiscountFormWizard({
                   <FormItem className="min-w-0">
                     <FormLabel>Coupon code</FormLabel>
                     <FormDescription>
-                      Typed in manually — not auto-generated. Letters and
-                      numbers only; not case-sensitive.
+                      {mode === "edit"
+                        ? "Code can’t be changed after the coupon is created."
+                        : "Typed in manually — not auto-generated. Letters and numbers only; not case-sensitive."}
                     </FormDescription>
                     <FormControl>
                       <Input
@@ -1082,6 +1076,7 @@ export function DiscountFormWizard({
                         autoCorrect="off"
                         spellCheck={false}
                         inputMode="text"
+                        disabled={mode === "edit"}
                         className="w-full max-w-full font-mono uppercase sm:max-w-sm"
                         onChange={(e) =>
                           field.onChange(e.target.value.toUpperCase())
@@ -1631,7 +1626,9 @@ export function DiscountFormWizard({
                     </div>
                     <div className="rounded-lg bg-muted/40 px-3 py-2.5">
                       <dt className="text-xs text-muted-foreground">Event</dt>
-                      <dd className="mt-0.5 text-sm font-medium">{eventName}</dd>
+                      <dd className="mt-0.5 text-sm font-medium">
+                        {eventName}
+                      </dd>
                     </div>
                   </dl>
                 </section>
@@ -1707,7 +1704,9 @@ export function DiscountFormWizard({
                       </h4>
                       <dl className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                         <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-                          <dt className="text-xs text-muted-foreground">Code</dt>
+                          <dt className="text-xs text-muted-foreground">
+                            Code
+                          </dt>
                           <dd className="mt-0.5 font-mono text-sm font-medium">
                             {values.coupon_code?.trim() || "—"}
                           </dd>
@@ -1828,7 +1827,7 @@ export function DiscountFormWizard({
           <div className="sticky bottom-0 z-10 mt-6 border-t bg-background/95 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:static sm:mt-8 sm:bg-transparent sm:pt-4 sm:pb-0 sm:backdrop-blur-none">
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex gap-2">
-                {step > 1 ? (
+                {step > firstStep ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -1845,7 +1844,7 @@ export function DiscountFormWizard({
                 )}
               </div>
               <div className="flex gap-2">
-                {step < steps.length ? (
+                {step < lastStep ? (
                   <Button
                     type="button"
                     onClick={() => void goNext()}
@@ -1855,7 +1854,11 @@ export function DiscountFormWizard({
                     <ChevronRight className="ml-1 h-4 w-4" />
                   </Button>
                 ) : (
-                  <Button type="submit" disabled={isSubmitting}>
+                  <Button
+                    type="button"
+                    onClick={onCreateClick}
+                    disabled={isSubmitting || !createArmed}
+                  >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

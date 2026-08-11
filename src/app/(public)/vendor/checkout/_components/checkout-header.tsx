@@ -50,7 +50,7 @@ export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
               alt={brandName}
               width={200}
               height={56}
-              className="max-h-10 w-auto object-contain sm:max-h-11"
+              className="max-h-11 w-auto max-w-[min(100%,10rem)] object-contain sm:max-h-12 sm:max-w-[min(100%,12rem)]"
             />
           </Link>
         </div>

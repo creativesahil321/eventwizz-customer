@@ -1,18 +1,11 @@
 "use client";
 
-import React from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useSession } from "next-auth/react";
+import { TypeToConfirmDeleteDialog } from "@/components/modals/type-to-confirm-delete-dialog";
 import { useDeleteLocation } from "../_lib/queries";
-import { Location } from "../_lib/types";
-import { AlertCircle } from "lucide-react";
+import type { Location } from "../_lib/types";
+
+const CONFIRM_PHRASE = "delete this location";
 
 interface DeleteLocationDialogProps {
   open: boolean;
@@ -25,72 +18,60 @@ export default function DeleteLocationDialog({
   onOpenChange,
   location,
 }: DeleteLocationDialogProps) {
-  const { mutate: deleteLocation, isPending } = useDeleteLocation();
+  const { data: session } = useSession();
+  const { mutateAsync: deleteLocation, isPending } = useDeleteLocation();
+  const accountEmail = session?.user?.email?.trim() || "";
+  const resourceLabel =
+    location.city?.trim() || location.name?.trim() || `Location #${location.id}`;
 
-  const handleDelete = () => {
-    deleteLocation(location.id, {
-      onSuccess: () => {
-        onOpenChange(false);
-      },
-    });
+  const handleConfirm = async () => {
+    try {
+      await deleteLocation(location.id);
+      onOpenChange(false);
+    } catch {
+      // api-client interceptor surfaces the error toast
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-w-[90vw]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-destructive text-black">
-            <AlertCircle className="h-5 w-5" />
-            Delete Location
-          </DialogTitle>
-          <DialogDescription className="break-words">
-            Are you sure you want to delete <strong>{location.name}</strong>
-            {location.city && (
+    <TypeToConfirmDeleteDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Delete location"
+      description={
+        <>
+          <p>
+            This will permanently delete{" "}
+            <span className="font-semibold text-foreground">{resourceLabel}</span>
+            {location.address ? (
               <>
                 {" "}
-                (<span className="break-words">{location.city}</span>)
+                (<span className="break-words">{location.address}</span>)
               </>
-            )}
-            ? This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 text-black">
-          <div className="border rounded-md p-4 bg-muted/30">
-            <div className="grid grid-cols-2 gap-2">
-              <p className="text-sm font-medium">Location:</p>
-              <p className="text-sm break-words">{location.name}</p>
-
-              <p className="text-sm font-medium">City:</p>
-              <p className="text-sm break-words">{location.city}</p>
-
-              <p className="text-sm font-medium">Address:</p>
-              <p className="text-sm break-words">{location.address || "-"}</p>
-            </div>
-          </div>
-
-          <p className="text-sm text-muted-foreground">
-            Deleting this location will remove it permanently from your account.
-            Any events associated with this location will need to be reassigned.
+            ) : null}
+            .
+          </p>
+          <p>
+            All events, bookings, and everything else linked to this location
+            will be permanently removed. You cannot recover any of it later.
             Default locations cannot be deleted.
           </p>
-        </div>
-        <DialogFooter className="gap-2">
-          <Button
-            type="button"
-            variant="event-outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={isPending}
-          >
-            {isPending ? "Deleting..." : "Delete Location"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+      resourceLabel={resourceLabel}
+      warning={
+        <>
+          Warning: deleting{" "}
+          <span className="font-semibold">{resourceLabel}</span> will
+          permanently remove all related events, bookings, and linked data.
+          This cannot be undone or recovered.
+        </>
+      }
+      confirmEmail={accountEmail}
+      confirmPhrase={CONFIRM_PHRASE}
+      confirmButtonLabel="Delete location"
+      isPending={isPending}
+      onConfirm={handleConfirm}
+    />
   );
 }

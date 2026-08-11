@@ -362,6 +362,11 @@ export function transformCartToCheckout(
   editingData: Record<string, Record<string, EditableDateData>>,
   apiCartData: unknown,
   paymentGateway?: string | number | null,
+  options?: {
+    couponCode?: string | null;
+    /** Absolute discount applied to the booking (never exceeds pay-today). */
+    discountAmount?: number | null;
+  },
 ): CheckoutRequest | null {
   const eventData = editingData[eventSlug];
   if (!eventData) {
@@ -417,6 +422,37 @@ export function transformCartToCheckout(
     return null;
   }
 
+  const couponCode = options?.couponCode?.trim().toUpperCase() || null;
+  const discountAmountRaw = Number(options?.discountAmount ?? 0);
+  const discountAmount =
+    Number.isFinite(discountAmountRaw) && discountAmountRaw > 0
+      ? Math.round(Math.min(payToday + payLater, discountAmountRaw) * 100) / 100
+      : 0;
+
+  // Prefer reducing pay-today first; leftover discount reduces due-later.
+  const discountOnToday =
+    discountAmount > 0 ? Math.min(payToday, discountAmount) : 0;
+  const discountedPayToday =
+    Math.round(Math.max(0, payToday - discountOnToday) * 100) / 100;
+  const discountOnLater =
+    discountAmount > 0
+      ? Math.min(payLater, Math.max(0, discountAmount - discountOnToday))
+      : 0;
+  const discountedPayLater =
+    Math.round(Math.max(0, payLater - discountOnLater) * 100) / 100;
+
+  // Scale table-deposit portion with pay-today — never wipe partial_payment to
+  // null while a balance remains due later (coupon can exceed raw deposit).
+  const discountedDepositToday =
+    depositToday > 0 && payToday > 0
+      ? Math.round(
+          Math.min(
+            discountedPayToday,
+            discountedPayToday * (depositToday / payToday),
+          ) * 100,
+        ) / 100
+      : 0;
+
   const checkoutPayload: CheckoutRequest = {
     vendor_event_id: vendorEventId,
     event_slug: eventSlug,
@@ -424,8 +460,14 @@ export function transformCartToCheckout(
     payment_gateway: gatewayId,
     sub_total: subTotal,
     // Sum of table deposit amounts charged today (e.g. $25, or $25+$20 across dates)
-    partial_payment: depositToday > 0 ? depositToday : null,
-    total: payToday,
+    partial_payment: discountedDepositToday > 0 ? discountedDepositToday : null,
+    total: discountedPayToday,
+    ...(couponCode
+      ? {
+          coupon_code: couponCode,
+          discount_amount: discountAmount,
+        }
+      : {}),
   };
 
   if (roomMode) {
@@ -441,7 +483,9 @@ export function transformCartToCheckout(
     sub_total: checkoutPayload.sub_total,
     partial_payment: checkoutPayload.partial_payment,
     total: checkoutPayload.total,
-    balance_due_later: payLater > 0 ? payLater : null,
+    coupon_code: checkoutPayload.coupon_code ?? null,
+    discount_amount: checkoutPayload.discount_amount ?? 0,
+    balance_due_later: discountedPayLater > 0 ? discountedPayLater : null,
     payment_gateway: checkoutPayload.payment_gateway,
     dates_count: roomMode
       ? checkoutPayload.rooms?.reduce(
