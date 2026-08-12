@@ -3,6 +3,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "nextjs-toploader/app";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
+import {
+  addCacheBusting,
+  resolveMediaUpdatedAt,
+} from "@/lib/image-utils";
 import { useThemeQuery } from "@/hooks/use-theme-query";
 import { SingleLocationHome } from "./_components/single-location-home";
 import { VendorMainLandingView } from "./_components/LocationPage/vendor-main-landing-view";
@@ -23,18 +27,19 @@ export default function VendorSiteHomePage() {
   const singleLocation: LocationData | null =
     allLocations.length === 1 ? allLocations[0] : null;
 
+  // DB-backed; same on SSR + client — safe for next/image without hydration flash.
+  const mediaUpdatedAt = resolveMediaUpdatedAt(liveTheme, settings);
+
   const heroImageSrc = useMemo(() => {
     const cover =
       liveTheme?.main_landing_cover_image ??
       settings?.main_landing_cover_image ??
       liveTheme?.cover_image ??
       settings?.cover_image;
-    // LCP hero: keep the URL deterministic so SSR HTML and the client render match.
-    // A time-based `?v=` (query dataUpdatedAt) differs between server and client and
-    // forces the <img>/preload to re-download after hydration = a visible flash.
-    // Any backend-provided version query in `cover` is preserved as-is.
     if (typeof cover === "string" && cover.trim().length > 0) {
-      return cover.trim();
+      // Stable-URL asset (`main_landing_cover_image`) needs ?v= from media_updated_at.
+      // Location `cover_image` already gets a unique path per upload — busting is harmless.
+      return addCacheBusting(cover.trim(), mediaUpdatedAt);
     }
     return "/assets/images/Homepage/Homepage-Banner.png";
   }, [
@@ -42,6 +47,7 @@ export default function VendorSiteHomePage() {
     liveTheme?.cover_image,
     settings?.main_landing_cover_image,
     settings?.cover_image,
+    mediaUpdatedAt,
   ]);
 
   const heroHeading = useMemo(() => {

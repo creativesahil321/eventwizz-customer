@@ -19,8 +19,10 @@ export function isPrivateOrLocalImageHostname(hostname: string): boolean {
 /**
  * Use Next.js image optimizer for this `src` (`unoptimized={false}`) only when the host is
  * listed in `nextImageRemotePatterns` (same list as `next.config` `images.remotePatterns`).
- * Private/LAN hosts stay unoptimized so the browser loads them directly (the optimizer runs
- * on the Next server and often cannot reach 192.168.x.x).
+ *
+ * Private/LAN hosts (e.g. `192.168.1.100`) are optimized when allowlisted +
+ * `images.dangerouslyAllowLocalIP` is enabled in `next.config` — so local Laravel
+ * covers get AVIF/WebP the same as production.
  */
 export function shouldUseNextImageOptimization(src: string): boolean {
   if (!src || src.startsWith("data:") || src.startsWith("blob:")) {
@@ -30,14 +32,53 @@ export function shouldUseNextImageOptimization(src: string): boolean {
     return true;
   }
   try {
-    const hostname = new URL(src).hostname;
-    if (isPrivateOrLocalImageHostname(hostname)) {
+    const { hostname } = new URL(src);
+    if (!isNextImageRemoteHostname(hostname)) {
       return false;
     }
-    return isNextImageRemoteHostname(hostname);
+    // Private/LAN origins (e.g. 192.168.x, localhost) are only reachable by the
+    // image optimizer when it runs on the same machine — i.e. `npm run dev`.
+    // On a deployed build (Vercel/remote) the optimizer runs off-network and
+    // cannot fetch a LAN address, so routing the hero through it stalls until
+    // timeout (the "banner loads very late" symptom). Serve the original
+    // directly in production instead of optimizing an unreachable origin.
+    if (
+      isPrivateOrLocalImageHostname(hostname) &&
+      process.env.NODE_ENV === "production"
+    ) {
+      return false;
+    }
+    return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Prefer API `media_updated_at` (ISO UTC) from theme/settings sources.
+ * Same value on SSR + client — safe for hero/logo/favicon without hydration flash.
+ */
+export function resolveMediaUpdatedAt(
+  ...sources: Array<
+    { media_updated_at?: string | null } | null | undefined
+  >
+): string | null {
+  for (const source of sources) {
+    const value = source?.media_updated_at;
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+/** Convert `media_updated_at` ISO string to a numeric cache key for context consumers. */
+export function mediaUpdatedAtToVersion(
+  mediaUpdatedAt?: string | null,
+): number | undefined {
+  if (!mediaUpdatedAt) return undefined;
+  const ms = new Date(mediaUpdatedAt).getTime();
+  return Number.isFinite(ms) ? ms : undefined;
 }
 
 /**

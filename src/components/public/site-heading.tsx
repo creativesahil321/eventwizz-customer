@@ -12,7 +12,7 @@ import {
 
 type SiteHeadingLevel = 1 | 2 | 3;
 
-type SiteHeadingVariant = "onDark" | "onSurface";
+type SiteHeadingVariant = "onDark" | "onSurface" | "onLight";
 
 export type SiteHeadingProps = {
   /** Semantic heading level */
@@ -23,7 +23,11 @@ export type SiteHeadingProps = {
   accentHint?: string | null;
   /** Override theme (e.g. previews) */
   emphasis?: HeadingEmphasis;
-  /** onDark: hero over imagery; onSurface: page body */
+  /**
+   * onDark: white, for hero over dark imagery.
+   * onLight: near-black, for hero over light imagery (image-driven auto-contrast).
+   * onSurface: theme body text, for page content.
+   */
   variant?: SiteHeadingVariant;
   /**
    * Match hero column alignment (`heroBannerStackClass`). Used for `accent_tail`
@@ -113,6 +117,17 @@ export function SiteHeading({
   const baseOnDark =
     "text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.55),0_1px_3px_rgba(0,0,0,0.4)]";
   const baseOnSurface = "text-[var(--color-text)]";
+  /** Literal near-black (not theme token) so it stays readable on any light image. */
+  const baseOnLight =
+    "text-[#0c0d10] [text-shadow:0_1px_12px_rgba(255,255,255,0.55),0_1px_2px_rgba(255,255,255,0.65)]";
+
+  /** Base text color for the current variant (accent tail keeps brand color). */
+  const baseColorClass =
+    variant === "onDark"
+      ? baseOnDark
+      : variant === "onLight"
+        ? baseOnLight
+        : baseOnSurface;
 
   const accentGradient =
     "bg-gradient-to-r from-[color:var(--color-primary)] via-[color:var(--color-primary)] to-[color:color-mix(in_srgb,var(--color-primary)_82%,white)] bg-clip-text text-transparent";
@@ -140,7 +155,7 @@ export function SiteHeading({
           alignBox,
           headingLine,
           levelClass[level],
-          variant === "onDark" ? baseOnDark : baseOnSurface,
+          baseColorClass,
           "px-[0.12em] py-[0.08em]",
           className,
         )}
@@ -188,15 +203,12 @@ export function SiteHeading({
       )}
       style={{ fontFamily: bodyFamily }}
     >
-      <span
-        className={cn(
-          "leading-none",
-          variant === "onDark" ? baseOnDark : baseOnSurface,
-        )}
-        style={{ fontFamily: bodyFamily }}
-      >
-        {base}
-      </span>
+        <span
+          className={cn("leading-none", baseColorClass)}
+          style={{ fontFamily: bodyFamily }}
+        >
+          {base}
+        </span>
       {accent ? (
         <>
           {" "}

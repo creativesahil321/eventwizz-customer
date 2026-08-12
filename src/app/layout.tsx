@@ -25,6 +25,7 @@ import {
 } from "@/lib/site-custom-font-stylesheets";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { fontInter } from "@/lib/fonts";
+import { addCacheBustingSSR } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 
 /**
@@ -60,9 +61,9 @@ export async function generateMetadata(): Promise<Metadata> {
     keywords: keywords.length ? keywords : undefined,
     ...(theme?.favicon && {
       icons: {
-        icon: theme.favicon,
-        shortcut: theme.favicon,
-        apple: theme.favicon,
+        icon: addCacheBustingSSR(theme.favicon, theme.media_updated_at),
+        shortcut: addCacheBustingSSR(theme.favicon, theme.media_updated_at),
+        apple: addCacheBustingSSR(theme.favicon, theme.media_updated_at),
       },
     }),
   };
@@ -130,7 +131,10 @@ export default async function RootLayout({
         {initialTheme?.favicon && (
           <link
             rel="preload"
-            href={initialTheme.favicon}
+            href={addCacheBustingSSR(
+              initialTheme.favicon,
+              initialTheme.media_updated_at,
+            )}
             as="image"
             fetchPriority="high"
           />

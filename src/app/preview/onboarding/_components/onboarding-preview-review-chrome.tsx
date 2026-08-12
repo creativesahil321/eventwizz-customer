@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, PencilLine } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePreviewReviewChromeHeight } from "@/hooks/use-preview-review-chrome-height";
 
 export type OnboardingPreviewTab = "main-landing" | "location" | "event";
 
@@ -78,6 +79,7 @@ export function OnboardingPreviewReviewChrome({
   const stepIndex = steps.indexOf(activeTab);
   const isLastStep = stepIndex >= 0 && stepIndex === steps.length - 1;
   const isCurrentApproved = approved[activeTab];
+  const chromeRef = usePreviewReviewChromeHeight<HTMLDivElement>();
   const nextTab = !isLastStep ? steps[stepIndex + 1] : undefined;
 
   const stepTitle =
@@ -115,6 +117,7 @@ export function OnboardingPreviewReviewChrome({
 
   return (
     <div
+      ref={chromeRef}
       className="fixed inset-x-0 bottom-0 z-[80] isolate border-t border-slate-200 bg-white text-slate-900 shadow-[0_-2px_16px_rgba(15,23,42,0.1)]"
       role="region"
       aria-label="Onboarding preview review actions"

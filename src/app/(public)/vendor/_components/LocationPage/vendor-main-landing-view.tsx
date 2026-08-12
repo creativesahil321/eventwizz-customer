@@ -9,6 +9,7 @@ import {
 } from "react";
 import { motion } from "framer-motion";
 import { Map, LayoutGrid, MapPin, CalendarDays } from "lucide-react";
+import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import LocationSelectionHeader from "./location-selection-header";
 import LocationGrid from "./location-grid";
 import GoogleLocationMap from "./location-map-google";
@@ -40,6 +41,7 @@ import type { LocationData } from "@/types/theme.types";
 import type { ThemeSchema } from "@/types/theme.types";
 import type { VenueContactOverride } from "@/lib/resolve-venue-contact";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { useImageLuminance } from "@/hooks/use-image-luminance";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { usePublicSearch } from "@/services/common/public-search";
@@ -205,6 +207,14 @@ export function VendorMainLandingView({
   const heroAlign = "center" as const;
   const heroValign = "center" as const;
 
+  /**
+   * Auto-contrast: sample the cover so the headline flips black/white to stay
+   * readable on whatever the vendor uploads. Defaults to `dark` (white text +
+   * dark scrim) — the safe majority — until the reading lands.
+   */
+  const heroTone = useImageLuminance(heroImageSrc, "dark");
+  const heroIsLight = heroTone === "light";
+
   return (
     <div
       {...(style ? { "data-preview-theme-root": "" } : {})}
@@ -225,39 +235,29 @@ export function VendorMainLandingView({
         )}
       >
         {/*
-          Soft hero image band — no CSS blur:
-          absolute top band · opacity-50 · mask-image: linear-gradient(#000 50%, #00000057 98%)
-          User-uploaded cover: native <img> + cache busting (see CACHE_BUSTING_CHANGES.md).
-          Preload + fetchPriority so LCP is not delayed like a late CSS background-image.
+          Vivid hero image band + adaptive scrim. The image renders at full
+          strength (LCP via HeroCoverImage); a tone-matched scrim guarantees the
+          headline stays readable on any cover — dark scrim for dark images,
+          light scrim for light images — so vendors can't break contrast.
+          The mask fades the band into the page background at the bottom.
         */}
-        {heroImageSrc ? (
-          <link
-            rel="preload"
-            as="image"
-            href={heroImageSrc}
-            fetchPriority="high"
-          />
-        ) : null}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[520px] opacity-50 sm:h-[580px]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[520px] sm:h-[580px]"
           style={{
-            WebkitMaskImage:
-              "linear-gradient(#000000 50%, #00000057 98%)",
-            maskImage: "linear-gradient(#000000 50%, #00000057 98%)",
+            WebkitMaskImage: "linear-gradient(#000000 62%, #00000000 100%)",
+            maskImage: "linear-gradient(#000000 62%, #00000000 100%)",
           }}
         >
-          {heroImageSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element -- user-uploaded; cache-bust via ?v=
-            <img
-              src={heroImageSrc}
-              alt=""
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
-              className="absolute inset-0 h-full w-full object-cover object-center"
-            />
-          ) : null}
+          {heroImageSrc ? <HeroCoverImage src={heroImageSrc} /> : null}
+          <div
+            className={cn(
+              "absolute inset-0 transition-opacity duration-500",
+              heroIsLight
+                ? "bg-gradient-to-b from-white/72 via-white/45 to-transparent"
+                : "bg-gradient-to-b from-black/55 via-black/28 to-transparent",
+            )}
+          />
         </div>
 
         <div
@@ -277,7 +277,14 @@ export function VendorMainLandingView({
               "w-full min-w-0 overflow-visible",
             )}
           >
-            <span className="mb-3 inline-flex max-w-[min(100%,22rem)] items-center gap-2 truncate rounded-full border border-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] bg-[color:color-mix(in_srgb,var(--color-primary)_8%,var(--color-surface))] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)] sm:mb-4 sm:px-3.5 sm:py-1.5 sm:text-[11px] sm:tracking-[0.16em]">
+            <span
+              className={cn(
+                "mb-3 inline-flex max-w-[min(100%,22rem)] items-center gap-2 truncate rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] backdrop-blur-md transition-colors duration-500 sm:mb-4 sm:px-3.5 sm:py-1.5 sm:text-[11px] sm:tracking-[0.16em]",
+                heroIsLight
+                  ? "border-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] bg-[color:color-mix(in_srgb,var(--color-primary)_8%,var(--color-surface))] text-[var(--color-primary)]"
+                  : "border-white/25 bg-white/12 text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.4)]",
+              )}
+            >
               <span
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)]"
                 aria-hidden
@@ -290,7 +297,7 @@ export function VendorMainLandingView({
               title={heroHeading}
               accentHint={heroAccentHint}
               emphasis={normalizeHeadingEmphasis(headingEmphasis)}
-              variant="onSurface"
+              variant={heroIsLight ? "onLight" : "onDark"}
               align={heroAlign}
               className="mb-2.5 w-full min-w-0 max-w-full break-words font-bold !text-[1.65rem] !leading-[1.18] sm:mb-4 sm:!text-4xl sm:!leading-[1.12] md:max-w-5xl md:!text-5xl xl:!text-[3.25rem] xl:!leading-[1.05]"
             />
@@ -298,7 +305,10 @@ export function VendorMainLandingView({
             <p
               className={cn(
                 vendorHomeSubheroClass(heroAlign),
-                "!mb-8 !text-[var(--color-text-dimmed)] px-1 text-sm sm:!mb-10 sm:text-base md:text-lg",
+                "!mb-8 px-1 text-sm transition-colors duration-500 sm:!mb-10 sm:text-base md:text-lg",
+                heroIsLight
+                  ? "!text-[color:color-mix(in_srgb,#0c0d10_78%,transparent)]"
+                  : "!text-white/85 [text-shadow:0_1px_10px_rgba(0,0,0,0.45)]",
               )}
             >
               {heroSubheading}

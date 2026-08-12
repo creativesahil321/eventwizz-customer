@@ -65,6 +65,8 @@ export interface SiteEssentials {
   contactDetails?: SiteEssentialsContactDetails;
   logo: string;
   favicon: string;
+  /** ISO-8601 UTC; bumped when logo / favicon / main_landing_cover_image is replaced */
+  media_updated_at?: string | null;
   name: string;
   copyright: string;
   domain: string | null;

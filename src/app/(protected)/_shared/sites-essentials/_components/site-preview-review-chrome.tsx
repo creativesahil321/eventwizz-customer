@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePreviewReviewChromeHeight } from "@/hooks/use-preview-review-chrome-height";
 import type { SitePreviewReviewStep } from "@/store/site-preview.store";
 import type { PreviewLocationItem } from "../_lib/preview-locations";
 
@@ -83,6 +84,7 @@ export function SitePreviewReviewChrome({
       ? 1
       : 2 + currentLocationIndex
     : 1;
+  const chromeRef = usePreviewReviewChromeHeight<HTMLDivElement>();
 
   const stepTitle =
     reviewStep === "main"
@@ -114,6 +116,7 @@ export function SitePreviewReviewChrome({
 
   return (
     <div
+      ref={chromeRef}
       className="fixed inset-x-0 bottom-0 z-[120] isolate border-t border-slate-200 bg-white text-slate-900 shadow-[0_-2px_16px_rgba(15,23,42,0.1)] pointer-events-auto"
       role="region"
       aria-label="Preview review actions"

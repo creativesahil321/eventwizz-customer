@@ -25,9 +25,12 @@ import {
 import { VENDOR_FOOTER_PAGE_LINKS } from "@/lib/vendor-cms-content";
 import { useThemeQuery } from "@/hooks/use-theme-query";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
+import { hasPlainText } from "@/lib/plain-text-length";
+import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
 
 interface FooterSectionProps {
   copyright?: string | null;
@@ -47,7 +50,10 @@ interface FooterSectionProps {
    * Pass `{}` / all-empty to hide icons in preview.
    */
   socialLinksOverride?: Partial<
-    Record<"facebook" | "twitter" | "instagram" | "linkedin" | "youtube", string>
+    Record<
+      "facebook" | "twitter" | "instagram" | "linkedin" | "youtube",
+      string
+    >
   > | null;
 }
 
@@ -156,9 +162,10 @@ function FooterBrand({
   brandName: string;
   isPreviewMode: boolean;
 }) {
+  const { mediaVersion } = useTheme();
   const image = (
     <img
-      src={addCacheBusting(logoPath)}
+      src={addCacheBusting(logoPath, mediaVersion)}
       className="h-8 w-auto max-w-[min(100%,10rem)] object-contain"
       alt={brandName}
     />
@@ -193,6 +200,13 @@ export default function FooterSection({
   /** Social icons only on live site + Sites Essentials `/preview/site` — not onboarding. */
   const showSocialLinks =
     !isPreviewMode || Boolean(pathname?.includes("/preview/site"));
+  /**
+   * Fixed bottom review chrome exists on site/onboarding preview only.
+   * Event preview (`/preview/event`, editor embed) has no chrome — do not pad.
+   */
+  const needsReviewChromePadding =
+    Boolean(pathname?.includes("/preview/site")) ||
+    Boolean(pathname?.includes("/preview/onboarding"));
   /** Live site uses vendor theme; preview passes site-essentials so we never use platform dummy contact. */
   const themeForContact = contactTheme ?? vendorTheme;
 
@@ -251,9 +265,9 @@ export default function FooterSection({
     ? contactBlocks[0]?.contact
     : null;
 
-  const copyrightText =
-    copyright ||
-    vendorTheme?.copyright ||
+  const resolvedCopyright =
+    (hasPlainText(copyright) ? copyright : null) ||
+    (hasPlainText(vendorTheme?.copyright) ? vendorTheme?.copyright : null) ||
     `© ${currentYear} ${brandName}. All rights reserved.`;
 
   const hasSingleContact =
@@ -262,12 +276,14 @@ export default function FooterSection({
 
   return (
     <footer
-      className={cn(
-        "border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)] bg-[color:var(--color-footer)] text-[var(--color-on-footer)]",
-        // Site preview review chrome is fixed at the bottom — pad with footer color
-        // so copyright stays readable and no light strip shows under the footer.
-        isPreviewMode && "pb-[9.5rem] sm:pb-28",
-      )}
+      className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)] bg-[color:var(--color-footer)] text-[var(--color-on-footer)]"
+      style={
+        needsReviewChromePadding
+          ? {
+              paddingBottom: `var(${PREVIEW_REVIEW_CHROME_HEIGHT_VAR}, 9rem)`,
+            }
+          : undefined
+      }
     >
       <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-8">
         <div className="flex flex-col items-center text-center">
@@ -324,8 +340,8 @@ export default function FooterSection({
       <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_8%,transparent)]">
         <div className="mx-auto max-w-5xl px-4 py-3 sm:px-6">
           <div
-            className="break-words text-center text-[11px] leading-relaxed text-[var(--color-on-footer)]/50 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
-            dangerouslySetInnerHTML={{ __html: copyrightText }}
+            className="break-words text-center text-[11px] leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
+            dangerouslySetInnerHTML={{ __html: resolvedCopyright }}
           />
         </div>
       </div>

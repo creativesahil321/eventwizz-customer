@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { SiteHeading } from "@/components/public/site-heading";
+import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import {
   heroBandContentPadClass,
@@ -175,29 +176,16 @@ export default function HeroBanner({
         </div>
       )}
 
-      {/* Image background — slight scale for edge bleed; native img + cache busting */}
+      {/* Image background — slight scale for edge bleed; optimized LCP cover */}
       {!useVideo && finalImageUrl ? (
-        <>
-          <link
-            rel="preload"
-            as="image"
-            href={finalImageUrl}
-            fetchPriority="high"
+        <div className="absolute inset-0 overflow-hidden">
+          <HeroCoverImage
+            key={finalImageUrl}
+            src={finalImageUrl}
+            className="scale-105"
           />
-          <div className="absolute inset-0 overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded; cache-bust via ?v= */}
-            <img
-              key={finalImageUrl}
-              src={finalImageUrl}
-              alt=""
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
-              className="absolute inset-0 h-full w-full scale-105 object-cover"
-            />
-            <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
-          </div>
-        </>
+          <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
+        </div>
       ) : null}
 
       {/* Soft brand gradient orbs */}

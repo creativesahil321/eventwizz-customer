@@ -89,7 +89,7 @@ export default function AuthLayout({
       <img
         className="h-8 w-auto object-contain"
         alt="EventWizz"
-        src={addCacheBusting(logoPath)}
+        src={addCacheBusting(logoPath, theme?.media_updated_at)}
       />
     </Link>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { SiteHeading } from "@/components/public/site-heading";
+import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import {
@@ -178,14 +179,6 @@ export function EventHeroBand({
         className,
       )}
     >
-      {/*
-        Preload the LCP banner from <head> (React hoists this link) so the hero
-        starts downloading before the <img> is discovered in the body. Skip for
-        video heroes and File blob previews (nothing to preload over the network).
-      */}
-      {priorityHeroImage && bgImage && !videoUrl && !bgImage.startsWith("blob:") ? (
-        <link rel="preload" as="image" href={bgImage} fetchPriority="high" />
-      ) : null}
       <div className="absolute inset-0 overflow-hidden">
         {videoUrl ? (
           <>
@@ -206,8 +199,15 @@ export function EventHeroBand({
               preload="auto"
             />
           </>
+        ) : bgImage && !bgImage.startsWith("blob:") && priorityHeroImage ? (
+          <HeroCoverImage
+            src={bgImage}
+            alt={imageAlt}
+            className="scale-105"
+          />
         ) : bgImage ? (
-          // eslint-disable-next-line @next/next/no-img-element -- external vendor URLs + optional cache busting
+          // File blob / non-priority embeds — keep native <img> (next/image can't optimize blobs)
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={bgImage}
             alt={imageAlt}

@@ -147,6 +147,12 @@ export interface ThemeSchema {
 
   logo?: string;
   favicon?: string;
+  /**
+   * DB-backed cache-buster for stable-URL assets (`logo`, `favicon`,
+   * `main_landing_cover_image`). ISO-8601 UTC; null until first replace.
+   * Same value on SSR + client — use with `addCacheBusting(url, media_updated_at)`.
+   */
+  media_updated_at?: string | null;
   name?: string;
   /**
    * Domain role (admin, vendor, customer)

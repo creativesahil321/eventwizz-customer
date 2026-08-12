@@ -8,6 +8,7 @@ import { LucideIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ThemeSchema } from "@/types/theme.types";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { cn } from "@/lib/utils";
 import { resolveVenueContact } from "@/lib/resolve-venue-contact";
 
@@ -35,6 +36,7 @@ export default function HeadersSec({
   logo,
 }: HeadersSecProps = {}) {
   const { theme } = useContext(ServerContext);
+  const { mediaVersion } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { data: session, status } = useSession();
@@ -152,7 +154,7 @@ export default function HeadersSec({
             <Link href="/" aria-label="Home">
               <div className="h-14 flex items-center justify-center">
                 <img
-                  src={addCacheBusting(logoPath)}
+                  src={addCacheBusting(logoPath, mediaVersion)}
                   className="max-h-12 w-auto object-contain"
                   alt={vendorTheme?.name || "EventWizz"}
                 />
@@ -192,7 +194,7 @@ export default function HeadersSec({
             <Link href="/" aria-label="Home">
               <div className="h-10 flex items-center justify-center">
                 <img
-                  src={addCacheBusting(logoPath)}
+                  src={addCacheBusting(logoPath, mediaVersion)}
                   className="max-h-8 w-auto object-contain"
                   alt={vendorTheme?.name || "EventWizz"}
                 />
