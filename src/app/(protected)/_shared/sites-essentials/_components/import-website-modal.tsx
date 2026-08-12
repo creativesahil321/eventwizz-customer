@@ -42,6 +42,18 @@ import { useHasMultipleLocations } from "../_lib/use-has-multiple-locations";
 interface ImportWebsiteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Called with the full form snapshot after a successful Apply.
+   * Used by the live `/preview/site` bridge so imported content/images/theme
+   * paint into the preview immediately (not only when saving from the editor).
+   */
+  onApplied?: (values: SiteEssentialsFormValues) => void;
+  /**
+   * Display name of the location currently being edited / previewed
+   * (e.g. "Billericay"). Shown so vendors know which location page banner
+   * and copy the import will update.
+   */
+  locationLabel?: string | null;
 }
 
 type ToggleKey = Exclude<
@@ -56,18 +68,26 @@ function proxiedImageUrl(url: string): string {
 export function ImportWebsiteModal({
   open,
   onOpenChange,
+  onApplied,
+  locationLabel,
 }: ImportWebsiteModalProps) {
   const form = useFormContext<SiteEssentialsFormValues>();
   const { data: session } = useSession();
   const hasMultipleLocations = useHasMultipleLocations();
   const { locations: venueLocations } = useVendorLocationsList();
-  const activeVenueSlug = resolveDefaultVenueLocation(
+  const activeVenue = resolveDefaultVenueLocation(
     venueLocations,
     venueLocations.find(
       (loc) =>
         String(loc.id) === String(session?.user?.vendor_location_id ?? ""),
     ),
-  )?.slug?.trim();
+  );
+  const activeVenueSlug = activeVenue?.slug?.trim();
+  const resolvedLocationLabel =
+    locationLabel?.trim() ||
+    activeVenue?.city?.trim() ||
+    activeVenue?.name?.trim() ||
+    "";
   const { importWebsite, isImporting } = useWebsiteImport();
   const { generateColorTheme } = useColorThemeAI();
 
@@ -202,7 +222,7 @@ export function ImportWebsiteModal({
     if (!result) return;
     setApplying(true);
     try {
-      // Colors first so the logo is optimized against the imported header color.
+      // Colours first so the logo is optimised against the imported header colour.
       if (importColors) {
         await applyColorsFromWebsite();
       }
@@ -233,10 +253,18 @@ export function ImportWebsiteModal({
         });
       }
 
+      // Push the complete post-apply snapshot (content, Files, colors, fonts)
+      // before closing so live preview / editor consumers see every field.
+      onApplied?.(form.getValues());
+
       toast.success("Website content applied", {
-        description: `Updated ${summary.appliedFields} field${
-          summary.appliedFields === 1 ? "" : "s"
-        }. Review, then click Save to publish.`,
+        description: onApplied
+          ? `Updated ${summary.appliedFields} field${
+              summary.appliedFields === 1 ? "" : "s"
+            }. Review in the preview — Approve & save to keep, or Discard changes to undo.`
+          : `Updated ${summary.appliedFields} field${
+              summary.appliedFields === 1 ? "" : "s"
+            }. Review, then click Save to publish.`,
       });
       handleClose(false);
     } catch (error) {
@@ -288,17 +316,35 @@ export function ImportWebsiteModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[720px] max-h-[88vh] overflow-y-auto text-black">
+      <DialogContent
+        overlayClassName="z-[210]"
+        className="z-[211] sm:max-w-[720px] max-h-[88vh] overflow-y-auto text-black"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Globe className="h-5 w-5" />
             Import from an existing website
           </DialogTitle>
           <DialogDescription>
-            Paste a website URL and we&apos;ll analyze it with AI to pre-fill your
+            Paste a website URL and we&apos;ll analyse it with AI to pre-fill your
             site content, images and theme.
           </DialogDescription>
         </DialogHeader>
+
+        {hasMultipleLocations && resolvedLocationLabel ? (
+          <Alert className="border-slate-200 bg-slate-50 text-slate-800">
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-xs leading-relaxed">
+              Location page banner and page copy will apply to{" "}
+              <span className="font-semibold text-slate-900">
+                {resolvedLocationLabel}
+              </span>
+              . Main home background (if selected) updates the multi-location
+              home. Switch location in the preview bar first if you meant a
+              different page.
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         {!result ? (
           <div className="space-y-5 py-2">
@@ -327,12 +373,12 @@ export function ImportWebsiteModal({
                   {isImporting ? (
                     <>
                       <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                      Analyzing…
+                      Analysing…
                     </>
                   ) : (
                     <>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      Analyze
+                      Analyse
                     </>
                   )}
                 </Button>
@@ -402,10 +448,10 @@ export function ImportWebsiteModal({
                     className="mt-0.5"
                   />
                   <div className="space-y-0.5">
-                    <p className="text-sm font-medium leading-none">Color theme</p>
+                    <p className="text-sm font-medium leading-none">Colour theme</p>
                     <p className="text-xs text-muted-foreground">
                       {result.colorTheme
-                        ? "Brand colors from the site (dark themes kept dark)"
+                        ? "Brand colours from the site (dark themes kept dark)"
                         : "AI theme inspired by the site (contrast-safe)"}
                     </p>
                     {result.colorTheme ? (
@@ -417,9 +463,9 @@ export function ImportWebsiteModal({
                             result.colorTheme.surface,
                             result.colorTheme.secondary,
                           ] as string[]
-                        ).map((hex) => (
+                        ).map((hex, index) => (
                           <span
-                            key={hex}
+                            key={`${hex}-${index}`}
                             className="h-4 w-4 rounded-full border border-black/10"
                             style={{
                               background: hex.startsWith("#") ? hex : undefined,
@@ -444,17 +490,23 @@ export function ImportWebsiteModal({
                 {toggleRow(
                   "logo",
                   "Logo",
-                  result.images.logo ? "Detected logo (auto-optimized)" : "None found",
+                  result.images.logo
+                    ? "Detected logo (auto-optimised)"
+                    : "None found",
                   !result.images.logo,
                 )}
                 {toggleRow(
                   "cover",
                   hasMultipleLocations
-                    ? "Location page banner"
+                    ? resolvedLocationLabel
+                      ? `${resolvedLocationLabel} page banner`
+                      : "Location page banner"
                     : "Cover image",
                   hasCoverImages
                     ? hasMultipleLocations
-                      ? "Hero on the location you’re editing"
+                      ? resolvedLocationLabel
+                        ? `Hero banner for ${resolvedLocationLabel}`
+                        : "Hero on the location you’re editing"
                       : "Hero/banner image"
                     : "None found",
                   !hasCoverImages,
@@ -559,7 +611,9 @@ export function ImportWebsiteModal({
               <CoverGalleryPicker
                 title={
                   hasMultipleLocations
-                    ? "Choose a location page banner"
+                    ? resolvedLocationLabel
+                      ? `Choose a banner for ${resolvedLocationLabel}`
+                      : "Choose a location page banner"
                     : "Choose a cover image"
                 }
                 images={result.images.gallery}

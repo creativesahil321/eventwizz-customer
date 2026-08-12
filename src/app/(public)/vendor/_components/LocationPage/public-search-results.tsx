@@ -51,7 +51,8 @@ function filtersSummary(filters: LocationSearchFilters): string {
   const parts: string[] = [];
   const q = filters.query.trim();
   if (q) parts.push(`“${q}”`);
-  if (filters.city) parts.push(filters.city);
+  if (filters.nearMe) parts.push("Near Me");
+  else if (filters.city) parts.push(filters.city);
   if (filters.date) parts.push(format(filters.date, "d MMM yyyy"));
   if (parts.length === 0) return "Matching results";
   return `Results for ${parts.join(" · ")}`;

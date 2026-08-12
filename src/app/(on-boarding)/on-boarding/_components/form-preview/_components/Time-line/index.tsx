@@ -27,7 +27,18 @@ type EventSchedulerProps = {
   eventSchedularCopy?: string;
   eventSchedular: EventScheduler[] | null | undefined;
   eventSchedularBackgroundImage?: string | null;
+  /**
+   * Calendar dates the event actually runs on (e.g. `["2026-12-20"]`).
+   * Live time-of-day progress is only shown ON one of these dates — before the
+   * event every step is "upcoming", after it every step is "completed". When
+   * omitted (editor/onboarding previews with no real date) the schedule falls
+   * back to a time-of-day demo.
+   */
+  eventDates?: Array<string | null | undefined>;
 };
+
+/** Where "now" sits relative to the event's calendar date(s). */
+type EventDayPhase = "before" | "during" | "after" | "unknown";
 
 type ScheduleStatus = "completed" | "current" | "upcoming";
 
@@ -142,13 +153,73 @@ function getScheduleIcon(title: string, index: number, total: number): LucideIco
   return defaults[index % defaults.length];
 }
 
-function resolveCurrentIndex(schedules: EventScheduler[]): {
+/** Midnight (local) timestamp for a date, or null when unparseable. */
+function startOfDayTs(date: Date): number {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ).getTime();
+}
+
+/**
+ * Compare "today" against the event's calendar date(s) so live progress only
+ * runs on the actual event day. `unknown` (no dates supplied) lets previews
+ * keep the time-of-day demo.
+ */
+function resolveEventDayPhase(
+  eventDates: Array<string | null | undefined> | undefined,
+): EventDayPhase {
+  if (!eventDates || eventDates.length === 0) return "unknown";
+
+  const dayTimestamps = eventDates
+    .map((raw) => {
+      const value = (raw ?? "").trim();
+      if (value.length < 8) return null;
+      // Anchor at midday so a plain `YYYY-MM-DD` never rolls to the previous
+      // day under a negative UTC offset before we normalize to local midnight.
+      const parsed = new Date(`${value}T12:00:00`);
+      return Number.isNaN(parsed.getTime()) ? null : startOfDayTs(parsed);
+    })
+    .filter((ts): ts is number => ts !== null);
+
+  if (dayTimestamps.length === 0) return "unknown";
+
+  const today = startOfDayTs(new Date());
+  if (dayTimestamps.includes(today)) return "during";
+  // Past the last occurrence → the schedule has fully happened. Otherwise the
+  // next occurrence is still upcoming (covers multi-date events with gaps).
+  return today > Math.max(...dayTimestamps) ? "after" : "before";
+}
+
+type ScheduleProgress = {
   currentIndex: number;
   useLiveProgress: boolean;
-} {
+  allCompleted: boolean;
+};
+
+function resolveScheduleProgress(
+  schedules: EventScheduler[],
+  phase: EventDayPhase,
+): ScheduleProgress {
+  // Before the event day: purely informational — nothing done yet.
+  if (phase === "before") {
+    return { currentIndex: -1, useLiveProgress: false, allCompleted: false };
+  }
+
+  // After the event day: the whole schedule is in the past.
+  if (phase === "after") {
+    return {
+      currentIndex: schedules.length - 1,
+      useLiveProgress: true,
+      allCompleted: true,
+    };
+  }
+
+  // On the event day (or preview with no date): track the current slot by time.
   const minutesList = schedules.map((s) => parseTimeToMinutes(s.time));
   if (minutesList.some((m) => m === null)) {
-    return { currentIndex: -1, useLiveProgress: false };
+    return { currentIndex: -1, useLiveProgress: false, allCompleted: false };
   }
 
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
@@ -156,29 +227,39 @@ function resolveCurrentIndex(schedules: EventScheduler[]): {
   const last = minutesList[minutesList.length - 1]!;
 
   if (nowMinutes < first) {
-    return { currentIndex: -1, useLiveProgress: true };
+    return { currentIndex: -1, useLiveProgress: true, allCompleted: false };
   }
 
   if (nowMinutes >= last) {
-    return { currentIndex: minutesList.length - 1, useLiveProgress: true };
+    return {
+      currentIndex: minutesList.length - 1,
+      useLiveProgress: true,
+      allCompleted: false,
+    };
   }
 
   for (let i = 0; i < minutesList.length - 1; i++) {
     const start = minutesList[i]!;
     const end = minutesList[i + 1]!;
     if (nowMinutes >= start && nowMinutes < end) {
-      return { currentIndex: i, useLiveProgress: true };
+      return { currentIndex: i, useLiveProgress: true, allCompleted: false };
     }
   }
 
-  return { currentIndex: minutesList.length - 1, useLiveProgress: true };
+  return {
+    currentIndex: minutesList.length - 1,
+    useLiveProgress: true,
+    allCompleted: false,
+  };
 }
 
 function getItemStatus(
   index: number,
   currentIndex: number,
   useLiveProgress: boolean,
+  allCompleted: boolean,
 ): ScheduleStatus {
+  if (allCompleted) return "completed";
   if (!useLiveProgress || currentIndex < 0) return "upcoming";
   if (index < currentIndex) return "completed";
   if (index === currentIndex) return "current";
@@ -189,7 +270,9 @@ function segmentIsActive(
   segmentIndex: number,
   currentIndex: number,
   useLiveProgress: boolean,
+  allCompleted: boolean,
 ): boolean {
+  if (allCompleted) return true;
   if (!useLiveProgress || currentIndex < 0) return false;
   return segmentIndex < currentIndex;
 }
@@ -902,6 +985,7 @@ export default function Timeline({
   eventSchedularTitle,
   eventSchedularCopy,
   eventSchedularBackgroundImage,
+  eventDates,
 }: EventSchedulerProps) {
   const narrowPreview = usePreviewNarrowLayout();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -926,10 +1010,10 @@ export default function Timeline({
       .filter((item) => item.title || item.time);
   }, [eventSchedular]);
 
-  const { currentIndex, useLiveProgress } = useMemo(
-    () => resolveCurrentIndex(displaySchedules),
-    [displaySchedules],
-  );
+  const { currentIndex, useLiveProgress, allCompleted } = useMemo(() => {
+    const phase = resolveEventDayPhase(eventDates);
+    return resolveScheduleProgress(displaySchedules, phase);
+  }, [displaySchedules, eventDates]);
 
   const columnStyle = useMemo(
     () =>
@@ -1147,6 +1231,7 @@ export default function Timeline({
                     index,
                     currentIndex,
                     useLiveProgress,
+                    allCompleted,
                   );
                   const Icon = getScheduleIcon(
                     item.title,
@@ -1176,6 +1261,7 @@ export default function Timeline({
                               index - 1,
                               currentIndex,
                               useLiveProgress,
+                              allCompleted,
                             )}
                           />
                         ) : (
@@ -1184,7 +1270,12 @@ export default function Timeline({
                         <ProgressMarker status={status} index={index} />
                         {!isLast ? (
                           <TimelineConnector
-                            filled={segmentIsActive(index, currentIndex, useLiveProgress)}
+                            filled={segmentIsActive(
+                              index,
+                              currentIndex,
+                              useLiveProgress,
+                              allCompleted,
+                            )}
                           />
                         ) : (
                           <span style={{ flex: 1 }} aria-hidden />

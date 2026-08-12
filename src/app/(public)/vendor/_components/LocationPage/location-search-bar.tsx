@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   addDays,
   addMonths,
@@ -15,7 +15,9 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  Loader2,
   MapPin,
+  Navigation,
   Search,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
@@ -26,6 +28,7 @@ import {
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { requestUserLocation } from "@/lib/request-user-location";
 import { usePublicAvailability } from "@/services/common/public-search";
 import type { LocationSearchFilters } from "./_lib/search-filters";
 
@@ -58,6 +61,11 @@ export type LocationSearchBarProps = {
    * days that have bookable slots (plus clears past dates).
    */
   availability?: SearchAvailabilityScope;
+  /**
+   * Show "Near Me" in the city menu (multi-location home). Off on
+   * single-location pages / when `hideCity` is true.
+   */
+  enableNearMe?: boolean;
 };
 
 function clampAvailabilityRange(month: Date): { from: string; to: string } {
@@ -86,9 +94,12 @@ export function LocationSearchBar({
   hideCity = false,
   lockedCityLabel = null,
   availability,
+  enableNearMe = false,
 }: LocationSearchBarProps) {
   const [cityOpen, setCityOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [nearMeLoading, setNearMeLoading] = useState(false);
+  const [nearMeError, setNearMeError] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() =>
     startOfMonth(value.date ?? new Date()),
   );
@@ -107,6 +118,53 @@ export function LocationSearchBar({
 
   const patch = (partial: Partial<LocationSearchFilters>) => {
     onChange({ ...value, ...partial });
+  };
+
+  const cityFieldLabel = value.nearMe
+    ? "Near Me"
+    : (value.city ?? "Any city");
+
+  const handleSelectAnyCity = () => {
+    setNearMeError(null);
+    patch({
+      city: null,
+      nearMe: false,
+      nearMeCoords: null,
+    });
+    setCityOpen(false);
+  };
+
+  const handleSelectCity = (option: string) => {
+    setNearMeError(null);
+    patch({
+      city: option,
+      nearMe: false,
+      nearMeCoords: null,
+    });
+    setCityOpen(false);
+  };
+
+  const handleSelectNearMe = async () => {
+    setNearMeError(null);
+    setNearMeLoading(true);
+    // Always hit the browser API on click so the permission prompt can appear
+    // (skipping stale localStorage cache that would silently "succeed").
+    const result = await requestUserLocation({ forcePrompt: true });
+    setNearMeLoading(false);
+
+    if (!result.ok) {
+      setNearMeError(result.message);
+      return;
+    }
+
+    patch({
+      city: null,
+      nearMe: true,
+      nearMeCoords: result.coords,
+    });
+    setCityOpen(false);
+    // Kick search so results refresh immediately after permission grant.
+    onSearch();
   };
 
   const availabilityEnabled =
@@ -249,7 +307,7 @@ export function LocationSearchBar({
                       aria-hidden
                     />
                     <span className="min-w-0 flex-1 truncate text-[var(--color-text)]">
-                      {value.city ?? "Any city"}
+                      {cityFieldLabel}
                     </span>
                     <ChevronDown
                       className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-dimmed)]"
@@ -269,22 +327,40 @@ export function LocationSearchBar({
                 >
                   <CityOption
                     label="Any city"
-                    selected={value.city === null}
-                    onSelect={() => {
-                      patch({ city: null });
-                      setCityOpen(false);
-                    }}
+                    selected={!value.nearMe && value.city === null}
+                    onSelect={handleSelectAnyCity}
                   />
+                  {enableNearMe ? (
+                    <>
+                      <CityOption
+                        label="Near Me"
+                        icon={
+                          nearMeLoading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-primary)]" />
+                          ) : (
+                            <Navigation className="h-3.5 w-3.5 text-[var(--color-primary)]" />
+                          )
+                        }
+                        selected={value.nearMe}
+                        disabled={nearMeLoading}
+                        onSelect={() => {
+                          void handleSelectNearMe();
+                        }}
+                      />
+                      {nearMeError ? (
+                        <p className="px-2.5 py-1.5 text-[11px] leading-snug text-red-600">
+                          {nearMeError}
+                        </p>
+                      ) : null}
+                    </>
+                  ) : null}
                   {cityOptions.map((option) => (
                     <CityOption
                       key={option}
                       label={option}
                       eventCount={cityEventCounts?.[option]}
-                      selected={value.city === option}
-                      onSelect={() => {
-                        patch({ city: option });
-                        setCityOpen(false);
-                      }}
+                      selected={!value.nearMe && value.city === option}
+                      onSelect={() => handleSelectCity(option)}
                     />
                   ))}
                 </PopoverContent>
@@ -408,11 +484,15 @@ function CityOption({
   eventCount,
   selected,
   onSelect,
+  icon,
+  disabled = false,
 }: {
   label: string;
   eventCount?: number;
   selected: boolean;
   onSelect: () => void;
+  icon?: ReactNode;
+  disabled?: boolean;
 }) {
   const showCount = typeof eventCount === "number" && Number.isFinite(eventCount);
   const eventLabel = showCount
@@ -423,13 +503,15 @@ function CityOption({
     <button
       type="button"
       onClick={onSelect}
+      disabled={disabled}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+        "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors disabled:opacity-60",
         selected
           ? "bg-[color:color-mix(in_srgb,var(--color-primary)_12%,transparent)] text-[var(--color-text)]"
           : "text-[var(--color-text)] hover:bg-[color:color-mix(in_srgb,var(--color-text)_5%,transparent)]",
       )}
     >
+      {icon ? <span className="shrink-0">{icon}</span> : null}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {eventLabel ? (
         <span className="shrink-0 rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--color-primary-foreground)]">

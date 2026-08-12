@@ -14,6 +14,8 @@ import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essent
 import { toSiteEssentialsUpdatePayload } from "@/app/(protected)/_shared/sites-essentials/_lib/payload";
 import { hydratePreviewMediaForSave } from "@/app/(protected)/_shared/sites-essentials/_lib/hydrate-preview-media-for-save";
 import {
+  fetchSiteEssentialsBySlugForPreview,
+  SITE_ESSENTIALS_BY_SLUG_STALE_MS,
   siteEssentialsKeys,
   useSiteEssentialsBySlugQuery,
   useSiteEssentialsMutation,
@@ -22,6 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-customizer";
+import { PreviewImportWebsiteControl } from "@/app/(protected)/_shared/sites-essentials/_components/preview-import-website-control";
 import { RestoreDefaultThemeControl } from "@/app/(protected)/_shared/sites-essentials/_components/restore-default-theme-control";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { useToast } from "@/components/ui/use-toast";
@@ -42,7 +45,6 @@ import type { LocationData } from "@/types/theme.types";
 import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib/hooks";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
-import siteEssentialsService from "@/services/common/site-essentials/site-essentials.service";
 import { cn } from "@/lib/utils";
 
 /** Theme fields that count as a real preview edit (not browse/normalize noise). */
@@ -107,6 +109,19 @@ export default function SitePreviewPage() {
   );
   /** Prevents empty-state flash while router leaves after Approve & save. */
   const [isExiting, setIsExiting] = useState(false);
+  /**
+   * True only after an import / theme try / restore-default in THIS preview
+   * visit. `previewRequiresSave` can already be true when opening from a dirty
+   * editor — that must not show Discard by itself.
+   */
+  const [hasSessionEdits, setHasSessionEdits] = useState(false);
+  /**
+   * Snapshot from when this preview session started (or after Save theme).
+   * Discard changes restores here so an unwanted import can be undone safely.
+   */
+  const sessionBaselineRef = useRef<SiteEssentialsFormValues | null>(null);
+  /** `previewRequiresSave` at the moment the baseline was captured. */
+  const baselineRequiresSaveRef = useRef(false);
   /**
    * Hold the last fully-ready location preview while the next slug fetches so
    * Approve → Next does not flash editorSnapshot → API content.
@@ -324,7 +339,10 @@ export default function SitePreviewPage() {
     if (locationApiPending) {
       // First location with nothing pinned yet — show editor snapshot immediately.
       if (!pinnedLocationPreviewRef.current) {
-        const initial = { slug: currentSlug, values: locationPreviewFormValues };
+        const initial = {
+          slug: currentSlug,
+          values: locationPreviewFormValues,
+        };
         pinnedLocationPreviewRef.current = initial;
         setPinnedLocationPreview(initial);
       }
@@ -374,24 +392,58 @@ export default function SitePreviewPage() {
       if (!nextSlug) return;
       void queryClient.prefetchQuery({
         queryKey: siteEssentialsKeys.bySlug(nextSlug),
-        queryFn: () =>
-          siteEssentialsService.getSiteEssentials({ slug: nextSlug }),
-        staleTime: 1000 * 60 * 2,
+        queryFn: () => fetchSiteEssentialsBySlugForPreview(nextSlug),
+        staleTime: SITE_ESSENTIALS_BY_SLUG_STALE_MS,
       });
     },
     [queryClient],
   );
 
-  // Warm the next location while the vendor reviews the current one.
+  // Warm only the immediate neighbours (prev/next) so the common
+  // "Next location" / arrow jumps land warm. Distant locations are warmed
+  // on demand via hover/focus prefetch on the chips and dropdown — we do NOT
+  // eagerly fetch the entire list, which floods the backend with a by-slug
+  // request per location the moment a single location is opened.
   useEffect(() => {
-    if (effectiveReviewStep !== "location") return;
-    const next = locationList[safeLocationIndex + 1]?.slug;
-    prefetchLocationPreview(next);
+    if (effectiveReviewStep !== "location" || locationList.length === 0) return;
+
+    prefetchLocationPreview(locationList[safeLocationIndex - 1]?.slug);
+    prefetchLocationPreview(locationList[safeLocationIndex + 1]?.slug);
   }, [
     effectiveReviewStep,
     locationList,
     safeLocationIndex,
     prefetchLocationPreview,
+  ]);
+
+  // Keep the active vendor location in sync with the location being previewed —
+  // exactly like the dashboard LocationSelector. Selecting a tab / dropdown /
+  // next-prev updates `currentLocation`, and this effect switches the session to
+  // it so location-scoped operations (Import from website, Save theme) send the
+  // correct X-Venue-Location-Id instead of the default location. `useSwitchLocation`
+  // already preserves the preview snapshot while on /preview/site.
+  const lastSyncedLocationIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (effectiveReviewStep !== "location") return;
+    const targetId = currentLocation?.id;
+    if (targetId == null) return;
+
+    const sessionId = Number(session?.user?.vendor_location_id ?? 0);
+    if (Number(targetId) === sessionId) {
+      // Already active — record it so we don't re-fire after the session settles.
+      lastSyncedLocationIdRef.current = Number(targetId);
+      return;
+    }
+    // Guard against re-firing for a switch that's already in flight to this id.
+    if (lastSyncedLocationIdRef.current === Number(targetId)) return;
+
+    lastSyncedLocationIdRef.current = Number(targetId);
+    void switchLocation(targetId);
+  }, [
+    effectiveReviewStep,
+    currentLocation?.id,
+    session?.user?.vendor_location_id,
+    switchLocation,
   ]);
 
   useEffect(() => {
@@ -402,11 +454,23 @@ export default function SitePreviewPage() {
         const clonedData = JSON.parse(JSON.stringify(previewData));
         if (isMounted) {
           setFormData(clonedData);
+          // Capture once per preview visit — later imports/theme tries can Discard
+          // back to this baseline without wiping a later Save theme (we refresh it).
+          if (!sessionBaselineRef.current) {
+            sessionBaselineRef.current = clonedData;
+            baselineRequiresSaveRef.current =
+              useSitePreviewStore.getState().previewRequiresSave;
+          }
         }
       } catch (error) {
         console.error("Error cloning preview data:", error);
         if (isMounted) {
           setFormData(previewData);
+          if (!sessionBaselineRef.current) {
+            sessionBaselineRef.current = previewData;
+            baselineRequiresSaveRef.current =
+              useSitePreviewStore.getState().previewRequiresSave;
+          }
         }
       }
     }
@@ -499,10 +563,69 @@ export default function SitePreviewPage() {
       // Only enter Approve & save mode when theme fields actually changed
       if (previewThemeSliceChanged(prev, next)) {
         setPreviewRequiresSave(true);
+        setHasSessionEdits(true);
       }
     },
     [setPreviewData, setPreviewRequiresSave],
   );
+
+  /**
+   * Import from website can change content/images without touching theme keys.
+   * Always mark dirty so Approve & save is available, and keep the preview
+   * canvas in sync with the full post-apply snapshot (including File media).
+   */
+  const handleImportApplied = useCallback(
+    (next: SiteEssentialsFormValues) => {
+      // Prefer the location currently under review so location-scoped fields
+      // (banner, cover, about) win over the API merge after import.
+      const slug =
+        next.slug?.trim() ||
+        currentSlug?.trim() ||
+        defaultVenueLocation?.slug?.trim() ||
+        undefined;
+      const withSlug = slug && !next.slug?.trim() ? { ...next, slug } : next;
+      setFormData(withSlug);
+      setPreviewData(withSlug);
+      setPreviewRequiresSave(true);
+      setHasSessionEdits(true);
+    },
+    [
+      currentSlug,
+      defaultVenueLocation?.slug,
+      setPreviewData,
+      setPreviewRequiresSave,
+    ],
+  );
+
+  const handleDiscardPreviewChanges = useCallback(() => {
+    const baseline = sessionBaselineRef.current;
+    if (!baseline) {
+      toast({
+        title: "Nothing to discard",
+        description: "There is no earlier preview snapshot to restore.",
+      });
+      return;
+    }
+    try {
+      const restored = JSON.parse(
+        JSON.stringify(baseline),
+      ) as SiteEssentialsFormValues;
+      setFormData(restored);
+      setPreviewData(restored);
+      setPreviewRequiresSave(baselineRequiresSaveRef.current);
+      setHasSessionEdits(false);
+      toast({
+        title: "Changes discarded",
+        description:
+          "Import and theme tries were undone. The preview is back to how it looked when you opened it.",
+      });
+    } catch {
+      toast({
+        title: "Could not discard changes",
+        variant: "destructive",
+      });
+    }
+  }, [setPreviewData, setPreviewRequiresSave, toast]);
 
   const leavePreviewToEditor = useCallback(
     (options?: { keepUnsavedSnapshot?: boolean }) => {
@@ -560,21 +683,19 @@ export default function SitePreviewPage() {
       const index = locationList.findIndex((loc) => loc.slug === slug);
       if (index < 0) return false;
 
-      if (options?.approveMain && !mainPageApproved) {
-        setMainPageApproved(true);
-      }
-      setReviewStep("location");
-      setCurrentLocationIndex(index);
+      // Single store write — avoids double sessionStorage persist on each jump.
+      useSitePreviewStore.setState({
+        ...(options?.approveMain && !mainPageApproved
+          ? { mainPageApproved: true }
+          : {}),
+        reviewStep: "location",
+        previewScope: "location",
+        currentLocationIndex: index,
+      });
       window.scrollTo({ top: 0, behavior: "smooth" });
       return true;
     },
-    [
-      locationList,
-      mainPageApproved,
-      setMainPageApproved,
-      setReviewStep,
-      setCurrentLocationIndex,
-    ],
+    [locationList, mainPageApproved],
   );
 
   const handleContinueFromMain = () => {
@@ -641,8 +762,7 @@ export default function SitePreviewPage() {
       }
 
       const approvedSlugs =
-        options?.approveSlug &&
-        !safeApprovedSlugs.includes(options.approveSlug)
+        options?.approveSlug && !safeApprovedSlugs.includes(options.approveSlug)
           ? [...safeApprovedSlugs, options.approveSlug]
           : safeApprovedSlugs;
 
@@ -794,6 +914,26 @@ export default function SitePreviewPage() {
     const dataForSave = locationPreviewData ?? resolvedGlobalData;
     if (!dataForSave) return;
     try {
+      // A location theme/banner save must target the previewed location — not
+      // the default session location. Without this switch the API interceptor
+      // keeps sending X-Venue-Location-Id for the default location (e.g. 2),
+      // so an imported banner for a non-default location is written to the
+      // wrong location. Mirrors the switch in handleSave.
+      if (effectiveReviewStep === "location") {
+        const targetSlug =
+          currentSlug?.trim() || dataForSave.slug?.trim() || undefined;
+        const targetLocation = locationList.find(
+          (loc) => loc.slug === targetSlug,
+        );
+        const currentId = Number(session?.user?.vendor_location_id ?? 0);
+        if (
+          targetLocation?.id != null &&
+          Number(targetLocation.id) !== currentId
+        ) {
+          await switchLocation(targetLocation.id);
+        }
+      }
+
       const hydrated = await hydratePreviewMediaForSave(
         toSiteEssentialsUpdatePayload(dataForSave),
       );
@@ -806,6 +946,17 @@ export default function SitePreviewPage() {
         queryKey: siteEssentialsKeys.details(),
       });
       router.refresh();
+      // Refresh discard baseline so Discard no longer undoes a published theme.
+      try {
+        sessionBaselineRef.current = JSON.parse(
+          JSON.stringify(dataForSave),
+        ) as SiteEssentialsFormValues;
+        baselineRequiresSaveRef.current =
+          useSitePreviewStore.getState().previewRequiresSave;
+      } catch {
+        sessionBaselineRef.current = dataForSave;
+      }
+      setHasSessionEdits(false);
       toast({
         title: "Theme saved",
         description: "Colors and fonts were updated.",
@@ -819,13 +970,23 @@ export default function SitePreviewPage() {
   }, [
     locationPreviewData,
     resolvedGlobalData,
+    effectiveReviewStep,
+    currentSlug,
+    locationList,
+    switchLocation,
+    session?.user?.vendor_location_id,
     queryClient,
     router,
     saveSiteEssentials,
     toast,
   ]);
 
-  const previewValuesForCustomizer = locationPreviewData ?? resolvedGlobalData;
+  // Prefer the pinned/smooth canvas values so the customizer doesn't thrash to an
+  // editor snapshot while a location fetch is still in flight.
+  const previewValuesForCustomizer =
+    (effectiveReviewStep === "location" ? smoothLocationPreviewValues : null) ??
+    locationPreviewData ??
+    resolvedGlobalData;
 
   if (isLoading) {
     return (
@@ -902,6 +1063,9 @@ export default function SitePreviewPage() {
             }
           : undefined
       }
+      onPreviewLocationPrefetch={
+        hasMultipleLocations ? prefetchLocationPreview : undefined
+      }
     >
       <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-[var(--color-background)]">
         {/* Top/bottom chrome overlays the site — clearance lives on the footer (footer bg)
@@ -971,10 +1135,30 @@ export default function SitePreviewPage() {
             onSaveTheme={handleSaveTheme}
             isSavingTheme={isSaving}
             showHeroLayoutControls={effectiveReviewStep === "location"}
+            importSlot={
+              session?.user?.account_type !== "admin" ? (
+                <PreviewImportWebsiteControl
+                  values={previewValuesForCustomizer}
+                  onValuesChange={handleImportApplied}
+                  locationLabel={
+                    (effectiveReviewStep === "location"
+                      ? currentLocation?.city
+                      : undefined) ??
+                    defaultVenueLocation?.city ??
+                    defaultVenueLocation?.name
+                  }
+                  disabled={isSaving || isExiting}
+                />
+              ) : undefined
+            }
+            showDiscardChanges={hasSessionEdits}
+            onDiscardChanges={handleDiscardPreviewChanges}
             sheetDescription={
-              previewRequiresSave
-                ? "Adjust colors or fonts. Approve each location page, then save."
-                : "Adjust colors or fonts. Editing will enable Approve & save."
+              hasSessionEdits
+                ? "Adjust colours or fonts. Don’t like an import or theme try? Use Discard changes."
+                : previewRequiresSave
+                  ? "Adjust colours or fonts. Approve each location page, then save."
+                  : "Adjust colours or fonts. Editing will enable Approve & save."
             }
             footerSlot={
               <RestoreDefaultThemeControl
@@ -1014,21 +1198,31 @@ export default function SitePreviewPage() {
             void handleSave(options);
           }}
           onClosePreview={handleClosePreview}
+          onPrefetchLocation={prefetchLocationPreview}
           onGoToStep={(step) => {
             if (step === "main") {
-              setReviewStep("main");
+              useSitePreviewStore.setState({
+                reviewStep: "main",
+                previewScope: "main",
+              });
             } else {
               const slug = locationList[step.locationIndex]?.slug;
               prefetchLocationPreview(slug);
-              setReviewStep("location");
-              setCurrentLocationIndex(step.locationIndex);
+              useSitePreviewStore.setState({
+                reviewStep: "location",
+                previewScope: "location",
+                currentLocationIndex: step.locationIndex,
+              });
             }
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
           onBackToMain={
             hasMultipleLocations
               ? () => {
-                  setReviewStep("main");
+                  useSitePreviewStore.setState({
+                    reviewStep: "main",
+                    previewScope: "main",
+                  });
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }
               : undefined

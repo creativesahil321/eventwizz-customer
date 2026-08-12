@@ -2,9 +2,11 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import siteEssentialsService from "@/services/common/site-essentials/site-essentials.service";
+import type { SiteEssentials } from "@/services/common/site-essentials/type";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { SiteEssentialsFormValues } from "./schema";
 import { toSiteEssentialsUpdatePayload } from "./payload";
+import { slimSiteEssentialsForLocationPreview } from "./slim-location-preview-essentials";
 
 // Query key for site essentials
 export const siteEssentialsKeys = {
@@ -13,6 +15,20 @@ export const siteEssentialsKeys = {
   bySlug: (slug: string) =>
     [...siteEssentialsKeys.all, "by-slug", slug] as const,
 };
+
+/** Shared stale window for by-slug location preview fetches. */
+export const SITE_ESSENTIALS_BY_SLUG_STALE_MS = 1000 * 60 * 5;
+
+/**
+ * Fetch location-scoped site essentials and strip unused CMS HTML before
+ * caching — keeps `/preview/site` location switches fast.
+ */
+export async function fetchSiteEssentialsBySlugForPreview(
+  slug: string,
+): Promise<SiteEssentials> {
+  const data = await siteEssentialsService.getSiteEssentials({ slug });
+  return slimSiteEssentialsForLocationPreview(data);
+}
 
 /**
  * Hook to fetch site essentials data with TanStack Query caching
@@ -33,10 +49,10 @@ export const useSiteEssentialsBySlugQuery = (
 ) => {
   return useQuery({
     queryKey: siteEssentialsKeys.bySlug(slug ?? ""),
-    queryFn: () =>
-      siteEssentialsService.getSiteEssentials({ slug: slug! }),
+    queryFn: () => fetchSiteEssentialsBySlugForPreview(slug!),
     enabled: enabled && Boolean(slug?.trim()),
-    staleTime: 1000 * 60 * 2,
+    staleTime: SITE_ESSENTIALS_BY_SLUG_STALE_MS,
+    gcTime: 1000 * 60 * 15,
   });
 };
 

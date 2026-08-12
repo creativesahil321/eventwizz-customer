@@ -17,6 +17,7 @@ import { LocationSearchBar } from "./location-search-bar";
 import { PublicSearchResults } from "./public-search-results";
 import {
   filterLocations,
+  matchVendorCityToPlace,
   resolveLocationSlugForCity,
   toSearchDateParam,
 } from "./_lib/filter-locations";
@@ -45,6 +46,8 @@ import { useImageLuminance } from "@/hooks/use-image-luminance";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { usePublicSearch } from "@/services/common/public-search";
+import { useReverseGeocode } from "@/hooks/useReverseGeocode";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type VendorMainLandingViewProps = {
   brandName: string;
@@ -115,6 +118,38 @@ export function VendorMainLandingView({
   const { filters, apiFilters, setFilters, clearFilters, isSearchMode } =
     usePublicSearchFilters({ syncUrl: useApi });
 
+  const nearMeLat = filters.nearMe ? filters.nearMeCoords?.lat ?? null : null;
+  const nearMeLng = filters.nearMe ? filters.nearMeCoords?.lng ?? null : null;
+  const {
+    city: nearMePlaceCity,
+    loading: nearMePlaceLoading,
+  } = useReverseGeocode(nearMeLat, nearMeLng);
+
+  const vendorCities = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const location of locations) {
+      const city = location.city?.trim();
+      if (!city || seen.has(city)) continue;
+      seen.add(city);
+      list.push(city);
+    }
+    return list;
+  }, [locations]);
+
+  /** FE-first: map GPS → nearest vendor city until backend nearby lands. */
+  const nearMeMatchedCity = useMemo(
+    () =>
+      filters.nearMe
+        ? matchVendorCityToPlace(nearMePlaceCity, vendorCities)
+        : null,
+    [filters.nearMe, nearMePlaceCity, vendorCities],
+  );
+
+  const effectiveCity = filters.nearMe
+    ? nearMeMatchedCity
+    : apiFilters.city;
+
   /**
    * Map chrome only from xl (1280px)+ — small desktops keep grid and avoid
    * CTA / toggle collisions in the hero fade.
@@ -122,8 +157,8 @@ export function VendorMainLandingView({
   const hideMapView = isPreviewNarrow || isCompactViewport;
 
   const locationSlugForCity = useMemo(
-    () => resolveLocationSlugForCity(apiFilters.city, locations),
-    [apiFilters.city, locations],
+    () => resolveLocationSlugForCity(effectiveCity, locations),
+    [effectiveCity, locations],
   );
 
   const searchParams = useMemo(
@@ -131,32 +166,70 @@ export function VendorMainLandingView({
       q: apiFilters.query.trim() || undefined,
       // Prefer slug when unique; otherwise exact city label for the API.
       location_slug: locationSlugForCity,
-      city: locationSlugForCity ? undefined : apiFilters.city ?? undefined,
+      city: locationSlugForCity ? undefined : effectiveCity ?? undefined,
       date: toSearchDateParam(apiFilters.date),
       mode: "auto" as const,
       per_page: 40,
     }),
-    [apiFilters.query, apiFilters.city, apiFilters.date, locationSlugForCity],
+    [
+      apiFilters.query,
+      apiFilters.date,
+      effectiveCity,
+      locationSlugForCity,
+    ],
   );
+
+  const nearMeResolving =
+    filters.nearMe &&
+    Boolean(filters.nearMeCoords) &&
+    nearMePlaceLoading;
+
+  const nearMeNoMatch =
+    filters.nearMe &&
+    Boolean(filters.nearMeCoords) &&
+    !nearMePlaceLoading &&
+    !nearMeMatchedCity;
 
   const searchQuery = usePublicSearch(domain, searchParams, {
-    enabled: useApi && isSearchMode,
+    enabled:
+      useApi &&
+      isSearchMode &&
+      !nearMeResolving &&
+      // Until backend nearby exists, Near Me alone needs a matched vendor city.
+      !(nearMeNoMatch && !apiFilters.query.trim() && !apiFilters.date),
   });
 
-  /** Preview / browse: location cards. Live search: API event/date results. */
-  const filteredLocations = useMemo(
-    () =>
-      useApi && isSearchMode
-        ? locations
-        : filterLocations(locations, apiFilters),
-    [useApi, isSearchMode, locations, apiFilters],
+  const filtersForClient = useMemo(
+    () => ({
+      ...apiFilters,
+      city: effectiveCity,
+    }),
+    [apiFilters, effectiveCity],
   );
 
-  const showApiResults = useApi && isSearchMode;
+  /** Preview / browse: location cards. Live search: API event/date results. */
+  const filteredLocations = useMemo(() => {
+    if (nearMeNoMatch && !apiFilters.query.trim() && !apiFilters.date) {
+      return [];
+    }
+    return useApi && isSearchMode
+      ? locations
+      : filterLocations(locations, filtersForClient);
+  }, [
+    useApi,
+    isSearchMode,
+    locations,
+    filtersForClient,
+    nearMeNoMatch,
+    apiFilters.query,
+    apiFilters.date,
+  ]);
+
+  const showApiResults =
+    useApi && isSearchMode && !nearMeNoMatch && !nearMeResolving;
   const showEmptySearchState =
-    !showApiResults &&
-    isSearchMode &&
-    filteredLocations.length === 0;
+    (!showApiResults && isSearchMode && filteredLocations.length === 0) ||
+    nearMeNoMatch;
 
   const totalEvents = (showApiResults ? locations : filteredLocations).reduce(
     (sum, loc) =>
@@ -206,6 +279,15 @@ export function VendorMainLandingView({
 
   const heroAlign = "center" as const;
   const heroValign = "center" as const;
+
+  /**
+   * Single emphasis source for every heading on this page (hero + section titles
+   * + newsletter). Section headings previously read `useTheme()` independently,
+   * which diverged from the hero's prop in preview (accent tail leaked onto the
+   * location-list / newsletter titles). Threading one resolved value keeps
+   * preview and live 1:1.
+   */
+  const resolvedHeadingEmphasis = normalizeHeadingEmphasis(headingEmphasis);
 
   /**
    * Auto-contrast: sample the cover so the headline flips black/white to stay
@@ -296,7 +378,7 @@ export function VendorMainLandingView({
               level={1}
               title={heroHeading}
               accentHint={heroAccentHint}
-              emphasis={normalizeHeadingEmphasis(headingEmphasis)}
+              emphasis={resolvedHeadingEmphasis}
               variant={heroIsLight ? "onLight" : "onDark"}
               align={heroAlign}
               className="mb-2.5 w-full min-w-0 max-w-full break-words font-bold !text-[1.65rem] !leading-[1.18] sm:mb-4 sm:!text-4xl sm:!leading-[1.12] md:max-w-5xl md:!text-5xl xl:!text-[3.25rem] xl:!leading-[1.05]"
@@ -316,19 +398,34 @@ export function VendorMainLandingView({
 
             <LocationSearchBar
               className="w-full max-w-3xl px-0"
-              cities={locations.map((location) => location.city)}
+              cities={vendorCities}
               cityEventCounts={cityEventCounts}
               value={filters}
               onChange={setFilters}
               onSearch={scrollToResults}
+              enableNearMe
               availability={{
                 domain,
                 q: filters.query,
-                city: locationSlugForCity ? undefined : filters.city,
+                city: locationSlugForCity ? undefined : effectiveCity,
                 location_slug: locationSlugForCity,
                 enabled: useApi,
               }}
             />
+            {nearMeResolving ? (
+              <div className="mt-3 flex items-center justify-center gap-2 text-sm text-[var(--color-text-dimmed)]">
+                <Skeleton className="h-4 w-4 rounded-full" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+            ) : null}
+            {filters.nearMe && nearMeMatchedCity && !nearMeResolving ? (
+              <p className="mt-3 text-center text-xs text-[var(--color-text-dimmed)] sm:text-sm">
+                Showing venues near{" "}
+                <span className="font-semibold text-[var(--color-text)]">
+                  {nearMeMatchedCity}
+                </span>
+              </p>
+            ) : null}
           </motion.div>
         </div>
       </section>
@@ -414,6 +511,7 @@ export function VendorMainLandingView({
               level={2}
               align="center"
               title={locationsListTitle}
+              emphasis={resolvedHeadingEmphasis}
               variant="onSurface"
               className={cn(
                 "mb-1 !text-xl !font-black !leading-snug tracking-tight",
@@ -514,9 +612,12 @@ export function VendorMainLandingView({
 
           {showApiResults ? (
             <PublicSearchResults
-              filters={filters}
+              filters={{
+                ...filters,
+                city: nearMeMatchedCity ?? filters.city,
+              }}
               data={searchQuery.data}
-              isLoading={searchQuery.isFetching}
+              isLoading={searchQuery.isFetching || nearMeResolving}
               isError={searchQuery.isError}
               onClear={clearSearchFilters}
               sectionId={`${exploreCitiesSectionId}-results`}
@@ -525,10 +626,16 @@ export function VendorMainLandingView({
           ) : showEmptySearchState ? (
             <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-6 py-10 text-center">
               <p className="text-base font-semibold text-[var(--color-text)]">
-                No locations match your search
+                {nearMeNoMatch
+                  ? "No venues near you yet"
+                  : "No locations match your search"}
               </p>
               <p className="text-sm text-[var(--color-text-dimmed)]">
-                Try another city or date.
+                {nearMeNoMatch
+                  ? nearMePlaceCity
+                    ? `We couldn’t match “${nearMePlaceCity}” to a venue city. Pick a city from the list instead.`
+                    : "Pick a city from the list, or try again later."
+                  : "Try another city or date."}
               </p>
               <button
                 type="button"
@@ -554,7 +661,7 @@ export function VendorMainLandingView({
         </motion.div>
       </section>
 
-      <SubscribeSection />
+      <SubscribeSection emphasis={resolvedHeadingEmphasis} />
 
       <FooterSection
         copyright={copyright}

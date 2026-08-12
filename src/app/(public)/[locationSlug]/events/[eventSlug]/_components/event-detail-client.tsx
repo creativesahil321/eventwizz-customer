@@ -240,6 +240,13 @@ export default function EventDetailClient({
     String(slices.event_schedular_title ?? "").trim().length > 0 ||
     timelineRows.length > 0;
 
+  // The schedule is live-tracked only on the event's actual date(s); before/after
+  // it stays informational instead of showing a false daily countdown.
+  const scheduleEventDates = useMemo(
+    () => (slices.dates ?? []).map((d) => d.event_date),
+    [slices.dates],
+  );
+
   const drinkPackages = useMemo(
     () =>
       (slices.packages ?? []).map((pkg) => ({
@@ -350,6 +357,7 @@ export default function EventDetailClient({
               <Timeline
                 eventSchedular={timelineRows}
                 eventSchedularTitle={slices.event_schedular_title}
+                eventDates={scheduleEventDates}
                 eventSchedularBackgroundImage={
                   typeof slices.event_schedular_background_image === "string"
                     ? slices.event_schedular_background_image

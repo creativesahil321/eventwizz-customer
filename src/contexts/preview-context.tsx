@@ -17,6 +17,8 @@ interface PreviewContextType {
   previewLocations?: PreviewLocationOption[];
   activePreviewLocationSlug?: string;
   onPreviewLocationSelect?: (slug: string) => void;
+  /** Warm by-slug cache when hovering a location in the header switcher. */
+  onPreviewLocationPrefetch?: (slug: string) => void;
 }
 
 const PreviewContext = createContext<PreviewContextType | undefined>(undefined);
@@ -28,6 +30,7 @@ interface PreviewProviderProps {
   previewLocations?: PreviewLocationOption[];
   activePreviewLocationSlug?: string;
   onPreviewLocationSelect?: (slug: string) => void;
+  onPreviewLocationPrefetch?: (slug: string) => void;
 }
 
 export function PreviewProvider({
@@ -37,6 +40,7 @@ export function PreviewProvider({
   previewLocations,
   activePreviewLocationSlug,
   onPreviewLocationSelect,
+  onPreviewLocationPrefetch,
 }: PreviewProviderProps) {
   return (
     <PreviewContext.Provider
@@ -46,6 +50,7 @@ export function PreviewProvider({
         previewLocations,
         activePreviewLocationSlug,
         onPreviewLocationSelect,
+        onPreviewLocationPrefetch,
       }}
     >
       {children}
@@ -68,12 +73,14 @@ export function usePreviewLocationNavigation() {
       previewLocations: undefined,
       activePreviewLocationSlug: undefined,
       onPreviewLocationSelect: undefined,
+      onPreviewLocationPrefetch: undefined,
     };
   }
   return {
     previewLocations: context.previewLocations,
     activePreviewLocationSlug: context.activePreviewLocationSlug,
     onPreviewLocationSelect: context.onPreviewLocationSelect,
+    onPreviewLocationPrefetch: context.onPreviewLocationPrefetch,
   };
 }
 

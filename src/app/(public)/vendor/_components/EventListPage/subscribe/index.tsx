@@ -5,9 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SiteHeading } from "@/components/public/site-heading";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { cn } from "@/lib/utils";
 
-export default function SubscribeSection() {
+interface SubscribeSectionProps {
+  /**
+   * Heading emphasis resolved by the parent (same source as the hero) so preview
+   * and live stay 1:1. When omitted, `SiteHeading` falls back to theme context.
+   */
+  emphasis?: HeadingEmphasis;
+}
+
+export default function SubscribeSection({ emphasis }: SubscribeSectionProps = {}) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -48,6 +57,7 @@ export default function SubscribeSection() {
           level={2}
           align="center"
           title="Never miss what's on"
+          emphasis={emphasis}
           variant="onSurface"
           className="mb-4 !text-3xl !font-semibold tracking-tight !text-[var(--color-on-surface)] md:!text-4xl"
         />

@@ -9,7 +9,6 @@ import {
   AlertCircle,
   Eye,
   RotateCcw,
-  Globe,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,6 @@ import {
 } from "../_lib/site-essentials-update-context";
 import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-values";
 import { hydratePreviewMediaForSave } from "../_lib/hydrate-preview-media-for-save";
-import { ImportWebsiteModal } from "./import-website-modal";
 
 const SITE_ESSENTIALS_TABS = [
   "branding",
@@ -82,7 +80,6 @@ function SiteEssentialsFormInner() {
   const hasMultipleLocations = useHasMultipleLocations();
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const {
@@ -330,15 +327,16 @@ function SiteEssentialsFormInner() {
         openOnLocation,
         initialLocationIndex:
           initialLocationIndex >= 0 ? initialLocationIndex : 0,
-        // View-only when the editor has no unsaved changes.
-        // Use a fresh isDirty read so Preview never opens in save mode by accident
-        // after a pristine load (RHF can briefly report stale dirty during sync).
-        requiresSave: Boolean(form.formState.isDirty),
+        // View-only when the editor has no unsaved changes. Use `dirtyFields`
+        // (genuine user edits) rather than `isDirty`, which RHF can report stale
+        // during a server `values` re-sync — that opened Preview in save mode
+        // after a pristine load.
+        requiresSave: hasRealEdits,
       });
       setPreviewData(completeFormValues);
 
       // If the form is pristine, ensure we never restore-as-dirty on return
-      if (!form.formState.isDirty) {
+      if (!hasRealEdits) {
         useSitePreviewStore.getState().setPreviewRequiresSave(false);
       }
 
@@ -436,8 +434,13 @@ function SiteEssentialsFormInner() {
   // Count total errors for error summary
   const errorCount = Object.keys(tabsWithErrors).length;
 
-  // Subscribe so the Discard button re-renders when the form becomes dirty
-  const { isDirty } = form.formState;
+  // `isDirty` can flip true transiently while react-hook-form re-syncs the
+  // server `values` (keepDirtyValues) — e.g. when switching Main home ⇄ Location
+  // scope or when a refetch settles — even though the user changed nothing. That
+  // made "Discard changes" appear on a plain visit. `dirtyFields` only lists
+  // fields the user genuinely edited, so it's the reliable "has real edits" gate.
+  const { dirtyFields } = form.formState;
+  const hasRealEdits = Object.keys(dirtyFields).length > 0;
 
   const handleDiscardChanges = async () => {
     if (readOnly) return;
@@ -640,18 +643,6 @@ function SiteEssentialsFormInner() {
             {/* Actions sit on white, directly under tab content — avoids teal page chrome eating contrast */}
             <div className="border-t border-border bg-white px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-3">
-                {!isAdminSite && !readOnly && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setImportOpen(true)}
-                    type="button"
-                    disabled={submitting || previewLoading}
-                    className="flex items-center justify-center gap-2 border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                  >
-                    <Globe className="h-4 w-4" />
-                    Import from website
-                  </Button>
-                )}
                 {!isAdminSite && (
                   <Button
                     variant="outline"
@@ -668,7 +659,7 @@ function SiteEssentialsFormInner() {
                     {previewLoading ? "Loading..." : "Preview"}
                   </Button>
                 )}
-                {isDirty && !readOnly && (
+                {hasRealEdits && !readOnly && (
                   <Button
                     variant="outline"
                     type="button"
@@ -698,10 +689,6 @@ function SiteEssentialsFormInner() {
           </Card>
         </Tabs>
       </form>
-
-      {!isAdminSite && (
-        <ImportWebsiteModal open={importOpen} onOpenChange={setImportOpen} />
-      )}
     </FormProvider>
   );
 }

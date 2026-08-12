@@ -20,6 +20,7 @@ import {
   Loader2,
   Palette,
   RotateCcw,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -98,6 +99,77 @@ const HEADING_STYLE_OPTIONS: {
   },
 ];
 
+const HERO_ALIGN_OPTIONS: {
+  v: BannerHeadingAlign;
+  Icon: LucideIcon;
+  label: string;
+}[] = [
+  { v: "left", Icon: AlignLeft, label: "Left" },
+  { v: "center", Icon: AlignCenter, label: "Center" },
+  { v: "right", Icon: AlignRight, label: "Right" },
+];
+
+const HERO_VALIGN_OPTIONS: {
+  v: BannerHeadingValign;
+  Icon: LucideIcon;
+  label: string;
+}[] = [
+  { v: "top", Icon: AlignVerticalJustifyStart, label: "Top" },
+  { v: "center", Icon: AlignVerticalJustifyCenter, label: "Middle" },
+  { v: "bottom", Icon: AlignVerticalJustifyEnd, label: "Bottom" },
+];
+
+const COLOR_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "dark", label: "Dark" },
+  { id: "light", label: "Light" },
+] as const;
+
+/** Consistent section label used across every panel group. */
+const SECTION_LABEL_CLASS =
+  "text-[11px] font-semibold uppercase tracking-wide text-slate-500";
+/** Consistent one-line helper text used under section labels. */
+const SECTION_HINT_CLASS = "text-[11px] leading-snug text-slate-400";
+
+/** Full-width segmented control shared by the hero align/valign pickers. */
+function SegmentGroup<T extends string>({
+  ariaLabel,
+  value,
+  options,
+  onChange,
+}: {
+  ariaLabel: string;
+  value: T;
+  options: { v: T; Icon: LucideIcon; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div
+      className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1"
+      role="group"
+      aria-label={ariaLabel}
+    >
+      {options.map(({ v, Icon, label }) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={value === v}
+          onClick={() => onChange(v)}
+          className={cn(
+            "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+            value === v
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900",
+          )}
+        >
+          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function sortTryThemeOptionsFirst<T>(
   items: readonly T[],
   pinnedKey: string | null,
@@ -128,6 +200,19 @@ type PreviewThemeCustomizerProps = {
   showHeroLayoutControls?: boolean;
   /** Rendered at the bottom of the panel — e.g. the editor injects Restore default theme here. */
   footerSlot?: ReactNode;
+  /**
+   * Optional action rendered near the top of the panel (under Save theme) — e.g.
+   * the site preview injects an "Import from website" control here. Kept as a
+   * slot so this component stays free of react-hook-form / import dependencies.
+   */
+  importSlot?: ReactNode;
+  /**
+   * When set, shows a clear “Discard changes” control so vendors can undo an
+   * import / theme try and return the live preview to the session baseline.
+   */
+  onDiscardChanges?: () => void;
+  /** Gates the Discard control (typically `previewRequiresSave`). */
+  showDiscardChanges?: boolean;
 };
 
 function presetById(
@@ -154,6 +239,9 @@ export function PreviewThemeCustomizer({
   isSavingTheme = false,
   showHeroLayoutControls = true,
   footerSlot,
+  importSlot,
+  onDiscardChanges,
+  showDiscardChanges = false,
 }: PreviewThemeCustomizerProps) {
   const canPersistSiteEssentials = usePermission("update-site-essential");
   useSiteEssentialsPresetFontsPreload();
@@ -448,152 +536,89 @@ export function PreviewThemeCustomizer({
             </SheetDescription>
           </SheetHeader>
 
-          {onSaveTheme ? (
-            <div className="shrink-0 border-b border-slate-100 px-4 py-3">
-              {/*
-                Must not use the default/event-primary variants — those bind to
-                preview CSS vars (--color-primary*). On some themes hover sets
-                white text on a light/white fill and the label vanishes.
-              */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-slate-300 !bg-white !font-medium !text-slate-900 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
-                disabled={isSavingTheme || !canPersistSiteEssentials}
-                onClick={() => void onSaveTheme()}
-              >
-                {isSavingTheme ? (
-                  <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
-                ) : null}
-                {canPersistSiteEssentials ? "Save theme" : "View only"}
-              </Button>
-              <p className="mt-2 text-[10px] leading-snug text-slate-500">
-                {canPersistSiteEssentials ? (
-                  <>
-                    Writes colors, fonts, and hero layout to Site Essentials
-                    (same as Save on the Site Essentials page).
-                  </>
-                ) : (
-                  <>
-                    Saving requires the{" "}
-                    <span className="font-medium text-slate-600">
-                      update-site-essential
-                    </span>{" "}
-                    permission. You can still try fonts and colors in this
-                    preview; they are not saved until someone with access saves
-                    from here or Site Essentials.
-                  </>
-                )}
-              </p>
+          {onSaveTheme || importSlot || (showDiscardChanges && onDiscardChanges) ? (
+            <div className="shrink-0 space-y-3 border-b border-slate-100 px-4 py-3">
+              {onSaveTheme ? (
+                <div className="space-y-1.5">
+                  {/*
+                    Must not use the default/event-primary variants — those bind to
+                    preview CSS vars (--color-primary*). On some themes hover sets
+                    white text on a light/white fill and the label vanishes.
+                  */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-300 !bg-white !font-medium !text-slate-900 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
+                    disabled={isSavingTheme || !canPersistSiteEssentials}
+                    onClick={() => void onSaveTheme()}
+                  >
+                    {isSavingTheme ? (
+                      <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
+                    ) : null}
+                    {canPersistSiteEssentials ? "Save theme" : "View only"}
+                  </Button>
+                  <p className={SECTION_HINT_CLASS}>
+                    {canPersistSiteEssentials
+                      ? "Publishes colors, fonts & hero layout to Site Essentials."
+                      : "Read-only — needs the update-site-essential permission to save."}
+                  </p>
+                </div>
+              ) : null}
+              {importSlot}
+              {showDiscardChanges && onDiscardChanges ? (
+                <div className="space-y-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-300 !bg-white !font-medium !text-slate-700 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
+                    disabled={isSavingTheme}
+                    onClick={onDiscardChanges}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4 shrink-0" />
+                    Discard changes
+                  </Button>
+                  <p className={SECTION_HINT_CLASS}>
+                    Undo import and theme tries — restores this preview to how
+                    it looked when you opened it.
+                  </p>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
           <ScrollArea className="flex-1 min-h-0">
-            <div className="space-y-6 px-4 py-4 pb-8">
+            <div className="space-y-5 px-4 py-4 pb-8">
               {showHeroLayoutControls ? (
-                <>
-                  <div>
-                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Hero horizontal
-                    </h3>
-                    <div
-                      className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
-                      role="group"
-                      aria-label="Hero text alignment"
-                    >
-                      {(
-                        [
-                          {
-                            v: "left" as const,
-                            Icon: AlignLeft,
-                            label: "Left",
-                          },
-                          {
-                            v: "center" as const,
-                            Icon: AlignCenter,
-                            label: "Center",
-                          },
-                          {
-                            v: "right" as const,
-                            Icon: AlignRight,
-                            label: "Right",
-                          },
-                        ] as const
-                      ).map(({ v, Icon, label }) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => applyHeroAlign(v)}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                            currentHeroAlign === v
-                              ? "bg-white text-slate-900 shadow-sm"
-                              : "text-slate-600 hover:text-slate-900",
-                          )}
-                        >
-                          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                          {label}
-                        </button>
-                      ))}
-                    </div>
+                <section className="space-y-2.5">
+                  <h3 className={SECTION_LABEL_CLASS}>Hero position</h3>
+                  <div className="space-y-2">
+                    <span className="block text-[11px] font-medium text-slate-500">
+                      Horizontal
+                    </span>
+                    <SegmentGroup
+                      ariaLabel="Hero text alignment"
+                      value={currentHeroAlign}
+                      options={HERO_ALIGN_OPTIONS}
+                      onChange={applyHeroAlign}
+                    />
+                    <span className="block pt-1 text-[11px] font-medium text-slate-500">
+                      Vertical
+                    </span>
+                    <SegmentGroup
+                      ariaLabel="Hero vertical position"
+                      value={currentHeroValign}
+                      options={HERO_VALIGN_OPTIONS}
+                      onChange={applyHeroValign}
+                    />
                   </div>
-
-                  <div>
-                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Hero vertical
-                    </h3>
-                    <div
-                      className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
-                      role="group"
-                      aria-label="Hero vertical position"
-                    >
-                      {(
-                        [
-                          {
-                            v: "top" as const,
-                            Icon: AlignVerticalJustifyStart,
-                            label: "Top",
-                          },
-                          {
-                            v: "center" as const,
-                            Icon: AlignVerticalJustifyCenter,
-                            label: "Middle",
-                          },
-                          {
-                            v: "bottom" as const,
-                            Icon: AlignVerticalJustifyEnd,
-                            label: "Bottom",
-                          },
-                        ] as const
-                      ).map(({ v, Icon, label }) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => applyHeroValign(v)}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                            currentHeroValign === v
-                              ? "bg-white text-slate-900 shadow-sm"
-                              : "text-slate-600 hover:text-slate-900",
-                          )}
-                        >
-                          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
+                </section>
               ) : null}
 
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Heading style
-                </h3>
-                <p className="mb-2 text-[10px] leading-snug text-slate-500">
-                  Trailing accent uses the last words of your banner title
-                  automatically (same idea as Site Essentials). Set a custom
-                  phrase there if you need an exact match.
+              <div className="space-y-2.5">
+                <h3 className={SECTION_LABEL_CLASS}>Heading style</h3>
+                <p className={SECTION_HINT_CLASS}>
+                  Trailing accent styles the last words of your banner title
+                  automatically.
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {HEADING_STYLE_OPTIONS.map(({ id, label, description }) => (
@@ -612,7 +637,7 @@ export function PreviewThemeCustomizer({
                       <span className="font-semibold">{label}</span>
                       <span
                         className={cn(
-                          "mt-0.5 block text-[10px] leading-snug",
+                          "mt-0.5 block text-[11px] leading-snug",
                           currentHeadingEmphasis === id
                             ? "text-white/85"
                             : "text-slate-500",
@@ -625,57 +650,45 @@ export function PreviewThemeCustomizer({
                 </div>
               </div>
 
-              <div>
-                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Try other colors
-                    </h3>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-slate-500"
-                      onClick={handleReset}
-                      title="Reset to when you opened this panel"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div
-                    className="flex flex-wrap gap-1"
-                    role="group"
-                    aria-label="Filter palettes by brightness"
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className={SECTION_LABEL_CLASS}>Colors</h3>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="-mr-1 h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700"
+                    onClick={handleReset}
+                    title="Undo all changes made since you opened this panel"
                   >
-                    {(
-                      [
-                        { id: "all" as const, label: "All" },
-                        { id: "dark" as const, label: "Dark" },
-                        { id: "light" as const, label: "Light" },
-                      ] as const
-                    ).map(({ id, label }) => (
-                      <button
-                        key={id}
-                        type="button"
-                        aria-pressed={colorFilter === id}
-                        onClick={() => setColorFilter(id)}
-                        className={cn(
-                          "rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors",
-                          colorFilter === id
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <p className="mb-3 text-[10px] leading-snug text-slate-500">
-                  Three dots: page background, primary accent, and a key tone
-                  (usually body text). Checkmark = body-on-background AA plus
-                  primary-on-surface for cards; triangle = double-check in Site
-                  Essentials.
+                <div
+                  className="flex flex-wrap gap-1"
+                  role="group"
+                  aria-label="Filter palettes by brightness"
+                >
+                  {COLOR_FILTERS.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={colorFilter === id}
+                      onClick={() => setColorFilter(id)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                        colorFilter === id
+                          ? "border-slate-900 bg-slate-900 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className={SECTION_HINT_CLASS}>
+                  Green badge passes common contrast checks; amber means
+                  double-check in Site Essentials.
                 </p>
                 <Accordion
                   type="multiple"
@@ -798,10 +811,8 @@ export function PreviewThemeCustomizer({
                 </Accordion>
               </div>
 
-              <div>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Try other fonts
-                </h3>
+              <div className="space-y-2.5">
+                <h3 className={SECTION_LABEL_CLASS}>Fonts</h3>
                 <Accordion
                   type="multiple"
                   defaultValue={["modern", "classic"]}

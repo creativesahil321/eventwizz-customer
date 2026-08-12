@@ -9,7 +9,9 @@ export {
   toSearchDateParam,
   parseSearchDateParam,
   resolveLocationSlugForCity,
+  matchVendorCityToPlace,
 } from "./search-filters";
+export type { NearMeCoords } from "./search-filters";
 
 function normalize(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
@@ -70,5 +72,5 @@ export function filterLocations(
 
 /** @deprecated Prefer `isSearchActive` — kept for older call sites. */
 export function hasHardSearchFilters(filters: LocationSearchFilters): boolean {
-  return Boolean(filters.city || filters.date);
+  return Boolean(filters.city || filters.date || filters.nearMe);
 }

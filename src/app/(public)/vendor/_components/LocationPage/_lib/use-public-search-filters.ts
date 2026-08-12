@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { parseAsString, useQueryStates } from "nuqs";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { parseAsString, parseAsStringEnum, useQueryStates } from "nuqs";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
+import { requestUserLocation } from "@/lib/request-user-location";
 import {
   EMPTY_SEARCH_FILTERS,
   isSearchActive,
@@ -12,7 +13,7 @@ import {
 } from "./search-filters";
 
 type UsePublicSearchFiltersOptions = {
-  /** Sync q/city/date to the URL (live pages). Off for Site Essentials previews. */
+  /** Sync q/city/date/near to the URL (live pages). Off for Site Essentials previews. */
   syncUrl?: boolean;
   /**
    * Location pages: city is shown as a locked chip only.
@@ -21,9 +22,12 @@ type UsePublicSearchFiltersOptions = {
   lockedCity?: string | null;
 };
 
+const nearParser = parseAsStringEnum(["1"] as const);
+
 /**
- * Search filter state with optional URL sync (`?q=&city=&date=`).
+ * Search filter state with optional URL sync (`?q=&city=&date=&near=1`).
  * Debounces free-text for API calls (~300ms).
+ * Near Me coords stay in memory (not URL) — restored from geolocation cache when `near=1`.
  */
 export function usePublicSearchFilters(
   options: UsePublicSearchFiltersOptions = {},
@@ -36,6 +40,7 @@ export function usePublicSearchFilters(
       q: parseAsString.withDefault(""),
       city: parseAsString,
       date: parseAsString,
+      near: nearParser,
     },
     { history: "replace", shallow: true },
   );
@@ -43,12 +48,15 @@ export function usePublicSearchFilters(
   const [localFilters, setLocalFilters] =
     useState<LocationSearchFilters>(EMPTY_SEARCH_FILTERS);
 
+  /** Coords for Near Me — never put lat/lng in the URL. */
+  const [nearMeCoords, setNearMeCoords] = useState<
+    LocationSearchFilters["nearMeCoords"]
+  >(null);
+
   const filters: LocationSearchFilters = useMemo(() => {
     if (!syncUrl) {
       return {
         ...localFilters,
-        // Locked city is UI chrome only — keep filter city null so search mode
-        // activates on query/date, not merely opening a location page.
         city: cityIsLocked ? null : localFilters.city,
       };
     }
@@ -56,16 +64,22 @@ export function usePublicSearchFilters(
       query: urlState.q ?? "",
       city: cityIsLocked ? null : urlState.city,
       date: parseSearchDateParam(urlState.date),
+      nearMe: urlState.near === "1",
+      nearMeCoords,
     };
-  }, [syncUrl, localFilters, urlState, cityIsLocked]);
+  }, [syncUrl, localFilters, urlState, cityIsLocked, nearMeCoords]);
 
   const setFilters = useCallback(
     (next: LocationSearchFilters) => {
       const normalized: LocationSearchFilters = {
         query: next.query,
-        city: cityIsLocked ? null : next.city,
+        city: cityIsLocked ? null : next.nearMe ? null : next.city,
         date: next.date,
+        nearMe: cityIsLocked ? false : next.nearMe,
+        nearMeCoords: cityIsLocked ? null : next.nearMe ? next.nearMeCoords : null,
       };
+
+      setNearMeCoords(normalized.nearMeCoords);
 
       if (!syncUrl) {
         setLocalFilters(normalized);
@@ -74,8 +88,9 @@ export function usePublicSearchFilters(
 
       void setUrlState({
         q: normalized.query.trim() ? normalized.query : null,
-        city: cityIsLocked ? null : normalized.city,
+        city: cityIsLocked || normalized.nearMe ? null : normalized.city,
         date: toSearchDateParam(normalized.date) ?? null,
+        near: normalized.nearMe ? "1" : null,
       });
     },
     [cityIsLocked, setUrlState, syncUrl],
@@ -84,6 +99,19 @@ export function usePublicSearchFilters(
   const clearFilters = useCallback(() => {
     setFilters(EMPTY_SEARCH_FILTERS);
   }, [setFilters]);
+
+  // Restore coords from cache when landing with `?near=1` (no lat/lng in URL).
+  useEffect(() => {
+    if (!syncUrl || urlState.near !== "1" || nearMeCoords) return;
+    let cancelled = false;
+    void requestUserLocation().then((result) => {
+      if (cancelled || !result.ok) return;
+      setNearMeCoords(result.coords);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [syncUrl, urlState.near, nearMeCoords]);
 
   const debouncedQuery = useDebounce(filters.query, 300);
   const apiFilters = useMemo(

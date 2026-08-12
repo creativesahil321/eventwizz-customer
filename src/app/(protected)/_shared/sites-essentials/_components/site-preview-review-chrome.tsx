@@ -45,6 +45,8 @@ type SitePreviewReviewChromeProps = {
   onBackToMain?: () => void;
   /** Jump to Main home or a specific location in the review flow. */
   onGoToStep?: (step: "main" | { locationIndex: number }) => void;
+  /** Warm the by-slug cache when hovering / focusing a location chip. */
+  onPrefetchLocation?: (slug: string) => void;
   onSave: (options?: { approveSlug?: string }) => void;
   /** Close preview without saving (view-only). */
   onClosePreview?: () => void;
@@ -66,6 +68,7 @@ export function SitePreviewReviewChrome({
   onContinueFromMain,
   onNextLocation,
   onGoToStep,
+  onPrefetchLocation,
   onSave,
   onClosePreview,
 }: SitePreviewReviewChromeProps) {
@@ -156,6 +159,11 @@ export function SitePreviewReviewChrome({
                   onClick={
                     onGoToStep
                       ? () => onGoToStep({ locationIndex: idx })
+                      : undefined
+                  }
+                  onPrefetch={
+                    onPrefetchLocation
+                      ? () => onPrefetchLocation(loc.slug)
                       : undefined
                   }
                 />
@@ -318,11 +326,13 @@ function StepChip({
   done,
   active,
   onClick,
+  onPrefetch,
 }: {
   label: string;
   done: boolean;
   active: boolean;
   onClick?: () => void;
+  onPrefetch?: () => void;
 }) {
   const className = cn(
     "inline-flex max-w-[7.5rem] shrink-0 items-center gap-1 truncate rounded-md px-2.5 py-1 text-xs font-semibold sm:max-w-[11rem] sm:gap-1.5 sm:rounded-lg sm:px-3.5 sm:py-2 sm:text-[15px]",
@@ -342,6 +352,9 @@ function StepChip({
           className={className}
           title={`Go to ${label}`}
           onClick={onClick}
+          onMouseEnter={onPrefetch}
+          onFocus={onPrefetch}
+          onTouchStart={onPrefetch}
         >
           {done ? (
             <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />

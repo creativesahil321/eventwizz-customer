@@ -23,6 +23,7 @@ import {
   useIsPreviewMode,
   usePreviewLocationNavigation,
 } from "@/contexts/preview-context";
+import { usePreviewDeviceFramesEnabled } from "@/hooks/use-preview-narrow-layout";
 import { Check } from "lucide-react";
 import { useThemeQuery } from "@/hooks/use-theme-query";
 import {
@@ -74,6 +75,7 @@ export function VendorPublicLocationMobileMenuEntries({
     previewLocations,
     activePreviewLocationSlug,
     onPreviewLocationSelect,
+    onPreviewLocationPrefetch,
   } = usePreviewLocationNavigation();
 
   const previewLocationData: LocationData[] = (previewLocations ?? []).map(
@@ -151,6 +153,8 @@ export function VendorPublicLocationMobileMenuEntries({
                 "w-full transition-colors text-left",
                 isActive && "font-semibold",
               )}
+              onMouseEnter={() => onPreviewLocationPrefetch?.(slug)}
+              onFocus={() => onPreviewLocationPrefetch?.(slug)}
               onClick={() => {
                 onPreviewLocationSelect(slug);
                 onNavigate();
@@ -219,10 +223,12 @@ export function VendorPublicLocationBookNow({
   const { domain, settings, isLoading } = useDomain();
   const { data: liveTheme } = useThemeQuery(domain, settings);
   const isPreviewMode = useIsPreviewMode();
+  const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
   const {
     previewLocations,
     activePreviewLocationSlug,
     onPreviewLocationSelect,
+    onPreviewLocationPrefetch,
   } = usePreviewLocationNavigation();
   const hostRef = useRef<HTMLDivElement>(null);
   const [previewThemeStyle, setPreviewThemeStyle] = useState<
@@ -264,9 +270,16 @@ export function VendorPublicLocationBookNow({
     return null;
   }
 
-  const locationsLabelClass = isPreviewMode
-    ? "hidden @md/preview:inline"
-    : "inline";
+  /**
+   * Only gate the label behind the `@md/preview` container query when a device
+   * frame actually provides that container. Full-page `/preview/site` has no
+   * `@container/preview`, so the query never matches and the label would stay
+   * hidden (icon-only) — diverging from the live site, which shows "Locations".
+   */
+  const locationsLabelClass =
+    isPreviewMode && deviceFramesEnabled
+      ? "hidden @md/preview:inline"
+      : "inline";
 
   const bookNowPillClass = cn(
     "!rounded-full h-9 gap-1.5 border-0 !px-3.5 font-semibold backdrop-blur-sm transition-all duration-200",
@@ -307,6 +320,8 @@ export function VendorPublicLocationBookNow({
                     ? "bg-[color:color-mix(in_srgb,var(--color-primary)_14%,transparent)] font-semibold"
                     : "hover:bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)]",
                 )}
+                onMouseEnter={() => onPreviewLocationPrefetch?.(slug)}
+                onFocus={() => onPreviewLocationPrefetch?.(slug)}
                 onClick={() => {
                   onPreviewLocationSelect(slug);
                   onLocationNavigate?.();
