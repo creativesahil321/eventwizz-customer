@@ -168,8 +168,24 @@ export function PaymentBreakdownDateAccordion({
             <span className="text-sm font-semibold text-foreground">
               {group.title}
             </span>
-            <span className="ml-auto mr-1 text-sm font-bold tabular-nums text-foreground">
-              {formatCurrency(group.subtotal)}
+            <span className="ml-auto mr-1 flex flex-col items-end gap-0.5">
+              {group.originalSubtotal != null &&
+              group.originalSubtotal > group.subtotal + 0.009 ? (
+                <span className="text-[11px] font-medium tabular-nums text-muted-foreground line-through">
+                  {formatCurrency(group.originalSubtotal)}
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  "text-sm font-bold tabular-nums",
+                  group.originalSubtotal != null &&
+                    group.originalSubtotal > group.subtotal + 0.009
+                    ? "text-[var(--color-primary)]"
+                    : "text-foreground",
+                )}
+              >
+                {formatCurrency(group.subtotal)}
+              </span>
             </span>
           </AccordionTrigger>
           <AccordionContent className="pb-0 pt-0 [&>div]:py-0">
@@ -227,26 +243,47 @@ export function PaymentBreakdownDateAccordion({
 export function PaymentBreakdownTotals({
   subTotal,
   addOns = 0,
+  total,
   paid,
   outstanding,
   formatCurrency,
+  originalTotal = null,
+  discountAmount = null,
   appliedOffers = [],
 }: {
   subTotal: number;
   /** Unpaid pending add-ons — shown separately from booking subtotal. */
   addOns?: number;
+  /** Final total after discount (when provided). */
+  total?: number;
   paid: number;
   outstanding: number;
   formatCurrency: (amount: number) => string;
+  /** Pre-discount total — used when Subtotal should show original. */
+  originalTotal?: number | null;
+  discountAmount?: number | null;
   /** Coupons / date offers already applied on this booking (read-only). */
   appliedOffers?: ResolvedBookingAppliedOffer[];
 }) {
+  const hasDiscount =
+    (originalTotal != null && originalTotal > subTotal + 0.009) ||
+    (discountAmount != null && discountAmount > 0) ||
+    appliedOffers.length > 0;
+  const displaySubtotal =
+    hasDiscount && originalTotal != null ? originalTotal : subTotal;
+  const finalTotal =
+    total != null
+      ? total
+      : hasDiscount && discountAmount != null
+        ? Math.max(0, displaySubtotal - discountAmount + addOns)
+        : subTotal + addOns;
+
   return (
     <div className="space-y-2 rounded-lg border border-border bg-card px-4 py-3">
       <div className="flex justify-between text-sm">
         <span className="font-normal text-muted-foreground">Subtotal</span>
         <span className="font-semibold tabular-nums text-foreground">
-          {formatCurrency(subTotal)}
+          {formatCurrency(displaySubtotal)}
         </span>
       </div>
       {appliedOffers.length > 0 ? (
@@ -255,6 +292,13 @@ export function PaymentBreakdownTotals({
           formatMoney={formatCurrency}
           variant="rows"
         />
+      ) : discountAmount != null && discountAmount > 0 ? (
+        <div className="flex items-center justify-between gap-3 text-sm text-emerald-700">
+          <span className="font-medium">Discount</span>
+          <span className="shrink-0 font-semibold tabular-nums">
+            −{formatCurrency(discountAmount)}
+          </span>
+        </div>
       ) : null}
       {addOns > 0 && (
         <div className="flex justify-between text-sm">
@@ -264,6 +308,21 @@ export function PaymentBreakdownTotals({
           </span>
         </div>
       )}
+      {hasDiscount ? (
+        <div className="flex justify-between border-t border-border/70 pt-2 text-sm">
+          <span className="font-semibold text-foreground">Total</span>
+          <div className="text-right">
+            {originalTotal != null && originalTotal > finalTotal + 0.009 ? (
+              <p className="text-[11px] font-medium tabular-nums text-muted-foreground line-through">
+                {formatCurrency(originalTotal)}
+              </p>
+            ) : null}
+            <span className="font-bold tabular-nums text-[var(--color-primary)]">
+              {formatCurrency(finalTotal)}
+            </span>
+          </div>
+        </div>
+      ) : null}
       {paid > 0 && (
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Paid</span>

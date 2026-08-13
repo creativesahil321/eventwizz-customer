@@ -23,6 +23,22 @@ function buildSearchQuery(params: PublicSearchParams): Record<string, string | n
   if (params.mode) query.mode = params.mode;
   if (params.page != null) query.page = params.page;
   if (params.per_page != null) query.per_page = params.per_page;
+
+  // Near Me: both coords required — backend validates required_with.
+  if (
+    typeof params.lat === "number" &&
+    Number.isFinite(params.lat) &&
+    typeof params.lng === "number" &&
+    Number.isFinite(params.lng)
+  ) {
+    query.lat = params.lat;
+    query.lng = params.lng;
+    if (typeof params.radius_km === "number" && Number.isFinite(params.radius_km)) {
+      query.radius_km = params.radius_km;
+    }
+    if (params.sort?.trim()) query.sort = params.sort.trim();
+  }
+
   return query;
 }
 

@@ -22,36 +22,45 @@ function roundMoney(n: number): number {
   return Math.round(Math.max(0, n) * 100) / 100;
 }
 
-/** Resolve percentage / flat amount from cart API coupon fields (+ label fallback). */
+function isCouponExpired(expiresAt: string | null | undefined): boolean {
+  const raw = expiresAt?.trim();
+  if (!raw) return false;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? `${raw}T23:59:59`
+    : raw;
+  const end = new Date(normalized);
+  if (Number.isNaN(end.getTime())) return false;
+  return Date.now() > end.getTime();
+}
+
+/**
+ * Coupon codes support only two modes (no per-person):
+ * - `discount_type: "percentage"` + `amount` → % of booking final total
+ * - `discount_type: "flat"` + `amount` → flat off booking final total
+ *
+ * Coupons are applied once to the booking final total
+ * (tables + tickets + drinks across all dates) — never per-date.
+ */
 export function computeCouponDiscountAmount(
   coupon: CouponStripSource | null | undefined,
   subtotal: number,
 ): number {
   if (!coupon || !(subtotal > 0)) return 0;
+  if (isCouponExpired(coupon.expires_at)) return 0;
 
-  const type = (coupon.value_type ?? coupon.discount_type ?? "")
+  // Prefer cart API fields; keep vendor-form aliases as fallback.
+  const type = (coupon.discount_type ?? coupon.value_type ?? "")
     .toString()
     .toLowerCase();
-  const rawAmount = Number(coupon.discount_value ?? coupon.amount ?? NaN);
+  const rawAmount = Number(coupon.amount ?? coupon.discount_value ?? NaN);
+  if (!Number.isFinite(rawAmount) || !(rawAmount > 0)) return 0;
 
-  if (type === "percentage" && Number.isFinite(rawAmount) && rawAmount > 0) {
+  if (type === "percentage") {
     return roundMoney(Math.min(subtotal, (subtotal * rawAmount) / 100));
   }
 
-  if (type === "flat" && Number.isFinite(rawAmount) && rawAmount > 0) {
+  if (type === "flat") {
     return roundMoney(Math.min(subtotal, rawAmount));
-  }
-
-  const label = coupon.value_label?.trim() ?? "";
-  const pctMatch = label.match(/(\d+(?:\.\d+)?)\s*%/);
-  if (pctMatch) {
-    return roundMoney(
-      Math.min(subtotal, (subtotal * Number(pctMatch[1])) / 100),
-    );
-  }
-  const flatMatch = label.match(/(?:£|gbp\s*)?(\d+(?:\.\d+)?)\s*(?:off)?/i);
-  if (flatMatch && /off/i.test(label)) {
-    return roundMoney(Math.min(subtotal, Number(flatMatch[1])));
   }
 
   return 0;
@@ -66,9 +75,18 @@ export function isCheckoutCouponApplied(
   return Boolean(apiCode && applied && apiCode === applied);
 }
 
+/**
+ * Offer resolution:
+ * - Coupon → applied once to booking final total; date offers ignored
+ * - No coupon → per-date offers apply (each date’s own offer)
+ */
 export function resolveCheckoutPromoTotals(
   promo: CheckoutPromoApplied,
   eventCoupon: CouponStripSource | null | undefined,
+  /**
+   * Booking final total (all dates: tables + tickets + drinks).
+   * Used only as the coupon base — never per-date.
+   */
   subtotal: number,
   /** Automatic date-offer savings (ignored when a coupon is applied — no stacking). */
   dateOfferAmount = 0,
@@ -170,6 +188,21 @@ export function CheckoutPromoPanel({
       setError("That code isn’t valid for this booking");
       return;
     }
+    if (isCouponExpired(eventCoupon?.expires_at)) {
+      setError("This coupon has expired");
+      return;
+    }
+    const type = (
+      eventCoupon?.discount_type ??
+      eventCoupon?.value_type ??
+      ""
+    )
+      .toString()
+      .toLowerCase();
+    if (type !== "percentage" && type !== "flat") {
+      setError("This coupon is not available");
+      return;
+    }
     onChange({ ...value, couponCode: normalized });
     setCodeInput("");
     setError(null);
@@ -203,7 +236,13 @@ export function CheckoutPromoPanel({
 
       {appliedMatchesApi ? (
         <p className="text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
-          Coupon applied — date offers are not combined with coupon codes.
+          Coupon applied to the booking total — date discounts are not used with
+          a coupon.
+        </p>
+      ) : hasCouponOffer && appliedDateOffers.length > 0 ? (
+        <p className="text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
+          A coupon applies once to the booking total and replaces the date
+          offers below.
         </p>
       ) : null}
 

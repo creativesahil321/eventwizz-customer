@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type DrinkPackage = {
   id?: number;
@@ -28,6 +29,7 @@ type DrinkSectionProps = {
   roomIndex?: number;
   /** Show package list without an extra click (default: open on public + preview). */
   defaultExpanded?: boolean;
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 export default function DrinkSection({
@@ -38,6 +40,7 @@ export default function DrinkSection({
   roomId,
   roomIndex,
   defaultExpanded = true,
+  headingEmphasis,
 }: DrinkSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const [showMore] = useState(defaultExpanded);
@@ -105,6 +108,7 @@ export default function DrinkSection({
           <SiteHeading
             level={2}
             title={title || "Other Packages"}
+            emphasis={headingEmphasis}
             variant="onSurface"
             align="center"
             className="!text-3xl !font-black tracking-tight md:!text-4xl"

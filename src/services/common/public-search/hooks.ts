@@ -12,11 +12,18 @@ import type {
 
 /** User-entered filters that should trigger a search request. */
 function hasSearchIntent(params: PublicSearchParams): boolean {
+  const hasGeo =
+    typeof params.lat === "number" &&
+    Number.isFinite(params.lat) &&
+    typeof params.lng === "number" &&
+    Number.isFinite(params.lng);
+
   return Boolean(
     params.q?.trim() ||
       params.city?.trim() ||
       params.location_slug?.trim() ||
-      params.date?.trim(),
+      params.date?.trim() ||
+      hasGeo,
   );
 }
 

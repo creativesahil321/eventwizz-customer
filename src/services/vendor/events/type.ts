@@ -178,6 +178,22 @@ export interface EventDetailStepFour {
 export interface EventDetailStepFive {
   event_id: number;
   step: number;
+  /** Event pin address shown on the public brochure/map section. */
+  event_address?: string;
+  lat?: string | number | null;
+  long?: string | number | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  brochure_pdf?: string | null;
+  brochure_pdf_2?: string | null;
+  faq_pdf?: string | null;
+  price_start_from?: string;
+  price_start_from_button_text?: string;
+}
+
+export interface EventDetailStepSix {
+  event_id: number;
+  step: number;
   drink_title?: string;
   drink_description?: string;
   packages?: Array<{
@@ -187,17 +203,6 @@ export interface EventDetailStepFive {
     price: string | number;
     available_quantity?: number;
   }>;
-}
-
-export interface EventDetailStepSix {
-  event_id: number;
-  step: number;
-  brochure_pdf?: string | null;
-  brochure_pdf_2?: string | null;
-  faq_pdf?: string | null;
-  event_address?: string;
-  price_start_from?: string;
-  price_start_from_button_text?: string;
 }
 
 export interface EventDetailStepSeven {

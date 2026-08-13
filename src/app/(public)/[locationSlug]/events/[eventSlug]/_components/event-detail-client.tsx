@@ -396,11 +396,15 @@ export default function EventDetailClient({
                 undefined
               }
               roomId={activeRoomId}
+              headingEmphasis={headingEmphasisFromSite}
             />
           </RoomContentTransition>
         </div>
 
-        <EventGallery gallery={galleryItems} />
+        <EventGallery
+          gallery={galleryItems}
+          headingEmphasis={headingEmphasisFromSite}
+        />
 
         {slices.menus && slices.menus.length > 0 && (
           <div ref={menuRef}>
@@ -415,6 +419,7 @@ export default function EventDetailClient({
                     ? slices.menu_background_image
                     : undefined
                 }
+                headingEmphasis={headingEmphasisFromSite}
               />
             </RoomContentTransition>
           </div>
@@ -429,6 +434,7 @@ export default function EventDetailClient({
                 packages={drinkPackages}
                 eventSlug={eventSlug}
                 roomId={activeRoomId}
+                headingEmphasis={headingEmphasisFromSite}
               />
             </RoomContentTransition>
           </div>
@@ -437,6 +443,7 @@ export default function EventDetailClient({
         <div>
           <LazyBrochureSection
             showMapImmediately
+            headingEmphasis={headingEmphasisFromSite}
             location={{
               title: "EVENT LOCATION",
               description:
@@ -458,7 +465,10 @@ export default function EventDetailClient({
 
         {eventData.faqs && eventData.faqs.length > 0 && (
           <div ref={faqRef}>
-            <LazyFaqSection faqs={eventData.faqs} />
+            <LazyFaqSection
+              faqs={eventData.faqs}
+              headingEmphasis={headingEmphasisFromSite}
+            />
           </div>
         )}
 

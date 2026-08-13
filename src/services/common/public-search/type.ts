@@ -16,6 +16,12 @@ export type PublicSearchLocation = {
   slug: string;
   city: string;
   address?: string;
+  /** Exact event pin address from the event page (Near Me). */
+  event_address?: string | null;
+  /** Event pin latitude (Near Me). */
+  lat?: number | null;
+  /** Event pin longitude (Near Me). */
+  lng?: number | null;
 };
 
 export type PublicSearchEventCard = {
@@ -35,6 +41,8 @@ export type SearchEventResult = {
     location: string;
     event: string;
   };
+  /** Present when Near Me geo search is active — km from customer to event pin. */
+  distance_km?: number | null;
 };
 
 export type SearchDateSlotResult = {
@@ -68,6 +76,13 @@ export type PublicSearchMeta = {
   page: number;
   per_page: number;
   total: number;
+  /** Near Me geo search enrichments (only when lat+lng were sent). */
+  near_me?: boolean;
+  lat?: number | null;
+  lng?: number | null;
+  radius_km?: number | null;
+  sort?: string | null;
+  coordinate_source?: "event_pin" | string | null;
 };
 
 export type PublicSearchData = {
@@ -83,6 +98,13 @@ export type PublicSearchParams = {
   mode?: PublicSearchMode;
   page?: number;
   per_page?: number;
+  /** Customer GPS — activates Near Me event-pin ranking when both are set. */
+  lat?: number;
+  lng?: number;
+  /** Defaults to 50 on the backend when omitted. */
+  radius_km?: number;
+  /** Backend defaults to `distance` when geo is active. */
+  sort?: "distance" | string;
 };
 
 export type PublicAvailabilityRoom = {

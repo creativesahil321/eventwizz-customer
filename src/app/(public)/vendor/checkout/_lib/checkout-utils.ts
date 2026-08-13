@@ -354,6 +354,80 @@ function collectCheckoutRooms(
   return { rooms, subTotal, payToday, payLater, depositToday };
 }
 
+function roundCheckoutMoney(n: number): number {
+  return Math.round(Math.max(0, n) * 100) / 100;
+}
+
+/**
+ * Confirmed checkout money rule:
+ * 1) Apply the single discount to the booking total first
+ * 2) Then derive pay-today / pay-later from that discounted total
+ *    (keeps the same today:later ratio as the pre-discount split)
+ *
+ * Example: £1000 total, 10% off → £900; 30% partial → £270 today / £630 later.
+ */
+export function applyDiscountThenSplitPayment(options: {
+  subTotal: number;
+  discountAmount: number;
+  payToday: number;
+  payLater: number;
+  depositToday?: number;
+}): {
+  discountAmount: number;
+  discountedTotal: number;
+  payToday: number;
+  payLater: number;
+  depositToday: number;
+} {
+  const subTotal = roundCheckoutMoney(options.subTotal);
+  const discountAmount = roundCheckoutMoney(
+    Math.min(Math.max(0, options.discountAmount), subTotal),
+  );
+  const discountedTotal = roundCheckoutMoney(subTotal - discountAmount);
+
+  if (subTotal <= 0 || discountedTotal <= 0) {
+    return {
+      discountAmount,
+      discountedTotal: 0,
+      payToday: 0,
+      payLater: 0,
+      depositToday: 0,
+    };
+  }
+
+  const rawPayLater = Math.max(0, options.payLater);
+  // Full payment — charge the full discounted total today.
+  if (rawPayLater <= 0) {
+    return {
+      discountAmount,
+      discountedTotal,
+      payToday: discountedTotal,
+      payLater: 0,
+      depositToday: 0,
+    };
+  }
+
+  // Partial payment — same ratio on the discounted total.
+  const todayRatio = Math.min(1, Math.max(0, options.payToday / subTotal));
+  const payToday = roundCheckoutMoney(discountedTotal * todayRatio);
+  const payLater = roundCheckoutMoney(discountedTotal - payToday);
+  const depositRatio =
+    options.depositToday != null &&
+    options.depositToday > 0 &&
+    options.payToday > 0
+      ? Math.min(1, options.depositToday / options.payToday)
+      : 0;
+  const depositToday = roundCheckoutMoney(payToday * depositRatio);
+
+  return {
+    discountAmount,
+    discountedTotal,
+    payToday,
+    payLater,
+    depositToday,
+  };
+}
+
 /**
  * Transform cart edit store data into checkout API format.
  */
@@ -364,7 +438,7 @@ export function transformCartToCheckout(
   paymentGateway?: string | number | null,
   options?: {
     couponCode?: string | null;
-    /** Absolute discount applied to the booking (never exceeds pay-today). */
+    /** Absolute discount for the booking (applied to total before partial split). */
     discountAmount?: number | null;
   },
 ): CheckoutRequest | null {
@@ -424,34 +498,19 @@ export function transformCartToCheckout(
 
   const couponCode = options?.couponCode?.trim().toUpperCase() || null;
   const discountAmountRaw = Number(options?.discountAmount ?? 0);
-  const discountAmount =
+  const requestedDiscount =
     Number.isFinite(discountAmountRaw) && discountAmountRaw > 0
-      ? Math.round(Math.min(payToday + payLater, discountAmountRaw) * 100) / 100
+      ? discountAmountRaw
       : 0;
 
-  // Prefer reducing pay-today first; leftover discount reduces due-later.
-  const discountOnToday =
-    discountAmount > 0 ? Math.min(payToday, discountAmount) : 0;
-  const discountedPayToday =
-    Math.round(Math.max(0, payToday - discountOnToday) * 100) / 100;
-  const discountOnLater =
-    discountAmount > 0
-      ? Math.min(payLater, Math.max(0, discountAmount - discountOnToday))
-      : 0;
-  const discountedPayLater =
-    Math.round(Math.max(0, payLater - discountOnLater) * 100) / 100;
-
-  // Scale table-deposit portion with pay-today — never wipe partial_payment to
-  // null while a balance remains due later (coupon can exceed raw deposit).
-  const discountedDepositToday =
-    depositToday > 0 && payToday > 0
-      ? Math.round(
-          Math.min(
-            discountedPayToday,
-            discountedPayToday * (depositToday / payToday),
-          ) * 100,
-        ) / 100
-      : 0;
+  // Discount the booking total first, then split partial payment on that result.
+  const split = applyDiscountThenSplitPayment({
+    subTotal,
+    discountAmount: requestedDiscount,
+    payToday,
+    payLater,
+    depositToday,
+  });
 
   const checkoutPayload: CheckoutRequest = {
     vendor_event_id: vendorEventId,
@@ -459,15 +518,19 @@ export function transformCartToCheckout(
     is_rooms: roomMode,
     payment_gateway: gatewayId,
     sub_total: subTotal,
-    // Sum of table deposit amounts charged today (e.g. $25, or $25+$20 across dates)
-    partial_payment: discountedDepositToday > 0 ? discountedDepositToday : null,
-    total: discountedPayToday,
+    // Deposit / partial portion charged today (after discount).
+    partial_payment: split.depositToday > 0 ? split.depositToday : null,
+    total: split.payToday,
     ...(couponCode
       ? {
           coupon_code: couponCode,
-          discount_amount: discountAmount,
+          discount_amount: split.discountAmount,
         }
-      : {}),
+      : split.discountAmount > 0
+        ? {
+            discount_amount: split.discountAmount,
+          }
+        : {}),
   };
 
   if (roomMode) {
@@ -485,7 +548,7 @@ export function transformCartToCheckout(
     total: checkoutPayload.total,
     coupon_code: checkoutPayload.coupon_code ?? null,
     discount_amount: checkoutPayload.discount_amount ?? 0,
-    balance_due_later: discountedPayLater > 0 ? discountedPayLater : null,
+    balance_due_later: split.payLater > 0 ? split.payLater : null,
     payment_gateway: checkoutPayload.payment_gateway,
     dates_count: roomMode
       ? checkoutPayload.rooms?.reduce(

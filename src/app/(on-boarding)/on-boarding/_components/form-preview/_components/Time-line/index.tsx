@@ -15,6 +15,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type EventScheduler = {
   id?: string;
@@ -35,6 +36,8 @@ type EventSchedulerProps = {
    * back to a time-of-day demo.
    */
   eventDates?: Array<string | null | undefined>;
+  /** Site Essentials trailing accent — required on platform-host previews. */
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 /** Where "now" sits relative to the event's calendar date(s). */
@@ -986,6 +989,7 @@ export default function Timeline({
   eventSchedularCopy,
   eventSchedularBackgroundImage,
   eventDates,
+  headingEmphasis,
 }: EventSchedulerProps) {
   const narrowPreview = usePreviewNarrowLayout();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1169,6 +1173,7 @@ export default function Timeline({
             <SiteHeading
               level={2}
               title={scheduleTitle}
+              emphasis={headingEmphasis}
               variant="onSurface"
               align="center"
               className="!mx-auto !block !text-3xl !font-black tracking-tight md:!text-4xl"

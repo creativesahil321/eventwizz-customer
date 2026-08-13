@@ -120,9 +120,7 @@ export function LocationSearchBar({
     onChange({ ...value, ...partial });
   };
 
-  const cityFieldLabel = value.nearMe
-    ? "Near Me"
-    : (value.city ?? "Any city");
+  const cityFieldLabel = value.nearMe ? "Near Me" : (value.city ?? "Any city");
 
   const handleSelectAnyCity = () => {
     setNearMeError(null);
@@ -251,12 +249,18 @@ export function LocationSearchBar({
               onChange={(e) => patch({ query: e.target.value })}
               placeholder={
                 hideCity
-                  ? "Search events..."
-                  : "Search event, venue or city..."
+                  ? lockedCityLabel
+                    ? `Search ${lockedCityLabel} events`
+                    : "Search location events"
+                  : "Search event and category"
               }
               className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-dimmed)]"
               aria-label={
-                hideCity ? "Search events" : "Search event, venue or city"
+                hideCity
+                  ? lockedCityLabel
+                    ? `Search ${lockedCityLabel} events`
+                    : "Search location events"
+                  : "Search event and category"
               }
             />
           </label>
@@ -494,7 +498,8 @@ function CityOption({
   icon?: ReactNode;
   disabled?: boolean;
 }) {
-  const showCount = typeof eventCount === "number" && Number.isFinite(eventCount);
+  const showCount =
+    typeof eventCount === "number" && Number.isFinite(eventCount);
   const eventLabel = showCount
     ? `${eventCount} event${eventCount === 1 ? "" : "s"}`
     : null;

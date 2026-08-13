@@ -36,6 +36,7 @@ import {
 } from "@/lib/security/price-validation";
 import {
   buildDateSelectionSummary,
+  calculateEditableDateDiscountableTotal,
   calculateEditableDateTotal,
   getDateGuestCount,
 } from "../_lib/cart-calculations";
@@ -73,6 +74,11 @@ interface DateAccordionProps {
   discountLabel?: string | null;
   /** Monetary saving when the date offer is currently eligible. */
   discountAmount?: number | null;
+  /**
+   * Pre-discount base shown as strikethrough.
+   * Per-person table offers → table total; % / flat total → tables + tickets.
+   */
+  discountStrikeAmount?: number | null;
   /** Why the offer is locked (e.g. min guests) — shown instead of “applied”. */
   discountLockedHint?: string | null;
 }
@@ -119,6 +125,7 @@ export default function DateAccordion({
   serverEventData = null,
   discountLabel = null,
   discountAmount = null,
+  discountStrikeAmount = null,
   discountLockedHint = null,
 }: DateAccordionProps) {
   const { format: formatMoney, formatCompact: formatMoneyUnit } =
@@ -190,10 +197,15 @@ export default function DateAccordion({
   }, [isExpanded, hasChanges, isSaving, isAutoSaving, isPreviewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAmount = calculateEditableDateTotal(dateData);
+  const discountableTotal = calculateEditableDateDiscountableTotal(dateData);
   const appliedDiscount =
     typeof discountAmount === "number" && discountAmount > 0
       ? discountAmount
       : 0;
+  const strikeBase =
+    typeof discountStrikeAmount === "number" && discountStrikeAmount > 0
+      ? discountStrikeAmount
+      : discountableTotal;
   const payableAmount = Math.max(0, totalAmount - appliedDiscount);
 
   const handleSaveDate = async (): Promise<boolean> => {
@@ -451,14 +463,18 @@ export default function DateAccordion({
         "bg-white",
         isExpanded ? "overflow-visible" : "overflow-hidden",
         embedded
-          ? ""
+          ? "overflow-hidden rounded-xl border border-[color:var(--checkout-border)] shadow-sm"
           : "rounded-2xl border border-[color:var(--checkout-border)] shadow-sm",
       )}
     >
       <div
         className={cn(
           "flex w-full items-start justify-between gap-3 px-3 py-3.5 transition-colors sm:items-center sm:gap-3 sm:px-5 sm:py-3",
-          isExpanded ? "bg-white" : "hover:bg-[color:var(--checkout-muted)]/50",
+          isExpanded
+            ? "bg-white"
+            : embedded
+              ? "bg-white hover:bg-[color:var(--checkout-muted)]/35"
+              : "hover:bg-[color:var(--checkout-muted)]/50",
         )}
       >
         <button
@@ -527,9 +543,9 @@ export default function DateAccordion({
             ) : null}
             {totalAmount > 0 && (
               <div className="flex flex-col items-end">
-                {appliedDiscount > 0 ? (
+                {appliedDiscount > 0 && strikeBase > 0 ? (
                   <span className="text-[11px] tabular-nums text-[color:var(--checkout-muted-foreground)] line-through">
-                    {formatMoney(totalAmount)}
+                    {formatMoney(strikeBase)}
                   </span>
                 ) : null}
                 <span className="text-sm font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">

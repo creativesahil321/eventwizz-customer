@@ -6,6 +6,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type MenuItem = {
   title: string;
@@ -23,6 +24,7 @@ type MenuSectionProps = {
   menus: MenuCategory[];
   catering_option: number;
   menu_background_image?: string | null;
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 /**
@@ -83,6 +85,7 @@ export default function MenuSection({
   menus,
   catering_option,
   menu_background_image,
+  headingEmphasis,
 }: MenuSectionProps) {
   const [menuBgImageFailed, setMenuBgImageFailed] = useState(false);
   const narrowPreview = usePreviewNarrowLayout();
@@ -133,6 +136,7 @@ export default function MenuSection({
           <SiteHeading
             level={2}
             title={menu_title?.trim() || "Menu"}
+            emphasis={headingEmphasis}
             variant="onSurface"
             align="center"
             className="!text-3xl !font-black tracking-tight md:!text-4xl"

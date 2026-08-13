@@ -55,12 +55,14 @@ export const bookingsService = {
   },
 
   /**
-   * Get booking details by ID
+   * Get booking details by booking_number (e.g. EV-080)
    */
-  getBookingDetails: async (id: number): Promise<BookingDetailsResponse> => {
+  getBookingDetails: async (
+    bookingNumber: string,
+  ): Promise<BookingDetailsResponse> => {
     const endpoint = API_ENDPOINTS.CUSTOMER.BOOKINGS.BOOKING_DETAILS.replace(
       "{id}",
-      id.toString()
+      encodeURIComponent(bookingNumber),
     );
     return api.get<BookingDetailsResponse>(endpoint, {
       returnFullResponse: true,

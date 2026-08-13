@@ -17,11 +17,11 @@ export interface BookingsQueryParams {
 
 /**
  * Booking date information
+ * Room bookings include optional `room_name` (no `room_id` on customer list).
  */
 export interface BookingDate {
   date_key: string;
   date: string;
-  room_id?: number | null;
   room_name?: string | null;
   table: {
     table_id: number;
@@ -58,6 +58,11 @@ export interface BookingItem {
   payment_status: string; // Changed from number to string to match API
   partial_payment: string;
   total: string;
+  /** Pre-discount total for list cards (strikethrough). */
+  original_total?: number | string | null;
+  original_amount?: number | string | null;
+  subtotal_before_discount?: number | string | null;
+  total_before_discount?: number | string | null;
   created_date: string;
   booking_dates: BookingDate[];
   /** Applied coupon code (when booking used a checkout coupon). */
@@ -329,6 +334,11 @@ export interface BookingDetailsDate {
   discount?: BookingAppliedOffer | null;
   value_label?: string | null;
   discount_amount?: number | string | null;
+  /** Pre-discount date total when a date-level offer was applied. */
+  original_total?: number | string | null;
+  original_amount?: number | string | null;
+  subtotal_before_discount?: number | string | null;
+  total_before_discount?: number | string | null;
 }
 
 /** Top-level payment summary on booking details */
@@ -338,6 +348,11 @@ export interface BookingPaymentSummary {
   total_pending_amount?: number | null;
   total_addons_amount?: number | null;
   total_amount: number;
+  /** Pre-discount booking total (strikethrough in payment UI). */
+  original_total?: number | string | null;
+  original_amount?: number | string | null;
+  subtotal_before_discount?: number | string | null;
+  total_before_discount?: number | string | null;
   can_pay_now?: boolean;
   /** @deprecated use total_paid_amount */
   paid_amount?: number | null;

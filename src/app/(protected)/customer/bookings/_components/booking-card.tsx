@@ -19,12 +19,13 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Booking } from "../_lib/types";
-import { formatBookingStatus, getBookingDateRowKey } from "../_lib/utils";
+import { formatBookingStatus, getBookingDateRowKey, formatBookingDateLabel } from "../_lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
-import { resolveBookingAppliedOffers } from "@/lib/booking-applied-offer";
+import { resolveBookingDiscountPricing } from "@/lib/booking-applied-offer";
 import { BookingAppliedOffers } from "@/components/bookings/booking-applied-offers";
+import { BookingDiscountedPrice } from "@/components/bookings/booking-discounted-price";
 
 interface BookingCardProps {
   booking: Booking;
@@ -40,7 +41,17 @@ export default function BookingCard({
   const { symbol, format: formatMoney } = useCurrencyFormat();
   const totalRaw = booking.total || booking.total_amount;
   const totalNum = parseFormattedMoney(String(totalRaw ?? "0"), symbol);
-  const appliedOffers = resolveBookingAppliedOffers(booking);
+  const pricing = resolveBookingDiscountPricing({
+    ...booking,
+    total: Number.isFinite(totalNum) ? totalNum : totalRaw,
+    total_amount: booking.total_amount,
+  });
+  const appliedOffers = pricing.offers;
+  const displayTotal = Number.isFinite(pricing.total)
+    ? pricing.total
+    : Number.isFinite(totalNum)
+      ? totalNum
+      : 0;
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] flex flex-col h-full relative !p-0 border-[var(--color-border)]">
@@ -106,8 +117,8 @@ export default function BookingCard({
                     <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                     <span className="flex-1 line-clamp-1">
                       {booking.booking_dates.length === 1
-                        ? booking.booking_dates[0].date
-                        : `${booking.booking_dates[0].date} ...`}
+                        ? formatBookingDateLabel(booking.booking_dates[0])
+                        : `${formatBookingDateLabel(booking.booking_dates[0])} ...`}
                     </span>
                   </div>
                   {/* Multiple Dates Indicator */}
@@ -144,12 +155,19 @@ export default function BookingCard({
                       {booking.booking_dates.map((date, index) => (
                         <div
                           key={getBookingDateRowKey(date, index)}
-                          className="flex items-center gap-2 text-xs text-muted-foreground"
+                          className="flex items-start gap-2 text-xs text-muted-foreground"
                         >
-                          <span className="font-medium text-foreground text-black">
+                          <span className="font-medium text-foreground text-black shrink-0">
                             {index + 1}.
                           </span>
-                          <span className="text-black">{date.date}</span>
+                          <div className="min-w-0">
+                            <span className="text-black">{date.date}</span>
+                            {date.room_name?.trim() ? (
+                              <span className="block text-muted-foreground">
+                                {date.room_name.trim()}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -168,16 +186,33 @@ export default function BookingCard({
           />
         ) : null}
 
-        {/* Price */}
-        <div className="flex items-center justify-between py-2 sm:py-2.5 border-t border-b border-[var(--color-border)]">
-          <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-            Total
-          </span>
-          <span className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">
-            {Number.isFinite(totalNum)
-              ? formatMoney(totalNum)
-              : String(totalRaw ?? "")}
-          </span>
+        {/* Price — shows strikethrough original when discounted */}
+        <div className="flex items-center justify-between gap-3 py-2 sm:py-2.5 border-t border-b border-[var(--color-border)]">
+          <div className="min-w-0">
+            <span className="text-xs sm:text-sm font-medium text-muted-foreground">
+              Total
+            </span>
+            {pricing.hasDiscount && pricing.discountAmount != null ? (
+              <p className="mt-0.5 text-[11px] font-semibold text-emerald-700">
+                You saved {formatMoney(pricing.discountAmount)}
+                {(booking.booking_dates?.length ?? 0) > 1
+                  ? ` across ${booking.booking_dates.length} dates`
+                  : ""}
+              </p>
+            ) : null}
+          </div>
+          {Number.isFinite(displayTotal) ? (
+            <BookingDiscountedPrice
+              total={displayTotal}
+              originalTotal={pricing.originalTotal}
+              formatMoney={formatMoney}
+              size="md"
+            />
+          ) : (
+            <span className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">
+              {String(totalRaw ?? "")}
+            </span>
+          )}
         </div>
 
         {/* Action Buttons */}

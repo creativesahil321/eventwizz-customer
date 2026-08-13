@@ -10,8 +10,9 @@ import {
   VendorBookingFilterMeta,
   VendorBookingHistoryResponse,
   VendorBookingRoomFilterOption,
+  type VendorBookingEventDateEntry,
 } from "@/services/vendor/bookings/bookings.service";
-import { AdminHistoryParams, History } from "./types";
+import { AdminHistoryParams, History, type HistoryEventDate } from "./types";
 
 // Query keys for booking history
 export const bookingHistoryKeys = {
@@ -25,55 +26,75 @@ export const bookingHistoryKeys = {
 };
 
 /**
+ * Normalize list API event_date entries (objects; tolerate legacy strings).
+ */
+function normalizeEventDateEntries(
+  eventDate: VendorBookingHistoryResponse["data"][0]["event_date"] | unknown,
+): HistoryEventDate[] {
+  if (!Array.isArray(eventDate)) return [];
+
+  return eventDate
+    .map((entry): HistoryEventDate | null => {
+      if (typeof entry === "string" && entry.trim()) {
+        return { date: entry.trim() };
+      }
+      if (entry && typeof entry === "object") {
+        const raw = entry as VendorBookingEventDateEntry;
+        const date = typeof raw.date === "string" ? raw.date.trim() : "";
+        if (!date) return null;
+        const roomName =
+          typeof raw.room_name === "string" ? raw.room_name.trim() : "";
+        return roomName ? { date, room_name: roomName } : { date };
+      }
+      return null;
+    })
+    .filter((entry): entry is HistoryEventDate => entry != null);
+}
+
+/**
+ * Convert API date strings to a sortable ISO value.
+ * Supports legacy "dd-mm-yyyy" and display strings like "Friday, October 23, 2026".
+ */
+function toSortableDate(dateStr: string): string {
+  const trimmed = dateStr.trim();
+  if (!trimmed) return trimmed;
+
+  const dmy = /^(\d{2})-(\d{2})-(\d{4})$/.exec(trimmed);
+  if (dmy) {
+    const [, day, month, year] = dmy;
+    const date = new Date(`${year}-${month}-${day}T12:00:00`);
+    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+
+  return trimmed;
+}
+
+/**
  * Transform API booking item to History format
  */
 const transformBookingItem = (
-  item: VendorBookingHistoryResponse["data"][0]
+  item: VendorBookingHistoryResponse["data"][0],
 ): History => {
-  // Get primary date (first from event_date array)
-  const primaryDate =
-    item.event_date && item.event_date.length > 0
-      ? item.event_date[0]
-      : item.booking_date;
-
-  // Convert date format from "20-09-2025" to ISO string for consistency
-  const convertDateToISO = (dateStr: string): string => {
-    try {
-      const [day, month, year] = dateStr.split("-");
-      if (!day || !month || !year) {
-        // If format is wrong, try parsing as is
-        return new Date(dateStr).toISOString();
-      }
-      // Create date in YYYY-MM-DD format
-      const date = new Date(`${year}-${month}-${day}`);
-      if (isNaN(date.getTime())) {
-        // Fallback to original string if parsing fails
-        return dateStr;
-      }
-      return date.toISOString();
-    } catch (error) {
-      console.error("Error converting date:", dateStr, error);
-      return dateStr; // Return original if conversion fails
-    }
-  };
+  const eventDates = normalizeEventDateEntries(item.event_date);
+  const primaryDisplayDate =
+    eventDates[0]?.date ?? item.booking_date;
 
   return {
-    id: item.booking_id.toString(), // Use booking_id as id
+    id: item.booking_id.toString(),
     booking_id: item.booking_id,
-    booking_number: item.booking_number, // Add booking_number from API
+    booking_number: item.booking_number,
     event_id: item.event_id,
     event_name: item.event_name,
     user_name: item.user_name,
     user_id: item.user_id,
-    booking_date: convertDateToISO(item.booking_date),
-    date: convertDateToISO(primaryDate),
-    event_dates:
-      item.event_date.length > 1
-        ? item.event_date.map(convertDateToISO)
-        : undefined,
-    amount: parseFloat(item.amount) || 0, // Convert string to number
+    booking_date: toSortableDate(item.booking_date),
+    date: toSortableDate(primaryDisplayDate),
+    event_dates: eventDates.length > 0 ? eventDates : undefined,
+    amount: parseFloat(item.amount) || 0,
     status: item.status,
-    // Optional fields - set defaults if needed
     tickets: 0,
     total_table: 0,
     total_people: 0,
@@ -81,7 +102,7 @@ const transformBookingItem = (
     balance_amount: 0,
     discount: 0,
     total_amount: parseFloat(item.amount) || 0,
-    payment_status: item.status, // Use status as payment_status for now
+    payment_status: item.status,
     platform_fee: item.platform_fee ? parseFloat(item.platform_fee) : undefined,
     deposit_amount: item.deposit_amount
       ? parseFloat(item.deposit_amount)

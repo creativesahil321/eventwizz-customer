@@ -20,13 +20,15 @@ import {
 export type VendorPreviewRoomRef = {
   room_id: number;
   name: string;
+  /** True when the room has no bookable dates — shown but not selectable. */
+  disabled?: boolean;
 };
 
 type RoomKeyedStep = { rooms?: Record<string, unknown> };
 
 function pickRoomPayload(
   step: RoomKeyedStep | undefined,
-  room: VendorPreviewRoomRef,
+  room: Pick<VendorPreviewRoomRef, "room_id" | "name">,
 ): Record<string, unknown> | undefined {
   const rooms = step?.rooms;
   if (!rooms || typeof rooms !== "object") return undefined;
@@ -46,6 +48,14 @@ function pickRoomPayload(
   return undefined;
 }
 
+function roomHasBookableDates(
+  stepThree: RoomKeyedStep | undefined,
+  room: Pick<VendorPreviewRoomRef, "room_id" | "name">,
+): boolean {
+  const payload = pickRoomPayload(stepThree, room);
+  return Array.isArray(payload?.dates) && payload.dates.length > 0;
+}
+
 export function isVendorEventRoomPreviewMode(data: EventDetailData): boolean {
   const rooms = listVendorPreviewRooms(data);
   if (rooms.length >= 2) {
@@ -62,14 +72,30 @@ export function isVendorEventRoomPreviewMode(data: EventDetailData): boolean {
 export function listVendorPreviewRooms(
   data: EventDetailData,
 ): VendorPreviewRoomRef[] {
+  const stepThree = data.stepThree as RoomKeyedStep | undefined;
   return normalizeVendorStepTwoRooms(
     (data.stepTwo as { rooms?: unknown })?.rooms,
   )
     .filter((room) => Number(room.room_id) > 0)
-    .map((room, index) => ({
-      room_id: Number(room.room_id),
-      name: String(room.name || "").trim() || `Room ${index + 1}`,
-    }));
+    .map((room, index) => {
+      const ref = {
+        room_id: Number(room.room_id),
+        name: String(room.name || "").trim() || `Room ${index + 1}`,
+      };
+      return {
+        ...ref,
+        disabled: !roomHasBookableDates(stepThree, ref),
+      };
+    });
+}
+
+/** First room that still has dates; falls back to 0 when none are bookable. */
+export function firstBookableVendorPreviewRoomIndex(
+  data: EventDetailData,
+): number {
+  const rooms = listVendorPreviewRooms(data);
+  const idx = rooms.findIndex((room) => !room.disabled);
+  return idx >= 0 ? idx : 0;
 }
 
 /**
@@ -143,6 +169,7 @@ export function listVendorPreviewRoomSummaries(
       fromPrice: lowestPositivePrice(drinkPackages.map((drink) => drink.price)),
       packageCount: drinkPackages.length,
       highlights,
+      disabled: room.disabled,
     };
   });
 }
@@ -157,12 +184,12 @@ type PreviewMenuSlice = Pick<
 >;
 
 type PreviewDrinksSlice = Pick<
-  EventDetailStepFive,
+  EventDetailStepSix,
   "drink_title" | "drink_description" | "packages"
 >;
 
 type PreviewBrochureSlice = Pick<
-  EventDetailStepSix,
+  EventDetailStepFive,
   "brochure_pdf" | "brochure_pdf_2" | "event_address"
 >;
 
@@ -184,10 +211,15 @@ export function resolveVendorPreviewActiveSlices(
 ): VendorPreviewActiveSlices {
   const rooms = listVendorPreviewRooms(data);
   const roomMode = isVendorEventRoomPreviewMode(data);
-  const safeIndex = Math.min(
+  const requestedIndex = Math.min(
     Math.max(roomIndex, 0),
     Math.max(rooms.length - 1, 0),
   );
+  // Never activate a date-less room — snap to the first bookable one.
+  const safeIndex =
+    rooms[requestedIndex]?.disabled
+      ? firstBookableVendorPreviewRoomIndex(data)
+      : requestedIndex;
   const activeRoom = roomMode ? (rooms[safeIndex] ?? null) : null;
 
   const stepTwoRooms = normalizeVendorStepTwoRooms(
@@ -203,6 +235,7 @@ export function resolveVendorPreviewActiveSlices(
   if (!roomMode || !activeRoom) {
     const s3 = data.stepThree;
     const s4 = data.stepFour;
+    // Vendor form + API: step 5 = location/brochure, step 6 = drinks.
     const s5 = data.stepFive;
     const s6 = data.stepSix;
     return {
@@ -220,24 +253,21 @@ export function resolveVendorPreviewActiveSlices(
             menu_background_image: s4.menu_background_image,
           }
         : null,
-      drinks: s5
+      drinks: s6
         ? {
-            drink_title: s5.drink_title,
-            drink_description: s5.drink_description,
-            packages: s5.packages,
+            drink_title: s6.drink_title,
+            drink_description: s6.drink_description,
+            packages: s6.packages,
           }
         : null,
-      brochure: s6
+      brochure: s5
         ? {
-            brochure_pdf: s6.brochure_pdf,
-            brochure_pdf_2: s6.brochure_pdf_2,
-            event_address: s6.event_address,
+            brochure_pdf: s5.brochure_pdf,
+            brochure_pdf_2: s5.brochure_pdf_2,
+            event_address: s5.event_address,
           }
         : null,
-      eventAddress:
-        String(s6?.event_address ?? "").trim() ||
-        String((data.stepFive as { event_address?: string })?.event_address ?? "")
-          .trim(),
+      eventAddress: String(s5?.event_address ?? "").trim(),
     };
   }
 

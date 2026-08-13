@@ -500,25 +500,22 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   };
 
   const handleStripePaymentComplete = useCallback(() => {
-    const parsedBookingId = parseInt(bookingData.booking_id, 10);
-    if (!Number.isNaN(parsedBookingId)) {
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.bookingDetail(parsedBookingId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.rescheduleDates(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.lists(),
-      });
-    }
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.bookingDetails(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.rescheduleDates(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.lists(),
+    });
     setStripePaymentSession(null);
     setIsStripePaymentOpen(false);
     setSelectedDateForPayment(null);
     setSelectedRescheduleRequest(null);
     setRescheduleModalOpen(false);
     setSelectedDateForReschedule(null);
-  }, [bookingData.booking_id, queryClient]);
+  }, [queryClient]);
 
   const getPaymentStatusBadge = (status: string) => (
     <StatusBadge

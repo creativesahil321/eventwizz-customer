@@ -18,8 +18,8 @@ interface RoomTabSelectorProps {
 }
 
 /**
- * Room picker as full-width horizontal rows — readable on mobile,
- * not cramped two-column tiles or tiny pills.
+ * Room picker as side-by-side horizontal cards —
+ * icon + ROOM label + name + price, matching checkout design.
  */
 export default function RoomTabSelector({
   rooms,
@@ -40,7 +40,7 @@ export default function RoomTabSelector({
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--checkout-muted-foreground)]">
         Rooms
       </p>
-      <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {rooms.map((room, index) => {
           const tone = getCheckoutRoomTone(index);
           const isActive = room.room_id === activeRoomId;
@@ -54,7 +54,7 @@ export default function RoomTabSelector({
               onClick={() => onRoomChange(room.room_id)}
               aria-pressed={isActive}
               className={cn(
-                "flex min-h-12 w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",
+                "flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all",
                 "active:scale-[0.99]",
                 isActive
                   ? "border-[color:var(--checkout-brand-primary)] bg-[color:var(--checkout-brand-primary)] text-white shadow-sm"
@@ -73,7 +73,17 @@ export default function RoomTabSelector({
               <span className="min-w-0 flex-1">
                 <span
                   className={cn(
-                    "block truncate text-sm font-semibold leading-tight",
+                    "block text-[10px] font-medium uppercase tracking-[0.12em] leading-none",
+                    isActive
+                      ? "text-white/70"
+                      : "text-[color:var(--checkout-muted-foreground)]",
+                  )}
+                >
+                  Room
+                </span>
+                <span
+                  className={cn(
+                    "mt-1 block truncate text-sm font-semibold leading-tight",
                     isActive
                       ? "text-white"
                       : "text-[color:var(--checkout-foreground)]",
@@ -101,8 +111,8 @@ export default function RoomTabSelector({
           <Link
             href={addRoomUrl}
             className={cn(
-              "flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed",
-              "border-[color:var(--checkout-brand-accent)]/40 px-3 py-2.5",
+              "flex min-h-14 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed",
+              "border-[color:var(--checkout-brand-accent)]/40 px-3.5 py-3",
               "text-sm font-semibold text-[color:var(--checkout-brand-accent)]",
               "transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-blue-50/50",
             )}

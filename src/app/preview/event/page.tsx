@@ -33,6 +33,21 @@ import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentia
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { useToast } from "@/components/ui/use-toast";
 
+function resolveEventPreviewLocationSlug(
+  data: EventDetailData | undefined,
+  siteEssentials: SiteEssentialsFormValues | null,
+): string | null {
+  const locationId =
+    data?.stepOne?.vendor_location_id ?? data?.vendor_location_id;
+  const locations = siteEssentials?.locations ?? [];
+  if (locationId == null || locations.length === 0) return null;
+  const idNum = Number(locationId);
+  const matched = locations.find(
+    (loc) => loc.id != null && Number(loc.id) === idNum,
+  );
+  return matched?.slug?.trim() || null;
+}
+
 function EventPreviewPageLoadingShell() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -314,8 +329,27 @@ function EventPreviewPageContent() {
     );
   }
 
+  const previewEventData = eventData.data as EventDetailData;
+  const previewLocationSlug = resolveEventPreviewLocationSlug(
+    previewEventData,
+    siteEssentials,
+  );
+  const previewLocations =
+    siteEssentials?.locations
+      ?.filter((loc) => Boolean(loc.slug?.trim()))
+      .map((loc) => ({
+        id: loc.id,
+        slug: loc.slug,
+        city: loc.city,
+        total_events: loc.total_events,
+      })) ?? [];
+
   return (
-    <PreviewProvider isPreviewMode={true}>
+    <PreviewProvider
+      isPreviewMode={true}
+      previewLocations={previewLocations}
+      activePreviewLocationSlug={previewLocationSlug ?? undefined}
+    >
       {/*
         Viewport-height shell (no device frame). Theme FX use absolute inset:0 inside
         the scroll container — without a fixed height they stretch over the full page.
@@ -348,8 +382,9 @@ function EventPreviewPageContent() {
 
         <div className="flex min-h-0 flex-1 flex-col pt-14">
           <EventPreview
-            data={eventData.data as EventDetailData}
+            data={previewEventData}
             siteEssentials={siteEssentials}
+            locationSlug={previewLocationSlug}
             embedInShell
           />
         </div>

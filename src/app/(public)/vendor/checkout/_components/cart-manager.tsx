@@ -41,9 +41,11 @@ import {
   calculateRoomSubtotal,
   getDateGuestCount,
   getApiDateDiscount,
-  calculateEditableDateTotal,
+  calculateEditableDateDiscountableTotal,
+  calculateEditableDateTablesTotal,
   computeDateDiscountAmount,
   isDateDiscountEligible,
+  isFlatPerPersonDateDiscount,
   getDateDiscountMinPeople,
 } from "../_lib/cart-calculations";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
@@ -52,8 +54,10 @@ import DateAccordion from "./date-accordion";
 import RoomTabSelector from "./room-tab-selector";
 import CartSkeletonLoader from "./cart-skeleton-loader";
 import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
+import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
+import { isCheckoutCouponApplied } from "./checkout-promo-panel";
 import { useCartSync } from "../_lib/hooks/useCartSync";
 import { useLocationSlug } from "../_lib/hooks/useLocationSlug";
 import { generateEventBookingUrl } from "../_lib/utils/event-url";
@@ -107,10 +111,17 @@ export default function CartManager({}: CartManagerProps) {
   const clearAllCartMutation = useClearAllCart();
   const queryClient = useQueryClient();
   const { format: formatMoney } = useCurrencyFormat();
+  const couponCode = useCheckoutPromoStore((s) => s.couponCode);
 
   const { currentEventSlug, currentEventApiData, firstDate } = useMemo(() => {
     return extractCurrentEventData(apiCartData);
   }, [apiCartData]);
+
+  // Coupon replaces date offers — only one discount applies per booking.
+  const couponReplacesDateOffers = isCheckoutCouponApplied(
+    { couponCode },
+    currentEventApiData?.coupon ?? null,
+  );
 
   const locationSlug = useLocationSlug();
   const { domain } = useDomain();
@@ -724,6 +735,15 @@ export default function CartManager({}: CartManagerProps) {
               drinkTitle={drinkTitle}
               serverEventData={currentEventApiData}
               {...(() => {
+                if (couponReplacesDateOffers) {
+                  return {
+                    discountLabel: null,
+                    discountAmount: null as number | null,
+                    discountStrikeAmount: null as number | null,
+                    discountLockedHint: null as string | null,
+                  };
+                }
+
                 const discount = getApiDateDiscount(
                   currentEventApiData,
                   date,
@@ -733,29 +753,41 @@ export default function CartManager({}: CartManagerProps) {
                   return {
                     discountLabel: null,
                     discountAmount: null as number | null,
+                    discountStrikeAmount: null as number | null,
                     discountLockedHint: null as string | null,
                   };
                 }
 
                 const guests = getDateGuestCount(dateData);
-                const dateTotal = calculateEditableDateTotal(dateData);
-                const eligible = isDateDiscountEligible(discount, guests);
+                const tableTotal = calculateEditableDateTablesTotal(dateData);
+                const discountableTotal =
+                  calculateEditableDateDiscountableTotal(dateData);
+                const eligibility = {
+                  guestCount: guests,
+                  discountableTotal,
+                  tableTotal,
+                };
+                const eligible = isDateDiscountEligible(discount, eligibility);
                 const amount = eligible
-                  ? computeDateDiscountAmount(discount, dateTotal, guests)
+                  ? computeDateDiscountAmount(discount, eligibility)
                   : 0;
                 const minPeople = getDateDiscountMinPeople(discount);
-                const lockedHint =
-                  !eligible &&
-                  discount.flat_mode === "per_person" &&
-                  minPeople != null
-                    ? `Min ${minPeople} guests`
-                    : !eligible
-                      ? "Offer not available yet"
-                      : null;
+                const lockedHint = !eligible
+                  ? isFlatPerPersonDateDiscount(discount)
+                    ? minPeople != null
+                      ? `Min ${minPeople} table guests`
+                      : "Confirm table seating"
+                    : "Add tables or tickets"
+                  : null;
 
                 return {
                   discountLabel: label,
                   discountAmount: amount > 0 ? amount : null,
+                  discountStrikeAmount: eligible
+                    ? isFlatPerPersonDateDiscount(discount)
+                      ? tableTotal
+                      : discountableTotal
+                    : null,
                   discountLockedHint: lockedHint,
                 };
               })()}
@@ -802,10 +834,8 @@ export default function CartManager({}: CartManagerProps) {
           addRoomUrl={eventDetailsUrl ?? undefined}
         />
 
-        <div className="overflow-hidden rounded-2xl border border-[color:var(--checkout-border)] bg-white shadow-sm">
-          <div className="divide-y divide-[color:var(--checkout-border)]">
-            {dateSections}
-          </div>
+        <div className="space-y-3 rounded-2xl border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/40 p-2.5 sm:p-3">
+          {dateSections}
         </div>
       </div>
     );

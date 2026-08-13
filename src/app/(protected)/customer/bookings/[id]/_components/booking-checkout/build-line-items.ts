@@ -77,6 +77,9 @@ export interface BookingDateSource {
   packages?: BookingDetailsPackage[];
   tables?: BookingDetailsTable[];
   addons?: BookingDetailsAddons;
+  /** Pre-discount date total for payment breakdown strikethrough. */
+  originalTotalAmount?: number | null;
+  totalAmount?: number;
 }
 
 /** Prefer per-date `package_title` from booking API; optional booking-level fallback. */
@@ -601,12 +604,19 @@ export function buildPaymentBreakdown(
 
       const bookingSubtotal = lines.reduce((sum, line) => sum + line.amount, 0);
       const addonSubtotal = split.addonTotal;
+      const subtotal = bookingSubtotal + addonSubtotal;
+      const originalFromDate = date.originalTotalAmount;
+      const originalSubtotal =
+        originalFromDate != null && originalFromDate > subtotal + 0.009
+          ? originalFromDate
+          : null;
 
       return {
         id: date.id,
         title: date.date,
         packageTitle: date.package_title,
-        subtotal: bookingSubtotal + addonSubtotal,
+        subtotal,
+        originalSubtotal,
         lines,
         addonLines: addonLines.length > 0 ? addonLines : undefined,
         addonSubtotal: addonLines.length > 0 ? addonSubtotal : undefined,

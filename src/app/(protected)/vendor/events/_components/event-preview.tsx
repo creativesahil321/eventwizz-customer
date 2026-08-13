@@ -41,6 +41,7 @@ import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
 import {
+  firstBookableVendorPreviewRoomIndex,
   isVendorEventRoomPreviewMode,
   listVendorPreviewRoomSummaries,
   resolveVendorPreviewActiveSlices,
@@ -111,14 +112,17 @@ export function EventPreview({
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const chooserRef = useRef<HTMLDivElement>(null);
   const bookingRef = useRef<HTMLDivElement>(null);
-  const [currentRoomIndex, setCurrentRoomIndex] = useState(0);
+  const roomPreviewMode = isVendorEventRoomPreviewMode(data);
+  const [currentRoomIndex, setCurrentRoomIndex] = useState(() =>
+    firstBookableVendorPreviewRoomIndex(data),
+  );
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
 
-  const roomPreviewMode = isVendorEventRoomPreviewMode(data);
-
   useEffect(() => {
-    setCurrentRoomIndex(0);
+    setCurrentRoomIndex(firstBookableVendorPreviewRoomIndex(data));
+    // Reset when event identity / room-mode flips — not every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- data read intentionally once per id/mode
   }, [data.stepOne?.event_id, roomPreviewMode]);
 
   const slices = useMemo(
@@ -131,22 +135,38 @@ export function EventPreview({
     [roomPreviewMode, data],
   );
 
+  useEffect(() => {
+    if (!roomPreviewMode) return;
+    const bookableIndex = firstBookableVendorPreviewRoomIndex(data);
+    if (
+      roomSummaries[currentRoomIndex]?.disabled &&
+      bookableIndex !== currentRoomIndex
+    ) {
+      setCurrentRoomIndex(bookableIndex);
+    }
+  }, [roomPreviewMode, roomSummaries, currentRoomIndex, data]);
+
   const showRoomSelector = roomPreviewMode && roomSummaries.length >= 2;
   const roomContentKey =
     slices.activeRoom?.room_id ?? `room-${currentRoomIndex}`;
   const roomSelectorVisible = showRoomSelector && roomSelectorScrollVisible;
 
-  const handleRoomChange = useCallback((index: number) => {
-    setCurrentRoomIndex(index);
-    requestAnimationFrame(() => {
+  const handleRoomChange = useCallback(
+    (index: number) => {
+      const target = roomSummaries[index];
+      if (target?.disabled) return;
+      setCurrentRoomIndex(index);
       requestAnimationFrame(() => {
-        scrollToElementIfNeeded(bookingRef.current, {
-          headerOffsetPx: HEADER_OFFSET_PX,
-          scrollContainer: previewContainerRef.current,
+        requestAnimationFrame(() => {
+          scrollToElementIfNeeded(bookingRef.current, {
+            headerOffsetPx: HEADER_OFFSET_PX,
+            scrollContainer: previewContainerRef.current,
+          });
         });
       });
-    });
-  }, []);
+    },
+    [roomSummaries],
+  );
 
   useEffect(() => {
     if (!showRoomSelector) {
@@ -198,8 +218,30 @@ export function EventPreview({
     data.contact_number || data.stepEight?.contact_number || "";
 
   /** Same source as live event page: theme locations + contactDetails via site essentials. */
-  const footerLocationSlug =
-    locationSlug?.trim() || siteEssentials?.slug?.trim() || null;
+  const footerLocationSlug = useMemo(() => {
+    const fromProp = locationSlug?.trim();
+    if (fromProp) return fromProp;
+
+    const locationId =
+      data.stepOne?.vendor_location_id ?? data.vendor_location_id;
+    const locations = siteEssentials?.locations ?? [];
+    if (locationId != null && locations.length > 0) {
+      const idNum = Number(locationId);
+      const matched = locations.find(
+        (loc) => loc.id != null && Number(loc.id) === idNum,
+      );
+      if (matched?.slug?.trim()) return matched.slug.trim();
+    }
+
+    // Do not fall back to siteEssentials.slug — that is often the main/home
+    // slug and collapses the footer to a single head-office block.
+    return null;
+  }, [
+    locationSlug,
+    data.stepOne?.vendor_location_id,
+    data.vendor_location_id,
+    siteEssentials?.locations,
+  ]);
   const footerContactTheme = useMemo(
     () => buildSiteEssentialsContactTheme(siteEssentials),
     [siteEssentials],
@@ -222,12 +264,16 @@ export function EventPreview({
   /** Configured header color from theme / defaults */
   const configuredHeaderHex = themeColors.header || "#FFFFFF";
   /**
-   * Admin + in-app embed often have no Site Essentials → default white header.
-   * Many venue logos are white/light for use on photos; on white they disappear.
-   * Use the brand primary for the bar when the header would be near-white (same idea as a solid bar on live sites).
+   * Admin embeds often have no Site Essentials → default white header, which
+   * hides light logos. Only then swap near-white → primary.
+   * Never overwrite an explicit brand header (e.g. cream `#F7F3E3`) — that
+   * broke `/preview/event` parity with the live event page.
    */
+  const hasExplicitHeaderColor = Boolean(
+    siteEssentials?.colors?.header?.trim(),
+  );
   const headerHex = (() => {
-    if (!embedInShell) return configuredHeaderHex;
+    if (!embedInShell || hasExplicitHeaderColor) return configuredHeaderHex;
     try {
       const anchor = getAnchorColor(configuredHeaderHex);
       if (relativeLuminance(anchor) >= 0.88) {
@@ -281,8 +327,9 @@ export function EventPreview({
 
   const activePackage = slices.roomMode ? slices.package : s2;
   const activeMenu = slices.roomMode ? slices.menu : data.stepFour;
-  const activeDrinks = slices.roomMode ? slices.drinks : data.stepFive;
-  const activeBrochure = slices.roomMode ? slices.brochure : data.stepSix;
+  // Always from slices — non-room + room both map step5=brochure, step6=drinks.
+  const activeDrinks = slices.drinks;
+  const activeBrochure = slices.brochure;
 
   /** Same rows as the header downloads control (brochure / flyer PDFs). */
   const eventBrochureDownloads = useMemo(
@@ -402,8 +449,21 @@ export function EventPreview({
   const brochureAddress =
     slices.eventAddress ||
     activeBrochure?.event_address ||
-    data.stepSix?.event_address ||
+    data.stepFive?.event_address ||
     "";
+
+  const brochureLat =
+    data.lat ??
+    data.stepFive?.lat ??
+    data.stepFive?.latitude ??
+    s8?.latitude ??
+    null;
+  const brochureLng =
+    data.long ??
+    data.stepFive?.long ??
+    data.stepFive?.longitude ??
+    s8?.longitude ??
+    null;
 
   return (
     <CartConflictProvider>
@@ -445,6 +505,8 @@ export function EventPreview({
           className={embedInShell ? "px-3 sm:px-4 md:px-6" : ""}
           headerDownloads={headerDownloads}
           scrollContainerRef={previewContainerRef}
+          hideHeaderPhone
+          compactGuestAuth
         />
 
         {showRoomSelector ? (
@@ -503,6 +565,7 @@ export function EventPreview({
                   ? activePackage.event_schedular_background_image
                   : undefined
               }
+              headingEmphasis={headingEmphasisForHero}
             />
           </RoomContentTransition>
         ) : null}
@@ -534,11 +597,16 @@ export function EventPreview({
               eventImage={
                 s1?.event_banner_image || s1?.event_banner_video || undefined
               }
+              headingEmphasis={headingEmphasisForHero}
             />
           </RoomContentTransition>
         </div>
 
-        <EventGallery gallery={galleryImages} />
+        <EventGallery
+          gallery={galleryImages}
+          galleryTitle={siteEssentials?.event_gallery_title || undefined}
+          headingEmphasis={headingEmphasisForHero}
+        />
 
         {showMenu && (
           <RoomContentTransition roomKey={roomContentKey}>
@@ -552,6 +620,7 @@ export function EventPreview({
                   ? activeMenu.menu_background_image
                   : (activeMenu?.menu_background_image ?? undefined)
               }
+              headingEmphasis={headingEmphasisForHero}
             />
           </RoomContentTransition>
         )}
@@ -563,19 +632,21 @@ export function EventPreview({
               description={activeDrinks?.drink_description || ""}
               packages={drinkPackages}
               eventSlug={eventSlug}
+              headingEmphasis={headingEmphasisForHero}
             />
           </RoomContentTransition>
         )}
 
         <LazyBrochureSection
           showMapImmediately
+          headingEmphasis={headingEmphasisForHero}
           location={{
             title: "EVENT LOCATION",
             description:
               brochureAddress || "Event location will be displayed here",
             icon: "MapPin",
-            latitude: data.lat ?? s8?.latitude ?? null,
-            longitude: data.long ?? s8?.longitude ?? null,
+            latitude: brochureLat,
+            longitude: brochureLng,
           }}
           price={{
             title: "PRICES FROM",
@@ -585,7 +656,12 @@ export function EventPreview({
           }}
         />
 
-        {showFaqs && <LazyFaqSection faqs={faqs} />}
+        {showFaqs && (
+          <LazyFaqSection
+            faqs={faqs}
+            headingEmphasis={headingEmphasisForHero}
+          />
+        )}
 
         <FooterSection
           copyright={siteEssentials?.copyright}

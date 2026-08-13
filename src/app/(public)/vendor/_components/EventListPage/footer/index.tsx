@@ -197,9 +197,11 @@ export default function FooterSection({
   const narrowPreview = usePreviewNarrowLayout();
   const pathname = usePathname();
   const isPreviewMode = useIsPreviewMode();
-  /** Social icons only on live site + Sites Essentials `/preview/site` — not onboarding. */
+  /** Social icons on live site + site/event previews — not onboarding. */
   const showSocialLinks =
-    !isPreviewMode || Boolean(pathname?.includes("/preview/site"));
+    !isPreviewMode ||
+    Boolean(pathname?.includes("/preview/site")) ||
+    Boolean(pathname?.includes("/preview/event"));
   /**
    * Fixed bottom review chrome exists on site/onboarding preview only.
    * Event preview (`/preview/event`, editor embed) has no chrome — do not pad.

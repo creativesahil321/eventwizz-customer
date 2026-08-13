@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Loader2, MapPin } from "lucide-react";
+import { Calendar, Loader2, MapPin, Navigation } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +16,8 @@ export type LocationEventCardModel = {
   price: string | null;
   dateLabel: string | null;
   category?: string | null;
+  /** Near Me distance from customer to event pin (km). */
+  distanceKm?: number | null;
 };
 
 type LocationEventCardProps = {
@@ -23,12 +25,19 @@ type LocationEventCardProps = {
   locationSlug: string;
   /** City / venue label — shown when `showLocationChip` is true (cross-location search). */
   locationLabel?: string | null;
+  /** Prefer event pin address over city bucket when available. */
+  eventAddress?: string | null;
   /** Cross-location search results need a small location chip on the card. */
   showLocationChip?: boolean;
   isPending: boolean;
   onNavigateStart: () => void;
   imageFallback: string;
 };
+
+function formatDistanceKm(km: number): string {
+  if (km < 10) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
+}
 
 /**
  * Public event card: ~4/3 image, price pill top-right, date bottom-left on image,
@@ -38,6 +47,7 @@ export function LocationEventCard({
   event,
   locationSlug,
   locationLabel = null,
+  eventAddress = null,
   showLocationChip = false,
   isPending,
   onNavigateStart,
@@ -47,6 +57,9 @@ export function LocationEventCard({
   const onPreviewEventSelect = usePreviewEventSelect();
   const isInteractivePreview = isPreview && Boolean(onPreviewEventSelect);
   const href = `/${locationSlug}/events/${event.slug}`;
+  const placeLabel = eventAddress?.trim() || locationLabel?.trim() || null;
+  const hasDistance =
+    typeof event.distanceKm === "number" && Number.isFinite(event.distanceKm);
 
   // Visual hover is decoupled from click interactivity: preview cards should
   // still show the hover treatment (WYSIWYG) even though they don't navigate.
@@ -88,6 +101,18 @@ export function LocationEventCard({
           </div>
         ) : null}
 
+        {hasDistance ? (
+          <div
+            className={cn(
+              "absolute z-[1] flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold tabular-nums text-white backdrop-blur-sm",
+              event.price ? "right-2.5 top-10" : "right-2.5 top-2.5",
+            )}
+          >
+            <Navigation className="h-2.5 w-2.5 shrink-0" aria-hidden />
+            {formatDistanceKm(event.distanceKm!)}
+          </div>
+        ) : null}
+
         {event.dateLabel ? (
           <div className="absolute bottom-2.5 left-2.5 z-[1] flex items-center gap-1 text-[11px] font-semibold text-white drop-shadow-md">
             <Calendar className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
@@ -111,10 +136,10 @@ export function LocationEventCard({
         >
           {event.title}
         </h3>
-        {showLocationChip && locationLabel ? (
+        {showLocationChip && placeLabel ? (
           <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-white/70">
             <MapPin className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
-            <span className="truncate">{locationLabel}</span>
+            <span className="truncate">{placeLabel}</span>
           </p>
         ) : null}
       </div>

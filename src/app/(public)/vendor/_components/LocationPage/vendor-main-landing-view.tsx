@@ -17,7 +17,6 @@ import { LocationSearchBar } from "./location-search-bar";
 import { PublicSearchResults } from "./public-search-results";
 import {
   filterLocations,
-  matchVendorCityToPlace,
   resolveLocationSlugForCity,
   toSearchDateParam,
 } from "./_lib/filter-locations";
@@ -46,8 +45,6 @@ import { useImageLuminance } from "@/hooks/use-image-luminance";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { usePublicSearch } from "@/services/common/public-search";
-import { useReverseGeocode } from "@/hooks/useReverseGeocode";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export type VendorMainLandingViewProps = {
   brandName: string;
@@ -118,13 +115,6 @@ export function VendorMainLandingView({
   const { filters, apiFilters, setFilters, clearFilters, isSearchMode } =
     usePublicSearchFilters({ syncUrl: useApi });
 
-  const nearMeLat = filters.nearMe ? filters.nearMeCoords?.lat ?? null : null;
-  const nearMeLng = filters.nearMe ? filters.nearMeCoords?.lng ?? null : null;
-  const {
-    city: nearMePlaceCity,
-    loading: nearMePlaceLoading,
-  } = useReverseGeocode(nearMeLat, nearMeLng);
-
   const vendorCities = useMemo(() => {
     const seen = new Set<string>();
     const list: string[] = [];
@@ -137,99 +127,75 @@ export function VendorMainLandingView({
     return list;
   }, [locations]);
 
-  /** FE-first: map GPS → nearest vendor city until backend nearby lands. */
-  const nearMeMatchedCity = useMemo(
-    () =>
-      filters.nearMe
-        ? matchVendorCityToPlace(nearMePlaceCity, vendorCities)
-        : null,
-    [filters.nearMe, nearMePlaceCity, vendorCities],
-  );
-
-  const effectiveCity = filters.nearMe
-    ? nearMeMatchedCity
-    : apiFilters.city;
-
   /**
    * Map chrome only from xl (1280px)+ — small desktops keep grid and avoid
    * CTA / toggle collisions in the hero fade.
    */
   const hideMapView = isPreviewNarrow || isCompactViewport;
 
+  // Near Me uses event-pin geo on the API — never city-bucket matching.
+  const nearMeActive =
+    filters.nearMe &&
+    typeof filters.nearMeCoords?.lat === "number" &&
+    typeof filters.nearMeCoords?.lng === "number";
+
   const locationSlugForCity = useMemo(
-    () => resolveLocationSlugForCity(effectiveCity, locations),
-    [effectiveCity, locations],
+    () =>
+      nearMeActive
+        ? undefined
+        : resolveLocationSlugForCity(apiFilters.city, locations),
+    [nearMeActive, apiFilters.city, locations],
   );
 
-  const searchParams = useMemo(
-    () => ({
+  const searchParams = useMemo(() => {
+    const base = {
       q: apiFilters.query.trim() || undefined,
-      // Prefer slug when unique; otherwise exact city label for the API.
-      location_slug: locationSlugForCity,
-      city: locationSlugForCity ? undefined : effectiveCity ?? undefined,
       date: toSearchDateParam(apiFilters.date),
       mode: "auto" as const,
       per_page: 40,
-    }),
-    [
-      apiFilters.query,
-      apiFilters.date,
-      effectiveCity,
-      locationSlugForCity,
-    ],
-  );
+    };
 
-  const nearMeResolving =
-    filters.nearMe &&
-    Boolean(filters.nearMeCoords) &&
-    nearMePlaceLoading;
-
-  const nearMeNoMatch =
-    filters.nearMe &&
-    Boolean(filters.nearMeCoords) &&
-    !nearMePlaceLoading &&
-    !nearMeMatchedCity;
-
-  const searchQuery = usePublicSearch(domain, searchParams, {
-    enabled:
-      useApi &&
-      isSearchMode &&
-      !nearMeResolving &&
-      // Until backend nearby exists, Near Me alone needs a matched vendor city.
-      !(nearMeNoMatch && !apiFilters.query.trim() && !apiFilters.date),
-  });
-
-  const filtersForClient = useMemo(
-    () => ({
-      ...apiFilters,
-      city: effectiveCity,
-    }),
-    [apiFilters, effectiveCity],
-  );
-
-  /** Preview / browse: location cards. Live search: API event/date results. */
-  const filteredLocations = useMemo(() => {
-    if (nearMeNoMatch && !apiFilters.query.trim() && !apiFilters.date) {
-      return [];
+    if (nearMeActive && filters.nearMeCoords) {
+      return {
+        ...base,
+        // Backend ranks by event_details.lat/long — do not send city filters.
+        lat: filters.nearMeCoords.lat,
+        lng: filters.nearMeCoords.lng,
+        radius_km: 50,
+        sort: "distance" as const,
+      };
     }
-    return useApi && isSearchMode
-      ? locations
-      : filterLocations(locations, filtersForClient);
+
+    return {
+      ...base,
+      location_slug: locationSlugForCity,
+      city: locationSlugForCity ? undefined : apiFilters.city ?? undefined,
+    };
   }, [
-    useApi,
-    isSearchMode,
-    locations,
-    filtersForClient,
-    nearMeNoMatch,
     apiFilters.query,
     apiFilters.date,
+    apiFilters.city,
+    locationSlugForCity,
+    nearMeActive,
+    filters.nearMeCoords,
   ]);
 
-  const showApiResults =
-    useApi && isSearchMode && !nearMeNoMatch && !nearMeResolving;
+  const searchQuery = usePublicSearch(domain, searchParams, {
+    enabled: useApi && isSearchMode,
+  });
+
+  /** Preview / browse: location cards. Live search: API event/date results. */
+  const filteredLocations = useMemo(
+    () =>
+      useApi && isSearchMode
+        ? locations
+        : filterLocations(locations, apiFilters),
+    [useApi, isSearchMode, locations, apiFilters],
+  );
+
+  const showApiResults = useApi && isSearchMode;
   const showEmptySearchState =
-    (!showApiResults && isSearchMode && filteredLocations.length === 0) ||
-    nearMeNoMatch;
+    !showApiResults && isSearchMode && filteredLocations.length === 0;
 
   const totalEvents = (showApiResults ? locations : filteredLocations).reduce(
     (sum, loc) =>
@@ -407,23 +373,18 @@ export function VendorMainLandingView({
               availability={{
                 domain,
                 q: filters.query,
-                city: locationSlugForCity ? undefined : effectiveCity,
+                city: locationSlugForCity
+                  ? undefined
+                  : nearMeActive
+                    ? undefined
+                    : apiFilters.city,
                 location_slug: locationSlugForCity,
-                enabled: useApi,
+                enabled: useApi && !nearMeActive,
               }}
             />
-            {nearMeResolving ? (
-              <div className="mt-3 flex items-center justify-center gap-2 text-sm text-[var(--color-text-dimmed)]">
-                <Skeleton className="h-4 w-4 rounded-full" />
-                <Skeleton className="h-4 w-40" />
-              </div>
-            ) : null}
-            {filters.nearMe && nearMeMatchedCity && !nearMeResolving ? (
+            {nearMeActive ? (
               <p className="mt-3 text-center text-xs text-[var(--color-text-dimmed)] sm:text-sm">
-                Showing venues near{" "}
-                <span className="font-semibold text-[var(--color-text)]">
-                  {nearMeMatchedCity}
-                </span>
+                Showing events nearest to you
               </p>
             ) : null}
           </motion.div>
@@ -612,12 +573,9 @@ export function VendorMainLandingView({
 
           {showApiResults ? (
             <PublicSearchResults
-              filters={{
-                ...filters,
-                city: nearMeMatchedCity ?? filters.city,
-              }}
+              filters={filters}
               data={searchQuery.data}
-              isLoading={searchQuery.isFetching || nearMeResolving}
+              isLoading={searchQuery.isFetching}
               isError={searchQuery.isError}
               onClear={clearSearchFilters}
               sectionId={`${exploreCitiesSectionId}-results`}
@@ -626,16 +584,10 @@ export function VendorMainLandingView({
           ) : showEmptySearchState ? (
             <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-6 py-10 text-center">
               <p className="text-base font-semibold text-[var(--color-text)]">
-                {nearMeNoMatch
-                  ? "No venues near you yet"
-                  : "No locations match your search"}
+                No locations match your search
               </p>
               <p className="text-sm text-[var(--color-text-dimmed)]">
-                {nearMeNoMatch
-                  ? nearMePlaceCity
-                    ? `We couldn’t match “${nearMePlaceCity}” to a venue city. Pick a city from the list instead.`
-                    : "Pick a city from the list, or try again later."
-                  : "Try another city or date."}
+                Try another city or date.
               </p>
               <button
                 type="button"

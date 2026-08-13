@@ -39,6 +39,7 @@ import {
   transformCartToCheckout,
   validateCheckoutRequirements,
   calculateCheckoutSummary,
+  applyDiscountThenSplitPayment,
 } from "../_lib/checkout-utils";
 import {
   useProcessCheckout,
@@ -51,6 +52,7 @@ import { buildCheckoutStripeSession, mergeStripePaymentSession } from "@/service
 import { getStripePromise } from "@/lib/stripe/stripe-loader";
 import { handleCheckoutError } from "@/services/customer/checkout/utils";
 import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
+import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.store";
 import PaymentGatewaySelector, {
@@ -65,7 +67,6 @@ import OrderViewBreakdown from "./order-view-breakdown";
 import PerDatePaymentSelection from "./per-date-payment-selection";
 import {
   CheckoutPromoPanel,
-  DEFAULT_CHECKOUT_PROMO,
   resolveCheckoutPromoTotals,
   type CheckoutPromoApplied,
 } from "./checkout-promo-panel";
@@ -99,9 +100,14 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showViewBreakdown, setShowViewBreakdown] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
-  /** Applied coupon code from cart API event.coupon (display / capture only). */
-  const [checkoutPromo, setCheckoutPromo] =
-    useState<CheckoutPromoApplied>(DEFAULT_CHECKOUT_PROMO);
+  const couponCode = useCheckoutPromoStore((s) => s.couponCode);
+  const setCouponCode = useCheckoutPromoStore((s) => s.setCouponCode);
+  const checkoutPromo: CheckoutPromoApplied = {
+    couponCode,
+  };
+  const setCheckoutPromo = (promo: CheckoutPromoApplied) => {
+    setCouponCode(promo.couponCode);
+  };
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
   const [justExpiredBookingNumber, setJustExpiredBookingNumber] = useState<
     string | null
@@ -332,19 +338,22 @@ export default function BookingSummary({}: BookingSummaryProps) {
   ]);
 
   const appliedPromoDiscount = useMemo(() => {
+    const getEditableDate = (dateKey: string) =>
+      currentEventSlug ? getDateData(currentEventSlug, dateKey) : null;
     const dateRows = resolveCartDateDiscounts(
       currentEventApiData,
-      (dateKey) =>
-        currentEventSlug ? getDateData(currentEventSlug, dateKey) : null,
+      getEditableDate,
     );
     const dateOfferSavings = dateRows.reduce(
       (sum, row) => sum + (row.status === "applied" ? row.amount : 0),
       0,
     );
+    // Coupon = once on booking final total (not per-date).
+    const bookingFinalTotal = totalToday + totalLater;
     return resolveCheckoutPromoTotals(
       checkoutPromo,
       currentEventApiData?.coupon ?? null,
-      totalToday + totalLater,
+      bookingFinalTotal,
       dateOfferSavings,
     ).totalDiscount;
   }, [
@@ -358,9 +367,13 @@ export default function BookingSummary({}: BookingSummaryProps) {
   ]);
 
   const payableTodayWithCoupon = useMemo(() => {
-    const againstToday = Math.min(totalToday, appliedPromoDiscount);
-    return Math.max(0, totalToday - againstToday);
-  }, [totalToday, appliedPromoDiscount]);
+    return applyDiscountThenSplitPayment({
+      subTotal: totalToday + totalLater,
+      discountAmount: appliedPromoDiscount,
+      payToday: totalToday,
+      payLater: totalLater,
+    }).payToday;
+  }, [totalToday, totalLater, appliedPromoDiscount]);
 
   // Bug 1 fix — discard pending session when the amount the user owes today changes
   // (e.g. switching deposit ↔ pay-in-full, adding/removing items, applying a coupon).
@@ -1020,15 +1033,17 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const bookingGrandTotal = totalToday + totalLater;
   const hasPayableTotal = bookingGrandTotal > 0;
   const eventCoupon = currentEventApiData?.coupon ?? null;
+  const getEditableDateForPromo = (dateKey: string) =>
+    currentEventSlug ? getDateData(currentEventSlug, dateKey) : null;
   const dateDiscountRows = resolveCartDateDiscounts(
     currentEventApiData,
-    (dateKey) =>
-      currentEventSlug ? getDateData(currentEventSlug, dateKey) : null,
+    getEditableDateForPromo,
   );
   const dateOfferSavings = dateDiscountRows.reduce(
     (sum, row) => sum + (row.status === "applied" ? row.amount : 0),
     0,
   );
+  // Coupon uses booking final total once; date offers stay per-date when no coupon.
   const promoTotals = resolveCheckoutPromoTotals(
     checkoutPromo,
     eventCoupon,
@@ -1040,15 +1055,16 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const totalPromoDiscount = promoTotals.totalDiscount;
   const appliedCouponLabel = promoTotals.couponLabel;
 
-  // Prefer reducing pay-today first so the Total / Pay today line updates immediately.
-  const discountAgainstToday = Math.min(totalToday, totalPromoDiscount);
-  const discountAgainstLater = Math.min(
-    totalLater,
-    Math.max(0, totalPromoDiscount - discountAgainstToday),
-  );
-  const discountedToday = Math.max(0, totalToday - discountAgainstToday);
-  const discountedLater = Math.max(0, totalLater - discountAgainstLater);
-  const discountedGrandTotal = discountedToday + discountedLater;
+  // Discount the booking total first, then split partial payment on that total.
+  const paymentAfterDiscount = applyDiscountThenSplitPayment({
+    subTotal: bookingGrandTotal,
+    discountAmount: totalPromoDiscount,
+    payToday: totalToday,
+    payLater: totalLater,
+  });
+  const discountedToday = paymentAfterDiscount.payToday;
+  const discountedLater = paymentAfterDiscount.payLater;
+  const discountedGrandTotal = paymentAfterDiscount.discountedTotal;
 
   // Platform fee
   const platformFeeMeta = (

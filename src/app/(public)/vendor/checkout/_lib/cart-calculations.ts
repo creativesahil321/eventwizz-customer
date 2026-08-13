@@ -609,34 +609,90 @@ function tableLineTotal(table: EditableDateData["tables"][number]): number {
   return pricePerPerson * (table.minPersons || 1) * table.quantity;
 }
 
-/** Sum tickets, confirmed tables, and drinks for one editable date bucket. */
-export function calculateEditableDateTotal(
-  dateData:
-    | Pick<EditableDateData, "tables" | "tickets" | "drinks" | "confirmedTableIds">
-    | null
-    | undefined,
+type EditableDateBillableSlice = Pick<
+  EditableDateData,
+  "tables" | "tickets" | "drinks" | "confirmedTableIds"
+>;
+
+/** Drink package total only — never included in discount / coupon bases. */
+export function calculateEditableDateDrinksTotal(
+  dateData: EditableDateBillableSlice | null | undefined,
 ): number {
   if (!dateData) return 0;
 
   let total = 0;
-
-  for (const table of getBillableTables(dateData)) {
-    total += tableLineTotal(table);
-  }
-
-  for (const ticket of dateData.tickets) {
-    if (ticket.quantity > 0) {
-      total += ticket.price * ticket.quantity;
-    }
-  }
-
   for (const drink of dateData.drinks) {
     if (drink.quantity > 0) {
       total += drink.price * drink.quantity;
     }
   }
-
   return total;
+}
+
+/** Confirmed table seating total only (used by flat per-person table offers). */
+export function calculateEditableDateTablesTotal(
+  dateData: EditableDateBillableSlice | null | undefined,
+): number {
+  if (!dateData) return 0;
+
+  let total = 0;
+  for (const table of getBillableTables(dateData)) {
+    total += tableLineTotal(table);
+  }
+  return total;
+}
+
+/** Ticket lines only. */
+export function calculateEditableDateTicketsTotal(
+  dateData: EditableDateBillableSlice | null | undefined,
+): number {
+  if (!dateData) return 0;
+
+  let total = 0;
+  for (const ticket of dateData.tickets) {
+    if (ticket.quantity > 0) {
+      total += ticket.price * ticket.quantity;
+    }
+  }
+  return total;
+}
+
+/**
+ * Tables + tickets only. Percentage / flat-total offers and coupon codes use
+ * this base — drink packages are always excluded.
+ */
+export function calculateEditableDateDiscountableTotal(
+  dateData: EditableDateBillableSlice | null | undefined,
+): number {
+  if (!dateData) return 0;
+  return (
+    calculateEditableDateTablesTotal(dateData) +
+    calculateEditableDateTicketsTotal(dateData)
+  );
+}
+
+/** Sum tickets, confirmed tables, and drinks for one editable date bucket. */
+export function calculateEditableDateTotal(
+  dateData: EditableDateBillableSlice | null | undefined,
+): number {
+  if (!dateData) return 0;
+  return (
+    calculateEditableDateDiscountableTotal(dateData) +
+    calculateEditableDateDrinksTotal(dateData)
+  );
+}
+
+/** Cart-wide discountable subtotal (tables + tickets across all dates). */
+export function calculateEditableCartDiscountableTotal(
+  eventData: ApiEventCartData | null | undefined,
+  getEditableDate: (dateKey: string) => EditableDateData | null | undefined,
+): number {
+  if (!eventData) return 0;
+  return getApiCartDateKeys(eventData).reduce((sum, dateKey) => {
+    return (
+      sum + calculateEditableDateDiscountableTotal(getEditableDate(dateKey))
+    );
+  }, 0);
 }
 
 /** Per-room subtotal — prefers live Zustand edits, falls back to API date buckets. */
@@ -1081,52 +1137,138 @@ export function getDateDiscountMinPeople(
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** Whether a date offer can reduce the price for the current party size. */
+/** True when flat offer is per seated guest (table offer). */
+export function isFlatPerPersonDateDiscount(
+  discount: ApiEventCartDateBucket["discount"] | null | undefined,
+): boolean {
+  return (
+    discount?.discount_type === "flat" && discount.flat_mode === "per_person"
+  );
+}
+
+/** True when flat offer is a fixed amount off tables + tickets. */
+export function isFlatTotalDateDiscount(
+  discount: ApiEventCartDateBucket["discount"] | null | undefined,
+): boolean {
+  return (
+    discount?.discount_type === "flat" &&
+    (discount.flat_mode === "total" ||
+      discount.flat_mode == null ||
+      discount.flat_mode === "")
+  );
+}
+
+export type DateDiscountEligibilityInput = {
+  /** Table seating guests (allocation / peopleCount). */
+  guestCount: number;
+  /** Tables + tickets total (never drinks). */
+  discountableTotal: number;
+  /** Confirmed table seating total only. */
+  tableTotal: number;
+};
+
+/**
+ * Eligibility by offer mode:
+ * - flat per_person (table offer): guestCount > 0, meets min_people, tableTotal > 0
+ * - percentage / flat total: discountableTotal (tables + tickets) > 0
+ */
 export function isDateDiscountEligible(
   discount: ApiEventCartDateBucket["discount"] | null | undefined,
-  guestCount: number,
+  guestCountOrInput: number | DateDiscountEligibilityInput,
+  discountableTotal = 0,
+  tableTotal = 0,
 ): boolean {
   if (!discount) return false;
   if (isApiDateDiscountExpired(discount.expires_at)) return false;
   const amount = Number(discount.amount);
   if (!Number.isFinite(amount) || !(amount > 0)) return false;
 
-  if (
-    discount.discount_type === "flat" &&
-    discount.flat_mode === "per_person"
-  ) {
+  const guestCount =
+    typeof guestCountOrInput === "number"
+      ? guestCountOrInput
+      : guestCountOrInput.guestCount;
+  const discountable =
+    typeof guestCountOrInput === "number"
+      ? discountableTotal
+      : guestCountOrInput.discountableTotal;
+  const tables =
+    typeof guestCountOrInput === "number"
+      ? tableTotal
+      : guestCountOrInput.tableTotal;
+
+  if (isFlatPerPersonDateDiscount(discount)) {
+    if (!(tables > 0) || guestCount <= 0) return false;
     const minPeople = getDateDiscountMinPeople(discount);
     if (minPeople != null && guestCount < minPeople) return false;
-    if (guestCount <= 0) return false;
+    return true;
   }
 
-  return true;
+  if (
+    discount.discount_type === "percentage" ||
+    isFlatTotalDateDiscount(discount)
+  ) {
+    return discountable > 0;
+  }
+
+  return false;
 }
 
+/**
+ * Savings by offer mode (drinks never included):
+ * - percentage → % of tables + tickets
+ * - flat total → fixed amount off tables + tickets
+ * - flat per_person → amount × guests, capped by table total only
+ */
 export function computeDateDiscountAmount(
   discount: ApiEventCartDateBucket["discount"] | null | undefined,
-  dateSubtotal: number,
-  guestCount: number,
+  dateSubtotalOrInput: number | DateDiscountEligibilityInput,
+  guestCount = 0,
+  tableTotal = 0,
 ): number {
-  if (!discount || !(dateSubtotal > 0)) return 0;
-  if (!isDateDiscountEligible(discount, guestCount)) return 0;
+  if (!discount) return 0;
+
+  const input: DateDiscountEligibilityInput =
+    typeof dateSubtotalOrInput === "number"
+      ? {
+          discountableTotal: dateSubtotalOrInput,
+          guestCount,
+          tableTotal:
+            tableTotal > 0 ? tableTotal : dateSubtotalOrInput,
+        }
+      : dateSubtotalOrInput;
+
+  if (!isDateDiscountEligible(discount, input)) return 0;
 
   const amount = Number(discount.amount);
   if (!Number.isFinite(amount) || !(amount > 0)) return 0;
 
+  // Percentage → tables + tickets (not drinks)
   if (discount.discount_type === "percentage") {
+    if (!(input.discountableTotal > 0)) return 0;
     return roundDiscountMoney(
-      Math.min(dateSubtotal, (dateSubtotal * amount) / 100),
+      Math.min(
+        input.discountableTotal,
+        (input.discountableTotal * amount) / 100,
+      ),
     );
   }
 
   if (discount.discount_type === "flat") {
-    if (discount.flat_mode === "per_person") {
+    // Table offer: £X OFF / person × seated guests, capped by table total
+    if (isFlatPerPersonDateDiscount(discount)) {
+      if (!(input.tableTotal > 0) || input.guestCount <= 0) return 0;
       return roundDiscountMoney(
-        Math.min(dateSubtotal, amount * guestCount),
+        Math.min(input.tableTotal, amount * input.guestCount),
       );
     }
-    return roundDiscountMoney(Math.min(dateSubtotal, amount));
+
+    // Flat off total → tables + tickets (not drinks)
+    if (isFlatTotalDateDiscount(discount)) {
+      if (!(input.discountableTotal > 0)) return 0;
+      return roundDiscountMoney(
+        Math.min(input.discountableTotal, amount),
+      );
+    }
   }
 
   return 0;
@@ -1149,10 +1291,20 @@ export function resolveCartDateDiscounts(
     if (!discount || !label) continue;
 
     const editable = getEditableDate(dateKey) ?? null;
-    const dateSubtotal = editable ? calculateEditableDateTotal(editable) : 0;
+    const tableTotal = editable
+      ? calculateEditableDateTablesTotal(editable)
+      : 0;
+    const dateSubtotal = editable
+      ? calculateEditableDateDiscountableTotal(editable)
+      : 0;
     const guestCount = editable ? getDateGuestCount(editable) : 0;
     const minPeople = getDateDiscountMinPeople(discount);
     const expired = isApiDateDiscountExpired(discount.expires_at);
+    const eligibilityInput: DateDiscountEligibilityInput = {
+      guestCount,
+      discountableTotal: dateSubtotal,
+      tableTotal,
+    };
 
     let status: CartDateDiscountStatus = "applied";
     let unlockHint: string | null = null;
@@ -1160,37 +1312,38 @@ export function resolveCartDateDiscounts(
     if (expired) {
       status = "expired";
       unlockHint = "This offer has expired";
+    } else if (isFlatPerPersonDateDiscount(discount)) {
+      if (guestCount <= 0 || !(tableTotal > 0)) {
+        status = "locked";
+        unlockHint = minPeople
+          ? `Confirm table seating with at least ${minPeople} guests to unlock`
+          : "Confirm table seating to unlock this offer";
+      } else if (minPeople != null && guestCount < minPeople) {
+        status = "locked";
+        const needed = minPeople - guestCount;
+        unlockHint = `Add ${needed} more guest${needed === 1 ? "" : "s"} (min ${minPeople}) to unlock`;
+      }
     } else if (
-      discount.discount_type === "flat" &&
-      discount.flat_mode === "per_person" &&
-      minPeople != null &&
-      guestCount < minPeople
+      (discount.discount_type === "percentage" ||
+        isFlatTotalDateDiscount(discount)) &&
+      !(dateSubtotal > 0)
     ) {
       status = "locked";
-      const needed = minPeople - guestCount;
-      unlockHint =
-        guestCount <= 0
-          ? `Book at least ${minPeople} guests to unlock this offer`
-          : `Add ${needed} more guest${needed === 1 ? "" : "s"} (min ${minPeople}) to unlock`;
-    } else if (
-      discount.discount_type === "flat" &&
-      discount.flat_mode === "per_person" &&
-      guestCount <= 0
-    ) {
-      status = "locked";
-      unlockHint = minPeople
-        ? `Book at least ${minPeople} guests to unlock this offer`
-        : "Add guests to unlock this offer";
+      unlockHint = "Add tables or tickets to use this offer (drinks excluded)";
     }
 
     const amount =
       status === "applied"
-        ? computeDateDiscountAmount(discount, dateSubtotal, guestCount)
+        ? computeDateDiscountAmount(discount, eligibilityInput)
         : 0;
 
-    // Hide zero-savings "applied" rows when the date has no billable total yet.
-    if (status === "applied" && !(dateSubtotal > 0) && amount <= 0) {
-      continue;
+    // Hide zero-savings "applied" rows when nothing discountable is selected yet.
+    if (status === "applied" && amount <= 0) {
+      const hasBase =
+        isFlatPerPersonDateDiscount(discount)
+          ? tableTotal > 0
+          : dateSubtotal > 0;
+      if (!hasBase) continue;
     }
 
     rows.push({

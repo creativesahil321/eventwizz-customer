@@ -16,6 +16,8 @@ import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { buildCartDateLookupKey } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import {
   resolveBookingAppliedOffers,
+  resolveBookingDiscountPricing,
+  resolveDateDiscountAllocations,
   type ResolvedBookingAppliedOffer,
 } from "@/lib/booking-applied-offer";
 import BookingCheckoutPage from "./booking-checkout/booking-checkout-page";
@@ -51,11 +53,11 @@ function collectBookingAppliedOffers(
 }
 
 interface AdjustBookingContentProps {
-  bookingId: string;
+  bookingNumber: string;
 }
 
 export default function AdjustBookingContent({
-  bookingId,
+  bookingNumber,
 }: AdjustBookingContentProps) {
   const { format: formatCurrency } = useCurrencyFormat();
   const router = useRouter();
@@ -65,7 +67,7 @@ export default function AdjustBookingContent({
     data: bookingResponse,
     isLoading,
     error,
-  } = useBookingDetails(parseInt(bookingId));
+  } = useBookingDetails(bookingNumber);
 
   const bookingData = bookingResponse?.data;
 
@@ -114,18 +116,55 @@ export default function AdjustBookingContent({
           ) || datesPaidTotal;
         const depositSelectedAmount = parseAmount(apiSummary?.deposit_amount);
 
+        const discountPricing = resolveBookingDiscountPricing({
+          ...bookingData,
+          ...apiSummary,
+          total: totalAmount,
+          total_amount: totalAmount,
+          sub_total_amount: subTotalAmount,
+          discount_amount:
+            apiSummary?.discount_amount ?? bookingData.discount_amount,
+        });
+        const displaySubTotal =
+          discountPricing.originalTotal != null && discountPricing.hasDiscount
+            ? discountPricing.originalTotal
+            : subTotalAmount;
+        const displayTotal = discountPricing.hasDiscount
+          ? discountPricing.total
+          : totalAmount;
+        const appliedOffers =
+          discountPricing.offers.length > 0
+            ? discountPricing.offers
+            : collectBookingAppliedOffers(bookingData);
+
         const pendingFromSummary =
           apiSummary?.total_pending_amount ?? apiSummary?.pending_amount;
         const outstandingAmount =
           pendingFromSummary != null
             ? parseAmount(pendingFromSummary)
-            : Math.max(totalAmount - paidAmount, 0);
+            : Math.max(displayTotal - paidAmount, 0);
 
         const paymentStatusLabel =
           bookingData.payment_status_label?.trim() || "";
 
         const bookingCanPay = apiSummary?.can_pay_now !== false;
         const isRoomSystem = bookingData.is_room_system === true;
+
+        // Per-date discount first; else split booking-level discount across dates.
+        const dateDiscountAllocations = resolveDateDiscountAllocations(
+          bookingData.dates.map((dateEntry) => ({
+            total: parseAmount(dateEntry.total_amount),
+            total_amount: dateEntry.total_amount,
+            original_total: dateEntry.original_total,
+            original_amount: dateEntry.original_amount,
+            subtotal_before_discount: dateEntry.subtotal_before_discount,
+            total_before_discount: dateEntry.total_before_discount,
+            discount_amount: dateEntry.discount_amount,
+            discount: dateEntry.discount ?? null,
+            value_label: dateEntry.value_label,
+          })),
+          discountPricing,
+        );
 
         const dates: (BookingDateSource & {
           booking_date_id: number;
@@ -134,6 +173,7 @@ export default function AdjustBookingContent({
           can_reschedule?: boolean;
           total: string;
           totalAmount: number;
+          originalTotalAmount?: number | null;
           paidAmount: number;
           pendingAmount: number | null;
           paymentStatus: ReturnType<typeof normalizePaymentStatus>;
@@ -141,7 +181,7 @@ export default function AdjustBookingContent({
           canPayNow: boolean;
           partialPayment?: string;
           reschedule_requests?: BookingRescheduleRequest[];
-        })[] = bookingData.dates.map((dateEntry) => {
+        })[] = bookingData.dates.map((dateEntry, dateIndex) => {
           const pendingAmount =
             dateEntry.pending_amount != null
               ? parseAmount(dateEntry.pending_amount)
@@ -159,6 +199,7 @@ export default function AdjustBookingContent({
             (pendingAmount != null && pendingAmount > 0
               ? true
               : paymentStatus !== "paid");
+          const dateDiscount = dateDiscountAllocations[dateIndex];
 
           return {
             id: isRoomSystem
@@ -185,6 +226,7 @@ export default function AdjustBookingContent({
             canPayNow: dateCanPay,
             total: formatCurrency(dateEntry.total_amount),
             totalAmount: totalAmountForDate,
+            originalTotalAmount: dateDiscount?.originalTotal ?? null,
             paidAmount: paidAmountForDate,
             pendingAmount,
             partialPayment: dateEntry.paid_amount
@@ -199,11 +241,11 @@ export default function AdjustBookingContent({
         });
 
         return {
-          id: bookingId,
+          id: String(bookingData.booking_id),
           event_name: bookingData.event_name,
           booking_id: bookingData.booking_id.toString(),
           booking_number:
-            bookingData.booking_number || bookingData.booking_id.toString(),
+            bookingData.booking_number || bookingNumber,
           location: bookingData.location,
           payment_status: paymentStatusLabel,
           booking_status:
@@ -215,13 +257,15 @@ export default function AdjustBookingContent({
           reschedule_count: bookingData.reschedule_count ?? 0,
           payment_gateways: bookingData.payment_gateways,
           summary: {
-            subTotal: subTotalAmount,
+            subTotal: displaySubTotal,
             addOns: addOnsAmount,
-            total: totalAmount,
+            total: displayTotal,
             paid: paidAmount,
             outstanding: outstandingAmount,
             depositSelected: depositSelectedAmount,
-            appliedOffers: collectBookingAppliedOffers(bookingData),
+            originalTotal: discountPricing.originalTotal,
+            discountAmount: discountPricing.discountAmount,
+            appliedOffers,
           },
           dates,
         };
@@ -229,10 +273,10 @@ export default function AdjustBookingContent({
     : null;
 
   const handleDownloadInvoice = async () => {
-    if (isDownloadingInvoice) return;
+    if (!bookingData || isDownloadingInvoice) return;
     setIsDownloadingInvoice(true);
     try {
-      await bookingsService.downloadBookingInvoice(parseInt(bookingId));
+      await bookingsService.downloadBookingInvoice(bookingData.booking_id);
       toast.success("Invoice downloaded successfully");
     } catch (err) {
       console.error("Invoice download failed:", err);
@@ -263,7 +307,7 @@ export default function AdjustBookingContent({
     );
   }
 
-  if (error || !transformedData) {
+  if (error || !bookingData || !transformedData) {
     return (
       <section className="w-full space-y-4">
         <Button
@@ -290,7 +334,7 @@ export default function AdjustBookingContent({
 
   return (
     <BookingCheckoutPage
-      bookingId={bookingId}
+      bookingId={String(bookingData.booking_id)}
       bookingNumber={transformedData.booking_number}
       eventName={transformedData.event_name}
       location={transformedData.location}

@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { CustomerDashboardRecentBooking } from "@/services/customer/dashboard";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
+import { getCustomerBookingDetailPath } from "@/app/(protected)/customer/bookings/_lib/utils";
 
 interface DashboardRecentBookingsProps {
   readonly bookings: CustomerDashboardRecentBooking[];
@@ -41,8 +42,8 @@ export default function DashboardRecentBookings({
             <div className="space-y-3">
               {bookings.map((booking) => (
                 <Link
-                  key={booking.booking_id}
-                  href={`/customer/bookings/${booking.booking_id}`}
+                  key={booking.booking_number || booking.booking_id}
+                  href={getCustomerBookingDetailPath(booking.booking_number)}
                   className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   <Card className="hover:shadow-md transition-all cursor-pointer">

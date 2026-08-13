@@ -729,7 +729,7 @@ export function RescheduleDateModal({
 
                 {/* Price Difference Message - Only show if price increases */}
                 {isPriceIncrease && (
-                  <div className="border border-orange-200 bg-orange-50 rounded-lg p-4">
+                  <div className="border border-orange-200 bg-orange-50 rounded-lg p-4 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-orange-900">
                         Additional Payment Required:
@@ -738,6 +738,10 @@ export function RescheduleDateModal({
                         {formatMoney(priceDifference)}
                       </span>
                     </div>
+                    <p className="text-xs text-orange-800/90">
+                      Reschedule pricing does not re-apply checkout discounts or
+                      coupon codes.
+                    </p>
                   </div>
                 )}
               </motion.div>

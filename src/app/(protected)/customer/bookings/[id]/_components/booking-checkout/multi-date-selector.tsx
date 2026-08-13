@@ -114,7 +114,18 @@ function DateCardGridItem({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Total
             </p>
-            <p className="mt-0.5 text-lg font-bold leading-none text-foreground">
+            {card.originalAmountFormatted ? (
+              <p className="mt-0.5 text-[10px] font-medium tabular-nums text-muted-foreground line-through">
+                {card.originalAmountFormatted}
+              </p>
+            ) : null}
+            <p
+              className={
+                card.originalAmountFormatted
+                  ? "mt-0.5 text-lg font-bold leading-none text-[var(--color-primary)]"
+                  : "mt-0.5 text-lg font-bold leading-none text-foreground"
+              }
+            >
               {card.amountFormatted}
             </p>
           </div>
@@ -242,7 +253,18 @@ function DateStripPill({
       )}
       <div className="mt-2 flex items-baseline justify-between gap-2">
         <span className="text-[10px] font-semibold text-muted-foreground">
-          {card.amountFormatted}
+          {card.originalAmountFormatted ? (
+            <>
+              <span className="mr-1 line-through opacity-70">
+                {card.originalAmountFormatted}
+              </span>
+              <span className="font-bold text-[var(--color-primary)]">
+                {card.amountFormatted}
+              </span>
+            </>
+          ) : (
+            card.amountFormatted
+          )}
         </span>
         <span
           className={cn(
@@ -298,7 +320,19 @@ function SelectedDateActionBar({
           </span>
         )}
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Total {card.amountFormatted}
+          Total{" "}
+          {card.originalAmountFormatted ? (
+            <>
+              <span className="line-through opacity-70">
+                {card.originalAmountFormatted}
+              </span>{" "}
+              <span className="font-semibold text-[var(--color-primary)]">
+                {card.amountFormatted}
+              </span>
+            </>
+          ) : (
+            card.amountFormatted
+          )}
           {!isFullyPaid && pendingDue > 0 && (
             <span className="font-semibold text-[#ea580c]">
               {" "}

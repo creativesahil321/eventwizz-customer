@@ -46,6 +46,8 @@ export function NotificationDetailsComponent({
 
   const handleOpenNotificationLink = () => {
     if (!hasActionLink) return;
+    // Use action_url as-is. Booking links should already be
+    // /customer/bookings/{booking_number} (e.g. EV-080) — never rewrite to numeric booking_id.
     const normalizedUrl = action_url!.trim();
 
     if (isUnread) {

@@ -29,6 +29,7 @@ export function VendorPreviewRoomSelector({
       rooms={rooms.map((room, index) => ({
         key: `${room.room_id}-${index}`,
         label: room.name || `Room ${index + 1}`,
+        disabled: room.disabled,
       }))}
       activeIndex={currentRoomIndex}
       onSelect={onRoomChange}

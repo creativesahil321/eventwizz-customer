@@ -142,6 +142,11 @@ function mapTableDetailsForStore(
   }));
 }
 
+/**
+ * Builds the reschedule API payload.
+ * Confirmed product rule: reschedule amounts never re-apply checkout
+ * discounts/coupons — use server `price` / `unpaid_amount` only.
+ */
 export function buildRescheduleStorePayload(input: {
   bookingId: number;
   bookingDateId: number;

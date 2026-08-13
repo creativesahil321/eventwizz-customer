@@ -86,6 +86,8 @@ interface CheckoutDate extends BookingDateSource {
   has_unbooked_event_dates?: boolean;
   total: string;
   totalAmount: number;
+  /** Pre-discount date total when an offer was applied. */
+  originalTotalAmount?: number | null;
   paidAmount: number;
   pendingAmount: number | null;
   paymentStatus?: "paid" | "pending" | "partial" | "refunded" | "cancelled";
@@ -226,6 +228,8 @@ interface BookingCheckoutPageProps {
     paid: number;
     outstanding: number;
     depositSelected: number;
+    originalTotal?: number | null;
+    discountAmount?: number | null;
     appliedOffers?: ResolvedBookingAppliedOffer[];
   };
   dates: CheckoutDate[];
@@ -329,6 +333,16 @@ export default function BookingCheckoutPage({
         subtitle: isRoomSystem ? d.room_name : buildDateSubtitle(d),
         amount: d.totalAmount ?? 0,
         amountFormatted: d.total,
+        originalAmount:
+          d.originalTotalAmount != null &&
+          d.originalTotalAmount > (d.totalAmount ?? 0)
+            ? d.originalTotalAmount
+            : null,
+        originalAmountFormatted:
+          d.originalTotalAmount != null &&
+          d.originalTotalAmount > (d.totalAmount ?? 0)
+            ? formatCurrency(d.originalTotalAmount)
+            : null,
         paidAmount: d.paidAmount ?? 0,
         paidAmountFormatted: formatCurrency(d.paidAmount ?? 0),
         paymentStatus: d.paymentStatus ?? "pending",
@@ -514,36 +528,30 @@ export default function BookingCheckoutPage({
       setPaymentModalOpen(false);
       setPaymentDateId(null);
       setRescheduleRequest(null);
-      const parsedBookingId = parseInt(bookingId, 10);
-      if (!Number.isNaN(parsedBookingId)) {
-        void queryClient.invalidateQueries({
-          queryKey: bookingsKeys.bookingDetail(parsedBookingId),
-        });
-      }
+      void queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetails(),
+      });
     },
-    [bookingId, queryClient],
+    [queryClient],
   );
 
   const handleStripePaymentComplete = useCallback(() => {
-    const parsedBookingId = parseInt(bookingId, 10);
-    if (!Number.isNaN(parsedBookingId)) {
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.bookingDetail(parsedBookingId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.rescheduleDates(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.lists(),
-      });
-    }
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.bookingDetails(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.rescheduleDates(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.lists(),
+    });
     setStripePaymentSession(null);
     setIsStripePaymentOpen(false);
     setPaymentDateId(null);
     setRescheduleRequest(null);
     setRescheduleModalOpen(false);
     setSelectedDateForReschedule(null);
-  }, [bookingId, queryClient]);
+  }, [queryClient]);
 
   const resolvePaymentGatewayId = (): number | null => {
     if (
@@ -840,9 +848,12 @@ export default function BookingCheckoutPage({
               <PaymentBreakdownTotals
                 subTotal={summary.subTotal}
                 addOns={summary.addOns}
+                total={summary.total}
                 paid={summary.paid}
                 outstanding={summary.outstanding}
                 formatCurrency={formatCurrency}
+                originalTotal={summary.originalTotal}
+                discountAmount={summary.discountAmount}
                 appliedOffers={summary.appliedOffers}
               />
             </div>

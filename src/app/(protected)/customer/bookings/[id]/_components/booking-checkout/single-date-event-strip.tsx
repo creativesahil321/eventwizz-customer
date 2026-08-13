@@ -167,7 +167,19 @@ export function SingleDateEventStrip({
             <p className="text-[0.625rem] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
               Total
             </p>
-            <p className="mt-1 text-lg font-extrabold leading-none text-foreground tabular-nums sm:text-xl">
+            {card.originalAmountFormatted ? (
+              <p className="mt-1 text-[11px] font-medium tabular-nums text-muted-foreground line-through">
+                {card.originalAmountFormatted}
+              </p>
+            ) : null}
+            <p
+              className={cn(
+                "font-extrabold leading-none tabular-nums sm:text-xl",
+                card.originalAmountFormatted
+                  ? "mt-0.5 text-lg text-[var(--color-primary)]"
+                  : "mt-1 text-lg text-foreground",
+              )}
+            >
               {card.amountFormatted}
             </p>
           </div>

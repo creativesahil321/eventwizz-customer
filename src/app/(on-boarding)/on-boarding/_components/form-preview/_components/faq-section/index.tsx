@@ -12,6 +12,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 type Faq = {
   question?: string;
   answer?: string;
@@ -20,6 +21,7 @@ type FaqSectionProps = {
   faqs: Faq[];
   /** Show FAQ list without an extra click (default: open on public + preview). */
   defaultExpanded?: boolean;
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 function normalizeFaqQuestion(text: string | undefined): string {
@@ -31,6 +33,7 @@ function normalizeFaqQuestion(text: string | undefined): string {
 export default function FaqSection({
   faqs,
   defaultExpanded = true,
+  headingEmphasis,
 }: FaqSectionProps) {
   const [showMore, setShowMore] = useState(defaultExpanded);
   const narrowPreview = usePreviewNarrowLayout();
@@ -74,6 +77,7 @@ export default function FaqSection({
             <SiteHeading
               level={2}
               title="Frequently Asked Questions"
+              emphasis={headingEmphasis}
               variant="onSurface"
               align="center"
               className="!text-3xl !font-black tracking-tight md:!text-4xl"

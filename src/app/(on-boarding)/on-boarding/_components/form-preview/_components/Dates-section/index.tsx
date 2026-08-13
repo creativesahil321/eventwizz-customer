@@ -45,6 +45,7 @@ import {
 import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
 import { savePendingBooking } from "@/lib/booking/pending-booking";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 // Define proper user interface for session
 interface SessionUser {
@@ -74,6 +75,8 @@ type DatesSectionProps = {
   roomId?: number;
   /** Fallback scope when room id is not assigned yet (onboarding preview). */
   roomIndex?: number;
+  /** Site Essentials `typography.headingEmphasis` — required on platform-host previews. */
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 type DateInfo = {
@@ -330,6 +333,7 @@ export default function DatesSection({
   eventImage,
   roomId,
   roomIndex,
+  headingEmphasis,
 }: DatesSectionProps) {
   const currencySymbol = useCurrencySymbol();
   const router = useRouter();
@@ -841,6 +845,7 @@ export default function DatesSection({
             variant="onDark"
             align="center"
             className={headingClass}
+            emphasis={headingEmphasis as HeadingEmphasis | undefined}
           />
           <p className="text-sm text-white/70">
             Add dates in the form to preview them here.
@@ -903,6 +908,7 @@ export default function DatesSection({
             variant="onDark"
             align="center"
             className={headingClass}
+            emphasis={headingEmphasis as HeadingEmphasis | undefined}
           />
           {showAlreadyBookedLoginCta && (
             <Button
@@ -1032,6 +1038,7 @@ export default function DatesSection({
           variant="onDark"
           align="center"
           className={headingClass}
+          emphasis={headingEmphasis as HeadingEmphasis | undefined}
         />
         {showAlreadyBookedLoginCta && (
           <Button

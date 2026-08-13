@@ -39,6 +39,7 @@ function formatSlotDate(raw: string): string {
 
 function resultsHeading(meta: PublicSearchMeta | undefined): string {
   if (!meta) return "Search results";
+  if (meta.near_me) return "Events near you";
   if (meta.match_type === "category" && meta.matched_category?.name) {
     return `Category: ${meta.matched_category.name}`;
   }
@@ -236,10 +237,14 @@ export function PublicSearchResults({
               aria-hidden
             />
             <p className="text-base font-semibold text-[var(--color-text)]">
-              No results match your search
+              {filters.nearMe
+                ? "No events near you yet"
+                : "No results match your search"}
             </p>
             <p className="text-sm text-[var(--color-text-dimmed)]">
-              Try another keyword, city, or date.
+              {filters.nearMe
+                ? "No bookable events with a map pin were found within range. Try another date, or browse by city."
+                : "Try another keyword, city, or date."}
             </p>
             <button
               type="button"
@@ -342,9 +347,11 @@ export function PublicSearchResults({
                       category: event.category?.name ?? null,
                       image: event.banner_image || FALLBACK_IMAGE,
                       slug: event.slug || "",
+                      distanceKm: item.distance_km,
                     }}
-                    locationSlug={item.location.slug}
+                    locationSlug={item.location.slug.replace(/^\/+/, "")}
                     locationLabel={item.location.city}
+                    eventAddress={item.location.event_address}
                     showLocationChip
                     isPending={pendingKey === cardKey}
                     onNavigateStart={() => setPendingKey(cardKey)}

@@ -78,6 +78,11 @@ export interface VendorBookingHistoryResponse {
   };
 }
 
+export interface VendorBookingEventDateEntry {
+  date: string;
+  room_name?: string;
+}
+
 export interface VendorBookingItem {
   booking_id: number;
   booking_number: string; // Booking number (e.g., "EV-007")
@@ -86,12 +91,15 @@ export interface VendorBookingItem {
   user_id: number;
   user_name: string;
   booking_date: string; // Format: "05-11-2025"
-  event_date: string[]; // Format: ["20-09-2025", "21-09-2025"]
+  /** Event dates — objects with display `date` and optional `room_name`. */
+  event_date: VendorBookingEventDateEntry[];
   amount: string; // Format: "5800.00"
   status: string; // "Pending", "Confirmed", etc.
   platform_fee?: string; // Format: "15.00"
   deposit_amount?: string; // Format: "400.00"
   pending_amount?: string; // Format: "4070.00"
+  room_id?: number | null;
+  room_name?: string | null;
 }
 
 // Vendor Booking Detail Types

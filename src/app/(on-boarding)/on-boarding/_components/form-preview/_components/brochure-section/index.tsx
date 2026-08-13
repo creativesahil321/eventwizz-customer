@@ -7,6 +7,7 @@ import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type LucideIconName = keyof typeof Icons;
 
@@ -41,6 +42,8 @@ type BrochureSectionProps = {
   showMapImmediately?: boolean;
   /** Hide the price tile (e.g. when prices are shown in About on the public event page). */
   omitPricePanel?: boolean;
+  /** Site Essentials `typography.headingEmphasis` — required on platform-host previews. */
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 export default function BrochureSection({
@@ -48,6 +51,7 @@ export default function BrochureSection({
   price,
   showMapImmediately = false,
   omitPricePanel = false,
+  headingEmphasis,
 }: BrochureSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const narrowPreview = usePreviewNarrowLayout();
@@ -120,6 +124,7 @@ export default function BrochureSection({
             title="Check Out The Latest Dates To Be Released — Get In Quick!"
             variant="onSurface"
             align="center"
+            emphasis={headingEmphasis as HeadingEmphasis | undefined}
             className="mx-auto !max-w-4xl !text-3xl !font-black tracking-tight md:!text-4xl"
           />
         </div>

@@ -6,6 +6,7 @@ import { GalleryLightbox } from "@/components/public/gallery-lightbox";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type PackageImage = {
   path: string;
@@ -22,6 +23,7 @@ type GalleryImageType = {
 type PackageSectionProps = {
   gallery?: GalleryImageType[];
   galleryTitle?: string;
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 function resolveImageSrc(image: PackageImage | File | null | string) {
@@ -62,6 +64,7 @@ function galleryGridClass(count: number, narrowPreview: boolean): string {
 export default function EventGallery({
   gallery,
   galleryTitle,
+  headingEmphasis,
 }: PackageSectionProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -125,6 +128,7 @@ export default function EventGallery({
           <SiteHeading
             level={2}
             title={title}
+            emphasis={headingEmphasis as HeadingEmphasis}
             variant="onSurface"
             align="center"
             className="!text-3xl !font-black tracking-tight md:!text-4xl"

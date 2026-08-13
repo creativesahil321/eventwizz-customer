@@ -7,6 +7,12 @@ export interface Transaction {
   status: string;
 }
 
+/** Single event date entry from vendor bookings list API. */
+export interface HistoryEventDate {
+  date: string;
+  room_name?: string;
+}
+
 export interface History {
   id: string; // Maps to booking_id from API
   booking_id?: number; // Original booking_id from API
@@ -25,8 +31,9 @@ export interface History {
   total_amount?: number;
   payment_status?: string;
   transaction_history?: Transaction[];
-  date: string; // Primary event date (first from event_date array)
-  event_dates?: string[]; // Array of event dates from API (event_date field)
+  date: string; // Primary event date (sortable ISO when parseable)
+  /** Event dates from API — keep all rows (same calendar day + different rooms). */
+  event_dates?: HistoryEventDate[];
   amount: number | string; // Amount from API (can be string like "5800.00")
   status: string; // "Pending", "Confirmed", "Processing", "Cancelled"
   created_at?: string;
