@@ -77,8 +77,8 @@ export interface BookingDateSource {
   packages?: BookingDetailsPackage[];
   tables?: BookingDetailsTable[];
   addons?: BookingDetailsAddons;
-  /** Pre-discount date total for payment breakdown strikethrough. */
-  originalTotalAmount?: number | null;
+  /** Present only when this date has promo savings. */
+  savedAmount?: number | null;
   totalAmount?: number;
 }
 
@@ -605,18 +605,13 @@ export function buildPaymentBreakdown(
       const bookingSubtotal = lines.reduce((sum, line) => sum + line.amount, 0);
       const addonSubtotal = split.addonTotal;
       const subtotal = bookingSubtotal + addonSubtotal;
-      const originalFromDate = date.originalTotalAmount;
-      const originalSubtotal =
-        originalFromDate != null && originalFromDate > subtotal + 0.009
-          ? originalFromDate
-          : null;
 
       return {
         id: date.id,
         title: date.date,
         packageTitle: date.package_title,
         subtotal,
-        originalSubtotal,
+        savedAmount: date.savedAmount ?? null,
         lines,
         addonLines: addonLines.length > 0 ? addonLines : undefined,
         addonSubtotal: addonLines.length > 0 ? addonSubtotal : undefined,

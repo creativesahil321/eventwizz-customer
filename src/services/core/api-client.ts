@@ -601,6 +601,18 @@ apiClient.interceptors.response.use(
                 );
               }
             }
+
+            // Business / role permission errors (e.g. staff cannot delete location)
+            const suppressErrorToast = (
+              error.config as RequestOptions | undefined
+            )?.suppressErrorToast;
+            if (!suppressErrorToast && !isLogoutInProgress) {
+              safeToast.error(
+                typeof message === "string" && message.trim()
+                  ? message
+                  : "You do not have permission to perform this action.",
+              );
+            }
           }
           break;
         }

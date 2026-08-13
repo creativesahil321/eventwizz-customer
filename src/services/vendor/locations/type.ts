@@ -145,6 +145,44 @@ export type LocationUpdateResponse = BaseApiResponse<LocationDetail>;
 export type LocationDeleteResponse = BaseApiResponse<null>;
 
 /**
+ * Send delete OTP — backend emails the vendor owner (not staff).
+ * Contract for backend:
+ * POST /vendor/locations/{id}/send-delete-otp
+ */
+export type LocationSendDeleteOtpResponse = BaseApiResponse<{
+  /** Masked owner email, e.g. v***r@example.com */
+  masked_email?: string;
+  /** Seconds until the OTP expires / resend is allowed */
+  expires_in?: number;
+  resend_after?: number;
+}>;
+
+/**
+ * Verify delete OTP before enabling the final confirmation phrase.
+ * Contract for backend:
+ * POST /vendor/locations/{id}/verify-delete-otp
+ * Body: { otp: string }
+ */
+export interface LocationVerifyDeleteOtpPayload {
+  otp: string;
+}
+
+export type LocationVerifyDeleteOtpResponse = BaseApiResponse<{
+  verified?: boolean;
+}>;
+
+/**
+ * Final delete after OTP + typed phrase.
+ * Contract for backend:
+ * DELETE /vendor/locations/{id}
+ * Body: { otp: string, confirmation: "delete this location" }
+ */
+export interface LocationDeletePayload {
+  otp: string;
+  confirmation: string;
+}
+
+/**
  * Response type for switch location operation
  */
 export interface SwitchLocationData {

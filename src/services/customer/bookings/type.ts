@@ -44,6 +44,19 @@ export interface BookingAppliedOffer {
   category?: string | null;
 }
 
+/** List/detail payment summary — savings only via optional `saved_amount`. */
+export interface BookingListPaymentSummary {
+  sub_total_amount?: number | null;
+  total_paid_amount?: number | null;
+  total_pending_amount?: number | null;
+  total_addons_amount?: number | null;
+  total_amount?: number | null;
+  /** Present only when > 0; omitted when no promo savings. */
+  saved_amount?: number;
+  can_pay_now?: boolean;
+  platform_fee_amount?: number;
+}
+
 /**
  * Individual booking item from API response
  */
@@ -57,25 +70,11 @@ export interface BookingItem {
   status: string; // e.g., "pending", "Confirmed", "confirmed"
   payment_status: string; // Changed from number to string to match API
   partial_payment: string;
-  total: string;
-  /** Pre-discount total for list cards (strikethrough). */
-  original_total?: number | string | null;
-  original_amount?: number | string | null;
-  subtotal_before_discount?: number | string | null;
-  total_before_discount?: number | string | null;
+  total: string | number;
   created_date: string;
   booking_dates: BookingDate[];
-  /** Applied coupon code (when booking used a checkout coupon). */
-  coupon_code?: string | null;
-  discount_code?: string | null;
-  value_label?: string | null;
-  discount_label?: string | null;
-  discount_amount?: number | string | null;
-  discount?: BookingAppliedOffer | null;
-  applied_offer?: BookingAppliedOffer | null;
-  coupon?: BookingAppliedOffer | null;
-  offers?: BookingAppliedOffer[] | null;
-  applied_offers?: BookingAppliedOffer[] | null;
+  /** List savings live only here — not on the booking root. */
+  payment_summary?: BookingListPaymentSummary | null;
 }
 
 /**
@@ -330,15 +329,8 @@ export interface BookingDetailsDate {
   tables: BookingDetailsTable[];
   addons?: BookingDetailsAddons;
   reschedule_requests?: BookingRescheduleRequest[];
-  /** Per-date automatic offer applied at checkout (read-only). */
-  discount?: BookingAppliedOffer | null;
-  value_label?: string | null;
-  discount_amount?: number | string | null;
-  /** Pre-discount date total when a date-level offer was applied. */
-  original_total?: number | string | null;
-  original_amount?: number | string | null;
-  subtotal_before_discount?: number | string | null;
-  total_before_discount?: number | string | null;
+  /** Present only when > 0; omitted when no promo savings for this date. */
+  saved_amount?: number;
 }
 
 /** Top-level payment summary on booking details */
@@ -348,12 +340,10 @@ export interface BookingPaymentSummary {
   total_pending_amount?: number | null;
   total_addons_amount?: number | null;
   total_amount: number;
-  /** Pre-discount booking total (strikethrough in payment UI). */
-  original_total?: number | string | null;
-  original_amount?: number | string | null;
-  subtotal_before_discount?: number | string | null;
-  total_before_discount?: number | string | null;
+  /** Present only when > 0; omitted when no promo savings. */
+  saved_amount?: number;
   can_pay_now?: boolean;
+  platform_fee_amount?: number;
   /** @deprecated use total_paid_amount */
   paid_amount?: number | null;
   /** @deprecated use total_pending_amount */
@@ -361,16 +351,6 @@ export interface BookingPaymentSummary {
   /** @deprecated use total_addons_amount */
   addons_amount?: number | null;
   deposit_amount?: number | null;
-  coupon_code?: string | null;
-  discount_code?: string | null;
-  value_label?: string | null;
-  discount_label?: string | null;
-  discount_amount?: number | string | null;
-  discount?: BookingAppliedOffer | null;
-  applied_offer?: BookingAppliedOffer | null;
-  coupon?: BookingAppliedOffer | null;
-  offers?: BookingAppliedOffer[] | null;
-  applied_offers?: BookingAppliedOffer[] | null;
 }
 
 /**
@@ -397,16 +377,6 @@ export interface BookingDetailsData {
   }>;
   dates: BookingDetailsDate[];
   payment_summary: BookingPaymentSummary;
-  coupon_code?: string | null;
-  discount_code?: string | null;
-  value_label?: string | null;
-  discount_label?: string | null;
-  discount_amount?: number | string | null;
-  discount?: BookingAppliedOffer | null;
-  applied_offer?: BookingAppliedOffer | null;
-  coupon?: BookingAppliedOffer | null;
-  offers?: BookingAppliedOffer[] | null;
-  applied_offers?: BookingAppliedOffer[] | null;
 }
 
 /**

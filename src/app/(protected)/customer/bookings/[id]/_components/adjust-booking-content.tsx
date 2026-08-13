@@ -14,43 +14,11 @@ import { bookingsService } from "@/services/customer/bookings/bookings.service";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { buildCartDateLookupKey } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
-import {
-  resolveBookingAppliedOffers,
-  resolveBookingDiscountPricing,
-  resolveDateDiscountAllocations,
-  type ResolvedBookingAppliedOffer,
-} from "@/lib/booking-applied-offer";
+import { parseSavedAmount } from "@/lib/booking-saved-amount";
 import BookingCheckoutPage from "./booking-checkout/booking-checkout-page";
 import type { BookingDateSource } from "./booking-checkout/build-line-items";
-import type {
-  BookingDetailsData,
-  BookingRescheduleRequest,
-} from "@/services/customer/bookings/type";
+import type { BookingRescheduleRequest } from "@/services/customer/bookings/type";
 import { useState } from "react";
-
-function collectBookingAppliedOffers(
-  bookingData: BookingDetailsData,
-): ResolvedBookingAppliedOffer[] {
-  const fromRoot = resolveBookingAppliedOffers(bookingData);
-  const fromSummary = resolveBookingAppliedOffers(bookingData.payment_summary);
-  const fromDates = bookingData.dates.flatMap((dateEntry) =>
-    resolveBookingAppliedOffers({
-      discount: dateEntry.discount ?? null,
-      value_label: dateEntry.value_label,
-      discount_amount: dateEntry.discount_amount,
-    }),
-  );
-
-  const merged: ResolvedBookingAppliedOffer[] = [];
-  const seen = new Set<string>();
-  for (const offer of [...fromRoot, ...fromSummary, ...fromDates]) {
-    const key = `${offer.kind}|${offer.code ?? ""}|${offer.label ?? ""}|${offer.amount ?? ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(offer);
-  }
-  return merged;
-}
 
 interface AdjustBookingContentProps {
   bookingNumber: string;
@@ -116,55 +84,20 @@ export default function AdjustBookingContent({
           ) || datesPaidTotal;
         const depositSelectedAmount = parseAmount(apiSummary?.deposit_amount);
 
-        const discountPricing = resolveBookingDiscountPricing({
-          ...bookingData,
-          ...apiSummary,
-          total: totalAmount,
-          total_amount: totalAmount,
-          sub_total_amount: subTotalAmount,
-          discount_amount:
-            apiSummary?.discount_amount ?? bookingData.discount_amount,
-        });
-        const displaySubTotal =
-          discountPricing.originalTotal != null && discountPricing.hasDiscount
-            ? discountPricing.originalTotal
-            : subTotalAmount;
-        const displayTotal = discountPricing.hasDiscount
-          ? discountPricing.total
-          : totalAmount;
-        const appliedOffers =
-          discountPricing.offers.length > 0
-            ? discountPricing.offers
-            : collectBookingAppliedOffers(bookingData);
+        const savedAmount = parseSavedAmount(apiSummary?.saved_amount);
 
         const pendingFromSummary =
           apiSummary?.total_pending_amount ?? apiSummary?.pending_amount;
         const outstandingAmount =
           pendingFromSummary != null
             ? parseAmount(pendingFromSummary)
-            : Math.max(displayTotal - paidAmount, 0);
+            : Math.max(totalAmount - paidAmount, 0);
 
         const paymentStatusLabel =
           bookingData.payment_status_label?.trim() || "";
 
         const bookingCanPay = apiSummary?.can_pay_now !== false;
         const isRoomSystem = bookingData.is_room_system === true;
-
-        // Per-date discount first; else split booking-level discount across dates.
-        const dateDiscountAllocations = resolveDateDiscountAllocations(
-          bookingData.dates.map((dateEntry) => ({
-            total: parseAmount(dateEntry.total_amount),
-            total_amount: dateEntry.total_amount,
-            original_total: dateEntry.original_total,
-            original_amount: dateEntry.original_amount,
-            subtotal_before_discount: dateEntry.subtotal_before_discount,
-            total_before_discount: dateEntry.total_before_discount,
-            discount_amount: dateEntry.discount_amount,
-            discount: dateEntry.discount ?? null,
-            value_label: dateEntry.value_label,
-          })),
-          discountPricing,
-        );
 
         const dates: (BookingDateSource & {
           booking_date_id: number;
@@ -173,7 +106,7 @@ export default function AdjustBookingContent({
           can_reschedule?: boolean;
           total: string;
           totalAmount: number;
-          originalTotalAmount?: number | null;
+          savedAmount?: number | null;
           paidAmount: number;
           pendingAmount: number | null;
           paymentStatus: ReturnType<typeof normalizePaymentStatus>;
@@ -181,7 +114,7 @@ export default function AdjustBookingContent({
           canPayNow: boolean;
           partialPayment?: string;
           reschedule_requests?: BookingRescheduleRequest[];
-        })[] = bookingData.dates.map((dateEntry, dateIndex) => {
+        })[] = bookingData.dates.map((dateEntry) => {
           const pendingAmount =
             dateEntry.pending_amount != null
               ? parseAmount(dateEntry.pending_amount)
@@ -199,7 +132,6 @@ export default function AdjustBookingContent({
             (pendingAmount != null && pendingAmount > 0
               ? true
               : paymentStatus !== "paid");
-          const dateDiscount = dateDiscountAllocations[dateIndex];
 
           return {
             id: isRoomSystem
@@ -226,7 +158,7 @@ export default function AdjustBookingContent({
             canPayNow: dateCanPay,
             total: formatCurrency(dateEntry.total_amount),
             totalAmount: totalAmountForDate,
-            originalTotalAmount: dateDiscount?.originalTotal ?? null,
+            savedAmount: parseSavedAmount(dateEntry.saved_amount),
             paidAmount: paidAmountForDate,
             pendingAmount,
             partialPayment: dateEntry.paid_amount
@@ -257,15 +189,13 @@ export default function AdjustBookingContent({
           reschedule_count: bookingData.reschedule_count ?? 0,
           payment_gateways: bookingData.payment_gateways,
           summary: {
-            subTotal: displaySubTotal,
+            subTotal: subTotalAmount,
             addOns: addOnsAmount,
-            total: displayTotal,
+            total: totalAmount,
             paid: paidAmount,
             outstanding: outstandingAmount,
             depositSelected: depositSelectedAmount,
-            originalTotal: discountPricing.originalTotal,
-            discountAmount: discountPricing.discountAmount,
-            appliedOffers,
+            savedAmount,
           },
           dates,
         };

@@ -135,9 +135,8 @@ export interface CheckoutDateCard {
   subtitle?: string;
   amount: number;
   amountFormatted: string;
-  /** Pre-discount amount when an offer reduced this date total. */
-  originalAmount?: number | null;
-  originalAmountFormatted?: string | null;
+  /** Present only when this date has promo savings. */
+  savedAmount?: number | null;
   paidAmount: number;
   paidAmountFormatted: string;
   paymentStatus: "paid" | "pending" | "partial" | "refunded" | "cancelled";
@@ -159,8 +158,8 @@ export interface PaymentBreakdownGroup {
   title: string;
   packageTitle?: string;
   subtotal: number;
-  /** Pre-discount date subtotal when an offer reduced this date. */
-  originalSubtotal?: number | null;
+  /** Present only when this date has promo savings. */
+  savedAmount?: number | null;
   lines: PaymentBreakdownLine[];
   addonLines?: PaymentBreakdownLine[];
   addonSubtotal?: number;

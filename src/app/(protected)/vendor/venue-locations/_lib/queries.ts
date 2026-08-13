@@ -407,16 +407,42 @@ export const useToggleLocationStatus = () => {
   });
 };
 
-// Function to delete a location
+export const useSendLocationDeleteOtp = () => {
+  return useMutation({
+    mutationFn: (id: number | string) => locationService.sendDeleteOtp(id),
+  });
+};
+
+export const useVerifyLocationDeleteOtp = () => {
+  return useMutation({
+    mutationFn: ({
+      id,
+      otp,
+    }: {
+      id: number | string;
+      otp: string;
+    }) => locationService.verifyDeleteOtp(id, { otp }),
+  });
+};
+
+// Function to delete a location (requires verified OTP + confirmation phrase)
 export const useDeleteLocation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number | string) => locationService.deleteLocation(id),
-    onSuccess: async (_response, deletedId) => {
+    mutationFn: ({
+      id,
+      otp,
+      confirmation,
+    }: {
+      id: number | string;
+      otp: string;
+      confirmation: string;
+    }) => locationService.deleteLocation(id, { otp, confirmation }),
+    onSuccess: async (_response, variables) => {
       // Invalidate all location queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ["locations"] });
-      queryClient.removeQueries({ queryKey: ["location", deletedId] });
+      queryClient.removeQueries({ queryKey: ["location", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },

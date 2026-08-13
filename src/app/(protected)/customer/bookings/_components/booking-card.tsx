@@ -23,9 +23,7 @@ import { formatBookingStatus, getBookingDateRowKey, formatBookingDateLabel } fro
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
-import { resolveBookingDiscountPricing } from "@/lib/booking-applied-offer";
-import { BookingAppliedOffers } from "@/components/bookings/booking-applied-offers";
-import { BookingDiscountedPrice } from "@/components/bookings/booking-discounted-price";
+import { parseSavedAmount } from "@/lib/booking-saved-amount";
 
 interface BookingCardProps {
   booking: Booking;
@@ -41,17 +39,11 @@ export default function BookingCard({
   const { symbol, format: formatMoney } = useCurrencyFormat();
   const totalRaw = booking.total || booking.total_amount;
   const totalNum = parseFormattedMoney(String(totalRaw ?? "0"), symbol);
-  const pricing = resolveBookingDiscountPricing({
-    ...booking,
-    total: Number.isFinite(totalNum) ? totalNum : totalRaw,
-    total_amount: booking.total_amount,
-  });
-  const appliedOffers = pricing.offers;
-  const displayTotal = Number.isFinite(pricing.total)
-    ? pricing.total
-    : Number.isFinite(totalNum)
-      ? totalNum
-      : 0;
+  const displayTotal = Number.isFinite(totalNum) ? totalNum : 0;
+  const savedAmount = parseSavedAmount(
+    booking.payment_summary?.saved_amount,
+  );
+  const dateCount = booking.booking_dates?.length ?? 0;
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] flex flex-col h-full relative !p-0 border-[var(--color-border)]">
@@ -178,41 +170,24 @@ export default function BookingCard({
           </TooltipProvider>
         )}
 
-        {appliedOffers.length > 0 ? (
-          <BookingAppliedOffers
-            offers={appliedOffers}
-            formatMoney={formatMoney}
-            variant="pills"
-          />
-        ) : null}
-
-        {/* Price — shows strikethrough original when discounted */}
-        <div className="flex items-center justify-between gap-3 py-2 sm:py-2.5 border-t border-b border-[var(--color-border)]">
+        {/* Price — savings line only when discounted (no pills / strikethrough) */}
+        <div className="flex items-center justify-between gap-3 border-b border-t border-[var(--color-border)] py-2 sm:py-2.5">
           <div className="min-w-0">
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground">
+            <span className="text-xs font-medium text-muted-foreground sm:text-sm">
               Total
             </span>
-            {pricing.hasDiscount && pricing.discountAmount != null ? (
+            {savedAmount != null ? (
               <p className="mt-0.5 text-[11px] font-semibold text-emerald-700">
-                You saved {formatMoney(pricing.discountAmount)}
-                {(booking.booking_dates?.length ?? 0) > 1
-                  ? ` across ${booking.booking_dates.length} dates`
-                  : ""}
+                You saved {formatMoney(savedAmount)}
+                {dateCount > 1 ? ` across ${dateCount} dates` : ""}
               </p>
             ) : null}
           </div>
-          {Number.isFinite(displayTotal) ? (
-            <BookingDiscountedPrice
-              total={displayTotal}
-              originalTotal={pricing.originalTotal}
-              formatMoney={formatMoney}
-              size="md"
-            />
-          ) : (
-            <span className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">
-              {String(totalRaw ?? "")}
-            </span>
-          )}
+          <span className="text-lg font-bold tabular-nums text-[var(--color-primary)] sm:text-xl">
+            {Number.isFinite(displayTotal)
+              ? formatMoney(displayTotal)
+              : String(totalRaw ?? "")}
+          </span>
         </div>
 
         {/* Action Buttons */}

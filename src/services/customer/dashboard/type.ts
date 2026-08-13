@@ -11,8 +11,11 @@ export interface CustomerDashboardRecentBooking {
   event_slug: string;
   status: string;
   payment_status: string;
+  /** Full booking amount (sub_total), not pay-now / deposit. */
   total: number;
   total_formatted: string;
+  /** Present only when > 0; omitted when no promo savings. */
+  saved_amount?: number;
   created_at: string;
   created_ago: string;
 }

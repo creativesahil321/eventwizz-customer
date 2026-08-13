@@ -130,11 +130,10 @@ export function hasBookingAppliedOffers(
 }
 
 /**
- * Temporary preview until list/detail booking APIs return discount pricing.
- * Flip to `false` once backend ships the keys documented on
- * {@link BookingDiscountPricingSource}.
+ * Dummy discount UI for local previews. Customer booking list/detail now use
+ * `saved_amount` from the API — keep this off in production paths.
  */
-export const BOOKING_DISCOUNT_UI_USE_DUMMY = true;
+export const BOOKING_DISCOUNT_UI_USE_DUMMY = false;
 
 /**
  * Preferred API keys for discounted booking totals (list + detail).

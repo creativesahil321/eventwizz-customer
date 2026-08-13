@@ -163,6 +163,12 @@ export const API_ENDPOINTS = {
       CREATE: "/vendor/locations",
       UPDATE: "/vendor/locations/{id}",
       DELETE: "/vendor/locations/{id}",
+      /**
+       * Security-first delete: OTP is emailed to the vendor owner account
+       * (never staff). Frontend contract for backend — implement these routes.
+       */
+      SEND_DELETE_OTP: "/vendor/locations/{id}/send-delete-otp",
+      VERIFY_DELETE_OTP: "/vendor/locations/{id}/verify-delete-otp",
       TOGGLE_LOCATION_STATUS: "/vendor/locations/toggle-status",
     },
     NOTIFICATIONS: {

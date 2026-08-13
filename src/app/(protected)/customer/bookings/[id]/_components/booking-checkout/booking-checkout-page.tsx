@@ -77,17 +77,14 @@ import {
   DEFAULT_STRIPE_PAYMENT_GATEWAY,
   normalizeReschedulePaymentGateways,
 } from "@/services/customer/bookings/reschedule-utils";
-import { BookingAppliedOffers } from "@/components/bookings/booking-applied-offers";
-import type { ResolvedBookingAppliedOffer } from "@/lib/booking-applied-offer";
-
 interface CheckoutDate extends BookingDateSource {
   booking_date_id: number;
   is_menu_choice?: boolean;
   has_unbooked_event_dates?: boolean;
   total: string;
   totalAmount: number;
-  /** Pre-discount date total when an offer was applied. */
-  originalTotalAmount?: number | null;
+  /** Present only when this date has promo savings. */
+  savedAmount?: number | null;
   paidAmount: number;
   pendingAmount: number | null;
   paymentStatus?: "paid" | "pending" | "partial" | "refunded" | "cancelled";
@@ -228,9 +225,8 @@ interface BookingCheckoutPageProps {
     paid: number;
     outstanding: number;
     depositSelected: number;
-    originalTotal?: number | null;
-    discountAmount?: number | null;
-    appliedOffers?: ResolvedBookingAppliedOffer[];
+    /** Present only when booking has promo savings. */
+    savedAmount?: number | null;
   };
   dates: CheckoutDate[];
   paymentGateways?: Array<{ id: number; slug: string }>;
@@ -333,16 +329,7 @@ export default function BookingCheckoutPage({
         subtitle: isRoomSystem ? d.room_name : buildDateSubtitle(d),
         amount: d.totalAmount ?? 0,
         amountFormatted: d.total,
-        originalAmount:
-          d.originalTotalAmount != null &&
-          d.originalTotalAmount > (d.totalAmount ?? 0)
-            ? d.originalTotalAmount
-            : null,
-        originalAmountFormatted:
-          d.originalTotalAmount != null &&
-          d.originalTotalAmount > (d.totalAmount ?? 0)
-            ? formatCurrency(d.originalTotalAmount)
-            : null,
+        savedAmount: d.savedAmount ?? null,
         paidAmount: d.paidAmount ?? 0,
         paidAmountFormatted: formatCurrency(d.paidAmount ?? 0),
         paymentStatus: d.paymentStatus ?? "pending",
@@ -804,16 +791,11 @@ export default function BookingCheckoutPage({
 
       {/* Payment summary — scrolls with page on mobile; pay bar is separate sticky strip */}
       <section className="overflow-hidden border-t border-border bg-card lg:border lg:rounded-b-xl">
-        {summary.appliedOffers && summary.appliedOffers.length > 0 ? (
+        {summary.savedAmount != null ? (
           <div className="border-b border-border bg-card px-4 py-3 sm:px-6 lg:px-8">
-            <p className="mb-2 text-[10px] font-extrabold tracking-[0.14em] uppercase text-muted-foreground">
-              Applied offers
+            <p className="text-sm font-semibold text-emerald-700">
+              You saved {formatCurrency(summary.savedAmount)}
             </p>
-            <BookingAppliedOffers
-              offers={summary.appliedOffers}
-              formatMoney={formatCurrency}
-              variant="pills"
-            />
           </div>
         ) : null}
         <div className="flex items-center justify-between gap-3 border-b border-border bg-card p-4 py-3 pr-14 sm:p-6 sm:pr-6 lg:p-8 lg:pr-8 sm:py-3.5">
@@ -852,9 +834,7 @@ export default function BookingCheckoutPage({
                 paid={summary.paid}
                 outstanding={summary.outstanding}
                 formatCurrency={formatCurrency}
-                originalTotal={summary.originalTotal}
-                discountAmount={summary.discountAmount}
-                appliedOffers={summary.appliedOffers}
+                savedAmount={summary.savedAmount}
               />
             </div>
           </div>
