@@ -5,6 +5,7 @@ export {
 } from "./public-search.service";
 export {
   usePublicAvailability,
+  usePublicEventCatalog,
   usePublicLocationSearch,
   usePublicSearch,
 } from "./hooks";

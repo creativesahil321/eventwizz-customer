@@ -49,6 +49,10 @@ export type Booking = {
   balance_amount: number;
   discount: number;
   total_amount: number;
+  /** Present only when promo savings exist. */
+  saved_amount?: number | null;
+  /** Present only when a coupon was used. */
+  coupon_code?: string | null;
   payment_status: string;
   transaction_history: TransactionHistory[];
   date: string;

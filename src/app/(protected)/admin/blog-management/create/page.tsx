@@ -1,5 +1,6 @@
 import { Shell } from "@/components/shell";
 import { BackButton } from "@/components/ui/back-button";
+import { blogAdminPaths } from "@/lib/blogs";
 import { BlogForm } from "../../../_shared/blog-management/_components/blog-form";
 
 export default function CreateBlogPage() {
@@ -7,7 +8,7 @@ export default function CreateBlogPage() {
     <section className="page bg-[var(--color-background,#f3f4f6)]">
       <Shell>
         <BackButton
-          href="/admin/blog-management"
+          href={blogAdminPaths.list}
           label="Back to Blog Management"
         />
 

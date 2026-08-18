@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { blogPublicPaths } from "@/lib/blogs";
 import { cn } from "@/lib/utils";
 
 interface BlogShareButtonProps {
@@ -36,8 +37,8 @@ export function BlogShareButton({
   const [open, setOpen] = React.useState(false);
 
   const getShareUrl = React.useCallback(() => {
-    if (typeof window === "undefined") return `/blog/${slug}`;
-    return `${window.location.origin}/blog/${slug}`;
+    if (typeof window === "undefined") return blogPublicPaths.article(slug);
+    return `${window.location.origin}${blogPublicPaths.article(slug)}`;
   }, [slug]);
 
   const handleShareClick = async (

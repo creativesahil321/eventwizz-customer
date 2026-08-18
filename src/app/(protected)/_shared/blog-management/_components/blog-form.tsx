@@ -5,13 +5,14 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Crop, Save, Send } from "lucide-react";
 import { toast } from "sonner";
-import { Loader2, Save, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUploader } from "@/components/ui/file-uploader";
+import { CropDialog, type CroppedImage } from "@/components/ui/image-cropper";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import {
   Form,
@@ -29,13 +30,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useBlogStore } from "../_lib/blog-store";
+import {
+  useCreateAdminBlog,
+  useUpdateAdminBlog,
+} from "@/services/admin/blogs";
+import {
+  BLOG_EXCERPT_MAX,
+  BLOG_FEATURED_IMAGE_ACCEPT,
+  BLOG_FEATURED_IMAGE_MAX_BYTES,
+  BLOG_META_DESCRIPTION_MAX,
+  BLOG_META_TITLE_MAX,
+  BLOG_TITLE_MAX,
+  blogAdminPaths,
+  slugifyTitle,
+  type BlogPost,
+  type BlogStatus,
+} from "@/lib/blogs";
+import {
+  BLOG_FEATURED_IMAGE_CROP,
+  BLOG_FEATURED_UPLOAD_HINT,
+} from "@/lib/event-image-crop-presets";
+import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import {
   blogFormSchema,
+  getBlogImageError,
   type BlogFormValues,
-  slugifyTitle,
 } from "../_lib/schema";
-import type { BlogPost } from "@/lib/blogs";
 import { BlogCardPreview } from "./blog-card-preview";
 
 interface BlogFormProps {
@@ -49,15 +69,19 @@ function todayIsoDate() {
 
 export function BlogForm({ mode, initialPost }: BlogFormProps) {
   const router = useRouter();
-  const createPost = useBlogStore((s) => s.createPost);
-  const updatePost = useBlogStore((s) => s.updatePost);
+  const createBlog = useCreateAdminBlog();
+  const updateBlog = useUpdateAdminBlog();
 
   const [coverFiles, setCoverFiles] = React.useState<File[]>([]);
+  const [removedCover, setRemovedCover] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [cropSource, setCropSource] = React.useState<File | null>(null);
+  const [isPreparingCrop, setIsPreparingCrop] = React.useState(false);
   const objectUrlRef = React.useRef<string | null>(null);
 
   const form = useForm<BlogFormValues>({
     resolver: zodResolver(blogFormSchema),
+    shouldFocusError: true,
     defaultValues: {
       title: initialPost?.title ?? "",
       excerpt: initialPost?.excerpt ?? "",
@@ -81,31 +105,47 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
     };
   }, []);
 
-  const handleCoverChange = async (files: File[]) => {
-    setCoverFiles(files);
-    const file = files[0];
-    if (!file) {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
-      form.setValue("cover_image", "", { shouldValidate: true });
+  const applyCoverFile = (file: File, previewUrl?: string) => {
+    const imageError = getBlogImageError(file);
+    if (imageError) {
+      form.setError("cover_image", { type: "manual", message: imageError });
       return;
     }
 
+    form.clearErrors("cover_image");
+    setCoverFiles([file]);
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
     }
-    const url = URL.createObjectURL(file);
+    const url = previewUrl ?? URL.createObjectURL(file);
     objectUrlRef.current = url;
+    setRemovedCover(false);
     form.setValue("cover_image", url, {
       shouldValidate: true,
       shouldDirty: true,
     });
   };
 
+  const handleCoverChange = async (files: File[]) => {
+    const file = files[0];
+    if (!file) {
+      setCoverFiles([]);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+      setRemovedCover(Boolean(initialPost?.cover_image));
+      form.setValue("cover_image", "", { shouldValidate: true });
+      return;
+    }
+
+    applyCoverFile(file);
+  };
+
   const handleRemoveCover = () => {
     setCoverFiles([]);
+    setCropSource(null);
+    setRemovedCover(true);
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
@@ -116,66 +156,102 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
     });
   };
 
+  const openCropAdjuster = async () => {
+    if (coverFiles[0]) {
+      setCropSource(coverFiles[0]);
+      return;
+    }
+
+    if (!coverImage) return;
+
+    setIsPreparingCrop(true);
+    try {
+      const sourceUrl =
+        coverImage.startsWith("blob:") || coverImage.startsWith("data:")
+          ? coverImage
+          : `/api/blog-media?url=${encodeURIComponent(coverImage)}`;
+      const response = await fetch(sourceUrl);
+      if (!response.ok) throw new Error("Failed to load image");
+      const blob = await response.blob();
+      if (!blob.type.startsWith("image/")) {
+        throw new Error("Not an image");
+      }
+      const extension = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+      setCropSource(
+        new File([blob], `featured-image.${extension}`, {
+          type: blob.type || "image/jpeg",
+        }),
+      );
+    } catch {
+      toast.error("Unable to adjust this image. Upload it again to crop.");
+    } finally {
+      setIsPreparingCrop(false);
+    }
+  };
+
+  const handleCropComplete = (cropped: CroppedImage) => {
+    applyCoverFile(cropped.file, cropped.previewUrl);
+    setCropSource(null);
+  };
+
   const persist = async (
     values: BlogFormValues,
-    nextStatus?: "draft" | "published",
+    nextStatus: BlogStatus,
   ) => {
+    const featuredImage = coverFiles[0] ?? null;
+    if (featuredImage) {
+      const imageError = getBlogImageError(featuredImage);
+      if (imageError) {
+        form.setError("cover_image", { type: "manual", message: imageError });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const payload = {
-        title: values.title,
-        excerpt: values.excerpt,
+        title: values.title.trim(),
+        excerpt: values.excerpt.trim(),
         content: values.content,
-        cover_image: values.cover_image,
-        published_at: values.published_at,
-        status: nextStatus ?? values.status,
-        meta_title: values.meta_title ?? "",
-        meta_description: values.meta_description ?? "",
+        published_at: values.published_at || undefined,
+        status: nextStatus,
+        meta_title: values.meta_title.trim(),
+        meta_description: values.meta_description.trim(),
+        featured_image: featuredImage,
+        remove_featured_image: removedCover && !featuredImage,
       };
 
       if (mode === "edit" && initialPost) {
-        const updated = updatePost(initialPost.id, payload);
-        if (!updated) {
-          toast.error("Post not found");
-          return;
-        }
-        toast.success(
-          payload.status === "published"
-            ? "Blog post published"
-            : "Blog post saved as draft",
-        );
-      } else {
-        const created = createPost(payload);
-        toast.success(
-          payload.status === "published"
-            ? "Blog post published"
-            : "Draft created",
-        );
-        router.push(`/admin/blog-management/edit/${created.id}`);
+        await updateBlog.mutateAsync({
+          slug: initialPost.slug,
+          payload,
+        });
+        router.push(blogAdminPaths.list);
         return;
       }
 
-      router.push("/admin/blog-management");
+      await createBlog.mutateAsync(payload);
+      router.push(blogAdminPaths.list);
+    } catch {
+      // Error toast handled by Axios interceptor
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const onSubmit = form.handleSubmit((values) => persist(values));
-
-  const saveAsDraft = form.handleSubmit((values) =>
-    persist({ ...values, status: "draft" }, "draft"),
-  );
-
-  const publish = form.handleSubmit((values) =>
-    persist({ ...values, status: "published" }, "published"),
-  );
+  const submitWithStatus = (status: BlogStatus) => {
+    form.setValue("status", status, { shouldDirty: true });
+    void form.handleSubmit((values) => persist(values, status))();
+  };
 
   const coverImage = watched.cover_image;
 
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="space-y-4 pb-24 sm:space-y-6 xl:pb-0">
+      <form
+        onSubmit={form.handleSubmit((values) => persist(values, values.status))}
+        className="space-y-4 pb-24 sm:space-y-6 xl:pb-0"
+      >
         <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="order-2 space-y-4 sm:space-y-6 xl:order-1">
             <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:p-6">
@@ -193,10 +269,14 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   name="title"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Article title</FormLabel>
+                      <FormLabel>
+                        Article title{" "}
+                        <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="How to Plan a Perfect Corporate Christmas Party"
+                          placeholder="Enter the article title"
+                          maxLength={BLOG_TITLE_MAX}
                           {...field}
                         />
                       </FormControl>
@@ -216,7 +296,12 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   name="published_at"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Publication date</FormLabel>
+                      <FormLabel>
+                        Publication date{" "}
+                        {watched.status === "published" ? (
+                          <span className="text-destructive">*</span>
+                        ) : null}
+                      </FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -230,7 +315,9 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Status</FormLabel>
+                      <FormLabel>
+                        Status <span className="text-destructive">*</span>
+                      </FormLabel>
                       <Select
                         value={field.value}
                         onValueChange={field.onChange}
@@ -255,16 +342,23 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   name="excerpt"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Short excerpt</FormLabel>
+                      <FormLabel>
+                        Short excerpt{" "}
+                        {watched.status === "published" ? (
+                          <span className="text-destructive">*</span>
+                        ) : null}
+                      </FormLabel>
                       <FormControl>
                         <Textarea
                           rows={3}
+                          maxLength={BLOG_EXCERPT_MAX}
                           placeholder="A short summary shown on the news card (2–3 lines)."
                           {...field}
                         />
                       </FormControl>
                       <FormDescription>
-                        {field.value?.length ?? 0}/280 characters
+                        {field.value?.length ?? 0}/{BLOG_EXCERPT_MAX} characters.
+                        Required to publish.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -278,8 +372,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                 Featured image
               </h2>
               <p className="mb-4 text-sm text-muted-foreground sm:mb-5">
-                Recommended 16:9 landscape (about 1200×675). Shown on the card
-                grid and article header.
+                {BLOG_FEATURED_UPLOAD_HINT}
               </p>
 
               <FormField
@@ -290,7 +383,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                     <FormControl>
                       {coverImage ? (
                         <div className="space-y-3">
-                          <div className="relative h-40 w-full overflow-hidden rounded-xl border border-[var(--color-border)] bg-slate-50 sm:h-52">
+                          <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-[var(--color-border)] bg-slate-50">
                             <Image
                               src={coverImage}
                               alt="Featured cover"
@@ -298,18 +391,32 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                               className="object-cover"
                               sizes="(max-width: 768px) 100vw, 720px"
                               unoptimized={
-                                coverImage.startsWith("blob:") ||
-                                coverImage.startsWith("data:")
+                                !shouldUseNextImageOptimization(coverImage)
                               }
                             />
                           </div>
-                          <button
-                            type="button"
-                            onClick={handleRemoveCover}
-                            className="text-sm text-red-500 underline"
-                          >
-                            Remove image
-                          </button>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <button
+                              type="button"
+                              onClick={() => void openCropAdjuster()}
+                              disabled={isPreparingCrop}
+                              className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] underline disabled:opacity-50"
+                            >
+                              {isPreparingCrop ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Crop className="h-3.5 w-3.5" />
+                              )}
+                              Adjust crop
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRemoveCover}
+                              className="text-sm text-red-500 underline"
+                            >
+                              Remove image
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <FileUploader
@@ -318,13 +425,12 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                             void handleCoverChange(files)
                           }
                           maxFileCount={1}
-                          maxSize={5 * 1024 * 1024}
-                          accept={{
-                            "image/png": [],
-                            "image/jpeg": [],
-                            "image/webp": [],
-                          }}
+                          maxSize={BLOG_FEATURED_IMAGE_MAX_BYTES}
+                          accept={BLOG_FEATURED_IMAGE_ACCEPT}
                           onRemove={handleRemoveCover}
+                          enableCropping
+                          aspectRatio={BLOG_FEATURED_IMAGE_CROP.aspectRatio}
+                          cropConfig={BLOG_FEATURED_IMAGE_CROP}
                         />
                       )}
                     </FormControl>
@@ -332,15 +438,26 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   </FormItem>
                 )}
               />
+              {cropSource ? (
+                <CropDialog
+                  image={cropSource}
+                  config={BLOG_FEATURED_IMAGE_CROP}
+                  onComplete={handleCropComplete}
+                  onCancel={() => setCropSource(null)}
+                />
+              ) : null}
             </section>
 
             <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:p-6">
               <h2 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
-                Article body
+                Article body{" "}
+                {watched.status === "published" ? (
+                  <span className="text-destructive">*</span>
+                ) : null}
               </h2>
               <p className="mb-4 text-sm text-muted-foreground sm:mb-5">
                 Use headings, lists, links, and the image button to place
-                pictures between paragraphs.
+                pictures between paragraphs. Required to publish.
               </p>
 
               <FormField
@@ -350,7 +467,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   <FormItem>
                     <FormControl>
                       <TiptapEditor
-                        value={field.value}
+                        value={field.value ?? ""}
                         onChange={field.onChange}
                         placeholder="Write your article content..."
                         enableRichBlocks
@@ -390,11 +507,13 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                               ? `${watched.title} | EventWizz`
                               : "SEO title for browser tabs & Google"
                           }
+                          maxLength={BLOG_META_TITLE_MAX}
                           {...field}
                         />
                       </FormControl>
                       <FormDescription>
-                        {field.value?.length ?? 0}/70 characters
+                        {field.value?.length ?? 0}/{BLOG_META_TITLE_MAX}{" "}
+                        characters
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -410,6 +529,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                       <FormControl>
                         <Textarea
                           rows={3}
+                          maxLength={BLOG_META_DESCRIPTION_MAX}
                           placeholder={
                             watched.excerpt ||
                             "Short summary shown in search results"
@@ -418,7 +538,8 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                         />
                       </FormControl>
                       <FormDescription>
-                        {field.value?.length ?? 0}/160 characters
+                        {field.value?.length ?? 0}/{BLOG_META_DESCRIPTION_MAX}{" "}
+                        characters
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -438,16 +559,16 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
               </p>
               <BlogCardPreview
                 title={watched.title}
-                excerpt={watched.excerpt}
+                excerpt={watched.excerpt ?? ""}
                 publishedAt={watched.published_at}
-                coverImage={watched.cover_image}
+                coverImage={watched.cover_image ?? ""}
               />
             </div>
 
             <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--color-border)] bg-white/95 p-3 backdrop-blur sm:static sm:z-auto sm:rounded-lg sm:border sm:bg-white sm:p-4 sm:shadow-sm sm:backdrop-blur-none">
               <p className="mb-2 hidden text-xs text-muted-foreground sm:mb-3 sm:block">
-                Demo mode — changes are saved in this browser only. API wiring
-                comes next.
+                Featured image, excerpt, and meta appear on the public news
+                cards and article SEO.
               </p>
               <div className="flex gap-2 sm:flex-col">
                 <Button
@@ -455,16 +576,14 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   variant="event-primary"
                   disabled={isSubmitting}
                   className="h-10 flex-1 gap-2 sm:w-full"
-                  onClick={() => void publish()}
+                  onClick={() => submitWithStatus("published")}
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                  <span className="sm:hidden">
-                    {mode === "edit" ? "Publish" : "Publish"}
-                  </span>
+                  <span className="sm:hidden">Publish</span>
                   <span className="hidden sm:inline">
                     {mode === "edit" ? "Save & publish" : "Publish"}
                   </span>
@@ -474,7 +593,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   variant="event-outline"
                   disabled={isSubmitting}
                   className="h-10 flex-1 gap-2 sm:w-full"
-                  onClick={() => void saveAsDraft()}
+                  onClick={() => submitWithStatus("draft")}
                 >
                   <Save className="h-4 w-4" />
                   <span className="sm:hidden">Draft</span>
@@ -485,7 +604,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                   variant="ghost"
                   disabled={isSubmitting}
                   className="hidden h-10 w-full sm:flex"
-                  onClick={() => router.push("/admin/blog-management")}
+                  onClick={() => router.push(blogAdminPaths.list)}
                 >
                   Cancel
                 </Button>

@@ -35,6 +35,10 @@ export interface History {
   /** Event dates from API — keep all rows (same calendar day + different rooms). */
   event_dates?: HistoryEventDate[];
   amount: number | string; // Amount from API (can be string like "5800.00")
+  /** Present only when promo savings exist. */
+  saved_amount?: number | null;
+  /** Present only when a coupon was used. */
+  coupon_code?: string | null;
   status: string; // "Pending", "Confirmed", "Processing", "Cancelled"
   created_at?: string;
   action?: string;

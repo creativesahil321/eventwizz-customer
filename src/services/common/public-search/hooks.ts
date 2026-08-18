@@ -79,6 +79,29 @@ export function usePublicLocationSearch(
   });
 }
 
+/**
+ * Full event catalog with categories — used to mark seasonal dates on the
+ * availability calendar (availability payload has no category field).
+ */
+export function usePublicEventCatalog(
+  domain: string | null | undefined,
+  options?: { enabled?: boolean },
+) {
+  const enabled = Boolean(domain) && options?.enabled !== false;
+
+  return useQuery({
+    queryKey: publicSearchKeys.search(domain ?? "", {
+      mode: "events",
+      per_page: 100,
+    }),
+    queryFn: () =>
+      publicSearchService.search(domain!, { mode: "events", per_page: 100 }),
+    enabled,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function usePublicAvailability(
   domain: string | null | undefined,
   params: PublicAvailabilityParams | null,

@@ -118,6 +118,10 @@ export type PublicAvailabilityEvent = {
   slug: string;
   name: string;
   rooms: PublicAvailabilityRoom[];
+  /** Explicit seasonal theme when the API provides it. */
+  event_theme?: string | null;
+  eventTheme?: string | null;
+  category?: string | null;
 };
 
 export type PublicAvailabilityLocation = {

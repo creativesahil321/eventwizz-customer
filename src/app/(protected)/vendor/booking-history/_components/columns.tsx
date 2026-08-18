@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
+import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
@@ -235,10 +236,27 @@ export function getHistoryColumns({
         const raw = row.getValue("amount");
         const n =
           typeof raw === "string" ? parseFloat(raw) || 0 : Number(raw) || 0;
+        const savedAmount = row.original.saved_amount;
+        const couponCode = row.original.coupon_code;
         return (
-          <span className="font-bold text-sm text-primary">
-            {formatMoney(n)}
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-bold text-sm text-primary">
+              {formatMoney(n)}
+            </span>
+            {savedAmount != null ? (
+              <span className="text-[11px] font-semibold text-emerald-700">
+                You saved {formatMoney(savedAmount)}
+              </span>
+            ) : null}
+            {couponCode ? (
+              <Badge
+                variant="outline"
+                className="h-5 w-fit px-1.5 text-[10px] font-semibold"
+              >
+                {couponCode}
+              </Badge>
+            ) : null}
+          </div>
         );
       },
       enableSorting: true,

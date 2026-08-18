@@ -79,6 +79,13 @@ const ADMIN_PAGES: Array<{ prefix: string; label: string; hints?: string }> = [
   { prefix: "/admin/staff", label: "Staff Management" },
   { prefix: "/admin/email-templates", label: "Email Template" },
   { prefix: "/admin/sites-essentials", label: "Site Essentials" },
+  {
+    prefix: "/admin/settings",
+    label: "Settings",
+    hints:
+      "Platform settings: default commission and Grok API key. Opened from profile → Settings, not the sidebar.",
+  },
+  { prefix: "/admin/payment-settings", label: "Settings" },
   { prefix: "/admin/support", label: "Support" },
   { prefix: "/admin/dispute", label: "Dispute Resolution Centre" },
 ];

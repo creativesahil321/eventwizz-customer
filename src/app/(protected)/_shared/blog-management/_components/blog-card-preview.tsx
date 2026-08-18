@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatBlogDate } from "../_lib/schema";
+import { shouldUseNextImageOptimization } from "@/lib/image-utils";
+import { formatBlogDate } from "@/lib/blogs";
 
 interface BlogCardPreviewProps {
   title: string;
@@ -11,6 +12,8 @@ interface BlogCardPreviewProps {
   publishedAt: string;
   coverImage: string;
   className?: string;
+  /** Form live preview uses placeholders; list cards hide empty fields. */
+  usePlaceholders?: boolean;
 }
 
 export function BlogCardPreview({
@@ -19,6 +22,7 @@ export function BlogCardPreview({
   publishedAt,
   coverImage,
   className,
+  usePlaceholders = true,
 }: BlogCardPreviewProps) {
   const hasImage = Boolean(coverImage);
 
@@ -37,27 +41,31 @@ export function BlogCardPreview({
             fill
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 360px"
-            unoptimized={
-              coverImage.startsWith("blob:") || coverImage.startsWith("data:")
-            }
+            unoptimized={!shouldUseNextImageOptimization(coverImage)}
           />
-        ) : (
+        ) : usePlaceholders ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             Featured image preview
           </div>
-        )}
+        ) : null}
       </div>
 
       <div className="space-y-2 p-5">
         <p className="text-xs font-medium text-muted-foreground">
-          {publishedAt ? formatBlogDate(publishedAt) : "Publication date"}
+          {publishedAt
+            ? formatBlogDate(publishedAt)
+            : usePlaceholders
+              ? "Publication date"
+              : ""}
         </p>
         <h3 className="line-clamp-2 text-base font-bold leading-snug text-foreground">
-          {title || "Article title"}
+          {title || (usePlaceholders ? "Article title" : "")}
         </h3>
-        <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-          {excerpt || "Short excerpt will appear here for the news card."}
-        </p>
+        {excerpt || usePlaceholders ? (
+          <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+            {excerpt || "Short excerpt will appear here for the news card."}
+          </p>
+        ) : null}
         <div className="flex items-center gap-1.5 pt-1 text-sm font-semibold text-[var(--color-primary)]">
           <span>Read Article</span>
           <ArrowRight className="h-4 w-4" />

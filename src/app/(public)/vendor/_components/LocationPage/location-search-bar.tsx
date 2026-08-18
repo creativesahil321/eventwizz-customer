@@ -22,6 +22,10 @@ import {
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
+  eventThemesBySlugFromSearchResults,
+  seasonThemesByDateFromEvents,
+} from "@/lib/event-season-theme";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -29,7 +33,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { requestUserLocation } from "@/lib/request-user-location";
-import { usePublicAvailability } from "@/services/common/public-search";
+import {
+  usePublicAvailability,
+  usePublicEventCatalog,
+} from "@/services/common/public-search";
 import type { LocationSearchFilters } from "./_lib/search-filters";
 
 export type SearchAvailabilityScope = {
@@ -200,6 +207,10 @@ export function LocationSearchBar({
     { enabled: availabilityEnabled && dateOpen },
   );
 
+  const catalogQuery = usePublicEventCatalog(availability?.domain, {
+    enabled: availabilityEnabled && dateOpen,
+  });
+
   const availableDateSet = useMemo(() => {
     const set = new Set<string>();
     for (const day of availabilityQuery.data?.days ?? []) {
@@ -207,6 +218,16 @@ export function LocationSearchBar({
     }
     return set;
   }, [availabilityQuery.data?.days]);
+
+  const seasonThemesByDate = useMemo(() => {
+    const themesBySlug = eventThemesBySlugFromSearchResults(
+      catalogQuery.data?.results ?? [],
+    );
+    return seasonThemesByDateFromEvents(
+      (availabilityQuery.data?.days ?? []).filter((day) => day.slot_count > 0),
+      themesBySlug,
+    );
+  }, [availabilityQuery.data?.days, catalogQuery.data?.results]);
 
   const today = startOfDay(new Date());
   const restrictToAvailability =
@@ -436,6 +457,7 @@ export function LocationSearchBar({
                       if (!restrictToAvailability) return false;
                       return !availableDateSet.has(format(date, "yyyy-MM-dd"));
                     }}
+                    seasonThemesByDate={seasonThemesByDate}
                     initialFocus
                   />
                 )}

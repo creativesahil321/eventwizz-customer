@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import { resolveAiRuntimeConfig } from "../lib/provider-config";
 import {
   BANNER_HEADING_MAX_WORDS,
   truncateToMaxWords,
@@ -146,8 +146,8 @@ export interface AIEventGeneratedContent {
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = env.GROQ_API_KEY;
-    if (!apiKey) {
+    const aiConfig = await resolveAiRuntimeConfig();
+    if (!aiConfig.isConfigured) {
       return NextResponse.json(
         { error: "AI service is not configured" },
         { status: 500 }
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
       maxFaqs: STEP_NINE_MAX_FAQS,
     });
 
-    const result: FallbackResult = await tryModelsWithFallback(apiKey, {
+    const result: FallbackResult = await tryModelsWithFallback(aiConfig, {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

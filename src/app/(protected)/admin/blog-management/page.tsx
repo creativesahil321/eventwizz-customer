@@ -2,6 +2,7 @@ import { Shell } from "@/components/shell";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
+import { blogAdminPaths } from "@/lib/blogs";
 import { BlogList } from "../../_shared/blog-management/_components/blog-list";
 
 export default function BlogManagementPage() {
@@ -15,7 +16,7 @@ export default function BlogManagementPage() {
                 Blog Management
               </h1>
               <Link
-                href="/admin/blog-management/create"
+                href={blogAdminPaths.create}
                 className="w-full shrink-0 sm:w-auto"
               >
                 <Button

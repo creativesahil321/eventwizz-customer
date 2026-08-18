@@ -4,26 +4,19 @@ import AdminHeader from "@/app/(public)/admin/_components/header";
 import AdminFooter from "@/app/(public)/admin/_components/footer";
 import { appConfig } from "@/config/app";
 import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
-import {
-  getBlogPostBySlug,
-  getBlogPostSlugs,
-  resolveBlogMeta,
-} from "@/lib/blogs";
+import { resolveBlogMeta, blogPublicPaths } from "@/lib/blogs";
+import { getPublishedBlogBySlugForRequest } from "@/lib/blogs/public-api";
 import BlogArticleContent from "./_components/blog-article-content";
 
 interface BlogArticlePageProps {
   params: Promise<{ slug: string }>;
 }
 
-export function generateStaticParams() {
-  return getBlogPostSlugs().map((slug) => ({ slug }));
-}
-
 export async function generateMetadata({
   params,
 }: BlogArticlePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getPublishedBlogBySlugForRequest(slug);
 
   if (!post) {
     return { title: "Article not found" };
@@ -37,12 +30,12 @@ export async function generateMetadata({
     openGraph: {
       title: meta.title,
       description: meta.description,
-      url: `${appConfig.url}/blog/${post.slug}`,
-      images: [{ url: post.cover_image }],
+      url: `${appConfig.url}${blogPublicPaths.article(post.slug)}`,
+      images: post.cover_image ? [{ url: post.cover_image }] : undefined,
       type: "article",
     },
     alternates: {
-      canonical: `${appConfig.url}/blog/${post.slug}`,
+      canonical: `${appConfig.url}${blogPublicPaths.article(post.slug)}`,
     },
   };
 }
@@ -51,7 +44,7 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
   await assertAdminPublicSite();
 
   const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getPublishedBlogBySlugForRequest(slug);
 
   if (!post) {
     notFound();

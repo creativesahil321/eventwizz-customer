@@ -95,3 +95,24 @@ export const EVENT_BANNER_CROP: CropperConfig & { aspectRatio: number } = {
   maxWidth: 1920,
   maxHeight: 823,
 };
+
+/** Blog featured image — locked to 16:9 to match news cards and article heroes. */
+export const BLOG_FEATURED_IMAGE_CROP: CropperConfig & {
+  aspectRatio: number;
+} = {
+  aspectRatio: ASPECT_RATIOS.landscape,
+  maxSizeKB: 800,
+  quality: 0.9,
+  maxWidth: 1920,
+  maxHeight: 1080,
+};
+
+export const BLOG_FEATURED_UPLOAD_HINT =
+  "Landscape 16:9 (JPG, PNG or WebP, max 5MB). Crop, zoom, and pan to frame the image for news cards and the article header.";
+
+/** Public article hero — reading-column width, capped height so it never fills the viewport. */
+export const BLOG_ARTICLE_HERO = {
+  width: 760,
+  height: { mobile: 200, tablet: 240, desktop: 280 },
+} as const;
+

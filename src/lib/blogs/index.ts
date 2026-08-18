@@ -1,12 +1,41 @@
-import { DUMMY_BLOG_POSTS } from "./dummy-posts";
 import type { BlogPost } from "./types";
 
-export type { BlogPost, BlogStatus, BlogPostInput } from "./types";
-export { DUMMY_BLOG_POSTS } from "./dummy-posts";
+export type {
+  BlogAdjacentPost,
+  BlogApiPost,
+  BlogListStats,
+  BlogPaginationMeta,
+  BlogPost,
+  BlogStatus,
+} from "./types";
+export { mapApiBlogPost } from "./map-api-post";
+export {
+  BLOG_ADMIN_PATH,
+  BLOG_ADMIN_PER_PAGE,
+  BLOG_EXCERPT_MAX,
+  BLOG_FEATURED_IMAGE_ACCEPT,
+  BLOG_FEATURED_IMAGE_MAX_BYTES,
+  BLOG_FEATURED_IMAGE_TYPES,
+  BLOG_HOME_PER_PAGE,
+  BLOG_LIST_PER_PAGE,
+  BLOG_META_DESCRIPTION_MAX,
+  BLOG_META_TITLE_MAX,
+  BLOG_PUBLISH_CONTENT_MIN,
+  BLOG_TITLE_MAX,
+  BLOG_TITLE_MIN,
+  blogAdminPaths,
+  blogPublicPaths,
+} from "./constants";
+
+function parseBlogDate(isoDate: string): Date | null {
+  if (!isoDate) return null;
+  const date = new Date(`${isoDate.slice(0, 10)}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 export function formatBlogDate(isoDate: string): string {
-  const date = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return isoDate;
+  const date = parseBlogDate(isoDate);
+  if (!date) return isoDate || "";
   return date.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
@@ -14,10 +43,9 @@ export function formatBlogDate(isoDate: string): string {
   });
 }
 
-/** Editorial metadata style: "April 8, 2024" */
 export function formatBlogDateLong(isoDate: string): string {
-  const date = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return isoDate;
+  const date = parseBlogDate(isoDate);
+  if (!date) return isoDate || "";
   return date.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
@@ -33,47 +61,6 @@ export function slugifyTitle(title: string): string {
     .replace(/[\s_-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
-}
-
-/** Published posts for the public marketing site (home cards + article pages). */
-export function getPublishedBlogPosts(
-  posts: BlogPost[] = DUMMY_BLOG_POSTS,
-): BlogPost[] {
-  return posts
-    .filter((post) => post.status === "published")
-    .sort(
-      (a, b) =>
-        new Date(b.published_at).getTime() - new Date(a.published_at).getTime(),
-    );
-}
-
-export function getBlogPostBySlug(
-  slug: string,
-  posts: BlogPost[] = DUMMY_BLOG_POSTS,
-): BlogPost | undefined {
-  return posts.find(
-    (post) => post.slug === slug && post.status === "published",
-  );
-}
-
-export function getBlogPostSlugs(
-  posts: BlogPost[] = DUMMY_BLOG_POSTS,
-): string[] {
-  return getPublishedBlogPosts(posts).map((post) => post.slug);
-}
-
-export function getAdjacentBlogPosts(
-  slug: string,
-  posts: BlogPost[] = DUMMY_BLOG_POSTS,
-): { previous: BlogPost | null; next: BlogPost | null } {
-  const published = getPublishedBlogPosts(posts);
-  const index = published.findIndex((post) => post.slug === slug);
-  if (index === -1) return { previous: null, next: null };
-
-  return {
-    previous: published[index + 1] ?? null,
-    next: published[index - 1] ?? null,
-  };
 }
 
 export function resolveBlogMeta(post: BlogPost) {

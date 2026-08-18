@@ -50,11 +50,16 @@ export interface VendorDashboardCommissionsStats {
 export interface VendorDashboardRecentBooking {
   /** Backend: use for navigation to /vendor/booking-history/[booking_id] */
   booking_id: number | string;
-  transaction_id: string;
+  transaction_id: string | null;
   customer: string;
   event: string;
   order_date: string;
+  /** Full booking amount (sub_total), not pay-now / deposit only. */
   total: number;
+  /** Present only when > 0; omitted when no promo savings. */
+  saved_amount?: number;
+  /** Present only when a coupon was used. */
+  coupon_code?: string;
   balance_due: number;
   status: string;
 }

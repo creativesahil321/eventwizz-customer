@@ -24,6 +24,11 @@ export const API_ENDPOINTS = {
       AVAILABILITY: "/domain/{domain}/availability",
       LOCATION_SEARCH: "/domain/{domain}/locations/{location_slug}/search",
     },
+    /** Public published blogs (no auth). Home cards + article pages. */
+    BLOGS: {
+      LIST: "/blogs",
+      SHOW: "/blogs/{slug}",
+    },
   },
   // Auth Endpoints
   AUTH: {
@@ -334,6 +339,13 @@ export const API_ENDPOINTS = {
     },
     /** Public per-page CMS content for the main admin marketing site (SSR/SEO). */
     INFO_PAGES: "/admin/info-pages",
+    BLOGS: {
+      LIST: "/admin/blogs",
+      STORE: "/admin/blogs/store",
+      SHOW: "/admin/blogs/{slug}",
+      UPDATE: "/admin/blogs/update/{slug}",
+      DELETE: "/admin/blogs/delete/{slug}",
+    },
     /** Default platform commission; per-venue overrides live on venue detail (PUT /admin/venues/{id}). */
     PAYMENT_SETTINGS: {
       GET_COMMISSION: "/admin/payment-settings/commission",
@@ -606,6 +618,12 @@ export const API_ENDPOINTS = {
       UPDATE_FAVICON: "/admin/settings/upload-files",
       NIDHI_WALLET: "/admin/wallets/get-all-wallets-with-balance",
       ADD_BALANCE_TO_NIDHI_WALLET: "/admin/wallets/add-balance-to-nidhi-wallet",
+      /** Stored server-side so the platform can switch provider/model/key without a rebuild. */
+      GET_AI_PROVIDERS: "/admin/settings/ai-providers",
+      UPSERT_AI_PROVIDER: "/admin/settings/ai-providers",
+      DELETE_AI_PROVIDER: "/admin/settings/ai-providers/{id}",
+      ACTIVATE_AI_PROVIDER: "/admin/settings/ai-providers/{id}/activate",
+      LIST_AI_MODELS: "/admin/settings/ai-providers/{id}/models",
     },
     PROFIT_WALLET: {
       ALL: "/admin/profit-transfer/schedule-task/list",

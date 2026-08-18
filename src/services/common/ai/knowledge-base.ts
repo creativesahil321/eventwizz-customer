@@ -31,7 +31,7 @@ EventWizz is an all-in-one event management platform that helps vendors and cust
 - Track commissions and transaction history
 - Resolve disputes (Dispute Resolution Centre)
 - Manage roles and staff (Manage Roles, Staff Management)
-- Configure platform branding (Site Essentials), email templates, payment settings (profile → Settings → Payment Settings)
+- Configure platform branding (Site Essentials), email templates, payment and AI settings (profile → Settings)
 - View support tickets, system logs, referrals, marketing analytics, SEO tools
 
 ## System Overview
@@ -365,9 +365,9 @@ After login as **admin**, the user lands on the **Admin Dashboard**. There is **
 
 16. **Dispute Resolution Centre** — **Disputes** between customers and vendors. View and resolve disputes in one place.
 
-**Not in the sidebar:** **Payment Settings** — Under the **profile (name/avatar at top)** → **Settings** → **Payment Settings**. Used to configure platform-level payment or gateway settings. Do not tell admins to look for Payment Settings in the sidebar; it is under their profile menu.
+**Not in the sidebar:** **Settings** — Under the **profile (name/avatar at top)** → **Settings**. Includes default platform commission and the Grok API key used by the chatbot. Do not tell admins to look for Settings in the sidebar; it is under their profile menu.
 
-**Summary for the AI:** Admins have no welcome/location step. Sidebar: Dashboard, All Venues, Transaction History, Notifications, Commission Overview, Manage Roles, Staff Management, Email Template, Site Essentials, Marketing Analytics, System Logs, Support, Referrals, Sales & Marketing, Seo Tools, Dispute Resolution Centre. Payment Settings is under profile → Settings. To manage a single venue: **All Venues** → click the venue → venue detail (domain approval, login as venue, reset password, edit, etc.). When answering admins, use only these menu and page names; do not use URLs or technical paths.
+**Summary for the AI:** Admins have no welcome/location step. Sidebar: Dashboard, All Venues, Transaction History, Notifications, Commission Overview, Manage Roles, Staff Management, Email Template, Site Essentials, Marketing Analytics, System Logs, Support, Referrals, Sales & Marketing, Seo Tools, Dispute Resolution Centre. Settings is under profile → Settings. To manage a single venue: **All Venues** → click the venue → venue detail (domain approval, login as venue, reset password, edit, etc.). When answering admins, use only these menu and page names; do not use URLs or technical paths.
 
 ## Customer Flow (How Customers Book & Use the Platform)
 
@@ -467,7 +467,7 @@ EventWizz is a comprehensive multi-tenant event management platform that serves 
 #### 🏢 Admin Portal (website_role="admin")
 - **Who**: Platform administrators and system managers
 - **Access**: After login, admins go straight to the **Admin Dashboard** (no welcome or select-location step). Full platform control and vendor management.
-- **Key Features** (see “Admin Dashboard — All Pages & Menus” for full detail): **Dashboard** (overview, metrics, sales, venues commission), **All Venues** (list of venues; click one for venue detail: domain approval, login as venue, reset password, edit, comments), **Transaction History**, **Notifications**, **Commission Overview**, **Manage Roles**, **Staff Management**, **Email Template**, **Site Essentials** (platform branding), **Marketing Analytics**, **System Logs**, **Support** (tickets), **Referrals**, **Sales & Marketing**, **Seo Tools**, **Dispute Resolution Centre**. **Payment Settings** is under **profile (top right)** → **Settings** → **Payment Settings**, not in the sidebar.
+- **Key Features** (see “Admin Dashboard — All Pages & Menus” for full detail): **Dashboard** (overview, metrics, sales, venues commission), **All Venues** (list of venues; click one for venue detail: domain approval, login as venue, reset password, edit, comments), **Transaction History**, **Notifications**, **Commission Overview**, **Manage Roles**, **Staff Management**, **Email Template**, **Site Essentials** (platform branding), **Marketing Analytics**, **System Logs**, **Support** (tickets), **Referrals**, **Sales & Marketing**, **Seo Tools**, **Dispute Resolution Centre**. **Settings** is under **profile (top right)** → **Settings**, not in the sidebar (default commission and Grok API key).
 
 #### 🏪 Vendor Portal (website_role="vendor") 
 - **Who**: Venue owners and event organizers
@@ -668,7 +668,8 @@ The full **11-step vendor onboarding** is described in the "Vendor Onboarding (F
 - **"How do I manage roles and permissions?"** - **Manage Roles** to define roles and permissions; **Staff Management** to add admin staff and assign roles.
 - **"Where do I change platform branding (logo, colors)?"** - **Site Essentials** in the left menu. This is for the main platform site, not per-venue.
 - **"Where are email templates?"** - **Email Template** in the left menu. Edit system-wide email templates.
-- **"Where do I configure payment settings?"** - **Profile** (your name/avatar at top right) → **Settings** → **Payment Settings**. It is not in the sidebar.
+- **"Where do I configure payment settings?"** - **Profile** (your name/avatar at top right) → **Settings**. Default platform commission is on that page. It is not in the sidebar.
+- **"Where do I update the Grok / AI API key?"** - **Profile** (top right) → **Settings**. Paste a new Grok API key there so chatbot and other AI tools use it without a frontend rebuild.
 - **"How do I view support tickets?"** - **Support** in the left menu. View and manage tickets from vendors and customers.
 - **"How do I check system logs?"** - **System Logs** in the left menu. For troubleshooting and monitoring.
 - **"Where are referrals?"** - **Referrals** in the left menu. Track and manage the referral program.
@@ -1004,7 +1005,7 @@ For ADMINS (platform administrators):
 - **Disputes**: **Dispute Resolution Centre** in the menu.
 - **Roles and staff**: **Manage Roles** for roles and permissions; **Staff Management** for admin staff.
 - **Platform branding**: **Site Essentials** (platform-level). **Email Template** for system email templates.
-- **Payment settings**: **Profile** (top right) → **Settings** → **Payment Settings** — not in the sidebar.
+- **Payment and AI settings**: **Profile** (top right) → **Settings** — not in the sidebar. Default platform commission and Grok API key live on this page.
 - **Support, logs, referrals, marketing**: **Support** (tickets), **System Logs**, **Referrals**, **Marketing Analytics**, **Sales & Marketing**, **Seo Tools** — all in the left menu. **Notifications** for admin notifications.
 
 For PARTNERS (white-label deployment inquiries):

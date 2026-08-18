@@ -25,6 +25,13 @@ const NAV_RULES: NavRule[] = [
     pattern:
       /\b(payment (gateway|settings|provider)|stripe|paypal|truelayer|connect payment|change payment|payment method)\b/i,
     vendor: { href: "/vendor/payment-settings", label: "Open Payment Settings" },
+    admin: { href: "/admin/settings", label: "Open Settings" },
+  },
+  {
+    id: "admin-settings",
+    pattern:
+      /\b(admin settings|platform settings|grok( api)? key|groq( api)? key|ai (api )?key)\b/i,
+    admin: { href: "/admin/settings", label: "Open Settings" },
   },
   {
     id: "domain",
@@ -270,7 +277,7 @@ Format exactly as [Label](/path).
   if (isAuthenticated && accountType === "admin") {
     return `
 NAVIGATION LINKS (MUST INCLUDE WHEN RELEVANT):
-Include markdown links such as [Open Dashboard](/admin/dashboard), [Open All Venues](/admin/vendors), [Open Site Essentials](/admin/sites-essentials) when helpful.
+Include markdown links such as [Open Dashboard](/admin/dashboard), [Open All Venues](/admin/vendors), [Open Site Essentials](/admin/sites-essentials), [Open Settings](/admin/settings) when helpful.
 `;
   }
 

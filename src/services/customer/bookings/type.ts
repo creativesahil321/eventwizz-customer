@@ -342,6 +342,8 @@ export interface BookingPaymentSummary {
   total_amount: number;
   /** Present only when > 0; omitted when no promo savings. */
   saved_amount?: number;
+  /** Present only when a coupon was used (vendor show). */
+  coupon_code?: string;
   can_pay_now?: boolean;
   platform_fee_amount?: number;
   /** @deprecated use total_paid_amount */

@@ -1,14 +1,20 @@
-import type { AdminHomeContent } from "@/lib/admin-cms-content";
+"use client";
+
 import { SiteHeading } from "@/components/public/site-heading";
-import { getPublishedBlogPosts } from "@/lib/blogs";
-import { BlogPostCard } from "@/app/(public)/blog/_components/blog-post-card";
+import type { AdminHomeContent } from "@/lib/admin-cms-content";
+import { BLOG_HOME_PER_PAGE } from "@/lib/blogs";
+import { usePublicBlogs } from "@/services/common/blogs";
+import {
+  BlogPostGrid,
+  BlogPostGridSkeleton,
+} from "@/app/(public)/blog/_components/blog-post-grid";
 
 export default function NewsSection({
   content,
 }: {
   content: AdminHomeContent["news"];
 }) {
-  const articles = getPublishedBlogPosts().slice(0, 3);
+  const { data: articles = [], isLoading } = usePublicBlogs(BLOG_HOME_PER_PAGE);
 
   return (
     <section
@@ -29,11 +35,11 @@ export default function NewsSection({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:gap-6 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
-          {articles.map((article) => (
-            <BlogPostCard key={article.id} post={article} />
-          ))}
-        </div>
+        {isLoading ? (
+          <BlogPostGridSkeleton count={BLOG_HOME_PER_PAGE} />
+        ) : (
+          <BlogPostGrid posts={articles} />
+        )}
       </div>
     </section>
   );

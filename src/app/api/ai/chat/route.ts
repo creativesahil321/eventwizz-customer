@@ -15,7 +15,7 @@ import {
 import { buildLiveEventsPromptBlock } from "@/lib/chat-live-events";
 import type { LiveEvent } from "@/types/theme.types";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import { resolveAiRuntimeConfig } from "../lib/provider-config";
 
 /**
  * Get condensed knowledge base to reduce token count
@@ -234,11 +234,11 @@ function buildSystemPrompt(context: ChatContext): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = env.GROQ_API_KEY;
+    const aiConfig = await resolveAiRuntimeConfig();
 
-    if (!apiKey) {
+    if (!aiConfig.isConfigured) {
       return NextResponse.json(
-        { error: "GROQ API key is not configured" },
+        { error: "AI service is not configured" },
         { status: 500 }
       );
     }
@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
 
     const apiMessages: Message[] = [systemMessage, ...recentMessages];
 
-    const result: FallbackResult = await tryModelsWithFallback(apiKey, {
+    const result: FallbackResult = await tryModelsWithFallback(aiConfig, {
       messages: apiMessages,
       max_tokens: 800,
       temperature: 0.7,

@@ -72,7 +72,7 @@ const UserDropdown = memo(() => {
 
     if (user) {
       if (user.account_type === "admin") {
-        url = "/admin/payment-settings";
+        url = "/admin/settings";
       } else if (user.account_type === "vendor") {
         url = "/vendor/payment-settings";
       } else if (user.account_type === "customer") {
@@ -82,7 +82,7 @@ const UserDropdown = memo(() => {
       const accountType = session.user.account_type;
 
       if (accountType === "admin") {
-        url = "/admin/payment-settings";
+        url = "/admin/settings";
       } else if (accountType === "vendor") {
         url = "/vendor/payment-settings";
       } else if (accountType === "customer") {
@@ -104,7 +104,6 @@ const UserDropdown = memo(() => {
 
   const showSettings = accountType !== "customer";
   const isVendor = accountType === "vendor";
-  const isAdmin = accountType === "admin";
 
   return (
     <div className="relative">
@@ -152,24 +151,20 @@ const UserDropdown = memo(() => {
           </DropdownMenuItem>
           {showSettings && (
             <PermissionGuard permissionKey="read-account" fallback={null}>
-              {isVendor || isAdmin ? (
+              {isVendor ? (
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger className="cursor-pointer">
                     <Settings size={16} className="mr-2" /> Settings
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-48">
-                    {isVendor && (
-                      <>
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={() => router.push("/vendor/domain-settings")}
-                        >
-                          <Globe size={15} className="mr-2 text-muted-foreground" />
-                          Domain Settings
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => router.push("/vendor/domain-settings")}
+                    >
+                      <Globe size={15} className="mr-2 text-muted-foreground" />
+                      Domain Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="cursor-pointer"
                       onClick={() => router.push(settingsUrl)}

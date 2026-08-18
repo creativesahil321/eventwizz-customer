@@ -93,7 +93,11 @@ export interface VendorBookingItem {
   booking_date: string; // Format: "05-11-2025"
   /** Event dates — objects with display `date` and optional `room_name`. */
   event_date: VendorBookingEventDateEntry[];
-  amount: string; // Format: "5800.00"
+  amount: string; // Format: "5800.00" — full booking amount when unscoped
+  /** Present only when > 0; string like "1500.00". */
+  saved_amount?: string;
+  /** Present only when a coupon was used. */
+  coupon_code?: string;
   status: string; // "Pending", "Confirmed", etc.
   platform_fee?: string; // Format: "15.00"
   deposit_amount?: string; // Format: "400.00"
@@ -172,6 +176,8 @@ export interface VendorBookingEventDate {
   total_amount: number;
   paid_amount: number;
   pending_payment: number;
+  /** Present only when this date has promo savings. */
+  saved_amount?: number;
   tables: VendorBookingTable[];
   tickets: VendorBookingTicket[];
   drinks: VendorBookingDrink[];

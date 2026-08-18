@@ -315,8 +315,9 @@ export function isValidAdminPolicySection(
 /**
  * Admin marketing home content — resolved from the theme (white-label keys) with
  * the current platform copy as fallback. The repeatable lists (partner logos,
- * audience cards, feature items, news articles, FAQ Q&As) stay in their section
- * components; only the surrounding text and the hero background are editable.
+ * audience cards, feature items, FAQ Q&As) stay in their section
+ * components; news articles are managed in Blog Management. Only the
+ * surrounding text and the hero background are editable.
  */
 export interface AdminHomeContent {
   hero: {

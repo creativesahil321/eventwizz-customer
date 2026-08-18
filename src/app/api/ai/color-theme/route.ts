@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import { resolveAiRuntimeConfig } from "../lib/provider-config";
 
 type ColorTheme = {
   primary: string;
@@ -570,7 +570,8 @@ export async function POST(req: Request) {
     } =
       await req.json();
 
-    if (!env.GROQ_API_KEY) {
+    const aiConfig = await resolveAiRuntimeConfig();
+    if (!aiConfig.isConfigured) {
       return NextResponse.json(
         { error: "AI service is not properly configured" },
         { status: 500 }
@@ -1056,7 +1057,7 @@ Remember: Return solid hex colors for most fields, but background can be either 
 
     // Use the fallback system to try models in sequence
     const result: FallbackResult = await tryModelsWithFallback(
-      env.GROQ_API_KEY,
+      aiConfig,
       {
         messages: [
           {

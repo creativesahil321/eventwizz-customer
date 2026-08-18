@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import { resolveAiRuntimeConfig } from "../lib/provider-config";
 
 type ContentType = "about" | "policy" | "contact" | "page";
 
@@ -133,7 +133,8 @@ export async function POST(req: Request) {
       policySection,
     } = await req.json();
 
-    if (!env.GROQ_API_KEY) {
+    const aiConfig = await resolveAiRuntimeConfig();
+    if (!aiConfig.isConfigured) {
       return NextResponse.json(
         { error: "AI service is not properly configured" },
         { status: 500 }
@@ -233,7 +234,7 @@ export async function POST(req: Request) {
     }
 
     const result: FallbackResult = await tryModelsWithFallback(
-      env.GROQ_API_KEY,
+      aiConfig,
       {
         messages: [
           {

@@ -274,7 +274,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
           Venue commission
         </CardTitle>
         <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-          Leave unset to use the default from Payment Settings, or choose a
+          Leave unset to use the default from Settings, or choose a
           custom fee for Stripe Connect at checkout.
         </p>
       </CardHeader>
@@ -289,7 +289,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
             </Label>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Turn on to set a venue-specific percentage or flat fee. When off,
-              Payment Settings defaults apply.
+              Settings defaults apply.
             </p>
           </div>
           <Switch
@@ -416,7 +416,7 @@ export function VenueCommissionCard({ venue }: VenueCommissionCardProps) {
           </>
         ) : (
           <p className="text-sm text-muted-foreground rounded-md border border-dashed border-slate-200 bg-slate-50/40 px-4 py-3">
-            Platform default commission from Payment Settings is used for
+            Platform default commission from Settings is used for
             this venue.
           </p>
         )}

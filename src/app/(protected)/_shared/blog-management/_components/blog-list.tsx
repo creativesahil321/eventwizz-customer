@@ -4,15 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import {
-  Eye,
-  Pencil,
-  PlusCircle,
-  RotateCcw,
-  Search,
-  Trash2,
-} from "lucide-react";
-import { toast } from "sonner";
+import { Eye, Pencil, PlusCircle, Search, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,75 +26,77 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useBlogStore } from "../_lib/blog-store";
-import { formatBlogDate } from "../_lib/schema";
-import type { BlogPost, BlogStatus } from "@/lib/blogs";
+import { useDebounce } from "@/hooks/data-table/use-debounce";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import {
+  BLOG_ADMIN_PER_PAGE,
+  blogAdminPaths,
+  formatBlogDate,
+  type BlogPost,
+  type BlogStatus,
+} from "@/lib/blogs";
+import { shouldUseNextImageOptimization } from "@/lib/image-utils";
+import { useAdminBlogs, useDeleteAdminBlog } from "@/services/admin/blogs";
 import { BlogCardPreview } from "./blog-card-preview";
+import { BlogListSkeleton } from "./skeleton-loader";
 
 type ViewMode = "table" | "cards";
 type StatusFilter = "all" | BlogStatus;
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = React.useState(false);
-
-  React.useEffect(() => {
-    const media = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    const update = () => setIsMobile(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, [breakpoint]);
-
-  return isMobile;
-}
-
 export function BlogList() {
   const router = useRouter();
-  const isMobile = useIsMobile();
-  const posts = useBlogStore((s) => s.posts);
-  const deletePost = useBlogStore((s) => s.deletePost);
-  const resetToDummy = useBlogStore((s) => s.resetToDummy);
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const deleteBlog = useDeleteAdminBlog();
 
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
+  const [page, setPage] = React.useState(1);
   const [viewMode, setViewMode] = React.useState<ViewMode>("cards");
   const [deleteTarget, setDeleteTarget] = React.useState<BlogPost | null>(null);
+
+  const debouncedSearch = useDebounce(search, 400);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
 
   React.useEffect(() => {
     if (isMobile) setViewMode("cards");
   }, [isMobile]);
 
-  const filtered = React.useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return posts.filter((post) => {
-      if (statusFilter !== "all" && post.status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        post.title.toLowerCase().includes(q) ||
-        post.excerpt.toLowerCase().includes(q) ||
-        post.meta_title.toLowerCase().includes(q)
-      );
-    });
-  }, [posts, search, statusFilter]);
+  const { data, isLoading, isFetching } = useAdminBlogs({
+    search: debouncedSearch || undefined,
+    status: statusFilter,
+    page,
+    per_page: BLOG_ADMIN_PER_PAGE,
+  });
 
-  const publishedCount = posts.filter((p) => p.status === "published").length;
-  const draftCount = posts.filter((p) => p.status === "draft").length;
+  const posts = data?.posts ?? [];
+  const stats = data?.stats ?? { total: 0, published: 0, drafts: 0 };
+  const meta = data?.meta;
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    deletePost(deleteTarget.id);
-    toast.success(`Deleted “${deleteTarget.title}”`);
-    setDeleteTarget(null);
+    try {
+      await deleteBlog.mutateAsync(deleteTarget.slug);
+      setDeleteTarget(null);
+    } catch {
+      // interceptor toasts
+    }
   };
 
   const effectiveView: ViewMode = isMobile ? "cards" : viewMode;
 
+  if (isLoading && !data) {
+    return <BlogListSkeleton />;
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <StatCard label="Total" value={posts.length} />
-        <StatCard label="Published" value={publishedCount} accent="green" />
-        <StatCard label="Drafts" value={draftCount} accent="amber" />
+        <StatCard label="Total" value={stats.total} />
+        <StatCard label="Published" value={stats.published} accent="green" />
+        <StatCard label="Drafts" value={stats.drafts} accent="amber" />
       </div>
 
       <div className="rounded-lg border border-[var(--color-border)] bg-white p-3 shadow-sm sm:p-4">
@@ -112,7 +106,7 @@ export function BlogList() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search title, excerpt, meta..."
+              placeholder="Search title, excerpt..."
               className="pl-9"
             />
           </div>
@@ -132,56 +126,40 @@ export function BlogList() {
               </SelectContent>
             </Select>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {!isMobile ? (
-                <div className="flex rounded-md border border-[var(--color-border)] p-0.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={viewMode === "table" ? "event-primary" : "ghost"}
-                    className="h-8"
-                    onClick={() => setViewMode("table")}
-                  >
-                    Table
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={viewMode === "cards" ? "event-primary" : "ghost"}
-                    className="h-8"
-                    onClick={() => setViewMode("cards")}
-                  >
-                    Cards
-                  </Button>
-                </div>
-              ) : null}
-
-              <Button
-                type="button"
-                variant="event-outline"
-                size="sm"
-                className="h-9 flex-1 gap-1.5 sm:flex-none"
-                onClick={() => {
-                  resetToDummy();
-                  toast.success("Reset to sample blog posts");
-                }}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset demo
-              </Button>
-            </div>
+            {!isMobile ? (
+              <div className="flex rounded-md border border-[var(--color-border)] p-0.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={viewMode === "table" ? "event-primary" : "ghost"}
+                  className="h-8"
+                  onClick={() => setViewMode("table")}
+                >
+                  Table
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={viewMode === "cards" ? "event-primary" : "ghost"}
+                  className="h-8"
+                  onClick={() => setViewMode("cards")}
+                >
+                  Cards
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {posts.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-white px-4 py-12 text-center sm:px-6 sm:py-16">
           <p className="text-lg font-semibold text-foreground">No posts found</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Try a different search, or create your first blog post.
           </p>
           <Link
-            href="/admin/blog-management/create"
+            href={blogAdminPaths.create}
             className="mt-4 inline-block w-full sm:w-auto"
           >
             <Button variant="event-primary" className="w-full gap-1.5 sm:w-auto">
@@ -191,14 +169,17 @@ export function BlogList() {
           </Link>
         </div>
       ) : effectiveView === "cards" ? (
-        <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
-          {filtered.map((post) => (
-            <div key={post.id} className="relative overflow-hidden rounded-2xl">
+        <div
+          className={`grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3 ${isFetching ? "opacity-70" : ""}`}
+        >
+          {posts.map((post) => (
+            <div key={post.slug} className="relative overflow-hidden rounded-2xl">
               <BlogCardPreview
                 title={post.title}
                 excerpt={post.excerpt}
                 publishedAt={post.published_at}
                 coverImage={post.cover_image}
+                usePlaceholders={false}
               />
               <div className="absolute inset-x-0 bottom-0 flex gap-2 bg-gradient-to-t from-black/55 via-black/25 to-transparent p-3 pt-10">
                 <Button
@@ -206,7 +187,7 @@ export function BlogList() {
                   variant="event-primary"
                   className="h-9 flex-1 shadow-md"
                   onClick={() =>
-                    router.push(`/admin/blog-management/edit/${post.id}`)
+                    router.push(blogAdminPaths.edit(post.slug))
                   }
                 >
                   <Pencil className="mr-1 h-3.5 w-3.5" />
@@ -239,28 +220,29 @@ export function BlogList() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((post, index) => (
+                {posts.map((post, index) => (
                   <tr
-                    key={post.id}
+                    key={post.slug}
                     className="border-b border-[var(--color-border)] last:border-0 hover:bg-slate-50/80"
                   >
                     <td className="px-4 py-3 text-muted-foreground">
-                      {index + 1}
+                      {(page - 1) * (meta?.per_page ?? BLOG_ADMIN_PER_PAGE) + index + 1}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md bg-slate-100">
-                          <Image
-                            src={post.cover_image}
-                            alt=""
-                            fill
-                            className="object-cover"
-                            sizes="64px"
-                            unoptimized={
-                              post.cover_image.startsWith("blob:") ||
-                              post.cover_image.startsWith("data:")
-                            }
-                          />
+                          {post.cover_image ? (
+                            <Image
+                              src={post.cover_image}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              sizes="64px"
+                              unoptimized={
+                                !shouldUseNextImageOptimization(post.cover_image)
+                              }
+                            />
+                          ) : null}
                         </div>
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-foreground">
@@ -298,9 +280,7 @@ export function BlogList() {
                           className="h-8 w-8"
                           title="Edit"
                           onClick={() =>
-                            router.push(
-                              `/admin/blog-management/edit/${post.id}`,
-                            )
+                            router.push(blogAdminPaths.edit(post.slug))
                           }
                         >
                           <Pencil className="h-4 w-4" />
@@ -310,7 +290,7 @@ export function BlogList() {
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8"
-                          title="Preview card"
+                          title="Card view"
                           onClick={() => setViewMode("cards")}
                         >
                           <Eye className="h-4 w-4" />
@@ -335,6 +315,34 @@ export function BlogList() {
         </div>
       )}
 
+      {meta && meta.last_page > 1 ? (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Page {meta.current_page} of {meta.last_page}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="event-outline"
+              size="sm"
+              disabled={page <= 1 || isFetching}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="event-outline"
+              size="sm"
+              disabled={page >= meta.last_page || isFetching}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <AlertDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
@@ -343,8 +351,8 @@ export function BlogList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this blog post?</AlertDialogTitle>
             <AlertDialogDescription>
-              “{deleteTarget?.title}” will be removed from the demo list. You
-              can restore sample posts with Reset demo.
+              “{deleteTarget?.title}” will be permanently deleted, including its
+              featured image.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
@@ -352,7 +360,7 @@ export function BlogList() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={() => void handleDelete()}
               className="m-0 w-full bg-destructive text-white hover:bg-destructive/90 sm:w-auto"
             >
               Delete

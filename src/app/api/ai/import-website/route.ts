@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { env } from "@/env";
+import { resolveAiRuntimeConfig } from "../lib/provider-config";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { assertSafeLogoUrl } from "@/lib/logo/fetch-logo-from-url";
 import {
@@ -476,13 +476,14 @@ export async function POST(req: Request) {
 
     let content: WebsiteImportContent;
 
-    if (!env.GROQ_API_KEY) {
+    const aiConfig = await resolveAiRuntimeConfig();
+    if (!aiConfig.isConfigured) {
       // No AI configured — still useful: return scraped/deterministic mapping.
       content = fallbackContent(site);
     } else {
       try {
         const result: FallbackResult = await tryModelsWithFallback(
-          env.GROQ_API_KEY,
+          aiConfig,
           {
             messages: [
               { role: "system", content: buildSystemPrompt(rewrite) },
@@ -567,7 +568,7 @@ export async function POST(req: Request) {
       colors: palette,
       colorTheme,
       contact: { emails: site.emails, phones: site.phones },
-      rewritten: rewrite && Boolean(env.GROQ_API_KEY),
+      rewritten: rewrite && aiConfig.isConfigured,
       warnings: warnings.length ? warnings : undefined,
     };
 

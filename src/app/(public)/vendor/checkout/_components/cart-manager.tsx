@@ -225,7 +225,8 @@ export default function CartManager({}: CartManagerProps) {
     }
   }, [currentEventSlug, roomMode, activeRoomId, setCurrentEvent]);
 
-  // Room mode: dates collapsed by default. Flat mode: all expanded.
+  // Flat mode: expand all dates. Room mode: keep multi-date collapsed,
+  // but open the only date when a room has just one.
   // Reset when the cart event changes (e.g. store-only replace).
   useEffect(() => {
     hasInitializedExpanded.current = false;
@@ -255,21 +256,32 @@ export default function CartManager({}: CartManagerProps) {
   }, [activeRoomId, roomMode]);
 
   useEffect(() => {
-    if (firstDate && !hasInitializedExpanded.current) {
-      if (roomMode) {
-        setExpandedDates(new Set());
-      } else {
-        const allDates = currentEventApiData
-          ? getAvailableDates(currentEventApiData)
-          : [firstDate];
-        setExpandedDates(new Set(allDates));
+    if (!firstDate) {
+      if (!(roomMode && rooms.length > 0)) {
+        hasInitializedExpanded.current = false;
       }
-      hasInitializedExpanded.current = true;
+      return;
     }
-    if (!firstDate && !(roomMode && rooms.length > 0)) {
-      hasInitializedExpanded.current = false;
+    if (hasInitializedExpanded.current) return;
+
+    if (roomMode) {
+      const roomId = activeRoomId ?? rooms[0]?.room_id ?? null;
+      if (roomId == null || !currentEventApiData) return;
+
+      const roomDates = getRoomDates(currentEventApiData, roomId).map((d) =>
+        buildRoomDateKey(roomId, d),
+      );
+      setExpandedDates(
+        roomDates.length === 1 ? new Set(roomDates) : new Set(),
+      );
+    } else {
+      const allDates = currentEventApiData
+        ? getAvailableDates(currentEventApiData)
+        : [firstDate];
+      setExpandedDates(new Set(allDates));
     }
-  }, [firstDate, currentEventApiData, roomMode, rooms]);
+    hasInitializedExpanded.current = true;
+  }, [firstDate, currentEventApiData, roomMode, rooms, activeRoomId]);
 
   // Cart synchronization check — never treat "Zustand not hydrated yet" as a wipe.
   useEffect(() => {
@@ -417,7 +429,10 @@ export default function CartManager({}: CartManagerProps) {
     const roomDates = getRoomDates(currentEventApiData, roomId).map((d) =>
       buildRoomDateKey(roomId, d),
     );
-    setExpandedDates(roomDates.length > 0 ? new Set([roomDates[0]]) : new Set());
+    // Single date → open; multiple dates stay collapsed by default.
+    setExpandedDates(
+      roomDates.length === 1 ? new Set(roomDates) : new Set(),
+    );
   };
 
   const roomSubtotals = useMemo(() => {

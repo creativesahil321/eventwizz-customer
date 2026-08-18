@@ -12,6 +12,10 @@ import {
   VendorBookingRoomFilterOption,
   type VendorBookingEventDateEntry,
 } from "@/services/vendor/bookings/bookings.service";
+import {
+  parseCouponCode,
+  parseSavedAmount,
+} from "@/lib/booking-saved-amount";
 import { AdminHistoryParams, History, type HistoryEventDate } from "./types";
 
 // Query keys for booking history
@@ -94,6 +98,8 @@ const transformBookingItem = (
     date: toSortableDate(primaryDisplayDate),
     event_dates: eventDates.length > 0 ? eventDates : undefined,
     amount: parseFloat(item.amount) || 0,
+    saved_amount: parseSavedAmount(item.saved_amount),
+    coupon_code: parseCouponCode(item.coupon_code),
     status: item.status,
     tickets: 0,
     total_table: 0,

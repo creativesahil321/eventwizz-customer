@@ -616,7 +616,11 @@ apiClient.interceptors.response.use(
           }
           break;
         }
-        case 404:
+        case 404: {
+          const suppressNotFoundToast = (
+            error.config as RequestOptions | undefined
+          )?.suppressErrorToast;
+          if (suppressNotFoundToast) break;
           // Handle not found - show error toast with message from response
           const notFoundData = error.response.data as ApiErrorResponse;
           if (notFoundData?.message && !isLogoutInProgress) {
@@ -625,6 +629,7 @@ apiClient.interceptors.response.use(
             safeToast.error("Resource not found");
           }
           break;
+        }
         case 422:
           // Handle validation errors
           const errorData = error.response.data as ApiErrorResponse;

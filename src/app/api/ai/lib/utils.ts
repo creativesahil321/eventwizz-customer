@@ -1,5 +1,8 @@
+import type { AiRuntimeConfig } from "./provider-config";
+
 /**
- * Groq model fallbacks in priority order.
+ * Default model fallbacks in priority order (used when no dynamic config is
+ * available — i.e. the legacy Groq path).
  *
  * Notes:
  * - We prefer higher-quality / more capable models first, but we still want a reliable
@@ -12,8 +15,6 @@ export const MODEL_FALLBACKS = [
   "gemma2-9b-it",
   "llama-3.1-8b-instant",
 ] as const;
-
-type GroqModel = (typeof MODEL_FALLBACKS)[number];
 
 // Define the fallback result type
 export type FallbackResult = {
@@ -97,58 +98,161 @@ function isFallbackWorthyGroqError(status: number, message: string | undefined, 
   return false;
 }
 
+type ChatMessage = { role: string; content: string };
+
 /**
- * Smart model fallback system that tries models in sequence
- * @param apiKey - GROQ API key
- * @param requestBody - Request body for the API call
- * @returns Promise with fallback result
+ * Normalise the openai-style requestBody the routes build into whatever the
+ * target provider expects. Both branches return a promise resolving to a
+ * uniform `{ ok, status, content?, errorMessage?, errorCode? }` shape.
+ */
+async function callProvider(
+  config: Pick<AiRuntimeConfig, "providerType" | "baseUrl" | "apiKey">,
+  model: string,
+  requestBody: Record<string, unknown>,
+): Promise<{
+  ok: boolean;
+  status: number;
+  content?: string;
+  errorMessage?: string;
+  errorCode?: string;
+}> {
+  const baseUrl = config.baseUrl.replace(/\/+$/, "");
+
+  if (config.providerType === "anthropic") {
+    const messages = Array.isArray(requestBody.messages)
+      ? (requestBody.messages as ChatMessage[])
+      : [];
+    const system = messages
+      .filter((m) => m.role === "system")
+      .map((m) => m.content)
+      .join("\n\n");
+    const chat = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    const response = await fetch(`${baseUrl}/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": config.apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens:
+          typeof requestBody.max_tokens === "number"
+            ? requestBody.max_tokens
+            : 1024,
+        ...(typeof requestBody.temperature === "number"
+          ? { temperature: requestBody.temperature }
+          : {}),
+        ...(system ? { system } : {}),
+        messages: chat,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const blocks = Array.isArray(data?.content) ? data.content : [];
+      const content = blocks
+        .filter((b: { type?: string }) => b?.type === "text")
+        .map((b: { text?: string }) => b.text ?? "")
+        .join("");
+      return { ok: true, status: response.status, content };
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+    return {
+      ok: false,
+      status: response.status,
+      errorMessage: errorData?.error?.message,
+      errorCode: errorData?.error?.type,
+    };
+  }
+
+  // OpenAI-compatible (Groq, OpenAI, xAI, Together, DeepSeek, Mistral, …)
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ...requestBody, model }),
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content ?? "";
+    return { ok: true, status: response.status, content };
+  }
+
+  const errorData = await response.json().catch(() => ({}));
+  return {
+    ok: false,
+    status: response.status,
+    errorMessage: errorData?.error?.message,
+    errorCode: errorData?.error?.code,
+  };
+}
+
+/** Coerce the legacy `apiKey` string arg into a Groq runtime config. */
+function toRuntimeConfig(
+  input: string | AiRuntimeConfig,
+): Pick<AiRuntimeConfig, "providerType" | "baseUrl" | "apiKey" | "models"> {
+  if (typeof input === "string") {
+    return {
+      providerType: "openai_compatible",
+      baseUrl: "https://api.groq.com/openai/v1",
+      apiKey: input,
+      models: [...MODEL_FALLBACKS],
+    };
+  }
+  return {
+    providerType: input.providerType,
+    baseUrl: input.baseUrl,
+    apiKey: input.apiKey,
+    models: input.models.length > 0 ? input.models : [...MODEL_FALLBACKS],
+  };
+}
+
+/**
+ * Provider-agnostic model fallback. Tries each configured model in order and
+ * skips to the next on rate-limit / capacity / availability errors.
+ *
+ * Accepts either a resolved {@link AiRuntimeConfig} (dynamic, multi-provider)
+ * or a bare API key string (legacy Groq path) for backward compatibility.
  */
 export async function tryModelsWithFallback(
-  apiKey: string,
+  configOrApiKey: string | AiRuntimeConfig,
   requestBody: Record<string, unknown>
 ): Promise<FallbackResult> {
+  const config = toRuntimeConfig(configOrApiKey);
   let lastError: unknown = null;
   const modelsTried: string[] = [];
   let lastStatus: number | undefined;
   let retryAfterMs: number | undefined;
 
-  for (const model of MODEL_FALLBACKS as readonly GroqModel[]) {
+  for (const model of config.models) {
     modelsTried.push(model);
     try {
-      const response = await fetch(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...requestBody,
-            model: model,
-          }),
-        }
-      );
+      const result = await callProvider(config, model, requestBody);
 
-      if (response.ok) {
-        const data = await response.json();
+      if (result.ok) {
         return {
           success: true,
-          data: data,
-          model: model,
+          data: { choices: [{ message: { content: result.content ?? "" } }] },
+          model,
           modelUsed: model,
           modelsTried,
         };
       }
 
-      // Check if this is a model decommissioning error
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage: string | undefined = errorData?.error?.message;
-      const errorCode: string | undefined = errorData?.error?.code;
-      lastStatus = response.status;
-      lastError = errorData;
+      const errorMessage = result.errorMessage;
+      const errorCode = result.errorCode;
+      lastStatus = result.status;
+      lastError = { message: errorMessage, code: errorCode, model };
 
-      // Capture retry-after if Groq provides it (useful for TPD exhaustion).
+      // Capture retry-after if the provider hints one (useful for TPD exhaustion).
       const parsedRetry = parseRetryAfterMsFromGroqMessage(errorMessage);
       if (typeof parsedRetry === "number") retryAfterMs = parsedRetry;
 
@@ -156,23 +260,23 @@ export async function tryModelsWithFallback(
         lastError = {
           type: "model_decommissioned",
           message: `Model ${model} has been decommissioned`,
-          model: model,
+          model,
         };
         continue; // Try next model
       }
 
       // Retry on the next model for rate-limit/capacity/model-availability errors.
-      if (isFallbackWorthyGroqError(response.status, errorMessage, errorCode)) {
+      if (isFallbackWorthyGroqError(result.status, errorMessage, errorCode)) {
         lastError = {
           type:
-            response.status === 413
+            result.status === 413
               ? "request_too_large"
-              : response.status === 429
+              : result.status === 429
                 ? "rate_limit"
                 : "model_unavailable",
-          message: `Groq error for model ${model}; trying next fallback`,
+          message: `AI provider error for model ${model}; trying next fallback`,
           model,
-          status: response.status,
+          status: result.status,
           details: errorMessage,
         };
         continue;
@@ -182,16 +286,16 @@ export async function tryModelsWithFallback(
       return {
         success: false,
         error: errorMessage || "API error",
-        status: response.status,
-        model: model,
-        lastError: errorData,
+        status: result.status,
+        model,
+        lastError,
         modelsTried,
       };
     } catch (error) {
       lastError = {
         type: "network_error",
         message: error instanceof Error ? error.message : "Unknown error",
-        model: model,
+        model,
       };
       continue; // Try next model
     }

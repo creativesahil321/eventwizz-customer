@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import { resolveAiRuntimeConfig } from "../lib/provider-config";
 
 // Define the message type
 type Message = {
@@ -16,12 +16,12 @@ type DomainSuggestion = {
 
 export async function POST(req: NextRequest) {
   try {
-    // Get API key from environment variable
-    const apiKey = env.GROQ_API_KEY;
+    // Resolve the active AI provider (dynamic; falls back to GROQ_API_KEY)
+    const aiConfig = await resolveAiRuntimeConfig();
 
-    if (!apiKey) {
+    if (!aiConfig.isConfigured) {
       return NextResponse.json(
-        { error: "GROQ API key is not configured" },
+        { error: "AI service is not configured" },
         { status: 500 }
       );
     }
@@ -71,7 +71,7 @@ Examples:
     const apiMessages: Message[] = [systemMessage, userMessage];
 
     // Use the fallback system to try models in sequence
-    const result: FallbackResult = await tryModelsWithFallback(apiKey, {
+    const result: FallbackResult = await tryModelsWithFallback(aiConfig, {
       messages: apiMessages,
       max_tokens: 1000,
       temperature: 0.7,
