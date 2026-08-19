@@ -26,11 +26,11 @@ export type CouponStripSource = {
   value_label?: string | null;
   discount_type?: "percentage" | "flat" | string | null;
   value_type?: "percentage" | "flat" | string | null;
-  /** API amount — % value or flat-off-total amount. */
+  /** API amount — percentage value. */
   amount?: number | null;
   /** @deprecated Prefer `amount` (vendor form alias). */
   discount_value?: number | null;
-  /** Not used for coupons (flat is always off total). Kept for date-offer reuse. */
+  /** Not used for coupons. Kept for date-offer reuse. */
   flat_mode?: string | null;
   expires_at?: string | null;
   /** API: show coupon banner on the event page. */
@@ -57,19 +57,13 @@ function resolveAmount(source: CouponStripSource): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Compact badge for the strip, e.g. `50% OFF` or `£10 OFF`. */
+/** Compact badge for the strip, e.g. `50% OFF`. */
 export function formatCouponStripBadge(source: CouponStripSource): string {
   const amount = resolveAmount(source);
   const valueType = resolveValueType(source);
-  if (!(amount > 0) || !valueType) return "";
+  if (!(amount > 0) || valueType !== "percentage") return "";
 
-  if (valueType === "percentage") {
-    return `${amount}% OFF`;
-  }
-
-  // Coupons are flat-off-total only (no per-person mode).
-  const formatted = Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
-  return `£${formatted} OFF`;
+  return `${amount}% OFF`;
 }
 
 /**

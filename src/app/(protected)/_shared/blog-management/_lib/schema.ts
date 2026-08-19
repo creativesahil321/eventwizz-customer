@@ -90,6 +90,14 @@ export const blogFormSchema = z
       });
     }
 
+    if (!values.cover_image.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cover_image"],
+        message: "Featured image is required",
+      });
+    }
+
     if (values.status !== "published") return;
 
     if (!values.published_at) {

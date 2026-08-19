@@ -25,3 +25,11 @@ export function usePreviewNarrowLayout(): boolean {
   const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
   return isPreview && deviceFramesEnabled && device !== "desktop";
 }
+
+/** True only for the 390px Mobile device frame (not tablet). */
+export function usePreviewMobileLayout(): boolean {
+  const isPreview = useIsPreviewMode();
+  const device = usePreviewDeviceStore((s) => s.device);
+  const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
+  return isPreview && deviceFramesEnabled && device === "mobile";
+}

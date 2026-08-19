@@ -56,15 +56,18 @@ function apiOfferToFormEntry(
   fallbackShowOnEventPage = true,
   fallbackLive = true,
 ): DiscountDateFormEntry {
+  const isFlat = entry.discount_type === "flat";
   const flatMode = normalizeFlatMode(entry.flat_mode);
   return {
     date_id: entry.date_id ?? 0,
     event_date: entry.date ?? "",
     room_id: entry.room_id ?? entry.room?.id ?? 0,
-    value_type: entry.discount_type === "flat" ? "flat" : "percentage",
+    value_type: isFlat ? "flat" : "percentage",
     discount_value: Number(entry.amount) || 0,
-    flat_mode: flatMode,
-    min_people: entry.min_people ?? null,
+    // Flat off total removed — coerce legacy flat/total rows to per person.
+    flat_mode: isFlat ? "per_person" : null,
+    min_people:
+      isFlat && flatMode === "per_person" ? (entry.min_people ?? null) : null,
     valid_from: entry.valid_from ?? "",
     original_valid_from: entry.valid_from ?? "",
     expires_at: entry.expires_at ?? "",
@@ -117,8 +120,6 @@ export function discountToFormValues(discount: Discount): DiscountFormValues {
   }
 
   const flatMode = normalizeFlatMode(discount.flat_mode);
-  const couponFlatMode =
-    isCoupon && flatMode === "per_person" ? "total" : flatMode;
 
   return {
     name: discount.name ?? "",
@@ -133,9 +134,20 @@ export function discountToFormValues(discount: Discount): DiscountFormValues {
     dynamic_text: couponBannerSubheading(discount),
     customer_audience: audience,
     customer_ids: discount.customers?.map((c) => c.id) ?? [],
-    value_type: discount.discount_type === "flat" ? "flat" : "percentage",
+    // Coupons are percentage-only (flat off total removed).
+    value_type: isCoupon
+      ? "percentage"
+      : discount.discount_type === "flat"
+        ? "flat"
+        : "percentage",
     discount_value: Number(discount.amount) || 0,
-    flat_mode: couponFlatMode,
+    flat_mode: isCoupon
+      ? null
+      : flatMode === "per_person"
+        ? "per_person"
+        : discount.discount_type === "flat"
+          ? "per_person"
+          : null,
     min_people: isCoupon ? null : discount.min_people,
     valid_from: discount.valid_from ?? "",
     original_valid_from: discount.valid_from ?? "",
@@ -176,7 +188,7 @@ export function buildDiscountStorePayload(
   const payload: DiscountFormPayload = {
     category: "coupon_code",
     vendor_event_id: eventId,
-    discount_type: data.value_type,
+    discount_type: "percentage",
     amount: Number(data.discount_value),
     name,
     valid_from: data.valid_from?.trim() ? data.valid_from : null,
@@ -193,11 +205,6 @@ export function buildDiscountStorePayload(
       ? data.dynamic_text?.trim() || null
       : null,
   };
-
-  if (data.value_type === "flat") {
-    payload.flat_mode =
-      data.flat_mode === "per_person" ? "total" : data.flat_mode ?? "total";
-  }
 
   if (data.customer_audience === "selected") {
     payload.customer_ids = data.customer_ids ?? [];

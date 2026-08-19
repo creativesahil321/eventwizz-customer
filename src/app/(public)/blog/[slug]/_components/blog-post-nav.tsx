@@ -11,7 +11,7 @@ export function BlogPostNav({ previous, next }: BlogPostNavProps) {
   if (!previous && !next) return null;
 
   return (
-    <nav className="mt-10 flex flex-col gap-4 border-t border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] pt-8 sm:mt-16 sm:flex-row sm:items-start sm:justify-between sm:gap-10 sm:pt-10">
+    <nav className="mt-8 flex flex-col gap-3 border-t border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] pt-6 sm:mt-10 sm:flex-row sm:items-start sm:justify-between sm:gap-8 sm:pt-7">
       {previous ? (
         <Link
           href={blogPublicPaths.article(previous.slug)}

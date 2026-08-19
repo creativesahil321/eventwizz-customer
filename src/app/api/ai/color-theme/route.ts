@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { resolveAiRuntimeConfig } from "../lib/provider-config";
+import {
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
 
 type ColorTheme = {
   primary: string;
@@ -572,10 +575,7 @@ export async function POST(req: Request) {
 
     const aiConfig = await resolveAiRuntimeConfig();
     if (!aiConfig.isConfigured) {
-      return NextResponse.json(
-        { error: "AI service is not properly configured" },
-        { status: 500 }
-      );
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     // Build contextual prompt based on user inputs

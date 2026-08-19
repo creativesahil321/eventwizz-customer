@@ -19,18 +19,18 @@ export default function NewsSection({
   return (
     <section
       id="latest-news"
-      className="bg-[color:var(--color-background)] py-12 sm:py-16 md:py-20"
+      className="bg-[color:var(--color-background)] py-10 sm:py-12 md:py-14"
     >
-      <div className="container mx-auto px-4">
-        <div className="mb-8 text-center sm:mb-12">
+      <div className="container mx-auto max-w-6xl px-4">
+        <div className="mb-8 max-w-2xl sm:mb-10">
           <SiteHeading
             level={2}
             title={content.title}
             variant="onSurface"
-            align="center"
-            className="mb-3 !text-2xl !font-bold sm:!text-3xl md:!text-4xl"
+            align="left"
+            className="mb-2 !text-2xl !font-bold sm:!text-3xl md:!text-4xl"
           />
-          <p className="mx-auto max-w-2xl px-1 text-sm text-[color:var(--color-text-dimmed)] sm:text-base">
+          <p className="text-sm text-[color:var(--color-text-dimmed)] sm:text-base">
             {content.subtitle}
           </p>
         </div>

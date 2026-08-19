@@ -34,6 +34,7 @@ import { DISCOUNT_OFFER_KIND_LABELS } from "../../_lib/types";
 import {
   buildCustomerPreviewItems,
   buildEventCatalogSlots,
+  listDiscountEventRooms,
   slotKey,
   type EventCatalogSlot,
 } from "../../_lib/offers";
@@ -42,14 +43,15 @@ import {
   formatDiscountPreviewBadge,
 } from "./discount-customer-dates-preview";
 
-type OfferKind = "percentage" | "flat_total" | "flat_per_person";
+type OfferKind = "percentage" | "flat_per_person";
 
 function offerKindFromEntry(entry: {
   value_type: "percentage" | "flat";
   flat_mode?: "total" | "per_person" | null;
 }): OfferKind {
   if (entry.value_type === "percentage") return "percentage";
-  return entry.flat_mode === "per_person" ? "flat_per_person" : "flat_total";
+  // Flat off total removed — treat legacy flat/total as per-person in the editor.
+  return "flat_per_person";
 }
 
 function applyOfferKind(
@@ -61,10 +63,7 @@ function applyOfferKind(
   if (kind === "percentage") {
     return { value_type: "percentage", flat_mode: null, min_people: null };
   }
-  if (kind === "flat_per_person") {
-    return { value_type: "flat", flat_mode: "per_person", min_people: null };
-  }
-  return { value_type: "flat", flat_mode: "total", min_people: null };
+  return { value_type: "flat", flat_mode: "per_person", min_people: null };
 }
 
 function firstOfferIndex(rows: DiscountFormValues["dates"]): number {
@@ -124,6 +123,11 @@ export function DiscountDatesEditor({
 
   const catalogSlots = useMemo(
     () => buildEventCatalogSlots(selectedEvent),
+    [selectedEvent],
+  );
+
+  const eventRoomTabs = useMemo(
+    () => listDiscountEventRooms(selectedEvent),
     [selectedEvent],
   );
 
@@ -433,6 +437,7 @@ export function DiscountDatesEditor({
       {customerPreviewItems.length > 0 ? (
         <DiscountCustomerDatesPreview
           items={customerPreviewItems}
+          rooms={eventRoomTabs}
           selectedFormIndex={activeIndex}
           onSetOffer={openOfferFromPreview}
         />

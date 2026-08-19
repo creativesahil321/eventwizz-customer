@@ -658,7 +658,7 @@ export function calculateEditableDateTicketsTotal(
 }
 
 /**
- * Tables + tickets only. Percentage / flat-total offers and coupon codes use
+ * Tables + tickets only. Percentage offers and coupon codes use
  * this base — drink packages are always excluded.
  */
 export function calculateEditableDateDiscountableTotal(
@@ -1146,18 +1146,6 @@ export function isFlatPerPersonDateDiscount(
   );
 }
 
-/** True when flat offer is a fixed amount off tables + tickets. */
-export function isFlatTotalDateDiscount(
-  discount: ApiEventCartDateBucket["discount"] | null | undefined,
-): boolean {
-  return (
-    discount?.discount_type === "flat" &&
-    (discount.flat_mode === "total" ||
-      discount.flat_mode == null ||
-      discount.flat_mode === "")
-  );
-}
-
 export type DateDiscountEligibilityInput = {
   /** Table seating guests (allocation / peopleCount). */
   guestCount: number;
@@ -1170,7 +1158,8 @@ export type DateDiscountEligibilityInput = {
 /**
  * Eligibility by offer mode:
  * - flat per_person (table offer): guestCount > 0, meets min_people, tableTotal > 0
- * - percentage / flat total: discountableTotal (tables + tickets) > 0
+ * - percentage: discountableTotal (tables + tickets) > 0
+ * - flat off total is no longer supported
  */
 export function isDateDiscountEligible(
   discount: ApiEventCartDateBucket["discount"] | null | undefined,
@@ -1203,10 +1192,7 @@ export function isDateDiscountEligible(
     return true;
   }
 
-  if (
-    discount.discount_type === "percentage" ||
-    isFlatTotalDateDiscount(discount)
-  ) {
+  if (discount.discount_type === "percentage") {
     return discountable > 0;
   }
 
@@ -1216,7 +1202,6 @@ export function isDateDiscountEligible(
 /**
  * Savings by offer mode (drinks never included):
  * - percentage → % of tables + tickets
- * - flat total → fixed amount off tables + tickets
  * - flat per_person → amount × guests, capped by table total only
  */
 export function computeDateDiscountAmount(
@@ -1259,14 +1244,6 @@ export function computeDateDiscountAmount(
       if (!(input.tableTotal > 0) || input.guestCount <= 0) return 0;
       return roundDiscountMoney(
         Math.min(input.tableTotal, amount * input.guestCount),
-      );
-    }
-
-    // Flat off total → tables + tickets (not drinks)
-    if (isFlatTotalDateDiscount(discount)) {
-      if (!(input.discountableTotal > 0)) return 0;
-      return roundDiscountMoney(
-        Math.min(input.discountableTotal, amount),
       );
     }
   }
@@ -1323,11 +1300,7 @@ export function resolveCartDateDiscounts(
         const needed = minPeople - guestCount;
         unlockHint = `Add ${needed} more guest${needed === 1 ? "" : "s"} (min ${minPeople}) to unlock`;
       }
-    } else if (
-      (discount.discount_type === "percentage" ||
-        isFlatTotalDateDiscount(discount)) &&
-      !(dateSubtotal > 0)
-    ) {
+    } else if (discount.discount_type === "percentage" && !(dateSubtotal > 0)) {
       status = "locked";
       unlockHint = "Add tables or tickets to use this offer (drinks excluded)";
     }

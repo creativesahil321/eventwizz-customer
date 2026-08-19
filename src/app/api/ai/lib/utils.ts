@@ -95,10 +95,115 @@ function isFallbackWorthyGroqError(status: number, message: string | undefined, 
   if (msg.includes("tokens per minute")) return true;
   if (msg.includes("tokens per day") || msg.includes("tpd")) return true;
   if (msg.includes("request too large")) return true;
+  // Per-model completion caps (e.g. allam-2-7b = 4096 vs our 8192 request).
+  if (
+    msg.includes("max_completion_tokens") &&
+    msg.includes("must be less than or equal")
+  ) {
+    return true;
+  }
   return false;
 }
 
+/** Org/model TPM-TPD — further Groq models usually fail the same way if we keep firing. */
+function isRateLimitStop(status: number, message: string | undefined): boolean {
+  if (status === 429) return true;
+  const msg = (message || "").toLowerCase();
+  return (
+    msg.includes("tokens per minute") ||
+    msg.includes("tokens per day") ||
+    (msg.includes("rate limit") && status === 413)
+  );
+}
+
+/** 4k-context / tiny-TPM models cannot complete onboarding/event JSON. */
+function isTooSmallForJsonJob(model: string): boolean {
+  const id = model.toLowerCase();
+  return id.includes("allam") || id.endsWith("compound-mini");
+}
+
 type ChatMessage = { role: string; content: string };
+
+function coerceMessageText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (!part || typeof part !== "object") return "";
+      const record = part as Record<string, unknown>;
+      if (typeof record.text === "string") return record.text;
+      if (typeof record.content === "string") return record.content;
+      return "";
+    })
+    .join("");
+}
+
+function visibleAssistantText(msg: Record<string, unknown>): string {
+  const content = coerceMessageText(msg.content).trim();
+  if (content) return content;
+  return [msg.reasoning, msg.reasoning_content]
+    .map(coerceMessageText)
+    .join("\n")
+    .trim();
+}
+
+/** Ceiling we request first. Some Groq models (e.g. allam-2-7b) cap lower — we retry from the 400. */
+const GROQ_MAX_COMPLETION_TOKENS = 8192;
+
+/**
+ * Onboarding / event JSON. Groq reserves input + max_completion against TPM;
+ * 8192 made a ~4k prompt request ~12k TPM and 413'd small fallbacks.
+ */
+export const AI_JSON_MAX_TOKENS = 4096;
+
+function clampCompletionTokens(
+  body: Record<string, unknown>,
+  cap = GROQ_MAX_COMPLETION_TOKENS,
+): Record<string, unknown> {
+  const next = { ...body };
+  if (typeof next.max_tokens === "number") {
+    next.max_tokens = Math.min(next.max_tokens, cap);
+  }
+  if (typeof next.max_completion_tokens === "number") {
+    next.max_completion_tokens = Math.min(next.max_completion_tokens, cap);
+  } else if (typeof next.max_tokens === "number") {
+    next.max_completion_tokens = next.max_tokens;
+  }
+  return next;
+}
+
+/** Groq: "`max_completion_tokens` must be less than or equal to `4096`" */
+function parseMaxCompletionTokensCap(message: string | undefined): number | undefined {
+  if (!message) return;
+  const match = message.match(
+    /max_completion_tokens[`'"]?\s*must be less than or equal to\s*[`'"]?(\d+)/i,
+  );
+  if (!match) return;
+  const n = Number(match[1]);
+  if (!Number.isFinite(n) || n < 1) return;
+  return Math.min(Math.floor(n), GROQ_MAX_COMPLETION_TOKENS);
+}
+
+function stripUnsupportedChatParams(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const {
+    reasoning_format: _rf,
+    reasoning_effort: _re,
+    response_format: _fmt,
+    ...rest
+  } = body;
+  return rest;
+}
+
+function hasUnsupportedChatParams(body: Record<string, unknown>): boolean {
+  return (
+    body.reasoning_format !== undefined ||
+    body.reasoning_effort !== undefined ||
+    body.response_format !== undefined
+  );
+}
 
 /**
  * Normalise the openai-style requestBody the routes build into whatever the
@@ -171,28 +276,75 @@ async function callProvider(
   }
 
   // OpenAI-compatible (Groq, OpenAI, xAI, Together, DeepSeek, Mistral, …)
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ ...requestBody, model }),
+  const postChat = async (
+    body: Record<string, unknown>,
+    tokenCap?: number,
+  ): Promise<{
+    ok: boolean;
+    status: number;
+    content?: string;
+    errorMessage?: string;
+    errorCode?: string;
+  }> => {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(clampCompletionTokens(body, tokenCap)),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const msg = (data?.choices?.[0]?.message ?? {}) as Record<string, unknown>;
+      return {
+        ok: true,
+        status: response.status,
+        content: visibleAssistantText(msg),
+      };
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+    return {
+      ok: false,
+      status: response.status,
+      errorMessage: errorData?.error?.message,
+      errorCode: errorData?.error?.code,
+    };
+  };
+
+  const withTokenCapRetry = async (
+    body: Record<string, unknown>,
+    knownCap?: number,
+  ) => {
+    let result = await postChat(body, knownCap);
+    if (result.ok || result.status !== 400) {
+      return { result, cap: knownCap };
+    }
+    const cap = parseMaxCompletionTokensCap(result.errorMessage);
+    if (!cap) return { result, cap: knownCap };
+    return { result: await postChat(body, cap), cap };
+  };
+
+  let { result, cap: learnedCap } = await withTokenCapRetry({
+    ...requestBody,
+    model,
   });
 
-  if (response.ok) {
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content ?? "";
-    return { ok: true, status: response.status, content };
+  // Qwen/GPT-OSS accept reasoning_* / json_object; Llama etc. may 400 on them.
+  if (
+    !result.ok &&
+    result.status === 400 &&
+    hasUnsupportedChatParams(requestBody)
+  ) {
+    ({ result } = await withTokenCapRetry(
+      { ...stripUnsupportedChatParams(requestBody), model },
+      learnedCap,
+    ));
   }
 
-  const errorData = await response.json().catch(() => ({}));
-  return {
-    ok: false,
-    status: response.status,
-    errorMessage: errorData?.error?.message,
-    errorCode: errorData?.error?.code,
-  };
+  return result;
 }
 
 /** Coerce the legacy `apiKey` string arg into a Groq runtime config. */
@@ -231,16 +383,37 @@ export async function tryModelsWithFallback(
   const modelsTried: string[] = [];
   let lastStatus: number | undefined;
   let retryAfterMs: number | undefined;
+  let stoppedForRateLimit = false;
+
+  const maxTokens =
+    typeof requestBody.max_tokens === "number"
+      ? requestBody.max_tokens
+      : typeof requestBody.max_completion_tokens === "number"
+        ? requestBody.max_completion_tokens
+        : 0;
+  const jsonSizedJob = maxTokens >= 2048;
 
   for (const model of config.models) {
+    if (jsonSizedJob && isTooSmallForJsonJob(model)) {
+      continue;
+    }
     modelsTried.push(model);
     try {
       const result = await callProvider(config, model, requestBody);
 
       if (result.ok) {
+        const text = result.content?.trim() ?? "";
+        if (!text) {
+          lastError = {
+            type: "empty_content",
+            message: `Model ${model} returned an empty message`,
+            model,
+          };
+          continue;
+        }
         return {
           success: true,
-          data: { choices: [{ message: { content: result.content ?? "" } }] },
+          data: { choices: [{ message: { content: text } }] },
           model,
           modelUsed: model,
           modelsTried,
@@ -279,6 +452,17 @@ export async function tryModelsWithFallback(
           status: result.status,
           details: errorMessage,
         };
+        if (isRateLimitStop(result.status, errorMessage)) {
+          stoppedForRateLimit = true;
+          lastError = {
+            type: "rate_limit",
+            message: errorMessage || `Rate limited on ${model}`,
+            model,
+            status: result.status,
+            details: errorMessage,
+          };
+          break;
+        }
         continue;
       }
 
@@ -301,15 +485,21 @@ export async function tryModelsWithFallback(
     }
   }
 
+  const retryAfterHuman =
+    typeof retryAfterMs === "number" ? formatRetryAfter(retryAfterMs) : undefined;
+
   // All models failed
   return {
     success: false,
-    error: "All models failed. Please try again later.",
-    status: lastStatus,
+    error: stoppedForRateLimit
+      ? retryAfterHuman
+        ? `The AI provider is busy. Try again in ${retryAfterHuman}.`
+        : "The AI provider is rate limited. Please try again shortly."
+      : "All models failed. Please try again later.",
+    status: stoppedForRateLimit ? 429 : lastStatus,
     lastError,
     modelsTried,
     retryAfterMs,
-    retryAfterHuman:
-      typeof retryAfterMs === "number" ? formatRetryAfter(retryAfterMs) : undefined,
+    retryAfterHuman,
   };
 }

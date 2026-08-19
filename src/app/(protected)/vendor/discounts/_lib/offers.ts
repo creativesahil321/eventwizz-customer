@@ -1,6 +1,7 @@
 import type {
   Discount,
   DiscountDateEntry,
+  DiscountEventDateRoom,
   DiscountEventWithDates,
   DiscountType,
   FlatDiscountMode,
@@ -85,7 +86,8 @@ export function formatOfferAmountLabel(
   if (mode === "per_person") {
     return `£${amount} / person${minPeople ? ` (min ${minPeople})` : ""}`;
   }
-  return `£${amount} off total`;
+  // Flat off total removed — fall back to a plain amount label for legacy rows.
+  return `£${amount} off`;
 }
 
 export function formatFormOfferValueLabel(
@@ -147,6 +149,63 @@ export function buildEventCatalogSlots(
     if (byDate !== 0) return byDate;
     return (a.roomName ?? "").localeCompare(b.roomName ?? "");
   });
+}
+
+export type DiscountEventRoomTab = {
+  roomId: number;
+  label: string;
+};
+
+/**
+ * Event-level room order for the customer preview tabs.
+ *
+ * Catalog slots are sorted by date, so first-seen-room would put whichever
+ * room has the earliest date on the left. The live event page instead uses
+ * `event.rooms` insertion order (typically the venue/event room relation,
+ * which follows room id). Match that here.
+ */
+export function listDiscountEventRooms(
+  event: DiscountEventWithDates | null | undefined,
+): DiscountEventRoomTab[] {
+  const unique = new Map<number, string>();
+  let richest: DiscountEventDateRoom[] = [];
+
+  for (const d of event?.dates ?? []) {
+    const rooms = (d.rooms ?? []).filter((r) => r?.id != null);
+    for (const room of rooms) {
+      if (!unique.has(room.id)) {
+        unique.set(room.id, room.name ?? `Room ${room.id}`);
+      }
+    }
+    if (rooms.length > richest.length) {
+      richest = rooms;
+    }
+  }
+
+  if (unique.size === 0) return [];
+
+  // A date that lists several rooms is the best proxy for public `event.rooms` order.
+  if (richest.length >= 2) {
+    const seen = new Set<number>();
+    const ordered: DiscountEventRoomTab[] = [];
+    for (const room of richest) {
+      if (seen.has(room.id)) continue;
+      seen.add(room.id);
+      ordered.push({
+        roomId: room.id,
+        label: unique.get(room.id) || room.name || `Room ${room.id}`,
+      });
+    }
+    for (const [roomId, label] of unique) {
+      if (seen.has(roomId)) continue;
+      ordered.push({ roomId, label });
+    }
+    return ordered;
+  }
+
+  return Array.from(unique.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([roomId, label]) => ({ roomId, label }));
 }
 
 export type CustomerPreviewOffer = {

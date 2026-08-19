@@ -1,5 +1,8 @@
 /**
  * Per-Date Payment Selection — clean radio-card design for full vs deposit.
+ *
+ * Amounts shown here must match Order Summary: apply date offer / coupon
+ * savings first, then compute pay-in-full and table-deposit splits.
  */
 
 "use client";
@@ -10,13 +13,20 @@ import type { ApiEventCartData, ApiDateData } from "@/lib/types/cart.types";
 import { format } from "date-fns";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import {
+  calculateEditableDateDiscountableTotal,
+  calculateEditableDateTablesTotal,
   calculateEditableDateTotal,
   getApiCartDateKeys,
   getApiDateData,
+  getApiDateDiscount,
   getBillableTables,
+  getDateGuestCount,
+  computeDateDiscountAmount,
   isDepositChoiceAvailable,
+  isFlatPerPersonDateDiscount,
   parseRoomDateKey,
 } from "../_lib/cart-calculations";
+import { applyDiscountThenSplitPayment } from "../_lib/checkout-utils";
 import type { EditableDateData } from "@/store/cart-edit.store";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
@@ -29,6 +39,13 @@ interface PerDatePaymentSelectionProps {
   getDateData?: (eventSlug: string, date: string) => EditableDateData | null;
   eventSlug?: string;
   getRoomName?: (dateKey: string) => string | null;
+  /**
+   * When a booking coupon is applied, date offers are ignored and this absolute
+   * discount is allocated across dates by share of booking subtotal.
+   */
+  bookingCouponDiscount?: number;
+  /** Full booking subtotal (all dates) — required to allocate coupon discount. */
+  bookingSubTotal?: number;
 }
 
 function isDepositAvailable(
@@ -50,6 +67,10 @@ function tableLineTotal(
   return pricePerPerson * (table.minPersons || 1) * table.quantity;
 }
 
+function roundMoney(n: number): number {
+  return Math.round(Math.max(0, n) * 100) / 100;
+}
+
 interface DepositBreakdown {
   fullTotal: number;
   tableTotal: number;
@@ -59,10 +80,13 @@ interface DepositBreakdown {
   tableBalanceLater: number;
 }
 
-function calculateDepositBreakdown(
+function calculateRawDepositBreakdown(
   paymentInfo: ApiDateData["payment"],
   editStoreData: EditableDateData | null,
-): DepositBreakdown {
+): DepositBreakdown & {
+  ticketTotal: number;
+  drinkTotal: number;
+} {
   if (!editStoreData) {
     return {
       fullTotal: 0,
@@ -71,6 +95,8 @@ function calculateDepositBreakdown(
       ticketsAndDrinksToday: 0,
       payToday: 0,
       tableBalanceLater: 0,
+      ticketTotal: 0,
+      drinkTotal: 0,
     };
   }
 
@@ -82,13 +108,15 @@ function calculateDepositBreakdown(
     0,
   );
 
-  const ticketsAndDrinksToday =
-    editStoreData.tickets
-      .filter((ticket) => ticket.quantity > 0)
-      .reduce((sum, ticket) => sum + ticket.price * ticket.quantity, 0) +
-    editStoreData.drinks
-      .filter((drink) => drink.quantity > 0)
-      .reduce((sum, drink) => sum + drink.price * drink.quantity, 0);
+  const ticketTotal = editStoreData.tickets
+    .filter((ticket) => ticket.quantity > 0)
+    .reduce((sum, ticket) => sum + ticket.price * ticket.quantity, 0);
+
+  const drinkTotal = editStoreData.drinks
+    .filter((drink) => drink.quantity > 0)
+    .reduce((sum, drink) => sum + drink.price * drink.quantity, 0);
+
+  const ticketsAndDrinksToday = ticketTotal + drinkTotal;
 
   const depositType = paymentInfo.deposit_type || "amount";
   const depositValue = Number(
@@ -119,6 +147,122 @@ function calculateDepositBreakdown(
     ticketsAndDrinksToday,
     payToday,
     tableBalanceLater,
+    ticketTotal,
+    drinkTotal,
+  };
+}
+
+/**
+ * Date offers: discount tables (+ tickets) first, then deposit % of discounted tables.
+ * Coupons: discount the date's share of the booking total, then keep the same split ratio.
+ */
+function applyPromoToBreakdown(
+  raw: ReturnType<typeof calculateRawDepositBreakdown>,
+  options: {
+    dateOfferAmount: number;
+    tableOnlyDateOffer: boolean;
+    couponShareAmount: number;
+    paymentInfo: ApiDateData["payment"];
+    guestCount: number;
+  },
+): DepositBreakdown {
+  const {
+    dateOfferAmount,
+    tableOnlyDateOffer,
+    couponShareAmount,
+    paymentInfo,
+    guestCount,
+  } = options;
+
+  // Coupon XOR date offer — coupon wins when present.
+  if (couponShareAmount > 0 && raw.fullTotal > 0) {
+    const split = applyDiscountThenSplitPayment({
+      subTotal: raw.fullTotal,
+      discountAmount: couponShareAmount,
+      payToday: raw.payToday,
+      payLater: raw.tableBalanceLater,
+      depositToday: raw.tableDeposit,
+    });
+    const fullSplit = applyDiscountThenSplitPayment({
+      subTotal: raw.fullTotal,
+      discountAmount: couponShareAmount,
+      payToday: raw.fullTotal,
+      payLater: 0,
+    });
+    const discountedTableTotal = roundMoney(
+      fullSplit.payToday *
+        (raw.fullTotal > 0 ? raw.tableTotal / raw.fullTotal : 0),
+    );
+
+    return {
+      fullTotal: fullSplit.payToday,
+      tableTotal: discountedTableTotal,
+      tableDeposit: split.depositToday,
+      ticketsAndDrinksToday: roundMoney(
+        Math.max(0, split.payToday - split.depositToday),
+      ),
+      payToday: split.payToday,
+      tableBalanceLater: split.payLater,
+    };
+  }
+
+  if (dateOfferAmount > 0) {
+    const discountable = tableOnlyDateOffer
+      ? raw.tableTotal
+      : raw.tableTotal + raw.ticketTotal;
+    const discount = roundMoney(Math.min(dateOfferAmount, discountable));
+
+    let discountedTables = raw.tableTotal;
+    let discountedTickets = raw.ticketTotal;
+
+    if (tableOnlyDateOffer) {
+      discountedTables = roundMoney(Math.max(0, raw.tableTotal - discount));
+    } else if (discountable > 0) {
+      discountedTables = roundMoney(
+        raw.tableTotal - discount * (raw.tableTotal / discountable),
+      );
+      discountedTickets = roundMoney(
+        raw.ticketTotal - discount * (raw.ticketTotal / discountable),
+      );
+    }
+
+    const depositType = paymentInfo.deposit_type || "amount";
+    const depositValue = Number(
+      paymentInfo.deposit_value || paymentInfo.deposit_amount || 0,
+    );
+    const tableDeposit =
+      depositType === "percentage"
+        ? roundMoney((discountedTables * depositValue) / 100)
+        : roundMoney(depositValue * guestCount);
+
+    const ticketsAndDrinksToday = roundMoney(
+      discountedTickets + raw.drinkTotal,
+    );
+    const payToday = roundMoney(tableDeposit + ticketsAndDrinksToday);
+    const tableBalanceLater = roundMoney(
+      Math.max(0, discountedTables - tableDeposit),
+    );
+    const fullTotal = roundMoney(
+      discountedTables + discountedTickets + raw.drinkTotal,
+    );
+
+    return {
+      fullTotal,
+      tableTotal: discountedTables,
+      tableDeposit,
+      ticketsAndDrinksToday,
+      payToday,
+      tableBalanceLater,
+    };
+  }
+
+  return {
+    fullTotal: raw.fullTotal,
+    tableTotal: raw.tableTotal,
+    tableDeposit: raw.tableDeposit,
+    ticketsAndDrinksToday: raw.ticketsAndDrinksToday,
+    payToday: raw.payToday,
+    tableBalanceLater: raw.tableBalanceLater,
   };
 }
 
@@ -243,6 +387,8 @@ export default function PerDatePaymentSelection({
   getDateData,
   eventSlug,
   getRoomName,
+  bookingCouponDiscount = 0,
+  bookingSubTotal = 0,
 }: PerDatePaymentSelectionProps) {
   const { format: formatCurrency } = useCurrencyFormat();
 
@@ -281,6 +427,8 @@ export default function PerDatePaymentSelection({
     }
   };
 
+  const usingCoupon = bookingCouponDiscount > 0 && bookingSubTotal > 0;
+
   return (
     <div className="w-full space-y-4">
       <div className="flex items-center justify-between">
@@ -316,10 +464,42 @@ export default function PerDatePaymentSelection({
             editStoreData,
             dateData,
           );
-          const breakdown = calculateDepositBreakdown(
+          const raw = calculateRawDepositBreakdown(paymentInfo, editStoreData);
+
+          const dateDiscount = usingCoupon
+            ? null
+            : getApiDateDiscount(eventData, dateKey);
+          const guestCount = editStoreData
+            ? getDateGuestCount(editStoreData)
+            : 0;
+          const tableTotalForOffer = editStoreData
+            ? calculateEditableDateTablesTotal(editStoreData)
+            : 0;
+          const dateOfferAmount =
+            dateDiscount && editStoreData
+              ? computeDateDiscountAmount(dateDiscount, {
+                  discountableTotal:
+                    calculateEditableDateDiscountableTotal(editStoreData),
+                  guestCount,
+                  tableTotal: tableTotalForOffer,
+                })
+              : 0;
+
+          const couponShareAmount =
+            usingCoupon && bookingSubTotal > 0 && raw.fullTotal > 0
+              ? roundMoney(
+                  (raw.fullTotal / bookingSubTotal) * bookingCouponDiscount,
+                )
+              : 0;
+
+          const breakdown = applyPromoToBreakdown(raw, {
+            dateOfferAmount,
+            tableOnlyDateOffer: isFlatPerPersonDateDiscount(dateDiscount),
+            couponShareAmount,
             paymentInfo,
-            editStoreData,
-          );
+            guestCount,
+          });
+
           const balanceDueLabel = formatBalanceDueDate(
             paymentInfo.balance_due_date,
           );

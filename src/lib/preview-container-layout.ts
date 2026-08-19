@@ -26,3 +26,26 @@ export const previewStackUntilSm =
 export const previewGridCols1UntilSm = "@max-sm/preview:!grid-cols-1";
 
 export const previewHideUntilSm = "@max-sm/preview:!hidden";
+
+/**
+ * LocationSearchBar on live is `flex-col` below `sm`. Preview frames sit in a
+ * wide window, so `sm:flex-row` / `sm:rounded-full` still apply unless we lock.
+ */
+export const previewSearchFormUntilSm =
+  "@max-sm/preview:!rounded-2xl @max-sm/preview:!p-1.5";
+
+export const previewSearchStackUntilSm =
+  "@max-sm/preview:!flex-col @max-sm/preview:!items-stretch @max-sm/preview:!gap-1.5";
+
+export const previewSearchFieldsUntilSm = "@max-sm/preview:!grid";
+
+export const previewSearchFieldsMultiUntilSm =
+  "@max-sm/preview:!grid-cols-2";
+
+export const previewSearchFieldsLocationUntilSm =
+  "@max-sm/preview:!grid-cols-[1fr_auto]";
+
+export const previewSearchSubmitUntilSm = "@max-sm/preview:!h-11";
+
+export const previewSearchSubmitFullUntilSm =
+  "@max-sm/preview:!col-span-2 @max-sm/preview:!h-11";

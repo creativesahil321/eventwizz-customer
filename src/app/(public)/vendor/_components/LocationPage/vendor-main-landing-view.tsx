@@ -347,13 +347,18 @@ export function VendorMainLandingView({
               emphasis={resolvedHeadingEmphasis}
               variant={heroIsLight ? "onLight" : "onDark"}
               align={heroAlign}
-              className="mb-2.5 w-full min-w-0 max-w-full break-words font-bold !text-[1.65rem] !leading-[1.18] sm:mb-4 sm:!text-4xl sm:!leading-[1.12] md:max-w-5xl md:!text-5xl xl:!text-[3.25rem] xl:!leading-[1.05]"
+              className={cn(
+                "mb-2.5 w-full min-w-0 max-w-full break-words font-bold !text-[1.65rem] !leading-[1.18]",
+                !isPreviewNarrow &&
+                  "sm:mb-4 sm:!text-4xl sm:!leading-[1.12] md:max-w-5xl md:!text-5xl xl:!text-[3.25rem] xl:!leading-[1.05]",
+              )}
             />
 
             <p
               className={cn(
                 vendorHomeSubheroClass(heroAlign),
-                "!mb-8 px-1 text-sm transition-colors duration-500 sm:!mb-10 sm:text-base md:text-lg",
+                "!mb-8 px-1 text-sm transition-colors duration-500",
+                !isPreviewNarrow && "sm:!mb-10 sm:text-base md:text-lg",
                 heroIsLight
                   ? "!text-[color:color-mix(in_srgb,#0c0d10_78%,transparent)]"
                   : "!text-white/85 [text-shadow:0_1px_10px_rgba(0,0,0,0.45)]",

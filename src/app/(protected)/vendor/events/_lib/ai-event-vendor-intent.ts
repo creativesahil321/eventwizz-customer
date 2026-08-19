@@ -7,6 +7,7 @@ import type { AIEventInput } from "@/app/api/ai/generate-event/route";
 import {
   ensureStepFiveRooms,
   ensureStepSevenRooms,
+  formatVendorFactsForPrompt,
   normalizeAiRoomNames,
   parseVendorDescriptionHints,
   sanitizeVendorDescription,
@@ -119,11 +120,15 @@ export function parseAiEventVendorIntent(
     );
 
   const wantsBothTicketsAndTables =
-    /\b(tickets?\s+and\s+tables?|table system and tickets?|both tickets and tables)\b/i.test(
+    (base.bookingFacts.ticketPrice != null &&
+      (base.bookingFacts.tableCount != null ||
+        base.bookingFacts.tablePrice != null ||
+        base.bookingFacts.tablePricePerPerson != null)) ||
+    (/\b(tickets?\s+and\s+tables?|tables?\s+and\s+tickets?|both tickets and tables)\b/i.test(
       lower,
     ) &&
-    !base.prefersTicketsOnly &&
-    !base.prefersTablesBooking;
+      !base.prefersTicketsOnly &&
+      !base.prefersTablesBooking);
 
   const faqMatch = lower.match(
     /\b(at least|minimum|min\.?)\s*(\d{1,2})\s*(faq|faqs|frequently asked)\b/i,
@@ -179,7 +184,7 @@ CRITICAL RULES:
 3. Times: HH:mm 24-hour, chronological within a day
 4. Prices: positive integers (strings in dates; numbers in drink packages)
 5. No HTML in text fields
-6. Honor vendor specs EXACTLY when stated (dates, prices, room names, deposit %, booking types)
+6. Honor vendor specs EXACTLY when stated (dates, prices, room names, deposit %, booking types). If they list dates like 26, 27, 28 Dec or "15 tables" or "tickets £10 per person", use those numbers — do not invent different dates or prices.
 7. Ignore jokes, insults, unrelated noise — use only event facts
 8. PAYMENT (backend rejects invalid combos):
    - booking_type "tickets": payment_type "full", no deposit fields
@@ -385,6 +390,7 @@ export function buildAiEventUserPrompt(params: {
 
   const faqHint = `Provide at least ${hints.requestedMinFaqs} FAQs (max ${maxFaqs}) covering pricing, deposits, what's included, room differences, and policies from vendor text.`;
 
+  const factsBlock = formatVendorFactsForPrompt(hints.bookingFacts);
   const descriptionBlock = hints.sanitizedDescription
     ? `\nVENDOR REQUIREMENTS (natural language — extract ALL facts, ignore noise):\n"""${hints.sanitizedDescription}"""\n`
     : "";
@@ -405,7 +411,7 @@ ${input.guestCount ? `- Expected Guests: "${input.guestCount}"` : ""}
 ${input.priceRange ? `- Price Range: "${input.priceRange}"` : ""}
 ROOM SYSTEM: ${hasRoomSystem ? "YES" : "NO"}
 ${hasRoomSystem ? `- Room names (use EXACTLY): ${roomNames.map((n) => `"${n}"`).join(", ")}` : ""}
-${descriptionBlock}${exampleBlock}
+${descriptionBlock}${factsBlock ? `\n${factsBlock}\n` : ""}${exampleBlock}
 INTERPRETATION HINTS:
 - ${datesHint}
 - ${paymentHint}
@@ -517,7 +523,7 @@ export function resolveRoomBrochureDescription(
 }
 
 export const AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER =
-  "Describe tickets, tables, dates per room, menus, drink packages, deposits, pricing, brochures, timeline, VIP rules or copy-from-room instructions. Example: Room A dates 25–27 Aug with tickets and tables and a 25% deposit; Room B dates 2, 6 and 8 Sep with tickets and tables; Italian menu in both; whisky packages in Room A, soft drinks in Room B; packages from £55; at least 10 FAQs.";
+  "e.g. 15 tables at £20 per person, tickets £10 per person, 20% deposit, dates 26, 27 and 28 Dec. Add room names if setups differ, plus menu or drinks notes.";
 
 export const AI_EVENT_ADDITIONAL_DETAILS_HINT =
-  "Describe what you need in plain English — dates per room, menus, drinks, packages, deposits, pricing and FAQs. Be specific about room names, dates and prices.";
+  "Be specific with numbers: dates, table count, ticket/table prices, and deposit %. We use those facts instead of inventing placeholders.";

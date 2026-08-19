@@ -15,7 +15,14 @@ import {
 import { buildLiveEventsPromptBlock } from "@/lib/chat-live-events";
 import type { LiveEvent } from "@/types/theme.types";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { resolveAiRuntimeConfig } from "../lib/provider-config";
+import {
+  AI_HIDE_REASONING,
+  toUserFacingChatReply,
+} from "../lib/extract-json";
+import {
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
 
 /**
  * Get condensed knowledge base to reduce token count
@@ -206,6 +213,8 @@ function buildSystemPrompt(context: ChatContext): string {
       When giving answers, don't explicitly reference a knowledge base. Incorporate information naturally.
       
       Use plain, everyday UK English. Include the required markdown navigation links when directing someone to a page.
+
+      OUTPUT (MUST FOLLOW): Reply with ONLY the message the visitor should read. Never append planning notes, policy checks, or lines like "User asks", "We need to respond", "This is disallowed", or "Must refuse".
       `;
   }
 
@@ -229,6 +238,8 @@ function buildSystemPrompt(context: ChatContext): string {
       Just incorporate the information naturally into your responses.
       
       Use plain UK English. Prefer page and button names. When sending someone to a section, include a markdown link from the NAVIGATION LINKS list (e.g. [Open Payment Settings](/vendor/payment-settings)).
+
+      OUTPUT (MUST FOLLOW): Reply with ONLY the message the user should read. Never append planning notes, policy checks, or lines like "User asks", "We need to respond", "This is disallowed", or "Must refuse".
       `;
 }
 
@@ -237,10 +248,7 @@ export async function POST(req: NextRequest) {
     const aiConfig = await resolveAiRuntimeConfig();
 
     if (!aiConfig.isConfigured) {
-      return NextResponse.json(
-        { error: "AI service is not configured" },
-        { status: 500 }
-      );
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     const { messages, context } = (await req.json()) as {
@@ -263,7 +271,10 @@ export async function POST(req: NextRequest) {
           (m.role === "user" || m.role === "assistant") &&
           typeof m.content === "string"
       )
-      .map(({ role, content }) => ({ role, content }));
+      .map(({ role, content }) => ({
+        role,
+        content: role === "assistant" ? toUserFacingChatReply(content) : content,
+      }));
 
     // Optimize: Only include recent conversation context (last 5 messages)
     const recentMessages = sanitizedMessages.slice(-5);
@@ -279,6 +290,7 @@ export async function POST(req: NextRequest) {
       messages: apiMessages,
       max_tokens: 800,
       temperature: 0.7,
+      ...AI_HIDE_REASONING,
     });
 
     if (!result.success) {
@@ -302,7 +314,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const assistantMessage = result.data.choices[0].message.content;
+    const assistantMessage =
+      toUserFacingChatReply(result.data.choices[0].message.content ?? "") ||
+      "Sorry, I didn’t catch that. Could you say it another way?";
 
     return NextResponse.json({
       message: assistantMessage,

@@ -34,6 +34,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { requestUserLocation } from "@/lib/request-user-location";
 import {
+  previewHideUntilSm,
+  previewSearchFieldsLocationUntilSm,
+  previewSearchFieldsMultiUntilSm,
+  previewSearchFieldsUntilSm,
+  previewSearchFormUntilSm,
+  previewSearchStackUntilSm,
+  previewSearchSubmitFullUntilSm,
+  previewSearchSubmitUntilSm,
+} from "@/lib/preview-container-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
+import {
   usePublicAvailability,
   usePublicEventCatalog,
 } from "@/services/common/public-search";
@@ -103,6 +114,7 @@ export function LocationSearchBar({
   availability,
   enableNearMe = false,
 }: LocationSearchBarProps) {
+  const isPreviewMobile = usePreviewMobileLayout();
   const [cityOpen, setCityOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [nearMeLoading, setNearMeLoading] = useState(false);
@@ -234,8 +246,11 @@ export function LocationSearchBar({
     availabilityEnabled &&
     (availabilityQuery.isSuccess || availableDateSet.size > 0);
 
-  const fieldBtnClass =
-    "flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2.5 py-2 text-left text-sm transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-text)_4%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:min-w-[9rem] sm:gap-2 sm:px-3 sm:py-2";
+  const fieldBtnClass = cn(
+    "flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2.5 py-2 text-left text-sm transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-text)_4%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:min-w-[9rem] sm:gap-2 sm:px-3 sm:py-2",
+    "@max-sm/preview:!min-w-0",
+    isPreviewMobile && "!min-w-0",
+  );
 
   /** Location pages: hide locked city on small screens — already on that city. */
   const showLockedCity = hideCity && Boolean(lockedCityLabel);
@@ -250,12 +265,17 @@ export function LocationSearchBar({
           event.preventDefault();
           onSearch();
         }}
-        className="rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-1.5 shadow-[0_10px_32px_-20px_rgba(0,0,0,0.28)] sm:rounded-full sm:p-1"
+        className={cn(
+          "rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-1.5 shadow-[0_10px_32px_-20px_rgba(0,0,0,0.28)] sm:rounded-full sm:p-1",
+          previewSearchFormUntilSm,
+          isPreviewMobile && "!rounded-2xl !p-1.5",
+        )}
       >
         <div
           className={cn(
             "flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-0",
-            hideCity && "sm:gap-0",
+            previewSearchStackUntilSm,
+            isPreviewMobile && "!flex-col !items-stretch !gap-1.5",
           )}
         >
           <label className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-2.5 sm:px-3.5 sm:py-2">
@@ -287,7 +307,11 @@ export function LocationSearchBar({
           </label>
 
           <div
-            className="mx-2.5 hidden h-7 w-px shrink-0 bg-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] sm:block"
+            className={cn(
+              "mx-2.5 hidden h-7 w-px shrink-0 bg-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] sm:block",
+              previewHideUntilSm,
+              isPreviewMobile && "!hidden",
+            )}
             aria-hidden
           />
 
@@ -299,6 +323,14 @@ export function LocationSearchBar({
             className={cn(
               "gap-1.5 sm:contents",
               hideCity ? "grid grid-cols-[1fr_auto]" : "grid grid-cols-2",
+              previewSearchFieldsUntilSm,
+              hideCity
+                ? previewSearchFieldsLocationUntilSm
+                : previewSearchFieldsMultiUntilSm,
+              isPreviewMobile &&
+                (hideCity
+                  ? "!grid !grid-cols-[1fr_auto]"
+                  : "!grid !grid-cols-2"),
             )}
           >
             {showLockedCity ? (
@@ -306,6 +338,8 @@ export function LocationSearchBar({
                 className={cn(
                   fieldBtnClass,
                   "hidden cursor-default hover:bg-transparent sm:flex",
+                  previewHideUntilSm,
+                  isPreviewMobile && "!hidden",
                 )}
                 aria-label={`Location ${lockedCityLabel}`}
               >
@@ -393,7 +427,11 @@ export function LocationSearchBar({
             ) : null}
 
             <div
-              className="mx-2.5 hidden h-7 w-px shrink-0 bg-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] sm:block"
+              className={cn(
+                "mx-2.5 hidden h-7 w-px shrink-0 bg-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] sm:block",
+                previewHideUntilSm,
+                isPreviewMobile && "!hidden",
+              )}
               aria-hidden
             />
 
@@ -493,6 +531,11 @@ export function LocationSearchBar({
               className={cn(
                 "inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-primary-foreground)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:h-9 sm:px-4",
                 !hideCity && "col-span-2 sm:col-span-1",
+                hideCity
+                  ? previewSearchSubmitUntilSm
+                  : previewSearchSubmitFullUntilSm,
+                isPreviewMobile && "!h-11",
+                isPreviewMobile && !hideCity && "!col-span-2",
               )}
             >
               Search

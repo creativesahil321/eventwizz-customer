@@ -63,6 +63,7 @@ import {
   buildCustomerPreviewItems,
   buildEventCatalogSlots,
   formatFormOfferValueLabel,
+  listDiscountEventRooms,
 } from "../../_lib/offers";
 import {
   useCreateDiscount,
@@ -310,13 +311,14 @@ export function DiscountFormWizard({
     form.setValue("dates", [], { shouldValidate: true });
   }, [currentVendorLocationId, mode, form]);
 
-  // Coupons: no flat-per-person — coerce legacy edits to flat off total.
+  // Coupons: percentage only — coerce legacy flat / flat-total edits.
   useEffect(() => {
     if (values.category !== "coupon_code") return;
-    if (values.flat_mode !== "per_person") return;
-    form.setValue("flat_mode", "total", { shouldValidate: true });
+    if (values.value_type === "percentage" && values.flat_mode == null) return;
+    form.setValue("value_type", "percentage", { shouldValidate: true });
+    form.setValue("flat_mode", null);
     form.setValue("min_people", null);
-  }, [values.category, values.flat_mode, form]);
+  }, [values.category, values.value_type, values.flat_mode, form]);
 
   const {
     data: customersResponse,
@@ -510,7 +512,7 @@ export function DiscountFormWizard({
           ? "Percentage"
           : row.flat_mode === "per_person"
             ? "Flat/person"
-            : "Flat total";
+            : "Percentage";
       const item = {
         index,
         roomName,
@@ -545,6 +547,12 @@ export function DiscountFormWizard({
       "review-preview",
     );
   }, [isDiscountCategory, values.dates, selectedEvent]);
+
+  const reviewEventRoomTabs = useMemo(
+    () =>
+      isDiscountCategory ? listDiscountEventRooms(selectedEvent) : [],
+    [isDiscountCategory, selectedEvent],
+  );
 
   /** Drop auto-filled slots the vendor never configured — offers are optional per date. */
   const pruneBlankDiscountDates = () => {
@@ -620,8 +628,8 @@ export function DiscountFormWizard({
         "status",
       ];
       if (values.value_type === "flat") {
-        // Coupons: percentage or flat off total only (no flat per person).
-        fields.push("flat_mode");
+        // Date discounts: flat is per-person only.
+        fields.push("flat_mode", "min_people");
       }
       return form.trigger(fields);
     }
@@ -1416,37 +1424,9 @@ export function DiscountFormWizard({
 
               <FormItem className="space-y-3">
                 <FormLabel>Offer type</FormLabel>
-                <ChoiceCards<"percentage" | "flat_total">
-                  value={
-                    values.value_type === "flat" ? "flat_total" : "percentage"
-                  }
-                  onChange={(key) => {
-                    if (key === "percentage") {
-                      form.setValue("value_type", "percentage", {
-                        shouldValidate: true,
-                      });
-                      form.setValue("flat_mode", null);
-                      form.setValue("min_people", null);
-                    } else {
-                      form.setValue("value_type", "flat", {
-                        shouldValidate: true,
-                      });
-                      form.setValue("flat_mode", "total");
-                      form.setValue("min_people", null);
-                    }
-                  }}
-                  className="sm:grid-cols-2"
-                  options={[
-                    {
-                      value: "percentage",
-                      label: DISCOUNT_OFFER_KIND_LABELS.percentage,
-                    },
-                    {
-                      value: "flat_total",
-                      label: DISCOUNT_OFFER_KIND_LABELS.flat_total,
-                    },
-                  ]}
-                />
+                <p className="text-sm text-muted-foreground">
+                  Coupons are percentage off the booking total.
+                </p>
               </FormItem>
 
               <FormField
@@ -1454,20 +1434,14 @@ export function DiscountFormWizard({
                 name="discount_value"
                 render={({ field }) => (
                   <FormItem className="min-w-0">
-                    <FormLabel>
-                      {values.value_type === "percentage"
-                        ? "Percentage"
-                        : "Amount (£)"}
-                    </FormLabel>
+                    <FormLabel>Percentage</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         inputMode="decimal"
                         min={0}
-                        max={
-                          values.value_type === "percentage" ? 100 : undefined
-                        }
-                        step={values.value_type === "percentage" ? 1 : 0.01}
+                        max={100}
+                        step={1}
                         value={
                           field.value != null && Number(field.value) > 0
                             ? field.value
@@ -1692,6 +1666,7 @@ export function DiscountFormWizard({
                     {reviewCustomerPreviewItems.length > 0 ? (
                       <DiscountCustomerDatesPreview
                         items={reviewCustomerPreviewItems}
+                        rooms={reviewEventRoomTabs}
                         className="pt-1"
                       />
                     ) : null}
@@ -1752,7 +1727,7 @@ export function DiscountFormWizard({
                                       ? ` (min ${values.min_people})`
                                       : ""
                                   }`
-                                : `£${values.discount_value} off total`}
+                                : `${values.discount_value}% off`}
                           </dd>
                         </div>
                         <div className="rounded-lg bg-muted/40 px-3 py-2.5">

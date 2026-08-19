@@ -1487,22 +1487,14 @@ export default function DatesTab() {
                                   }}
                                   className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-4 pt-2"
                                 >
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <RadioGroupItem value="full" />
-                                    </FormControl>
-                                    <Label className="font-normal cursor-pointer">
-                                      Full payment
-                                    </Label>
-                                  </FormItem>
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <RadioGroupItem value="deposit" />
-                                    </FormControl>
-                                    <Label className="font-normal cursor-pointer">
-                                      Deposit
-                                    </Label>
-                                  </FormItem>
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <RadioGroupItem value="full" />
+                                    <span className="font-normal">Full payment</span>
+                                  </label>
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <RadioGroupItem value="deposit" />
+                                    <span className="font-normal">Deposit</span>
+                                  </label>
                                 </RadioGroup>
                               </FormControl>
                               <FormMessage />
@@ -1542,22 +1534,14 @@ export default function DatesTab() {
                                     }}
                                     className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-4 pt-2"
                                   >
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                      <FormControl>
-                                        <RadioGroupItem value="amount" />
-                                      </FormControl>
-                                      <Label className="font-normal cursor-pointer">
-                                        Fixed amount
-                                      </Label>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                      <FormControl>
-                                        <RadioGroupItem value="percentage" />
-                                      </FormControl>
-                                      <Label className="font-normal cursor-pointer">
-                                        Percentage
-                                      </Label>
-                                    </FormItem>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                      <RadioGroupItem value="amount" />
+                                      <span className="font-normal">Fixed amount</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                      <RadioGroupItem value="percentage" />
+                                      <span className="font-normal">Percentage</span>
+                                    </label>
                                   </RadioGroup>
                                 </FormControl>
                                 <FormMessage />

@@ -265,10 +265,9 @@ export const DISCOUNT_VALUE_TYPE_LABELS: Record<DiscountType, string> = {
   flat: "Fixed amount",
 };
 
-/** Offer type choices matching the guide (flat splits into total vs per person). */
+/** Offer type choices for date discounts (no flat-off-total). */
 export const DISCOUNT_OFFER_KIND_LABELS = {
   percentage: "Percentage",
-  flat_total: "Flat off total",
   flat_per_person: "Flat per person",
 } as const;
 

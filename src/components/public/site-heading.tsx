@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import type { BannerHeadingAlign } from "@/lib/banner-heading-align";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewDeviceStore } from "@/store/preview-device.store";
 import {
   normalizeHeadingEmphasis,
   splitBannerHeading,
@@ -43,9 +44,28 @@ const levelClass: Record<SiteHeadingLevel, string> = {
   3: "text-2xl font-semibold tracking-tight md:text-3xl",
 };
 
+/** Phone / tablet device frames — sizes match a real handset, not the desktop window.
+ * Each size is repeated at sm/md/lg/xl as literals so Tailwind emits them and they
+ * beat consumer `md:!text-5xl` while the preview sits in a wide monitor. */
+const compactLevelClass = {
+  mobile: {
+    1: "font-semibold tracking-tight !text-[1.65rem] !leading-[1.22] sm:!text-[1.65rem] sm:!leading-[1.22] md:!text-[1.65rem] md:!leading-[1.22] lg:!text-[1.65rem] lg:!leading-[1.22] xl:!text-[1.65rem] xl:!leading-[1.22]",
+    2: "font-semibold tracking-tight !text-xl !leading-snug sm:!text-xl sm:!leading-snug md:!text-xl md:!leading-snug lg:!text-xl lg:!leading-snug xl:!text-xl xl:!leading-snug",
+    3: "font-semibold tracking-tight !text-lg !leading-snug sm:!text-lg sm:!leading-snug md:!text-lg md:!leading-snug lg:!text-lg lg:!leading-snug xl:!text-lg xl:!leading-snug",
+  },
+  tablet: {
+    1: "font-semibold tracking-tight !text-[2.15rem] !leading-[1.18] sm:!text-[2.15rem] sm:!leading-[1.18] md:!text-[2.15rem] md:!leading-[1.18] lg:!text-[2.15rem] lg:!leading-[1.18] xl:!text-[2.15rem] xl:!leading-[1.18]",
+    2: "font-semibold tracking-tight !text-2xl !leading-snug sm:!text-2xl sm:!leading-snug md:!text-2xl md:!leading-snug lg:!text-2xl lg:!leading-snug xl:!text-2xl xl:!leading-snug",
+    3: "font-semibold tracking-tight !text-xl !leading-snug sm:!text-xl sm:!leading-snug md:!text-xl md:!leading-snug lg:!text-xl lg:!leading-snug xl:!text-xl xl:!leading-snug",
+  },
+} as const satisfies Record<
+  "mobile" | "tablet",
+  Record<SiteHeadingLevel, string>
+>;
+
 /** Script/display fonts exceed tight metrics; bg-clip-text clips glyph swashes. */
 const headingLine =
-  "leading-[1.22] md:leading-[1.18] overflow-visible max-w-full";
+  "leading-[1.22] md:leading-[1.18] overflow-visible min-w-0 max-w-full break-words [overflow-wrap:anywhere]";
 const headingBox = "inline-block max-w-full overflow-visible";
 /** Extra right padding: script tails (e.g. “UK”) often extend past the em-box; bg-clip-text clips without it. */
 const accentTailScriptPad =
@@ -104,11 +124,16 @@ export function SiteHeading({
 }: SiteHeadingProps) {
   const { theme } = useTheme();
   const narrowPreview = usePreviewNarrowLayout();
+  const previewDevice = usePreviewDeviceStore((s) => s.device);
   const emphasis = normalizeHeadingEmphasis(
     emphasisProp ?? theme?.typography?.headingEmphasis,
   );
   /** Phone / tablet preview frames keep a desktop viewport — gate decorative accents. */
   const useCompactAccent = narrowPreview;
+  const compactType =
+    narrowPreview && previewDevice !== "desktop"
+      ? compactLevelClass[previewDevice]
+      : null;
 
   const Tag = level === 2 ? "h2" : level === 3 ? "h3" : "h1";
 
@@ -154,10 +179,11 @@ export function SiteHeading({
         className={cn(
           alignBox,
           headingLine,
-          levelClass[level],
+          !compactType && levelClass[level],
           baseColorClass,
           "px-[0.12em] py-[0.08em]",
           className,
+          compactType?.[level],
         )}
         style={{ fontFamily: headingFamily }}
       >
@@ -172,10 +198,11 @@ export function SiteHeading({
         className={cn(
           alignBox,
           headingLine,
-          levelClass[level],
+          !compactType && levelClass[level],
           variant === "onDark" ? accentGradient : accentSolidPrimary,
           "px-[0.2em] py-[0.1em]",
           className,
+          compactType?.[level],
         )}
         style={{ fontFamily: headingFamily }}
       >
@@ -192,19 +219,24 @@ export function SiteHeading({
   return (
     <Tag
       className={cn(
-        "block w-full max-w-full overflow-visible",
+        "block w-full min-w-0 max-w-full overflow-visible",
         align === "right" && "text-right",
         align === "center" && "text-center",
         align !== "right" && align !== "center" && "text-left",
         headingLine,
-        levelClass[level],
+        !compactType && levelClass[level],
         "px-[0.12em] py-[0.12em]",
         className,
+        compactType?.[level],
       )}
       style={{ fontFamily: bodyFamily }}
     >
         <span
-          className={cn("leading-none", baseColorClass)}
+          className={cn(
+            "break-words [overflow-wrap:anywhere]",
+            compactType ? "leading-[inherit]" : "leading-none",
+            baseColorClass,
+          )}
           style={{ fontFamily: bodyFamily }}
         >
           {base}
@@ -212,14 +244,15 @@ export function SiteHeading({
       {accent ? (
         <>
           {" "}
-          <span className="relative inline-block max-w-full align-baseline">
+          <span className="relative inline-block max-w-full min-w-0 break-words [overflow-wrap:anywhere] align-baseline">
             <AccentTailTrail
               variant={variant}
               enabled={!useCompactAccent}
             />
             <span
               className={cn(
-                "relative z-[1] font-black leading-none align-baseline",
+                "relative z-[1] font-black align-baseline break-words [overflow-wrap:anywhere]",
+                compactType ? "leading-[inherit]" : "leading-none",
                 accentTailScriptPad,
                 // Compact / mobile: solid primary. Desktop: gradient clip.
                 variant === "onDark"

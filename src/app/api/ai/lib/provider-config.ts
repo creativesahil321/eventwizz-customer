@@ -4,10 +4,9 @@ import type { AiProviderType } from "@/lib/ai/providers";
 /**
  * Resolved AI configuration used by every `/api/ai/*` route.
  *
- * The active provider/key/models are owned by the backend so the platform can
- * switch AI without a frontend rebuild. This module fetches that config
- * (cached briefly) and falls back to GROQ_API_KEY so AI keeps working before
- * the backend endpoint exists.
+ * Admin Settings stores the key in Laravel. Chat/onboarding/autofill load it
+ * from `AI_RUNTIME_URL` (server-to-server), not from the admin GET (which
+ * never returns the decrypted key).
  */
 export interface AiRuntimeConfig {
   isConfigured: boolean;
@@ -34,18 +33,56 @@ const GROQ_FALLBACK_MODELS = [
   "llama-3.1-8b-instant",
 ];
 
-const CACHE_TTL_MS = 60_000;
+const SUCCESS_CACHE_TTL_MS = 60_000;
+const FAILURE_CACHE_TTL_MS = 5_000;
 
 type CacheEntry = { value: AiRuntimeConfig; expiresAt: number };
 let cache: CacheEntry | null = null;
+let lastRuntimeHint: string | null = null;
 
 interface RuntimeResponseBody {
   provider_id?: string;
   provider_type?: AiProviderType;
   base_url?: string;
   api_key?: string;
-  models?: string[];
+  key?: string;
+  models?: unknown;
   default_model?: string | null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function str(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** Laravel wraps most JSON as `{ status|success, data }`. Spec also allows a flat body. */
+function unwrapRuntimePayload(json: unknown): RuntimeResponseBody | null {
+  const root = asRecord(json);
+  if (!root) return null;
+  if (root.status === false || root.success === false) return null;
+  const inner = asRecord(root.data);
+  return (inner ?? root) as RuntimeResponseBody;
+}
+
+function parseModels(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 function buildGroqFallback(): AiRuntimeConfig {
@@ -62,8 +99,18 @@ function buildGroqFallback(): AiRuntimeConfig {
   };
 }
 
+function setHint(hint: string): null {
+  lastRuntimeHint = hint;
+  console.warn(`[ai-runtime] ${hint}`);
+  return null;
+}
+
 async function fetchRuntimeConfig(): Promise<AiRuntimeConfig | null> {
-  if (!env.AI_RUNTIME_URL) return null;
+  if (!env.AI_RUNTIME_URL) {
+    return setHint(
+      "AI_RUNTIME_URL is not set. Chat cannot load the live provider from Laravel.",
+    );
+  }
 
   try {
     const res = await fetch(env.AI_RUNTIME_URL, {
@@ -74,21 +121,38 @@ async function fetchRuntimeConfig(): Promise<AiRuntimeConfig | null> {
           ? { "X-Internal-Secret": env.AI_RUNTIME_SECRET }
           : {}),
       },
-      // Route handlers cache their own layer; keep this fresh per TTL.
       cache: "no-store",
     });
 
-    if (!res.ok) return null;
+    if (res.status === 204) {
+      return setHint("Laravel runtime returned 204 (no active provider).");
+    }
 
-    const body = (await res.json()) as RuntimeResponseBody;
-    const baseUrl = (body.base_url ?? "").trim().replace(/\/+$/, "");
-    const apiKey = (body.api_key ?? "").trim();
-    const models = Array.isArray(body.models)
-      ? body.models.map((m) => String(m).trim()).filter(Boolean)
-      : [];
+    if (!res.ok) {
+      return setHint(
+        `Laravel runtime ${res.status} at AI_RUNTIME_URL. Expected GET /internal/ai-runtime with header X-Internal-Secret (no user JWT).`,
+      );
+    }
 
-    if (!baseUrl || !apiKey || models.length === 0) return null;
+    const json: unknown = await res.json();
+    const body = unwrapRuntimePayload(json);
+    if (!body) {
+      return setHint(
+        "Laravel runtime JSON was empty or status/success=false. Expected data.api_key, data.base_url, data.models.",
+      );
+    }
 
+    const baseUrl = str(body.base_url).replace(/\/+$/, "");
+    const apiKey = str(body.api_key) || str(body.key);
+    const models = parseModels(body.models);
+
+    if (!baseUrl || !apiKey || models.length === 0) {
+      return setHint(
+        "Laravel runtime responded but missing base_url, api_key, or models.",
+      );
+    }
+
+    lastRuntimeHint = null;
     return {
       isConfigured: true,
       providerType:
@@ -96,19 +160,18 @@ async function fetchRuntimeConfig(): Promise<AiRuntimeConfig | null> {
       baseUrl,
       apiKey,
       models,
-      defaultModel: body.default_model?.trim() || models[0],
-      providerId: body.provider_id?.trim() || "backend",
+      defaultModel: str(body.default_model) || models[0],
+      providerId: str(body.provider_id) || "backend",
       isFallback: false,
     };
   } catch {
-    return null;
+    return setHint("Laravel runtime request failed (network or invalid JSON).");
   }
 }
 
 /**
  * Resolve the active AI config. Prefers the backend-managed provider, falls
- * back to GROQ_API_KEY. Cached for {@link CACHE_TTL_MS} to avoid a round-trip
- * on every AI request.
+ * back to GROQ_API_KEY. Successful lookups cache for 60s; failures cache 5s.
  */
 export async function resolveAiRuntimeConfig(): Promise<AiRuntimeConfig> {
   const now = Date.now();
@@ -116,8 +179,25 @@ export async function resolveAiRuntimeConfig(): Promise<AiRuntimeConfig> {
 
   const fromBackend = await fetchRuntimeConfig();
   const value = fromBackend ?? buildGroqFallback();
-  cache = { value, expiresAt: now + CACHE_TTL_MS };
+  const ttl = fromBackend ? SUCCESS_CACHE_TTL_MS : FAILURE_CACHE_TTL_MS;
+  cache = { value, expiresAt: now + ttl };
   return value;
+}
+
+export function getAiRuntimeHint(): string | null {
+  return lastRuntimeHint;
+}
+
+export function aiUnconfiguredPayload(): {
+  error: string;
+  hint: string | null;
+} {
+  return {
+    error: "AI service is not configured",
+    hint:
+      lastRuntimeHint ??
+      "No live provider key. Save an AI provider in Admin Settings and expose GET /internal/ai-runtime.",
+  };
 }
 
 /** Clear the cached config (useful right after an admin saves a new provider). */

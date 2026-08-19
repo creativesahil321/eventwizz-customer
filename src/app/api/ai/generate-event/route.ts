@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
-import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { resolveAiRuntimeConfig } from "../lib/provider-config";
+import { tryModelsWithFallback, AI_JSON_MAX_TOKENS, type FallbackResult } from "../lib/utils";
+import { AI_JSON_COMPLETION, extractJsonObject } from "../lib/extract-json";
+import {
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
 import {
   BANNER_HEADING_MAX_WORDS,
   truncateToMaxWords,
@@ -15,7 +19,10 @@ import {
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/event-form-limits";
 import type { AIDate, AIRoomDates, AIRoomDrinks } from "@/app/api/ai/generate-onboarding/route";
-import { normalizeAIDatePaymentFields } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
+import {
+  applyVendorBookingFactsToDates,
+  normalizeAIDatePaymentFields,
+} from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import {
   AI_EVENT_MAX_ROOMS,
   AI_EVENT_MIN_ROOMS,
@@ -148,10 +155,7 @@ export async function POST(req: NextRequest) {
   try {
     const aiConfig = await resolveAiRuntimeConfig();
     if (!aiConfig.isConfigured) {
-      return NextResponse.json(
-        { error: "AI service is not configured" },
-        { status: 500 }
-      );
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     const input: AIEventInput = await req.json();
@@ -203,8 +207,9 @@ export async function POST(req: NextRequest) {
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.7,
-      max_tokens: 4500,
+      temperature: 0.4,
+      max_tokens: AI_JSON_MAX_TOKENS,
+      ...AI_JSON_COMPLETION,
     });
 
     if (!result.success || !result.data) {
@@ -230,10 +235,9 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No valid JSON found in response");
-
-      const content: AIEventGeneratedContent = JSON.parse(jsonMatch[0]);
+      const content = extractJsonObject<AIEventGeneratedContent>(rawContent, [
+        "stepOne",
+      ]);
       const truncate = (str: string, max: number) =>
         str && str.length > max ? str.substring(0, max) : str || "";
 
@@ -398,6 +402,13 @@ export async function POST(req: NextRequest) {
         };
       }
 
+      if (content.stepThree?.dates) {
+        content.stepThree.dates = applyVendorBookingFactsToDates(
+          content.stepThree.dates as AIDate[],
+          vendorHints.bookingFacts,
+        ) as AIEventDate[];
+      }
+
       if (hasRoomSystem && content.stepThree) {
         const baseDates = (content.stepThree.dates ?? []) as AIDate[];
         const sanitizeRoomDates = (dates: AIDate[] | undefined): AIDate[] =>
@@ -421,7 +432,15 @@ export async function POST(req: NextRequest) {
             const sanitized = sanitizeRoomDates(dates as AIDate[]);
             return sanitized.length > 0 ? sanitized : baseDates;
           },
-        );
+        ).map((room) => ({
+          ...room,
+          dates: applyVendorBookingFactsToDates(
+            (room.dates as AIDate[] | undefined)?.length
+              ? (room.dates as AIDate[])
+              : baseDates,
+            vendorHints.bookingFacts,
+          ),
+        }));
       } else if (content.stepThree?.rooms) {
         content.stepThree.rooms = [];
       }
@@ -503,6 +522,7 @@ export async function POST(req: NextRequest) {
         {
           error: "Failed to parse AI response",
           details: parseError instanceof Error ? parseError.message : "Unknown parsing error",
+          preview: rawContent.slice(0, 280),
         },
         { status: 500 }
       );

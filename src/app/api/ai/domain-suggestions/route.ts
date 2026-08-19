@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { resolveAiRuntimeConfig } from "../lib/provider-config";
+import {
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
 
 // Define the message type
 type Message = {
@@ -20,10 +23,7 @@ export async function POST(req: NextRequest) {
     const aiConfig = await resolveAiRuntimeConfig();
 
     if (!aiConfig.isConfigured) {
-      return NextResponse.json(
-        { error: "AI service is not configured" },
-        { status: 500 }
-      );
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     // Get the request data

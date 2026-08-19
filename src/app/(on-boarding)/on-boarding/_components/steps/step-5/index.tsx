@@ -36,7 +36,6 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import {
   getDefaultDate,
   stepFiveSchema,
@@ -1466,22 +1465,18 @@ export default function StepFive() {
                                 }}
                                 className="flex space-x-4 pt-2"
                               >
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                  <FormControl>
-                                    <RadioGroupItem value="full" />
-                                  </FormControl>
-                                  <FormLabel className="font-normal cursor-pointer">
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                  <RadioGroupItem value="full" />
+                                  <span className="text-sm font-normal">
                                     Full payment
-                                  </FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                  <FormControl>
-                                    <RadioGroupItem value="deposit" />
-                                  </FormControl>
-                                  <FormLabel className="font-normal cursor-pointer">
+                                  </span>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                  <RadioGroupItem value="deposit" />
+                                  <span className="text-sm font-normal">
                                     Deposit
-                                  </FormLabel>
-                                </FormItem>
+                                  </span>
+                                </label>
                               </RadioGroup>
                             </FormControl>
                             <FormMessage />
@@ -1521,22 +1516,18 @@ export default function StepFive() {
                                   }}
                                   className="flex space-x-4 pt-2"
                                 >
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <RadioGroupItem value="amount" />
-                                    </FormControl>
-                                    <Label className="font-normal cursor-pointer">
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <RadioGroupItem value="amount" />
+                                    <span className="text-sm font-normal">
                                       Fixed Amount
-                                    </Label>
-                                  </FormItem>
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <RadioGroupItem value="percentage" />
-                                    </FormControl>
-                                    <Label className="font-normal cursor-pointer">
+                                    </span>
+                                  </label>
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <RadioGroupItem value="percentage" />
+                                    <span className="text-sm font-normal">
                                       Percentage
-                                    </Label>
-                                  </FormItem>
+                                    </span>
+                                  </label>
                                 </RadioGroup>
                               </FormControl>
                               <FormMessage />

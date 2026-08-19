@@ -68,16 +68,16 @@ export function mapApiDiscountToDateCardOffer(
   const amount = Number(discount.amount);
   if (!Number.isFinite(amount) || !(amount > 0)) return null;
 
+  // Flat off total removed — only percentage and flat per person show on cards.
+  if (type === "flat" && discount.flat_mode !== "per_person") {
+    return null;
+  }
+
   return {
     show_on_page: discount.show_on_event_page !== false,
     value_type: type,
     discount_value: amount,
-    flat_mode:
-      type === "flat"
-        ? discount.flat_mode === "per_person"
-          ? "per_person"
-          : "total"
-        : null,
+    flat_mode: type === "flat" ? "per_person" : null,
   };
 }
 

@@ -528,7 +528,7 @@ export default function AICollectInfo({
 
   const descriptionPlaceholder = useMemo(() => {
     if (hasRoomSystem !== true) {
-      return `e.g. "Tickets ${currencySymbol}50 and VIP ${currencySymbol}120, tables for 6–10 at ${currencySymbol}150, deposit 25% due 2 weeks before event. Soft drinks package ${currencySymbol}50…"`;
+      return `e.g. "15 tables, each table ${currencySymbol}20 per person, tickets ${currencySymbol}10 per person, 20% deposit, dates 26, 27 and 28 Dec"`;
     }
 
     const namedRooms = (roomNameFields ?? [])
@@ -537,15 +537,15 @@ export default function AICollectInfo({
 
     if (namedRooms.length >= 2) {
       const [first, second] = namedRooms;
-      return `e.g. "${first} tickets ${currencySymbol}25, ${second} tables ${currencySymbol}150 with 25% deposit due 2 weeks before, same date July 21 for both spaces. Soft drinks ${currencySymbol}50…"`;
+      return `e.g. "${first} and ${second}: 15 tables at ${currencySymbol}20 per person, tickets ${currencySymbol}10, 20% deposit, dates 26, 27 and 28 Dec for both spaces"`;
     }
 
     if (namedRooms.length === 1) {
       const first = namedRooms[0];
-      return `e.g. "${first} tickets ${currencySymbol}25, other space tables ${currencySymbol}150 with deposit, same date for all spaces. Soft drinks ${currencySymbol}50…"`;
+      return `e.g. "${first}: 15 tables at ${currencySymbol}20 per person, tickets ${currencySymbol}10, 20% deposit, dates 26, 27 and 28 Dec"`;
     }
 
-    return `e.g. "Main Hall tickets ${currencySymbol}25, Garden tables ${currencySymbol}150 with 25% deposit due 2 weeks before, same date July 21 for both spaces. Soft drinks ${currencySymbol}50…"`;
+    return `e.g. "15 tables at ${currencySymbol}20 per person, tickets ${currencySymbol}10, 20% deposit, dates 26, 27 and 28 Dec for every space"`;
   }, [currencySymbol, hasRoomSystem, roomNameFields]);
 
   const setRoomSystem = (value: boolean) => {
@@ -1092,21 +1092,20 @@ export default function AICollectInfo({
               </label>
 
               <p className="text-slate-500 text-xs mb-2.5 leading-relaxed">
-                Write anything — casual notes are fine. Mention tickets, tables,
-                prices, deposit vs full payment, and food/drinks if you have them.
+                Write it like you would brief a colleague. Include real numbers:
+                how many tables, ticket or table price per person, deposit % if
+                you take one, and exact event dates (e.g. 26, 27 and 28 Dec).
                 {hasRoomSystem === true ? (
                   <>
                     {" "}
-                    Because you enabled multiple event spaces, you can also say
-                    which space gets which dates, tickets, or tables (e.g.
-                    &quot;same dates for every space&quot; or different setups per
-                    space).
+                    Because you enabled multiple event spaces, say whether every
+                    space shares the same dates and prices, or which space is
+                    different.
                   </>
                 ) : null}{" "}
-                We&apos;ll use your notes to pre-fill tickets, tables, pricing,
-                and other details. You can review and adjust everything before
-                you publish—and if anything is missing, you can complete or
-                change it manually in the onboarding steps at any time.
+                We use those facts as-is for tickets, tables, dates and deposits
+                instead of inventing placeholders. You can still review and
+                change everything in the onboarding steps before you publish.
               </p>
 
               <textarea

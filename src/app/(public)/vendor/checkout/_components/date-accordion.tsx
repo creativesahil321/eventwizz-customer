@@ -76,7 +76,7 @@ interface DateAccordionProps {
   discountAmount?: number | null;
   /**
    * Pre-discount base shown as strikethrough.
-   * Per-person table offers → table total; % / flat total → tables + tickets.
+   * Per-person table offers → table total; percentage → tables + tickets.
    */
   discountStrikeAmount?: number | null;
   /** Why the offer is locked (e.g. min guests) — shown instead of “applied”. */

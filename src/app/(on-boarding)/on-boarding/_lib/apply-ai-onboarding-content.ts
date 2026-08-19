@@ -22,8 +22,12 @@ import { withSuppressedSuccessToasts } from "@/services/core/api-client";
 import { ensureEventMenuCategoriesForRoom } from "@/lib/event-menu-categories";
 import {
   AI_ONBOARDING_MAX_ROOMS,
+  coerceAiStepFiveRooms,
+  ensureOnboardingDates,
+  fillOnboardingContentDefaults,
   formatAIDateForStepFive,
   normalizeAiRoomNames,
+  parseVendorDescriptionHints,
 } from "./ai-onboarding-sanitize";
 import {
   EVENT_GALLERY_MAX_IMAGES,
@@ -65,6 +69,69 @@ function clampAiStepNineFaqs(c: AIGeneratedContent): AIGeneratedContent {
   };
 }
 
+/** Truncated / compact AI JSON often omits later steps — apply must not throw. */
+function normalizeAIGeneratedContent(
+  c: Partial<AIGeneratedContent> | AIGeneratedContent,
+): AIGeneratedContent {
+  return {
+    stepTwo: {
+      banner_heading: "",
+      banner_sub_heading: "",
+      about_title: "",
+      about_description: "",
+      ...c.stepTwo,
+    },
+    stepThree: {
+      event_name: "",
+      event_banner_heading: "",
+      event_banner_sub_heading: "",
+      about_event_heading: "",
+      about_event_sub_heading: "",
+      about_event_description: "",
+      ...c.stepThree,
+    },
+    stepFour: {
+      package_title: "",
+      package_description: "",
+      package_button_name: "",
+      event_schedular_title: "",
+      ...c.stepFour,
+      package_details: Array.isArray(c.stepFour?.package_details)
+        ? c.stepFour.package_details
+        : [],
+      event_schedular: Array.isArray(c.stepFour?.event_schedular)
+        ? c.stepFour.event_schedular
+        : [],
+    },
+    stepFive: {
+      dates: Array.isArray(c.stepFive?.dates) ? c.stepFive.dates : [],
+      rooms: Array.isArray(c.stepFive?.rooms) ? c.stepFive.rooms : undefined,
+    },
+    stepSix: {
+      menu_title: "",
+      menu_description: "",
+      ...c.stepSix,
+      menus: Array.isArray(c.stepSix?.menus) ? c.stepSix.menus : [],
+    },
+    stepSeven: {
+      drink_title: "",
+      drink_description: "",
+      ...c.stepSeven,
+      packages: Array.isArray(c.stepSeven?.packages) ? c.stepSeven.packages : [],
+    },
+    stepEight: {
+      event_address: "",
+      price_start_from: "",
+      price_start_from_button_text: "Book Now",
+      ...c.stepEight,
+      location: c.stepEight?.location ?? { title: "", description: "" },
+    },
+    stepNine: {
+      faqs: Array.isArray(c.stepNine?.faqs) ? c.stepNine.faqs : [],
+    },
+  };
+}
+
 export interface ApplyAIOnboardingParams {
   content: AIGeneratedContent;
   venueInput: AIOnboardingInput;
@@ -101,7 +168,15 @@ async function applyAIGeneratedOnboardingContentInner({
   updateSession,
   onApplyStepChange,
 }: ApplyAIOnboardingParams): Promise<void> {
-  const editedContent = clampAiStepNineFaqs(content);
+  const editedContent = clampAiStepNineFaqs(
+    fillOnboardingContentDefaults(normalizeAIGeneratedContent(content), {
+      ...venueInput,
+      bookingFacts: parseVendorDescriptionHints(
+        venueInput.description,
+        venueInput.room_names,
+      ).bookingFacts,
+    }),
+  );
 
   /**
    * Backward compatibility:
@@ -140,7 +215,7 @@ async function applyAIGeneratedOnboardingContentInner({
       }>;
     }>;
   };
-  const stepSevenRaw = editedContent.stepSeven as unknown as Record<
+  const stepSevenRaw = (editedContent.stepSeven ?? {}) as unknown as Record<
     string,
     unknown
   >;
@@ -214,9 +289,10 @@ async function applyAIGeneratedOnboardingContentInner({
 
   globalForm.setValue("stepTwo", stepTwoData);
   const step2Response = await onboardingService.storeStepTwoData(stepTwoData);
-  if (step2Response.status) {
-    await updateSession({ on_boarding_step: 3 });
+  if (!step2Response.status) {
+    throw new Error(step2Response.message || "Failed to save landing page");
   }
+  await updateSession({ on_boarding_step: 3 });
 
   // --- Step 3: Event Details ---
   setStep(2);
@@ -244,9 +320,10 @@ async function applyAIGeneratedOnboardingContentInner({
 
   const eventId =
     step3Response.data?.event_id || step3Response.data?.id || 0;
-  if (step3Response.status) {
-    await updateSession({ on_boarding_step: 4 });
+  if (!step3Response.status || !eventId) {
+    throw new Error(step3Response.message || "Failed to save event details");
   }
+  await updateSession({ on_boarding_step: 4 });
 
   // --- Step 4: Packages ---
   setStep(3);
@@ -364,7 +441,15 @@ async function applyAIGeneratedOnboardingContentInner({
 
   // --- Step 5: Dates, Tickets & Tables ---
   setStep(4);
-  const rawAiDates = editedContent.stepFive?.dates || [];
+  const bookingFacts = parseVendorDescriptionHints(
+    venueInput.description,
+    venueInput.room_names,
+  ).bookingFacts;
+  const ensuredDates = ensureOnboardingDates(
+    editedContent.stepFive?.dates,
+    bookingFacts,
+  );
+  const rawAiDates = ensuredDates;
   const aiDates = (() => {
     const sorted = [...rawAiDates].sort(
       (a, b) =>
@@ -385,48 +470,18 @@ async function applyAIGeneratedOnboardingContentInner({
   const stepFiveData: StepFiveType = {
     step: 5,
     event_id: eventId,
-    dates:
-      formattedDates.length > 0
-        ? (formattedDates as StepFiveType["dates"])
-        : [
-            {
-              event_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
-                .toISOString()
-                .split("T")[0],
-              booking_type: "tickets",
-              total_ticket_types: 1,
-              total_table_types: 0,
-              tickets: [
-                {
-                  title: "General Admission",
-                  description: "Standard entry ticket",
-                  total_capacity: "100",
-                  price: "50",
-                },
-              ],
-              tables: [],
-            },
-          ],
+    dates: formattedDates as StepFiveType["dates"],
   };
 
   globalForm.setValue("stepFive", stepFiveData);
   const roomStepFiveByName = useRoomSystem
     ? new Map(
-        (
-          editedContent.stepFive as
-            | {
-                rooms?: Array<{
-                  room_name?: string;
-                  dates?: import("@/app/api/ai/generate-onboarding/route").AIDate[];
-                }>;
-              }
-            | undefined
-        )?.rooms?.map((room) => [
-          (room.room_name ?? "").trim().toLowerCase(),
-          (room.dates ?? []).map((d) =>
+        coerceAiStepFiveRooms(editedContent.stepFive?.rooms).map((room) => [
+          room.room_name.trim().toLowerCase(),
+          ensureOnboardingDates(room.dates, bookingFacts).map((d) =>
             formatAIDateForStepFive(d),
           ) as StepFiveType["dates"],
-        ]) ?? [],
+        ]),
       )
     : new Map<string, StepFiveType["dates"]>();
   const step5RoomsPayload = useRoomSystem
@@ -456,13 +511,14 @@ async function applyAIGeneratedOnboardingContentInner({
         isApproved: true,
       })
     : await onboardingService.storeStepFiveData(stepFiveData);
-  if (step5Response.status) {
-    await updateSession({ on_boarding_step: 6 });
+  if (!step5Response.status) {
+    throw new Error(step5Response.message || "Failed to save dates, tickets and tables");
   }
+  await updateSession({ on_boarding_step: 6 });
 
   // --- Step 6: Menu ---
   setStep(5);
-  const hasMenus = (editedContent.stepSix.menus?.length ?? 0) > 0;
+  const hasMenus = (editedContent.stepSix?.menus?.length ?? 0) > 0;
   const menuRemoved = removedSections.has("menu");
 
   const roomsForMenuCategories = useRoomSystem
@@ -587,9 +643,10 @@ async function applyAIGeneratedOnboardingContentInner({
           isApproved: true,
         })
       : await onboardingService.storeStepSixData(stepSixData);
-    if (step6Response.status) {
-      await updateSession({ on_boarding_step: 7 });
+    if (!step6Response.status) {
+      throw new Error(step6Response.message || "Failed to save catering & menu");
     }
+    await updateSession({ on_boarding_step: 7 });
   } else {
     await updateSession({ on_boarding_step: 7 });
   }
@@ -658,27 +715,47 @@ async function applyAIGeneratedOnboardingContentInner({
         ...stepSevenData,
         isApproved: true,
       });
-  if (step7Response.status) {
-    if (useRoomSystem) {
-      globalForm.setValue("multiSpace.rooms", step7RoomsPayload as never);
-    }
-    globalForm.setValue("stepSeven", { ...stepSevenData, isApproved: true });
-    await updateSession({ on_boarding_step: 8 });
+  if (!step7Response.status) {
+    throw new Error(
+      step7Response.message || "Failed to save brochure, location & pricing",
+    );
   }
+  if (useRoomSystem) {
+    globalForm.setValue("multiSpace.rooms", step7RoomsPayload as never);
+  }
+  globalForm.setValue("stepSeven", { ...stepSevenData, isApproved: true });
+  await updateSession({ on_boarding_step: 8 });
 
   // --- Step 8: Drinks ---
   setStep(7);
   const drinkPackages = Array.isArray(drinksSource.packages)
     ? drinksSource.packages
     : [];
-  const hasDrinkPackages = drinkPackages.length > 0;
+  const resolvedDrinkPackages =
+    drinkPackages.length > 0
+      ? drinkPackages
+      : [
+          {
+            title: "House pours",
+            description: "Selected beers, wines and soft drinks",
+            price: 25,
+            available_quantity: 80,
+          },
+          {
+            title: "Welcome drink",
+            description: "A drink on arrival for each guest",
+            price: 8,
+            available_quantity: 100,
+          },
+        ];
+  const hasDrinkPackages = resolvedDrinkPackages.length > 0;
   const drinksRemoved = removedSections.has("drinks");
   const stepEightData = {
     step: 8 as const,
     event_id: eventId,
     drink_title: drinksSource.drink_title ?? "",
     drink_description: drinksSource.drink_description ?? "",
-    packages: drinkPackages,
+    packages: resolvedDrinkPackages,
   };
   globalForm.setValue("stepEight", stepEightData);
   if (!drinksRemoved && hasDrinkPackages) {
@@ -740,9 +817,10 @@ async function applyAIGeneratedOnboardingContentInner({
           isApproved: true,
         })
       : await onboardingService.storeStepEightData(stepEightData);
-    if (step8Response.status) {
-      await updateSession({ on_boarding_step: 9 });
+    if (!step8Response.status) {
+      throw new Error(step8Response.message || "Failed to save drink packages");
     }
+    await updateSession({ on_boarding_step: 9 });
   } else {
     await updateSession({ on_boarding_step: 9 });
   }
@@ -752,14 +830,15 @@ async function applyAIGeneratedOnboardingContentInner({
   const stepNineData = {
     step: 9,
     event_id: eventId,
-    faqs: editedContent.stepNine.faqs.slice(0, STEP_NINE_MAX_FAQS),
+    faqs: (editedContent.stepNine?.faqs ?? []).slice(0, STEP_NINE_MAX_FAQS),
   };
 
   globalForm.setValue("stepNine", stepNineData);
   const step9Response = await onboardingService.storeStepNineData(stepNineData);
-  if (step9Response.status) {
-    await updateSession({ on_boarding_step: 10 });
+  if (!step9Response.status) {
+    throw new Error(step9Response.message || "Failed to save FAQs");
   }
+  await updateSession({ on_boarding_step: 10 });
 
   setStep(9);
   // Sync furthest progress to session, then open Site (step 2) for immediate preview

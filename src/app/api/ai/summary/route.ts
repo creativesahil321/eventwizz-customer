@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { resolveAiRuntimeConfig } from "../lib/provider-config";
+import {
+  AI_PLAIN_TEXT,
+  toUserFacingMarketingCopy,
+} from "../lib/extract-json";
+import {
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
 
 type ContentType = "about" | "policy" | "contact" | "page";
 
@@ -135,10 +142,7 @@ export async function POST(req: Request) {
 
     const aiConfig = await resolveAiRuntimeConfig();
     if (!aiConfig.isConfigured) {
-      return NextResponse.json(
-        { error: "AI service is not properly configured" },
-        { status: 500 }
-      );
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     const venueName =
@@ -223,7 +227,7 @@ export async function POST(req: Request) {
     `;
 
       systemContent =
-        "You are a professional business content writer who ONLY outputs final About section text." +
+        "You are a professional business content writer. Output ONLY the final customer-facing description — never thinking, analysis, role, task, constraints, or drafting notes." +
         "\n\nRULES:\n" +
         "1. Write 2-3 full sentences.\n" +
         "2. Max 50 words / 340 characters.\n" +
@@ -248,6 +252,7 @@ export async function POST(req: Request) {
         ],
         temperature: 0.7,
         max_tokens: maxTokens,
+        ...AI_PLAIN_TEXT,
       }
     );
 
@@ -271,7 +276,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const summary = result.data.choices?.[0]?.message?.content?.trim();
+    const summary = toUserFacingMarketingCopy(
+      result.data.choices?.[0]?.message?.content ?? "",
+    );
 
     if (!summary || summary === "REGENERATE") {
       return NextResponse.json(
@@ -301,6 +308,17 @@ export async function POST(req: Request) {
             .replace(/\s*```$/i, "")
             .trim();
 
+    if (
+      /thinking process|\*\*role:\*\*|analyze the request|drafting\s*[-–]\s*attempt/i.test(
+        cleanSummary,
+      )
+    ) {
+      return NextResponse.json(
+        { error: "AI returned invalid meta content. Please try again." },
+        { status: 500 }
+      );
+    }
+
     if (contentType === "about") {
       const bannedPrefixes = [
         "here is",
@@ -317,6 +335,9 @@ export async function POST(req: Request) {
       if (
         bannedPrefixes.some((prefix) =>
           cleanSummary.toLowerCase().startsWith(prefix)
+        ) ||
+        /thinking process|\*\*role:\*\*|analyze the request|drafting\s*[-–]\s*attempt/i.test(
+          cleanSummary,
         )
       ) {
         return NextResponse.json(

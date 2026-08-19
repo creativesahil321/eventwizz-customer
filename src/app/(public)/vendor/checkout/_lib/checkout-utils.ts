@@ -359,6 +359,44 @@ function roundCheckoutMoney(n: number): number {
 }
 
 /**
+ * After a booking-level discount, top-level `partial_payment` is the discounted
+ * table-deposit total. Per-date `deposit_amount` values must sum to that same
+ * figure or validation rejects: "partial_payment must equal the sum of table
+ * deposit amounts across deposit dates".
+ */
+function scaleDepositAmountsToTarget(
+  dates: CheckoutDateData[],
+  targetDepositToday: number,
+): void {
+  const depositDates = dates.filter(
+    (date) => date.is_deposit && date.deposit_amount > 0,
+  );
+  if (depositDates.length === 0) return;
+
+  const originalSum = depositDates.reduce(
+    (sum, date) => sum + date.deposit_amount,
+    0,
+  );
+  if (originalSum <= 0) return;
+
+  const target = roundCheckoutMoney(Math.max(0, targetDepositToday));
+  if (Math.abs(originalSum - target) <= 0.02) return;
+
+  let allocated = 0;
+  depositDates.forEach((date, index) => {
+    if (index === depositDates.length - 1) {
+      date.deposit_amount = roundCheckoutMoney(target - allocated);
+      return;
+    }
+    const scaled = roundCheckoutMoney(
+      (date.deposit_amount / originalSum) * target,
+    );
+    date.deposit_amount = scaled;
+    allocated = roundCheckoutMoney(allocated + scaled);
+  });
+}
+
+/**
  * Confirmed checkout money rule:
  * 1) Apply the single discount to the booking total first
  * 2) Then derive pay-today / pay-later from that discounted total
@@ -511,6 +549,18 @@ export function transformCartToCheckout(
     payLater,
     depositToday,
   });
+
+  // Keep per-date deposit_amount in sync with discounted partial_payment.
+  if (split.depositToday > 0 && split.discountAmount > 0) {
+    if (roomMode && checkoutRooms) {
+      scaleDepositAmountsToTarget(
+        checkoutRooms.flatMap((room) => room.dates),
+        split.depositToday,
+      );
+    } else if (checkoutDates) {
+      scaleDepositAmountsToTarget(checkoutDates, split.depositToday);
+    }
+  }
 
   const checkoutPayload: CheckoutRequest = {
     vendor_event_id: vendorEventId,

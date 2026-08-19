@@ -369,10 +369,10 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
 
             <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:p-6">
               <h2 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
-                Featured image
+                Featured image <span className="text-destructive">*</span>
               </h2>
               <p className="mb-4 text-sm text-muted-foreground sm:mb-5">
-                {BLOG_FEATURED_UPLOAD_HINT}
+                {BLOG_FEATURED_UPLOAD_HINT} Required.
               </p>
 
               <FormField

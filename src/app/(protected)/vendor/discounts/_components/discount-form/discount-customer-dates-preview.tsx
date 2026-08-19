@@ -36,6 +36,11 @@ type DiscountCustomerDatesPreviewProps = {
   selectedFormIndex?: number | null;
   /** Open / create the offer for this date/room (Dates step). */
   onSetOffer?: (item: DiscountDatePreviewItem) => void;
+  /**
+   * Event-level room order (matches the live event page). When omitted, tabs
+   * fall back to unique rooms sorted by id — never earliest-date-first.
+   */
+  rooms?: Array<{ roomId: number; label: string }>;
 };
 
 function dateParts(iso: string): {
@@ -61,19 +66,37 @@ export function DiscountCustomerDatesPreview({
   className,
   selectedFormIndex = null,
   onSetOffer,
+  rooms,
 }: DiscountCustomerDatesPreviewProps) {
   const roomTabs = useMemo(() => {
-    const map = new Map<number, string>();
+    const present = new Map<number, string>();
     for (const item of items) {
       if (item.roomId > 0 && item.roomName) {
-        map.set(item.roomId, item.roomName);
+        present.set(item.roomId, item.roomName);
       }
     }
-    return Array.from(map.entries()).map(([roomId, label]) => ({
-      roomId,
-      label,
-    }));
-  }, [items]);
+    if (present.size === 0) return [];
+
+    if (rooms && rooms.length > 0) {
+      const seen = new Set<number>();
+      const ordered: Array<{ roomId: number; label: string }> = [];
+      for (const room of rooms) {
+        const label = present.get(room.roomId);
+        if (!label || seen.has(room.roomId)) continue;
+        seen.add(room.roomId);
+        ordered.push({ roomId: room.roomId, label });
+      }
+      for (const [roomId, label] of present) {
+        if (seen.has(roomId)) continue;
+        ordered.push({ roomId, label });
+      }
+      return ordered;
+    }
+
+    return Array.from(present.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([roomId, label]) => ({ roomId, label }));
+  }, [items, rooms]);
 
   const hasRoomTabs = roomTabs.length >= 2;
   const [activeRoomIndex, setActiveRoomIndex] = useState(0);

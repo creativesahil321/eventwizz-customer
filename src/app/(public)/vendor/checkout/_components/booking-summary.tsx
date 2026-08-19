@@ -1250,6 +1250,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
           getDateData={getDateData}
           eventSlug={currentEventSlug ?? undefined}
           getRoomName={roomMode ? getRoomNameForKey : undefined}
+          bookingCouponDiscount={
+            promoTotals.usingCoupon ? couponDiscount : 0
+          }
+          bookingSubTotal={bookingGrandTotal}
         />
       )}
 
@@ -1300,7 +1304,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
           <div className="flex items-center justify-between text-sm text-emerald-700">
             <span>Date offers</span>
             <span className="font-medium tabular-nums">
-              −{formatMoney(autoDiscount)}
+              {formatMoney(autoDiscount)}
             </span>
           </div>
         ) : null}
@@ -1319,7 +1323,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               ) : null}
             </span>
             <span className="font-medium tabular-nums">
-              −{formatMoney(couponDiscount)}
+              {formatMoney(couponDiscount)}
             </span>
           </div>
         ) : null}

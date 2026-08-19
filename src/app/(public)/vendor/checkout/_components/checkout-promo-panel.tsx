@@ -34,9 +34,8 @@ function isCouponExpired(expiresAt: string | null | undefined): boolean {
 }
 
 /**
- * Coupon codes support only two modes (no per-person):
+ * Coupon codes support percentage only (flat off total removed):
  * - `discount_type: "percentage"` + `amount` → % of booking final total
- * - `discount_type: "flat"` + `amount` → flat off booking final total
  *
  * Coupons are applied once to the booking final total
  * (tables + tickets + drinks across all dates) — never per-date.
@@ -57,10 +56,6 @@ export function computeCouponDiscountAmount(
 
   if (type === "percentage") {
     return roundMoney(Math.min(subtotal, (subtotal * rawAmount) / 100));
-  }
-
-  if (type === "flat") {
-    return roundMoney(Math.min(subtotal, rawAmount));
   }
 
   return 0;
@@ -273,7 +268,7 @@ export function CheckoutPromoPanel({
                 </p>
               </div>
               <span className="shrink-0 text-sm font-semibold tabular-nums text-emerald-800">
-                −{formatMoney(row.amount)}
+                {formatMoney(row.amount)}
               </span>
             </button>
           ))}
