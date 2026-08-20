@@ -43,6 +43,7 @@ import {
   getApiDateDiscount,
   calculateEditableDateDiscountableTotal,
   calculateEditableDateTablesTotal,
+  calculateEditableDateTotal,
   computeDateDiscountAmount,
   isDateDiscountEligible,
   isFlatPerPersonDateDiscount,
@@ -57,7 +58,11 @@ import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
 import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
-import { isCheckoutCouponApplied, resolveCartEventCoupon } from "./checkout-promo-panel";
+import {
+  computeCouponDiscountAmount,
+  isCheckoutCouponApplied,
+  resolveCartEventCoupon,
+} from "./checkout-promo-panel";
 import { useCartSync } from "../_lib/hooks/useCartSync";
 import { useLocationSlug } from "../_lib/hooks/useLocationSlug";
 import { generateEventBookingUrl } from "../_lib/utils/event-url";
@@ -118,9 +123,13 @@ export default function CartManager({}: CartManagerProps) {
   }, [apiCartData]);
 
   // Coupon replaces date offers — only one discount applies per booking.
+  const eventCoupon = useMemo(
+    () => resolveCartEventCoupon(currentEventApiData),
+    [currentEventApiData],
+  );
   const couponReplacesDateOffers = isCheckoutCouponApplied(
     { couponCode },
-    resolveCartEventCoupon(currentEventApiData),
+    eventCoupon,
   );
 
   const locationSlug = useLocationSlug();
@@ -395,6 +404,40 @@ export default function CartManager({}: CartManagerProps) {
     }
     return getAvailableDates(currentEventApiData);
   }, [currentEventApiData, roomMode, activeRoomId]);
+
+  /** Whole-booking keys for coupon share (all rooms), not just the active room tab. */
+  const allBookingDateKeys = useMemo(() => {
+    if (!currentEventApiData) return [];
+    if (roomMode) return getAllRoomDateKeys(currentEventApiData);
+    return getAvailableDates(currentEventApiData);
+  }, [currentEventApiData, roomMode]);
+
+  const bookingDiscountableForPromo = useMemo(() => {
+    if (!currentEventSlug) return 0;
+    return allBookingDateKeys.reduce((sum, dateKey) => {
+      const dateData = getDateData(currentEventSlug, dateKey);
+      return (
+        sum +
+        (dateData ? calculateEditableDateDiscountableTotal(dateData) : 0)
+      );
+    }, 0);
+  }, [allBookingDateKeys, currentEventSlug, editingData, getDateData]);
+
+  const couponDiscountTotal = useMemo(() => {
+    if (!couponReplacesDateOffers) return 0;
+    return computeCouponDiscountAmount(
+      eventCoupon,
+      bookingDiscountableForPromo,
+    );
+  }, [couponReplacesDateOffers, eventCoupon, bookingDiscountableForPromo]);
+
+  const couponDiscountLabel = useMemo(() => {
+    if (!couponReplacesDateOffers || !eventCoupon) return null;
+    const label = eventCoupon.value_label?.trim();
+    if (label) return label;
+    const code = couponCode?.trim().toUpperCase();
+    return code ? `Coupon ${code}` : "Coupon";
+  }, [couponReplacesDateOffers, eventCoupon, couponCode]);
 
   const { totalCartItems } = useMemo(() => {
     if (!currentEventSlug) {
@@ -751,10 +794,24 @@ export default function CartManager({}: CartManagerProps) {
               serverEventData={currentEventApiData}
               {...(() => {
                 if (couponReplacesDateOffers) {
+                  const dateDiscountable =
+                    calculateEditableDateDiscountableTotal(dateData);
+                  const dateTotal = calculateEditableDateTotal(dateData);
+                  const share =
+                    couponDiscountTotal > 0 &&
+                    bookingDiscountableForPromo > 0 &&
+                    dateDiscountable > 0
+                      ? Math.round(
+                          ((dateDiscountable / bookingDiscountableForPromo) *
+                            couponDiscountTotal +
+                            Number.EPSILON) *
+                            100,
+                        ) / 100
+                      : 0;
                   return {
-                    discountLabel: null,
-                    discountAmount: null as number | null,
-                    discountStrikeAmount: null as number | null,
+                    discountLabel: share > 0 ? couponDiscountLabel : null,
+                    discountAmount: share > 0 ? share : null,
+                    discountStrikeAmount: share > 0 ? dateTotal : null,
                     discountLockedHint: null as string | null,
                   };
                 }

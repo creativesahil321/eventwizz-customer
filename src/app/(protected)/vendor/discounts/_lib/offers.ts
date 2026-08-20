@@ -116,11 +116,100 @@ export function slotKey(dateId: number, roomId: number): string {
   return `${dateId}:${roomId > 0 ? roomId : 0}`;
 }
 
+/** True when the catalog uses room-first nesting (`event.rooms`). */
+export function isRoomFirstDiscountEvent(
+  event: DiscountEventWithDates | null | undefined,
+): boolean {
+  return Array.isArray(event?.rooms) && event.rooms.length > 0;
+}
+
+/**
+ * Resolve calendar date + room label for a form offer row.
+ * Room-first: match `rooms[].dates[].date_id` (prefer `roomId` when set).
+ * Legacy / non-room: match top-level `dates[].date_id`.
+ */
+export function findDiscountEventCatalogDay(
+  event: DiscountEventWithDates | null | undefined,
+  dateId: number,
+  roomId = 0,
+): { date: string; date_id: number; roomName: string | null } | null {
+  if (!event || !(dateId > 0)) return null;
+
+  if (isRoomFirstDiscountEvent(event)) {
+    const rooms = event.rooms ?? [];
+    if (roomId > 0) {
+      const room = rooms.find((r) => r.id === roomId);
+      const day = (room?.dates ?? []).find((d) => d.date_id === dateId);
+      if (!day?.date) return null;
+      return {
+        date: day.date,
+        date_id: day.date_id,
+        roomName: room?.name ?? null,
+      };
+    }
+    for (const room of rooms) {
+      const day = (room.dates ?? []).find((d) => d.date_id === dateId);
+      if (day?.date) {
+        return {
+          date: day.date,
+          date_id: day.date_id,
+          roomName: room.name ?? null,
+        };
+      }
+    }
+    return null;
+  }
+
+  const day = (event.dates ?? []).find((d) => d.date_id === dateId);
+  if (!day?.date) return null;
+  const roomName =
+    roomId > 0
+      ? ((day.rooms ?? []).find((r) => r.id === roomId)?.name ?? null)
+      : null;
+  return { date: day.date, date_id: day.date_id, roomName };
+}
+
+/** Offer requires a room when the event is room-based (new or legacy nesting). */
+export function discountEventRequiresRoom(
+  event: DiscountEventWithDates | null | undefined,
+  dateId: number,
+): boolean {
+  if (!event || !(dateId > 0)) return false;
+  if (isRoomFirstDiscountEvent(event)) return true;
+  const day = (event.dates ?? []).find((d) => d.date_id === dateId);
+  return (day?.rooms?.length ?? 0) > 0;
+}
+
 /** Expand event dates into date/room slots for the Dates step + preview. */
 export function buildEventCatalogSlots(
   event: DiscountEventWithDates | null | undefined,
 ): EventCatalogSlot[] {
   const slots: EventCatalogSlot[] = [];
+
+  // Room-based (current API): event → rooms[] → dates[]
+  // Rooms with empty dates are kept in listDiscountEventRooms but yield no slots.
+  if (isRoomFirstDiscountEvent(event)) {
+    for (const room of event?.rooms ?? []) {
+      if (room?.id == null) continue;
+      for (const d of room.dates ?? []) {
+        if (d?.date_id == null || !d?.date) continue;
+        slots.push({
+          key: slotKey(d.date_id, room.id),
+          dateId: d.date_id,
+          date: d.date,
+          roomId: room.id,
+          roomName: room.name ?? null,
+        });
+      }
+    }
+    return slots.sort((a, b) => {
+      const byDate = a.date.localeCompare(b.date);
+      if (byDate !== 0) return byDate;
+      return (a.roomName ?? "").localeCompare(b.roomName ?? "");
+    });
+  }
+
+  // Non-room / legacy: event → dates[] (→ rooms[])
   for (const d of event?.dates ?? []) {
     if (d?.date_id == null || !d?.date) continue;
     const rooms = (d.rooms ?? []).filter((r) => r?.id != null);
@@ -159,14 +248,22 @@ export type DiscountEventRoomTab = {
 /**
  * Event-level room order for the customer preview tabs.
  *
- * Catalog slots are sorted by date, so first-seen-room would put whichever
- * room has the earliest date on the left. The live event page instead uses
- * `event.rooms` insertion order (typically the venue/event room relation,
- * which follows room id). Match that here.
+ * Room-first API: use `event.rooms` insertion order (include rooms with
+ * empty `dates` — they still belong to the event).
+ * Legacy: derive from richest date→rooms list / room id order.
  */
 export function listDiscountEventRooms(
   event: DiscountEventWithDates | null | undefined,
 ): DiscountEventRoomTab[] {
+  if (isRoomFirstDiscountEvent(event)) {
+    return (event?.rooms ?? [])
+      .filter((r) => r?.id != null)
+      .map((r) => ({
+        roomId: r.id,
+        label: r.name?.trim() || `Room ${r.id}`,
+      }));
+  }
+
   const unique = new Map<number, string>();
   let richest: DiscountEventDateRoom[] = [];
 

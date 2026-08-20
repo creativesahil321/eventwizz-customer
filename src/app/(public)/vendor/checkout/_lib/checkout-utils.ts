@@ -354,8 +354,13 @@ function collectCheckoutRooms(
   return { rooms, subTotal, payToday, payLater, depositToday };
 }
 
-function roundCheckoutMoney(n: number): number {
+export function roundCheckoutMoney(n: number): number {
   return Math.round(Math.max(0, n) * 100) / 100;
+}
+
+/** Compare checkout money after cent rounding — avoids float false mismatches. */
+export function checkoutMoneyEquals(a: number, b: number): boolean {
+  return roundCheckoutMoney(a) === roundCheckoutMoney(b);
 }
 
 /**
@@ -402,6 +407,10 @@ function scaleDepositAmountsToTarget(
  * 2) Then derive pay-today / pay-later from that discounted total
  *    (keeps the same today:later ratio as the pre-discount split)
  *
+ * Drink packages are never coupon-eligible. Pass them as
+ * `nonDiscountablePayToday` so they stay full-price on pay-today while the
+ * percentage coupon applies only to tables + tickets (matching the API).
+ *
  * Example: £1000 total, 10% off → £900; 30% partial → £270 today / £630 later.
  */
 export function applyDiscountThenSplitPayment(options: {
@@ -410,6 +419,8 @@ export function applyDiscountThenSplitPayment(options: {
   payToday: number;
   payLater: number;
   depositToday?: number;
+  /** Drink packages (and any other never-discounted pay-today amount). */
+  nonDiscountablePayToday?: number;
 }): {
   discountAmount: number;
   discountedTotal: number;
@@ -418,10 +429,31 @@ export function applyDiscountThenSplitPayment(options: {
   depositToday: number;
 } {
   const subTotal = roundCheckoutMoney(options.subTotal);
-  const discountAmount = roundCheckoutMoney(
-    Math.min(Math.max(0, options.discountAmount), subTotal),
+  const payTodayRaw = roundCheckoutMoney(Math.max(0, options.payToday));
+  const payLaterRaw = roundCheckoutMoney(Math.max(0, options.payLater));
+  const drinksToday = roundCheckoutMoney(
+    Math.max(
+      0,
+      Math.min(options.nonDiscountablePayToday ?? 0, payTodayRaw),
+    ),
   );
-  const discountedTotal = roundCheckoutMoney(subTotal - discountAmount);
+
+  // Coupon % is on tables+tickets only — peel drinks out, split, then add back.
+  const discountableSubTotal = roundCheckoutMoney(
+    Math.max(0, subTotal - drinksToday),
+  );
+  const discountablePayToday = roundCheckoutMoney(
+    Math.max(0, payTodayRaw - drinksToday),
+  );
+  const discountAmount = roundCheckoutMoney(
+    Math.min(Math.max(0, options.discountAmount), discountableSubTotal),
+  );
+  const discountedDiscountable = roundCheckoutMoney(
+    discountableSubTotal - discountAmount,
+  );
+  const discountedTotal = roundCheckoutMoney(
+    discountedDiscountable + drinksToday,
+  );
 
   if (subTotal <= 0 || discountedTotal <= 0) {
     return {
@@ -433,9 +465,8 @@ export function applyDiscountThenSplitPayment(options: {
     };
   }
 
-  const rawPayLater = Math.max(0, options.payLater);
   // Full payment — charge the full discounted total today.
-  if (rawPayLater <= 0) {
+  if (payLaterRaw <= 0) {
     return {
       discountAmount,
       discountedTotal,
@@ -445,17 +476,27 @@ export function applyDiscountThenSplitPayment(options: {
     };
   }
 
-  // Partial payment — same ratio on the discounted total.
-  const todayRatio = Math.min(1, Math.max(0, options.payToday / subTotal));
-  const payToday = roundCheckoutMoney(discountedTotal * todayRatio);
-  const payLater = roundCheckoutMoney(discountedTotal - payToday);
+  // Partial payment — same ratio on the discountable (tables+tickets) total.
+  const todayRatio =
+    discountableSubTotal > 0
+      ? Math.min(1, Math.max(0, discountablePayToday / discountableSubTotal))
+      : 0;
+  const discountedPayTodayCore = roundCheckoutMoney(
+    discountedDiscountable * todayRatio,
+  );
+  const payLater = roundCheckoutMoney(
+    discountedDiscountable - discountedPayTodayCore,
+  );
+  const payToday = roundCheckoutMoney(discountedPayTodayCore + drinksToday);
   const depositRatio =
     options.depositToday != null &&
     options.depositToday > 0 &&
-    options.payToday > 0
-      ? Math.min(1, options.depositToday / options.payToday)
+    discountablePayToday > 0
+      ? Math.min(1, options.depositToday / discountablePayToday)
       : 0;
-  const depositToday = roundCheckoutMoney(payToday * depositRatio);
+  const depositToday = roundCheckoutMoney(
+    discountedPayTodayCore * depositRatio,
+  );
 
   return {
     discountAmount,
@@ -541,13 +582,29 @@ export function transformCartToCheckout(
       ? discountAmountRaw
       : 0;
 
-  // Discount the booking total first, then split partial payment on that result.
+  // Discount tables+tickets first (drinks stay full price), then split partial.
+  const drinksToday = roomMode
+    ? (checkoutRooms ?? []).reduce(
+        (sum, room) =>
+          sum +
+          room.dates.reduce(
+            (dateSum, date) => dateSum + sumDrinkTotal(date.drink_package),
+            0,
+          ),
+        0,
+      )
+    : (checkoutDates ?? []).reduce(
+        (sum, date) => sum + sumDrinkTotal(date.drink_package),
+        0,
+      );
+
   const split = applyDiscountThenSplitPayment({
     subTotal,
     discountAmount: requestedDiscount,
     payToday,
     payLater,
     depositToday,
+    nonDiscountablePayToday: drinksToday,
   });
 
   // Keep per-date deposit_amount in sync with discounted partial_payment.

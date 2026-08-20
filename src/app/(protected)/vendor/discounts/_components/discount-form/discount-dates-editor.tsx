@@ -336,9 +336,12 @@ export function DiscountDatesEditor({
   }
 
   if (catalogSlots.length === 0) {
+    const roomCount = eventRoomTabs.length;
     return (
       <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-        This event has no dates yet. Add dates on the event, then come back.
+        {roomCount > 0
+          ? "This event’s rooms have no upcoming dates yet. Add dates on the event, then come back."
+          : "This event has no dates yet. Add dates on the event, then come back."}
       </div>
     );
   }

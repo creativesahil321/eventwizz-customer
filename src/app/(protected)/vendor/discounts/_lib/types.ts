@@ -204,10 +204,13 @@ export interface DiscountStoreResponse {
 }
 
 /**
- * GET /vendor/discounts/locations-with-events
+ * GET /vendor/discounts/events-with-dates
  * Events for the current header location.
  *
- * Shape: event → dates (`date_id`) → optional rooms.
+ * Non-room events: event → dates[]
+ * Room-based events (`is_rooms`): event → rooms[] → dates[]
+ *   Rooms with no upcoming dates still appear with `dates: []`.
+ * Legacy (pre room-first): event → dates[] → rooms[]
  */
 export interface DiscountEventDateRoom {
   id: number;
@@ -217,13 +220,30 @@ export interface DiscountEventDateRoom {
 export interface DiscountEventDateItem {
   date: string;
   date_id: number;
+  /** Legacy date→rooms nesting (pre room-first API). */
   rooms?: DiscountEventDateRoom[];
+}
+
+/** Room-first catalog date (no nested rooms). */
+export interface DiscountEventRoomDate {
+  date: string;
+  date_id: number;
+}
+
+/** Room-first catalog room; keep even when `dates` is empty. */
+export interface DiscountEventRoom {
+  id: number;
+  name: string;
+  dates?: DiscountEventRoomDate[];
 }
 
 export interface DiscountEventWithDates {
   id: number;
   name: string;
-  dates: DiscountEventDateItem[];
+  /** Non-room events, or legacy room nesting under each date. */
+  dates?: DiscountEventDateItem[];
+  /** Room-based events: room → dates (current API). */
+  rooms?: DiscountEventRoom[];
 }
 
 export interface DiscountEventsWithDatesResponse {

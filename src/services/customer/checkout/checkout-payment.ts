@@ -77,6 +77,8 @@ export function mergeStripePaymentSession(
   return {
     ...next,
     expiresAt: next.expiresAt ?? previous?.expiresAt,
+    clientQuotedAmount:
+      next.clientQuotedAmount ?? previous?.clientQuotedAmount,
   };
 }
 

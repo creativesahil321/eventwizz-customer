@@ -120,7 +120,7 @@ export default function DeleteLocationDialog({
           };
         }
       )?.data;
-      setMaskedEmail(data?.masked_email?.trim() || "vendor owner email");
+      setMaskedEmail(data?.masked_email?.trim() || "the account owner's email");
       setResendIn(data?.resend_after ?? data?.expires_in ?? RESEND_SECONDS);
       setOtp("");
       setStep("otp");
@@ -241,14 +241,14 @@ export default function DeleteLocationDialog({
                 </span>
                 <div className="min-w-0 flex-1 space-y-1 text-sm">
                   <p className="font-medium text-foreground">
-                    Verify with vendor owner email
+                    Verify with the owner’s email
                   </p>
                   <p className="leading-relaxed text-muted-foreground">
-                    We’ll email a one-time code to the{" "}
+                    We’ll send a one-time code to the{" "}
                     <span className="font-semibold text-foreground">
-                      vendor owner account
+                      account owner
                     </span>
-                    . Staff login emails never receive this code.
+                    .
                   </p>
                 </div>
               </div>
@@ -283,7 +283,7 @@ export default function DeleteLocationDialog({
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   Code sent to{" "}
                   <span className="break-all font-mono font-semibold text-foreground">
-                    {maskedEmail || "vendor owner email"}
+                    {maskedEmail || "the account owner's email"}
                   </span>
                 </p>
               </div>
@@ -348,7 +348,7 @@ export default function DeleteLocationDialog({
                   <p className="mt-0.5 break-all text-xs text-emerald-800/80">
                     Confirmed for{" "}
                     <span className="font-mono font-semibold">
-                      {maskedEmail || "vendor owner email"}
+                      {maskedEmail || "the account owner's email"}
                     </span>
                   </p>
                 </div>

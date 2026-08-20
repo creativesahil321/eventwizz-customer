@@ -62,7 +62,10 @@ import {
 import {
   buildCustomerPreviewItems,
   buildEventCatalogSlots,
+  discountEventRequiresRoom,
+  findDiscountEventCatalogDay,
   formatFormOfferValueLabel,
+  isRoomFirstDiscountEvent,
   listDiscountEventRooms,
 } from "../../_lib/offers";
 import {
@@ -166,9 +169,25 @@ function eventCatalogSummary(
   event: DiscountEventWithDates | null,
 ): string | null {
   if (!event) return null;
-  const dateCount = event.dates.length;
+
+  if (isRoomFirstDiscountEvent(event)) {
+    const rooms = event.rooms ?? [];
+    const dateCount = rooms.reduce(
+      (sum, room) => sum + (room.dates?.length ?? 0),
+      0,
+    );
+    const roomLabel = rooms.length === 1 ? "1 room" : `${rooms.length} rooms`;
+    if (dateCount === 0) {
+      return `${roomLabel} · no upcoming dates yet`;
+    }
+    const dateLabel = dateCount === 1 ? "1 date" : `${dateCount} dates`;
+    return `${roomLabel} · ${dateLabel} available next`;
+  }
+
+  const dates = event.dates ?? [];
+  const dateCount = dates.length;
   if (dateCount === 0) return "No dates on this event yet";
-  const roomSlots = event.dates.reduce(
+  const roomSlots = dates.reduce(
     (sum, d) => sum + (d.rooms?.length ? d.rooms.length : 1),
     0,
   );
@@ -368,7 +387,11 @@ export function DiscountFormWizard({
     let changed = false;
     const next = rows.map((row) => {
       if (!(row.date_id > 0)) return row;
-      const day = selectedEvent.dates.find((d) => d.date_id === row.date_id);
+      const day = findDiscountEventCatalogDay(
+        selectedEvent,
+        row.date_id,
+        Number(row.room_id) || 0,
+      );
       if (!day?.date || row.event_date === day.date) return row;
       changed = true;
       return { ...row, event_date: day.date };
@@ -493,8 +516,10 @@ export function DiscountFormWizard({
 
     rows.forEach((row, index) => {
       if (!(row.date_id > 0)) return;
-      const day = (selectedEvent?.dates ?? []).find(
-        (d) => d.date_id === row.date_id,
+      const day = findDiscountEventCatalogDay(
+        selectedEvent,
+        row.date_id,
+        Number(row.room_id) || 0,
       );
       const dateKey = row.event_date || day?.date || `id-${row.date_id}`;
       const dateLabel = row.event_date
@@ -504,8 +529,7 @@ export function DiscountFormWizard({
           : "—";
       const roomName =
         row.room_id > 0
-          ? ((day?.rooms ?? []).find((r) => r.id === row.room_id)?.name ??
-            `Room #${row.room_id}`)
+          ? (day?.roomName ?? `Room #${row.room_id}`)
           : "Whole date";
       const kind =
         row.value_type === "percentage"
@@ -575,11 +599,10 @@ export function DiscountFormWizard({
     let ok = true;
     rows.forEach((row, index) => {
       if (!(row.date_id > 0) || isDiscountDateOfferBlank(row)) return;
-      const day = (selectedEvent?.dates ?? []).find(
-        (d) => d.date_id === row.date_id,
-      );
-      const rooms = day?.rooms ?? [];
-      if (rooms.length > 0 && !(row.room_id > 0)) {
+      if (
+        discountEventRequiresRoom(selectedEvent, row.date_id) &&
+        !(row.room_id > 0)
+      ) {
         form.setError(`dates.${index}.room_id`, {
           type: "manual",
           message: "Please select a room",

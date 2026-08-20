@@ -31,6 +31,7 @@ import {
 } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { formatTableCapacityTitle } from "@/app/(public)/vendor/checkout/_lib/table-labels";
 import type { ApiEventCartData } from "@/lib/types/cart.types";
+import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 
 // Payment calculation utility
 function calculatePaymentAmounts(
@@ -1275,6 +1276,8 @@ export const useCartEditStore = create<CartEditState>()(
 
       clearAllCarts: () => {
         set({ editingData: {} });
+        // Applied coupon is cart-scoped — don't keep it for a fresh booking.
+        useCheckoutPromoStore.getState().clearCoupon();
         // Explicitly remove the persisted key so a page reload (e.g. after
         // payment) never rehydrates stale cart data ahead of the Zustand write.
         if (typeof window !== "undefined") {
@@ -1442,6 +1445,11 @@ export const useCartEditStore = create<CartEditState>()(
           }
           return { editingData: newEditingData };
         });
+        // Coupon is applied to the current booking — drop it when the cart is empty.
+        const remaining = get().editingData[eventSlug];
+        if (!remaining || Object.keys(remaining).length === 0) {
+          useCheckoutPromoStore.getState().clearCoupon();
+        }
       },
 
       removeAllDates: (eventSlug: string) => {
@@ -1450,6 +1458,7 @@ export const useCartEditStore = create<CartEditState>()(
           delete newEditingData[eventSlug];
           return { editingData: newEditingData };
         });
+        useCheckoutPromoStore.getState().clearCoupon();
       },
 
       // NEW: Payment management methods

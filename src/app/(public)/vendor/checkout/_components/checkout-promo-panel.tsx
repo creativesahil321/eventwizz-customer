@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Check, Lock, Percent, Tag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { CouponStripSource } from "@/lib/coupon-strip-props";
 import { parseRoomDateKey } from "../_lib/cart-calculations";
@@ -55,16 +54,17 @@ function isCouponExpired(expiresAt: string | null | undefined): boolean {
 
 /**
  * Coupon codes support percentage only (flat off total removed):
- * - `discount_type: "percentage"` + `amount` → % of booking final total
+ * - `discount_type: "percentage"` + `amount` → % of discountable booking total
  *
- * Coupons are applied once to the booking final total
- * (tables + tickets + drinks across all dates) — never per-date.
+ * Coupons are applied once to tables + tickets across all dates.
+ * Drink packages are never included in the coupon base.
  */
 export function computeCouponDiscountAmount(
   coupon: CouponStripSource | null | undefined,
-  subtotal: number,
+  /** Tables + tickets only (exclude drinks). */
+  discountableSubtotal: number,
 ): number {
-  if (!coupon || !(subtotal > 0)) return 0;
+  if (!coupon || !(discountableSubtotal > 0)) return 0;
   if (isCouponExpired(coupon.expires_at)) return 0;
 
   // Prefer cart API fields; keep vendor-form aliases as fallback.
@@ -75,7 +75,12 @@ export function computeCouponDiscountAmount(
   if (!Number.isFinite(rawAmount) || !(rawAmount > 0)) return 0;
 
   if (type === "percentage") {
-    return roundMoney(Math.min(subtotal, (subtotal * rawAmount) / 100));
+    return roundMoney(
+      Math.min(
+        discountableSubtotal,
+        (discountableSubtotal * rawAmount) / 100,
+      ),
+    );
   }
 
   return 0;
@@ -92,17 +97,16 @@ export function isCheckoutCouponApplied(
 
 /**
  * Offer resolution:
- * - Coupon → applied once to booking final total; date offers ignored
+ * - Coupon → applied once to tables + tickets (drinks excluded); date offers ignored
  * - No coupon → per-date offers apply (each date’s own offer)
  */
 export function resolveCheckoutPromoTotals(
   promo: CheckoutPromoApplied,
   eventCoupon: CouponStripSource | null | undefined,
   /**
-   * Booking final total (all dates: tables + tickets + drinks).
-   * Used only as the coupon base — never per-date.
+   * Coupon percentage base: tables + tickets across all dates (never drinks).
    */
-  subtotal: number,
+  discountableSubtotal: number,
   /** Automatic date-offer savings (ignored when a coupon is applied — no stacking). */
   dateOfferAmount = 0,
 ): {
@@ -114,7 +118,10 @@ export function resolveCheckoutPromoTotals(
 } {
   const usingCoupon = isCheckoutCouponApplied(promo, eventCoupon);
   if (usingCoupon) {
-    const couponAmount = computeCouponDiscountAmount(eventCoupon, subtotal);
+    const couponAmount = computeCouponDiscountAmount(
+      eventCoupon,
+      discountableSubtotal,
+    );
     return {
       autoDiscountAmount: 0,
       couponAmount,
@@ -153,6 +160,13 @@ type CheckoutPromoPanelProps = {
   eventCoupon?: CouponStripSource | null;
   /** Date-level offers with eligibility + savings. */
   dateDiscounts?: CartDateDiscountRow[];
+  /** Coupon savings when applied (booking-level). */
+  couponSavingsAmount?: number;
+  /**
+   * True when the cart has drink packages — coupons never discount drinks,
+   * so copy must not imply % off the full subtotal.
+   */
+  drinksExcludedFromCoupon?: boolean;
   value: CheckoutPromoApplied;
   onChange: (promo: CheckoutPromoApplied) => void;
   /** Jump to the matching date accordion in the cart (scroll + expand). */
@@ -168,13 +182,14 @@ export function CheckoutPromoPanel({
   formatMoney,
   eventCoupon,
   dateDiscounts = [],
+  couponSavingsAmount = 0,
+  drinksExcludedFromCoupon = false,
   value,
   onChange,
   onDateOfferClick,
   className,
   disabled = false,
 }: CheckoutPromoPanelProps) {
-  const [codeInput, setCodeInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const apiCode = eventCoupon?.coupon_code?.trim().toUpperCase() ?? "";
@@ -191,18 +206,9 @@ export function CheckoutPromoPanel({
 
   const couponExpired = isCouponExpired(eventCoupon?.expires_at);
 
-  const applyNormalizedCode = (raw: string, emptyMessage: string) => {
-    const normalized = raw.trim().toUpperCase();
-    if (!normalized) {
-      setError(emptyMessage);
-      return;
-    }
+  const handleApplySuggested = () => {
     if (!apiCode) {
       setError("No coupon is available for this event");
-      return;
-    }
-    if (normalized !== apiCode) {
-      setError("That code isn’t valid for this booking");
       return;
     }
     if (couponExpired) {
@@ -220,13 +226,9 @@ export function CheckoutPromoPanel({
       setError("This coupon is not available");
       return;
     }
-    onChange({ ...value, couponCode: normalized });
-    setCodeInput("");
+    onChange({ ...value, couponCode: apiCode });
     setError(null);
   };
-
-  const handleApply = () => applyNormalizedCode(codeInput, "Enter a coupon code");
-  const handleApplySuggested = () => applyNormalizedCode(apiCode, "Enter a coupon code");
 
   const appliedDateOffers = dateDiscounts.filter(
     (row) => row.status === "applied" && row.amount > 0,
@@ -256,13 +258,15 @@ export function CheckoutPromoPanel({
 
       {appliedMatchesApi ? (
         <p className="text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
-          Coupon applied to the booking total — date discounts are not used with
-          a coupon.
+          {drinksExcludedFromCoupon
+            ? "Coupon applies to tables and tickets only — drink packages stay full price. Date offers are not used with a coupon."
+            : "Coupon applied to tables and tickets — date discounts are not used with a coupon."}
         </p>
       ) : hasCouponOffer && appliedDateOffers.length > 0 ? (
         <p className="text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
-          A coupon applies once to the booking total and replaces the date
-          offers below.
+          {drinksExcludedFromCoupon
+            ? "A coupon applies once to tables and tickets (not drinks) and replaces the date offers below."
+            : "A coupon applies once to tables and tickets and replaces the date offers below."}
         </p>
       ) : null}
 
@@ -293,7 +297,7 @@ export function CheckoutPromoPanel({
                 </p>
               </div>
               <span className="shrink-0 text-sm font-semibold tabular-nums text-emerald-800">
-                {formatMoney(row.amount)}
+                {formatMoney(row.amount)} off
               </span>
             </button>
           ))}
@@ -360,7 +364,16 @@ export function CheckoutPromoPanel({
             </p>
             <p className="text-xs text-[color:var(--checkout-muted-foreground)]">
               {couponHeading || couponValueLabel || "Coupon applied"}
+              {drinksExcludedFromCoupon
+                ? " · tables & tickets only"
+                : null}
             </p>
+            {couponSavingsAmount > 0 ? (
+              <p className="mt-0.5 text-xs font-semibold tabular-nums text-emerald-700">
+                You saved {formatMoney(couponSavingsAmount)}
+                {drinksExcludedFromCoupon ? " on tables & tickets" : ""}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -408,48 +421,6 @@ export function CheckoutPromoPanel({
               disabled={disabled || couponExpired}
               onClick={handleApplySuggested}
               className="h-8 shrink-0 rounded-lg px-3 text-xs font-semibold"
-            >
-              Apply
-            </Button>
-          </div>
-          <label
-            htmlFor="checkout-coupon-code"
-            className="text-xs font-medium text-[color:var(--checkout-muted-foreground)]"
-          >
-            Or enter a different code
-          </label>
-          <div className="flex min-w-0 gap-2">
-            <Input
-              id="checkout-coupon-code"
-              value={codeInput}
-              onChange={(e) => {
-                setCodeInput(e.target.value.toUpperCase());
-                if (error) setError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleApply();
-                }
-              }}
-              placeholder="Enter code"
-              maxLength={40}
-              disabled={disabled}
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-              className={cn(
-                "h-10 flex-1 rounded-xl border-gray-200 bg-white font-mono text-sm uppercase tracking-wide",
-                "placeholder:normal-case placeholder:tracking-normal placeholder:text-gray-400",
-                error && "border-red-300 focus-visible:ring-red-200",
-              )}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={disabled || !codeInput.trim()}
-              onClick={handleApply}
-              className="h-10 shrink-0 rounded-xl px-4 text-sm font-semibold"
             >
               Apply
             </Button>

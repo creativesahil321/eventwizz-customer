@@ -75,16 +75,19 @@ export function DiscountCustomerDatesPreview({
         present.set(item.roomId, item.roomName);
       }
     }
-    if (present.size === 0) return [];
 
+    // Prefer event room order from the catalog — keep rooms with no upcoming
+    // dates so the UI does not look like the room was removed from the event.
     if (rooms && rooms.length > 0) {
       const seen = new Set<number>();
       const ordered: Array<{ roomId: number; label: string }> = [];
       for (const room of rooms) {
-        const label = present.get(room.roomId);
-        if (!label || seen.has(room.roomId)) continue;
+        if (!(room.roomId > 0) || seen.has(room.roomId)) continue;
         seen.add(room.roomId);
-        ordered.push({ roomId: room.roomId, label });
+        ordered.push({
+          roomId: room.roomId,
+          label: room.label || present.get(room.roomId) || `Room ${room.roomId}`,
+        });
       }
       for (const [roomId, label] of present) {
         if (seen.has(roomId)) continue;
@@ -92,6 +95,8 @@ export function DiscountCustomerDatesPreview({
       }
       return ordered;
     }
+
+    if (present.size === 0) return [];
 
     return Array.from(present.entries())
       .sort(([a], [b]) => a - b)

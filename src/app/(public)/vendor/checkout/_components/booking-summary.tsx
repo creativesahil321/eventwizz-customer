@@ -30,6 +30,8 @@ import {
   getApiDateData,
   parseRoomDateKey,
   calculateEditableDateTotal,
+  calculateEditableCartDiscountableTotal,
+  calculateEditableDateDrinksTotal,
   isDepositChoiceAvailable,
   hasUnconfirmedTableSeating,
   getDateGuestCount,
@@ -40,6 +42,7 @@ import {
   validateCheckoutRequirements,
   calculateCheckoutSummary,
   applyDiscountThenSplitPayment,
+  checkoutMoneyEquals,
 } from "../_lib/checkout-utils";
 import {
   useProcessCheckout,
@@ -349,12 +352,15 @@ export default function BookingSummary({}: BookingSummaryProps) {
       (sum, row) => sum + (row.status === "applied" ? row.amount : 0),
       0,
     );
-    // Coupon = once on booking final total (not per-date).
-    const bookingFinalTotal = totalToday + totalLater;
+    // Coupon % is on tables + tickets only (drinks excluded — matches API).
+    const discountableSubtotal = calculateEditableCartDiscountableTotal(
+      currentEventApiData,
+      getEditableDate,
+    );
     return resolveCheckoutPromoTotals(
       checkoutPromo,
       resolveCartEventCoupon(currentEventApiData),
-      bookingFinalTotal,
+      discountableSubtotal,
       dateOfferSavings,
     ).totalDiscount;
   }, [
@@ -363,29 +369,78 @@ export default function BookingSummary({}: BookingSummaryProps) {
     currentEventSlug,
     editingData,
     getDateData,
-    totalToday,
-    totalLater,
   ]);
 
-  const payableTodayWithCoupon = useMemo(() => {
-    return applyDiscountThenSplitPayment({
+  const drinksPayToday = useMemo(() => {
+    if (!currentEventSlug || !currentEventApiData) return 0;
+    return getApiCartDateKeys(currentEventApiData).reduce((sum, dateKey) => {
+      const dateData = getDateData(currentEventSlug, dateKey);
+      return sum + calculateEditableDateDrinksTotal(dateData);
+    }, 0);
+  }, [currentEventApiData, currentEventSlug, editingData, getDateData]);
+
+  const payableNowWithFee = useMemo(() => {
+    const split = applyDiscountThenSplitPayment({
       subTotal: totalToday + totalLater,
       discountAmount: appliedPromoDiscount,
       payToday: totalToday,
       payLater: totalLater,
-    }).payToday;
-  }, [totalToday, totalLater, appliedPromoDiscount]);
+      nonDiscountablePayToday: drinksPayToday,
+    });
+    const feeMeta = (
+      currentEventApiData as unknown as {
+        vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
+      }
+    )?.vendor_platform_fee;
+    const platformFeeRaw =
+      split.discountedTotal > 0 && feeMeta
+        ? feeMeta.mode === "flat"
+          ? Number(feeMeta.value || 0)
+          : (split.discountedTotal * Number(feeMeta.value || 0)) / 100
+        : 0;
+    const platformFee =
+      Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
+        ? Number(platformFeeRaw.toFixed(2))
+        : 0;
 
-  // Bug 1 fix — discard pending session when the amount the user owes today changes
-  // (e.g. switching deposit ↔ pay-in-full, adding/removing items, applying a coupon).
-  // The backend keeps the old booking alive; calling /resume with a new bookingNumber
-  // would open the wrong intent, so we drop the session and let the user re-checkout.
+    return {
+      payToday: split.payToday,
+      payLater: split.payLater,
+      discountedTotal: split.discountedTotal,
+      platformFee,
+      payTodayWithFee: split.payToday + platformFee,
+    };
+  }, [
+    totalToday,
+    totalLater,
+    appliedPromoDiscount,
+    drinksPayToday,
+    currentEventApiData,
+  ]);
+
+  // Discard a pending session only when the *cart quote* changes (deposit ↔ full,
+  // items, coupon). Never compare that quote with `session.amount` — the backend
+  // charge can include a platform fee or rounding the UI does not, which used to
+  // fire "Payment option changed" immediately after a successful checkout.
   useEffect(() => {
     if (!stripePaymentSession || stripePaymentCompletedRef.current) return;
+    if (isCheckoutInProgressRef.current) return;
     // totalToday is 0 while cart data is loading — ignore transient zeros
     if (totalToday === 0) return;
 
-    if (payableTodayWithCoupon !== stripePaymentSession.amount) {
+    const session = useCheckoutPaymentUiStore.getState().stripePaymentSession;
+    if (!session) return;
+
+    const quoted = session.clientQuotedAmount;
+    if (quoted == null || !Number.isFinite(quoted)) {
+      setStripePaymentSession({
+        ...session,
+        clientQuotedAmount: payableNowWithFee.payTodayWithFee,
+      });
+      return;
+    }
+
+    if (!checkoutMoneyEquals(quoted, payableNowWithFee.payTodayWithFee)) {
       clearPaymentSession();
       toast.info("Payment option changed", {
         description:
@@ -394,9 +449,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }
   }, [
     totalToday,
-    payableTodayWithCoupon,
-    stripePaymentSession,
+    payableNowWithFee.payTodayWithFee,
+    stripePaymentSession?.bookingNumber,
+    stripePaymentSession?.clientQuotedAmount,
     clearPaymentSession,
+    setStripePaymentSession,
   ]);
 
   const roomMode = useMemo(
@@ -531,9 +588,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
     if (stripePaymentSession) {
       // If the user changed payment type (deposit ↔ full) while a session is
-      // pending, the stored amount no longer matches the current cart total.
-      // Clear the stale session and fall through to create a fresh checkout.
-      if (stripePaymentSession.amount !== payableTodayWithCoupon) {
+      // pending, the cart quote no longer matches what this session was created
+      // for. Clear the stale session and fall through to create a fresh checkout.
+      const quoted =
+        stripePaymentSession.clientQuotedAmount ??
+        payableNowWithFee.payTodayWithFee;
+      if (!checkoutMoneyEquals(quoted, payableNowWithFee.payTodayWithFee)) {
         clearPaymentSession();
         useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
         // fall through to fresh checkout below
@@ -628,7 +688,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
         setStripePaymentSession(
           mergeStripePaymentSession(
             useCheckoutPaymentUiStore.getState().stripePaymentSession,
-            paymentAction.session,
+            {
+              ...paymentAction.session,
+              clientQuotedAmount: payableNowWithFee.payTodayWithFee,
+            },
           ),
         );
         setIsStripePaymentOpen(true);
@@ -1044,11 +1107,15 @@ export default function BookingSummary({}: BookingSummaryProps) {
     (sum, row) => sum + (row.status === "applied" ? row.amount : 0),
     0,
   );
-  // Coupon uses booking final total once; date offers stay per-date when no coupon.
+  // Coupon % is on tables + tickets only; date offers stay per-date when no coupon.
+  const discountableBookingSubtotal = calculateEditableCartDiscountableTotal(
+    currentEventApiData,
+    getEditableDateForPromo,
+  );
   const promoTotals = resolveCheckoutPromoTotals(
     checkoutPromo,
     eventCoupon,
-    bookingGrandTotal,
+    discountableBookingSubtotal,
     dateOfferSavings,
   );
   const couponDiscount = promoTotals.couponAmount;
@@ -1056,36 +1123,18 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const totalPromoDiscount = promoTotals.totalDiscount;
   const appliedCouponLabel = promoTotals.couponLabel;
 
-  // Discount the booking total first, then split partial payment on that total.
-  const paymentAfterDiscount = applyDiscountThenSplitPayment({
-    subTotal: bookingGrandTotal,
-    discountAmount: totalPromoDiscount,
-    payToday: totalToday,
-    payLater: totalLater,
-  });
-  const discountedToday = paymentAfterDiscount.payToday;
-  const discountedLater = paymentAfterDiscount.payLater;
-  const discountedGrandTotal = paymentAfterDiscount.discountedTotal;
-
-  // Platform fee
+  const discountedToday = payableNowWithFee.payToday;
+  const discountedLater = payableNowWithFee.payLater;
+  const discountedGrandTotal = payableNowWithFee.discountedTotal;
   const platformFeeMeta = (
     currentEventApiData as unknown as {
       vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
     }
   )?.vendor_platform_fee;
-  const platformFeeRaw =
-    hasPayableTotal && platformFeeMeta
-      ? platformFeeMeta.mode === "flat"
-        ? Number(platformFeeMeta.value || 0)
-        : (discountedGrandTotal * Number(platformFeeMeta.value || 0)) / 100
-      : 0;
-  const platformFee =
-    Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
-      ? Number(platformFeeRaw.toFixed(2))
-      : 0;
+  const platformFee = payableNowWithFee.platformFee;
 
   const bookingGrandTotalWithFee = discountedGrandTotal + platformFee;
-  const finalTotalWithFee = discountedToday + platformFee;
+  const finalTotalWithFee = payableNowWithFee.payTodayWithFee;
 
   if (hasPendingStripePayment && !currentEventApiData) {
     return (
@@ -1254,7 +1303,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
           bookingCouponDiscount={
             promoTotals.usingCoupon ? couponDiscount : 0
           }
-          bookingSubTotal={bookingGrandTotal}
+          bookingSubTotal={discountableBookingSubtotal}
         />
       )}
 
@@ -1268,6 +1317,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
             formatMoney={formatMoney}
             eventCoupon={eventCoupon}
             dateDiscounts={dateDiscountRows}
+            couponSavingsAmount={couponDiscount}
+            drinksExcludedFromCoupon={drinksPayToday > 0}
             value={checkoutPromo}
             onChange={setCheckoutPromo}
             onDateOfferClick={(dateKey) => {
@@ -1301,30 +1352,73 @@ export default function BookingSummary({}: BookingSummaryProps) {
           )}
         </div>
 
+        {hasPayableTotal &&
+        promoTotals.usingCoupon &&
+        drinksPayToday > 0 &&
+        discountableBookingSubtotal > 0 ? (
+          <div className="space-y-1 border-l-2 border-gray-100 pl-2.5">
+            <div className="flex items-center justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
+              <span>Tables & tickets</span>
+              <span className="tabular-nums">
+                {formatMoney(discountableBookingSubtotal)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
+              <span>Drink packages</span>
+              <span className="tabular-nums">
+                {formatMoney(drinksPayToday)}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         {hasPayableTotal && autoDiscount > 0 && !promoTotals.usingCoupon ? (
           <div className="flex items-center justify-between text-sm text-emerald-700">
-            <span>Date offers</span>
-            <span className="font-medium tabular-nums">
+            <span className="font-medium">You saved</span>
+            <span className="font-semibold tabular-nums">
               {formatMoney(autoDiscount)}
             </span>
           </div>
         ) : null}
 
         {hasPayableTotal && couponDiscount > 0 ? (
-          <div className="flex items-center justify-between text-sm text-emerald-700">
-            <span>
-              Coupon{" "}
-              <span className="font-mono text-xs tracking-wide">
-                {checkoutPromo.couponCode}
+          <div className="flex items-start justify-between gap-3 text-sm text-emerald-700">
+            <span className="min-w-0">
+              <span className="font-medium">
+                You saved
+                {checkoutPromo.couponCode ? (
+                  <>
+                    {" "}
+                    with{" "}
+                    <span className="font-mono text-xs tracking-wide">
+                      {checkoutPromo.couponCode}
+                    </span>
+                  </>
+                ) : null}
               </span>
-              {appliedCouponLabel ? (
-                <span className="ml-1 text-emerald-700/80">
-                  ({appliedCouponLabel})
-                </span>
-              ) : null}
+              <span className="mt-0.5 block text-xs font-normal text-emerald-700/85">
+                {drinksPayToday > 0
+                  ? appliedCouponLabel
+                    ? `${appliedCouponLabel} on tables & tickets · drinks not included`
+                    : "On tables & tickets · drinks not included"
+                  : appliedCouponLabel
+                    ? appliedCouponLabel
+                    : "On tables & tickets"}
+              </span>
             </span>
-            <span className="font-medium tabular-nums">
+            <span className="shrink-0 font-semibold tabular-nums">
               {formatMoney(couponDiscount)}
+            </span>
+          </div>
+        ) : null}
+
+        {hasPayableTotal && totalPromoDiscount > 0 ? (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[color:var(--checkout-muted-foreground)]">
+              Booking total
+            </span>
+            <span className="font-medium tabular-nums text-[color:var(--checkout-foreground)]">
+              {formatMoney(discountedGrandTotal)}
             </span>
           </div>
         ) : null}
@@ -1353,7 +1447,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
         <div className="flex items-center justify-between pt-1">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[color:var(--checkout-foreground)]">
-            {totalLater > 0 ? "Pay today" : "Total"}
+            {discountedLater > 0 ? "Pay today" : "Total"}
           </span>
           {hasPayableTotal ? (
             <span className="text-2xl font-bold tabular-nums text-[color:var(--checkout-foreground)]">
@@ -1438,9 +1532,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  {availableDates.length > 1 && hasPayableTotal ? (
+                  {hasPayableTotal ? (
                     <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--checkout-muted-foreground)]">
-                      Booking total
+                      {discountedLater > 0 ? "Booking total" : "Total"}
                     </p>
                   ) : null}
                   <p className="text-2xl font-bold tabular-nums tracking-tight text-[color:var(--checkout-foreground)]">
@@ -1448,6 +1542,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
                       ? formatMoney(bookingGrandTotalWithFee)
                       : "—"}
                   </p>
+                  {hasPayableTotal && discountedLater > 0 ? (
+                    <p className="mt-0.5 text-[11px] font-medium tabular-nums text-[color:var(--checkout-muted-foreground)]">
+                      Pay today {formatMoney(payableNowWithPromo)}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1534,13 +1633,17 @@ export default function BookingSummary({}: BookingSummaryProps) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
                   <p className="text-xs font-medium text-[color:var(--checkout-muted-foreground)]">
-                    {totalLater > 0 ? "Pay today" : "Total"}
+                    {discountedLater > 0 ? "Pay today" : "Total"}
                   </p>
                   <p className="text-lg font-bold tabular-nums text-[color:var(--checkout-brand-primary)]">
                     {hasPayableTotal ? formatMoney(payableNowWithPromo) : "—"}
                   </p>
                 </div>
-                {summaryMetaLine ? (
+                {discountedLater > 0 && hasPayableTotal ? (
+                  <p className="mt-0.5 text-[11px] tabular-nums text-[color:var(--checkout-muted-foreground)]">
+                    Booking total {formatMoney(bookingGrandTotalWithFee)}
+                  </p>
+                ) : summaryMetaLine ? (
                   <p className="mt-0.5 truncate text-[11px] text-[color:var(--checkout-muted-foreground)]">
                     {summaryMetaLine}
                   </p>

@@ -44,7 +44,10 @@ interface PerDatePaymentSelectionProps {
    * discount is allocated across dates by share of booking subtotal.
    */
   bookingCouponDiscount?: number;
-  /** Full booking subtotal (all dates) — required to allocate coupon discount. */
+  /**
+   * Discountable booking subtotal (tables + tickets, all dates). Used to
+   * allocate a booking coupon across dates — drinks are never in this base.
+   */
   bookingSubTotal?: number;
 }
 
@@ -175,6 +178,7 @@ function applyPromoToBreakdown(
   } = options;
 
   // Coupon XOR date offer — coupon wins when present.
+  // Coupon share is tables+tickets only; drinks stay full price on pay-today.
   if (couponShareAmount > 0 && raw.fullTotal > 0) {
     const split = applyDiscountThenSplitPayment({
       subTotal: raw.fullTotal,
@@ -182,21 +186,24 @@ function applyPromoToBreakdown(
       payToday: raw.payToday,
       payLater: raw.tableBalanceLater,
       depositToday: raw.tableDeposit,
+      nonDiscountablePayToday: raw.drinkTotal,
     });
     const fullSplit = applyDiscountThenSplitPayment({
       subTotal: raw.fullTotal,
       discountAmount: couponShareAmount,
       payToday: raw.fullTotal,
       payLater: 0,
+      nonDiscountablePayToday: raw.drinkTotal,
     });
-    const discountedTableTotal = roundMoney(
-      fullSplit.payToday *
-        (raw.fullTotal > 0 ? raw.tableTotal / raw.fullTotal : 0),
+    const discountable = raw.tableTotal + raw.ticketTotal;
+    const tableShare = discountable > 0 ? raw.tableTotal / discountable : 0;
+    const tablesAfterCoupon = roundMoney(
+      Math.max(0, discountable - couponShareAmount) * tableShare,
     );
 
     return {
       fullTotal: fullSplit.payToday,
-      tableTotal: discountedTableTotal,
+      tableTotal: tablesAfterCoupon,
       tableDeposit: split.depositToday,
       ticketsAndDrinksToday: roundMoney(
         Math.max(0, split.payToday - split.depositToday),
@@ -486,10 +493,16 @@ export default function PerDatePaymentSelection({
               : 0;
 
           const couponShareAmount =
-            usingCoupon && bookingSubTotal > 0 && raw.fullTotal > 0
-              ? roundMoney(
-                  (raw.fullTotal / bookingSubTotal) * bookingCouponDiscount,
-                )
+            usingCoupon && bookingSubTotal > 0
+              ? (() => {
+                  const dateDiscountable =
+                    raw.tableTotal + raw.ticketTotal;
+                  if (!(dateDiscountable > 0)) return 0;
+                  return roundMoney(
+                    (dateDiscountable / bookingSubTotal) *
+                      bookingCouponDiscount,
+                  );
+                })()
               : 0;
 
           const breakdown = applyPromoToBreakdown(raw, {

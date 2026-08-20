@@ -551,6 +551,11 @@ export default function DateAccordion({
                 <span className="text-sm font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
                   {formatMoney(payableAmount)}
                 </span>
+                {appliedDiscount > 0 ? (
+                  <span className="text-[10px] font-semibold tabular-nums text-emerald-700">
+                    You saved {formatMoney(appliedDiscount)}
+                  </span>
+                ) : null}
               </div>
             )}
           </div>

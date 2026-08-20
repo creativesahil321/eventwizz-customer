@@ -167,6 +167,12 @@ export interface CheckoutStripePaymentSession {
   bookingNumber: string;
   bookingId: number;
   amount: number;
+  /**
+   * Pay-today the checkout UI quoted when this session was created.
+   * Used to detect a real cart/payment-option change — do not compare the
+   * UI quote with `amount` (backend may add platform fee or round differently).
+   */
+  clientQuotedAmount?: number;
   dueLater: number | null;
   gateway: string;
   clientSecret: string;
