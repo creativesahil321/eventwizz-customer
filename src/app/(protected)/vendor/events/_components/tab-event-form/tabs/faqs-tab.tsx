@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2 } from "lucide-react";
+import { PlusCircle, Trash2 } from "lucide-react";
 
 export default function FaqsTab() {
   const [isLoading, setIsLoading] = useState(false);
@@ -267,11 +267,13 @@ export default function FaqsTab() {
               <div className="flex justify-center pt-4">
                 <Button
                   type="button"
+                  variant="outline"
                   onClick={handleAppend}
                   disabled={readOnly || faqFields.length >= STEP_NINE_MAX_FAQS}
-                  className="bg-[#F9FAFB] hover:bg-gray-100 text-gray-700 border border-[#E5E7EB]"
+                  className="flex items-center gap-2"
                 >
-                  <span className="mr-1">+</span> Add another FAQ
+                  <PlusCircle className="h-4 w-4" />
+                  Add another FAQ
                 </Button>
               </div>
             </div>

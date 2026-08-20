@@ -16,6 +16,10 @@ export default function NewsSection({
 }) {
   const { data: articles = [], isLoading } = usePublicBlogs(BLOG_HOME_PER_PAGE);
 
+  if (!isLoading && articles.length === 0) {
+    return null;
+  }
+
   return (
     <section
       id="latest-news"

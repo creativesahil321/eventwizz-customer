@@ -27,6 +27,7 @@ import { useCreateCustomerSupportTicket } from "@/services/customer/support";
 import type { SupportCategory } from "@/app/(protected)/customer/support/_lib/types";
 import { CATEGORY_LABELS } from "@/app/(protected)/customer/support/_lib/utils";
 import { resolveChatNavLink } from "@/lib/chat-nav-links";
+import { previewReviewChromeLiftStyle } from "@/hooks/use-preview-review-chrome-height";
 import type {
   VendorChatLiveStats,
   VendorChatDashboardSnapshot,
@@ -1263,7 +1264,26 @@ Is there anything else I can help you with?`,
       });
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+        const errBody = (await response.json().catch(() => null)) as {
+          retryAfter?: unknown;
+          details?: unknown;
+        } | null;
+        const wait =
+          typeof errBody?.retryAfter === "string" ? errBody.retryAfter : null;
+        const details =
+          typeof errBody?.details === "string" ? errBody.details : null;
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: wait
+              ? `I'm a bit busy right now. Please try again in ${wait}.`
+              : details ||
+                "Sorry, something went wrong. Please try again in a moment.",
+            supportCta,
+          },
+        ]);
+        return;
       }
 
       const data = await response.json();
@@ -1340,6 +1360,7 @@ Is there anything else I can help you with?`,
             exit={motionSafe ? { opacity: 0, scale: 0.85, y: 12 } : undefined}
             transition={{ type: "spring", stiffness: 420, damping: 24 }}
             className="fixed bottom-20 right-4 z-50 sm:bottom-8 sm:right-6"
+            style={previewReviewChromeLiftStyle}
           >
             <motion.button
               type="button"
@@ -1437,6 +1458,7 @@ Is there anything else I can help you with?`,
             )}
             style={{
               transition: "height 300ms ease-out",
+              ...previewReviewChromeLiftStyle,
             }}
           >
             <div className="flex h-14 shrink-0 items-center justify-between gap-2 bg-slate-800 px-3.5 text-white">

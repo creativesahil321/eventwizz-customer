@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import {
+  aiRuntimeFailureMeta,
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
@@ -1082,6 +1083,7 @@ Remember: Return solid hex colors for most fields, but background can be either 
           modelsTried: result.modelsTried,
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );

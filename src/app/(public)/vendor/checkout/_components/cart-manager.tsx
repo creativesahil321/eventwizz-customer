@@ -57,7 +57,7 @@ import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
 import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
-import { isCheckoutCouponApplied } from "./checkout-promo-panel";
+import { isCheckoutCouponApplied, resolveCartEventCoupon } from "./checkout-promo-panel";
 import { useCartSync } from "../_lib/hooks/useCartSync";
 import { useLocationSlug } from "../_lib/hooks/useLocationSlug";
 import { generateEventBookingUrl } from "../_lib/utils/event-url";
@@ -120,7 +120,7 @@ export default function CartManager({}: CartManagerProps) {
   // Coupon replaces date offers — only one discount applies per booking.
   const couponReplacesDateOffers = isCheckoutCouponApplied(
     { couponCode },
-    currentEventApiData?.coupon ?? null,
+    resolveCartEventCoupon(currentEventApiData),
   );
 
   const locationSlug = useLocationSlug();

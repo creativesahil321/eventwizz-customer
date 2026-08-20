@@ -63,47 +63,12 @@ const compactLevelClass = {
   Record<SiteHeadingLevel, string>
 >;
 
-/** Script/display fonts exceed tight metrics; bg-clip-text clips glyph swashes. */
+/** Script/display fonts exceed tight metrics; keep overflow visible so glyphs aren't sliced. */
 const headingLine =
-  "leading-[1.22] md:leading-[1.18] overflow-visible min-w-0 max-w-full break-words [overflow-wrap:anywhere]";
+  "leading-[1.22] overflow-visible min-w-0 max-w-full break-words [overflow-wrap:anywhere]";
 const headingBox = "inline-block max-w-full overflow-visible";
-/** Extra right padding: script tails (e.g. “UK”) often extend past the em-box; bg-clip-text clips without it. */
-const accentTailScriptPad =
-  "inline-block  pl-[0.06em] pr-[0.5em] py-[0.06em]";
-
-/** Soft bloom behind accent tail text (desktop only — on mobile it reads as ghost/overlapping text). */
-function AccentTailTrail({
-  variant,
-  enabled,
-}: {
-  variant: SiteHeadingVariant;
-  enabled: boolean;
-}) {
-  const isDark = variant === "onDark";
-  if (!enabled) return null;
-  return (
-    <>
-      <span
-        className={cn(
-          "pointer-events-none absolute left-[48%] top-1/2 z-0 hidden min-h-[2.25rem] w-[min(115%,14rem)] -translate-x-1/2 -translate-y-1/2 scale-x-[1.15] rounded-full blur-[26px] md:block md:min-h-[2.75rem] md:blur-[34px]",
-          isDark
-            ? "h-[0.88em] bg-[color:color-mix(in_srgb,var(--color-primary)_48%,transparent)]"
-            : "h-[0.82em] bg-[color:color-mix(in_srgb,var(--color-primary)_32%,transparent)]",
-        )}
-        aria-hidden
-      />
-      <span
-        className={cn(
-          "pointer-events-none absolute left-[54%] top-[56%] z-0 hidden h-[0.42em] min-h-[1rem] w-[min(95%,11rem)] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[18px] md:block md:blur-[22px]",
-          isDark
-            ? "bg-[color:color-mix(in_srgb,var(--color-primary)_28%,transparent)]"
-            : "bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)]",
-        )}
-        aria-hidden
-      />
-    </>
-  );
-}
+/** Breathing room for display swashes without forcing an unbreakable inline-block. */
+const accentTailScriptPad = "pl-[0.04em] pr-[0.12em] py-[0.08em]";
 
 /**
  * Public-site marketing heading (`typography.headingEmphasis`).
@@ -128,8 +93,6 @@ export function SiteHeading({
   const emphasis = normalizeHeadingEmphasis(
     emphasisProp ?? theme?.typography?.headingEmphasis,
   );
-  /** Phone / tablet preview frames keep a desktop viewport — gate decorative accents. */
-  const useCompactAccent = narrowPreview;
   const compactType =
     narrowPreview && previewDevice !== "desktop"
       ? compactLevelClass[previewDevice]
@@ -154,9 +117,12 @@ export function SiteHeading({
         ? baseOnLight
         : baseOnSurface;
 
-  const accentGradient =
-    "bg-gradient-to-r from-[color:var(--color-primary)] via-[color:var(--color-primary)] to-[color:color-mix(in_srgb,var(--color-primary)_82%,white)] bg-clip-text text-transparent";
-
+  /**
+   * Hero photos: lift primary toward white so emerald/burgundy still brand
+   * but stay readable. Page body: solid primary on cream/surface.
+   */
+  const accentOnPhoto =
+    "text-[color:color-mix(in_srgb,var(--color-primary)_38%,white)] [text-shadow:0_2px_18px_rgba(0,0,0,0.55),0_1px_3px_rgba(0,0,0,0.4)]";
   const accentSolidPrimary = "text-[color:var(--color-primary)]";
 
   const headingFamily = "var(--font-heading)";
@@ -199,7 +165,9 @@ export function SiteHeading({
           alignBox,
           headingLine,
           !compactType && levelClass[level],
-          variant === "onDark" ? accentGradient : accentSolidPrimary,
+          variant === "onDark" || variant === "onLight"
+            ? accentOnPhoto
+            : accentSolidPrimary,
           "px-[0.2em] py-[0.1em]",
           className,
           compactType?.[level],
@@ -211,10 +179,10 @@ export function SiteHeading({
     );
   }
 
-  /* accent_tail — lead: body + neutral; tail: heading + primary. Inline text flow
-   * (not flex-wrap) keeps the tail on the same line as the last base words when
-   * width allows; flex-wrap was forcing the tail onto its own row after a full-width
-   * base block. Tail padding avoids bg-clip-text slicing swashes. */
+  /* accent_tail — lead: body + neutral; tail: heading + primary. Keep both spans
+   * `inline` so the tail wraps with the sentence (inline-block + max-w-full was
+   * overflowing the remaining line width and clipping “Club”). Inherit line-height
+   * so display fonts aren't sliced by leading-none. */
 
   return (
     <Tag
@@ -225,7 +193,7 @@ export function SiteHeading({
         align !== "right" && align !== "center" && "text-left",
         headingLine,
         !compactType && levelClass[level],
-        "px-[0.12em] py-[0.12em]",
+        "py-[0.14em] pl-[0.12em] pr-[0.4em]",
         className,
         compactType?.[level],
       )}
@@ -233,8 +201,7 @@ export function SiteHeading({
     >
         <span
           className={cn(
-            "break-words [overflow-wrap:anywhere]",
-            compactType ? "leading-[inherit]" : "leading-none",
+            "break-words [overflow-wrap:anywhere] leading-[inherit]",
             baseColorClass,
           )}
           style={{ fontFamily: bodyFamily }}
@@ -244,24 +211,13 @@ export function SiteHeading({
       {accent ? (
         <>
           {" "}
-          <span className="relative inline-block max-w-full min-w-0 break-words [overflow-wrap:anywhere] align-baseline">
-            <AccentTailTrail
-              variant={variant}
-              enabled={!useCompactAccent}
-            />
+          <span className="inline min-w-0 break-words [overflow-wrap:anywhere] align-baseline">
             <span
               className={cn(
-                "relative z-[1] font-black align-baseline break-words [overflow-wrap:anywhere]",
-                compactType ? "leading-[inherit]" : "leading-none",
+                "inline font-black align-baseline break-words [overflow-wrap:anywhere] leading-[inherit]",
                 accentTailScriptPad,
-                // Compact / mobile: solid primary. Desktop: gradient clip.
-                variant === "onDark"
-                  ? useCompactAccent
-                    ? accentSolidPrimary
-                    : cn(
-                        accentSolidPrimary,
-                        "md:bg-gradient-to-r md:from-[color:var(--color-primary)] md:via-[color:var(--color-primary)] md:to-[color:color-mix(in_srgb,var(--color-primary)_82%,white)] md:bg-clip-text md:text-transparent",
-                      )
+                variant === "onDark" || variant === "onLight"
+                  ? accentOnPhoto
                   : accentSolidPrimary,
               )}
               style={{ fontFamily: headingFamily }}

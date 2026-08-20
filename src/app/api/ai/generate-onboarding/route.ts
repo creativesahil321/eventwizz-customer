@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { tryModelsWithFallback, AI_JSON_MAX_TOKENS, type FallbackResult } from "../lib/utils";
 import { AI_JSON_COMPLETION, extractJsonObject } from "../lib/extract-json";
 import {
+  aiRuntimeFailureMeta,
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
@@ -206,6 +207,7 @@ export async function POST(req: NextRequest) {
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
           lastError: result.lastError,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );

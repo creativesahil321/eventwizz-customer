@@ -48,9 +48,11 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     keyPrefixHint: "starts with gsk_",
     suggestedModels: [
       { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B (versatile)" },
-      { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B (instant)" },
-      { id: "mixtral-8x7b-32768", label: "Mixtral 8x7B" },
-      { id: "gemma2-9b-it", label: "Gemma2 9B" },
+      { id: "openai/gpt-oss-120b", label: "GPT OSS 120B" },
+      {
+        id: "meta-llama/llama-4-scout-17b-16e-instruct",
+        label: "Llama 4 Scout 17B",
+      },
     ],
   },
   {

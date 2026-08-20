@@ -5,6 +5,7 @@ import {
   toUserFacingMarketingCopy,
 } from "../lib/extract-json";
 import {
+  aiRuntimeFailureMeta,
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
@@ -264,6 +265,7 @@ export async function POST(req: Request) {
           modelsTried: result.modelsTried,
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );

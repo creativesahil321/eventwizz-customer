@@ -34,6 +34,8 @@ import {
   heroBandVerticalClass,
   heroBandViewToggleOffsetClass,
   heroBannerStackClass,
+  heroHeadingMeasureClass,
+  heroHomeHeadingTypeClass,
   vendorHomeSubheroClass,
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
@@ -66,7 +68,10 @@ export type VendorMainLandingViewProps = {
   contactOverride?: VenueContactOverride | null;
   contactTheme?: Pick<ThemeSchema, "contactDetails" | "locations"> | null;
   socialLinksOverride?: Partial<
-    Record<"facebook" | "twitter" | "instagram" | "linkedin" | "youtube", string>
+    Record<
+      "facebook" | "twitter" | "instagram" | "linkedin" | "youtube",
+      string
+    >
   > | null;
   /** Unique section id for Explore cities scroll target. */
   exploreCitiesSectionId?: string;
@@ -169,7 +174,7 @@ export function VendorMainLandingView({
     return {
       ...base,
       location_slug: locationSlugForCity,
-      city: locationSlugForCity ? undefined : apiFilters.city ?? undefined,
+      city: locationSlugForCity ? undefined : (apiFilters.city ?? undefined),
     };
   }, [
     apiFilters.query,
@@ -310,7 +315,8 @@ export function VendorMainLandingView({
 
         <div
           className={cn(
-            "relative z-10 mx-auto w-full min-w-0 max-w-[1180px] overflow-visible px-4 sm:px-6",
+            "relative z-10 mx-auto min-w-0 max-w-[1180px] overflow-visible px-3 sm:px-6",
+            heroHeadingMeasureClass,
             heroBandContentPadClass(heroValign),
             "pt-24 sm:pt-28 md:pt-32",
             hideMapView ? "pb-12 sm:pb-16" : "pb-16 sm:pb-20 xl:pb-24",
@@ -325,21 +331,6 @@ export function VendorMainLandingView({
               "w-full min-w-0 overflow-visible",
             )}
           >
-            <span
-              className={cn(
-                "mb-3 inline-flex max-w-[min(100%,22rem)] items-center gap-2 truncate rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] backdrop-blur-md transition-colors duration-500 sm:mb-4 sm:px-3.5 sm:py-1.5 sm:text-[11px] sm:tracking-[0.16em]",
-                heroIsLight
-                  ? "border-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] bg-[color:color-mix(in_srgb,var(--color-primary)_8%,var(--color-surface))] text-[var(--color-primary)]"
-                  : "border-white/25 bg-white/12 text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.4)]",
-              )}
-            >
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)]"
-                aria-hidden
-              />
-              <span className="min-w-0 truncate">{heroBadgeLabel}</span>
-            </span>
-
             <SiteHeading
               level={1}
               title={heroHeading}
@@ -348,9 +339,9 @@ export function VendorMainLandingView({
               variant={heroIsLight ? "onLight" : "onDark"}
               align={heroAlign}
               className={cn(
-                "mb-2.5 w-full min-w-0 max-w-full break-words font-bold !text-[1.65rem] !leading-[1.18]",
-                !isPreviewNarrow &&
-                  "sm:mb-4 sm:!text-4xl sm:!leading-[1.12] md:max-w-5xl md:!text-5xl xl:!text-[3.25rem] xl:!leading-[1.05]",
+                "mb-2.5 w-full max-w-5xl font-bold",
+                heroHomeHeadingTypeClass,
+                !isPreviewNarrow && "sm:mb-4",
               )}
             />
 
@@ -458,42 +449,42 @@ export function VendorMainLandingView({
           transition={{ duration: 0.45, delay: 0.12 }}
         >
           {!showApiResults ? (
-          <div
-            className={cn(
-              "mx-auto mb-3 max-w-2xl text-center md:mb-7",
-              !isPreviewNarrow && "sm:mb-5",
-            )}
-          >
-            <span
+            <div
               className={cn(
-                "mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--color-primary)]",
-                !isPreviewNarrow &&
-                  "sm:mb-2.5 sm:text-xs sm:tracking-[0.2em]",
+                "mx-auto mb-3 max-w-2xl text-center md:mb-7",
+                !isPreviewNarrow && "sm:mb-5",
               )}
             >
-              Explore cities
-            </span>
-            <SiteHeading
-              level={2}
-              align="center"
-              title={locationsListTitle}
-              emphasis={resolvedHeadingEmphasis}
-              variant="onSurface"
-              className={cn(
-                "mb-1 !text-xl !font-black !leading-snug tracking-tight",
-                !isPreviewNarrow &&
-                  "sm:mb-2.5 sm:!text-4xl sm:!leading-tight",
-              )}
-            />
-            <p
-              className={cn(
-                "mx-auto max-w-xl px-1 text-xs leading-snug text-[var(--color-text-dimmed)]",
-                !isPreviewNarrow && "sm:text-base sm:leading-relaxed",
-              )}
-            >
-              {locationsListSubtitle}
-            </p>
-          </div>
+              <span
+                className={cn(
+                  "mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--color-primary)]",
+                  !isPreviewNarrow &&
+                    "sm:mb-2.5 sm:text-xs sm:tracking-[0.2em]",
+                )}
+              >
+                Explore cities
+              </span>
+              <SiteHeading
+                level={2}
+                align="center"
+                title={locationsListTitle}
+                emphasis={resolvedHeadingEmphasis}
+                variant="onSurface"
+                className={cn(
+                  "mb-1 !text-xl !font-black !leading-snug tracking-tight",
+                  !isPreviewNarrow &&
+                    "sm:mb-2.5 sm:!text-4xl sm:!leading-tight",
+                )}
+              />
+              <p
+                className={cn(
+                  "mx-auto max-w-xl px-1 text-xs leading-snug text-[var(--color-text-dimmed)]",
+                  !isPreviewNarrow && "sm:text-base sm:leading-relaxed",
+                )}
+              >
+                {locationsListSubtitle}
+              </p>
+            </div>
           ) : null}
 
           {!showApiResults && locations.length > 0 ? (

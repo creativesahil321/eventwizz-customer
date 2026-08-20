@@ -128,8 +128,10 @@ export interface ApiEventCartData {
   event_rooms?: ApiEventRoomCatalogItem[];
   /** Present when the customer has an unpaid booking — enables cross-device session restore. */
   pending_payment?: ApiPendingPayment | null;
-  /** Event-level coupon from GET /customer/event. */
+  /** Event-level coupon from cart GET. */
   coupon?: CouponStripSource | null;
+  /** Duplicate of `coupon.coupon_code` on some cart payloads. */
+  coupon_code?: string | null;
   [key: string]:
     | string
     | number

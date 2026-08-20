@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import {
+  aiRuntimeFailureMeta,
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
@@ -80,12 +81,13 @@ Examples:
     if (!result.success) {
       return NextResponse.json(
         {
-          error: "Error from GROQ API",
+          error: "Error from AI provider",
           details: result.error,
           status: result.status || 500,
           modelsTried: result.modelsTried,
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );

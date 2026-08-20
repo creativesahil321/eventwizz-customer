@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthContent } from "./_components/auth-content";
-import { ServerContext } from "@/lib/server-context";
 import { AuthSkeleton } from "./_components/auth-skeleton";
-import { addCacheBusting } from "@/lib/image-utils";
 import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
+import LocationSelectionHeader from "@/app/(public)/vendor/_components/LocationPage/location-selection-header";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
 
 export default function AuthLayout({
   children,
@@ -18,20 +18,14 @@ export default function AuthLayout({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+  const { theme } = useTheme();
+  const { settings } = useDomain();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [isSigningOutSecurity, setIsSigningOutSecurity] = useState(false);
-  const { theme } = useContext(ServerContext);
 
   const isSecurityViolation =
     searchParams.get("error") === "security_violation";
   const callbackUrl = searchParams.get("callbackUrl");
-  const logoPath =
-    theme?.logo?.startsWith("/") ||
-    theme?.logo?.startsWith("data:") ||
-    theme?.logo?.startsWith("http") ||
-    theme?.logo?.startsWith("https")
-      ? theme.logo
-      : "/assets/images/logos/eventwizz-logo.png";
 
   useEffect(() => {
     if (!isSecurityViolation || status !== "authenticated") return;
@@ -84,43 +78,30 @@ export default function AuthLayout({
     );
   }
 
-  const logo = (
-    <Link href="/" className="inline-flex items-center shrink-0">
-      <img
-        className="h-8 w-auto object-contain"
-        alt="EventWizz"
-        src={addCacheBusting(logoPath, theme?.media_updated_at)}
-      />
-    </Link>
-  );
-
   return (
-    <div className="min-h-screen flex flex-col md:flex-row overflow-x-hidden font-body bg-[var(--color-background)]">
-      {/* Left — brand panel (desktop) */}
-      <aside
-        className="hidden md:flex md:w-[34%] lg:w-[32%] flex-col border-r border-[var(--color-text)]/8 bg-[color-mix(in_srgb,var(--color-primary)_7%,var(--color-background))]"
-      >
-        <div className="px-8 lg:px-12 pt-8 pb-4">{logo}</div>
-        <div className="flex flex-1 flex-col justify-center px-8 lg:px-12 pb-12">
-          <AuthContent />
-        </div>
-      </aside>
+    <>
+      {/* Same solid-theme header as the public home (`--color-header` / `--color-on-header`). */}
+      <LocationSelectionHeader
+        name={theme?.name || settings?.name}
+        logo={theme?.logo || settings?.logo || undefined}
+      />
+      <div className="flex min-h-screen flex-col overflow-x-hidden bg-[var(--color-background)] pt-[60px] font-body md:flex-row">
+        <aside className="hidden flex-col border-r border-[var(--color-text)]/8 bg-[color-mix(in_srgb,var(--color-primary)_7%,var(--color-background))] md:flex md:w-[34%] lg:w-[32%]">
+          <div className="flex flex-1 flex-col justify-center px-8 py-12 lg:px-12">
+            <AuthContent />
+          </div>
+        </aside>
 
-      {/* Right — form */}
-      <div className="flex flex-1 flex-col bg-[color-mix(in_srgb,var(--color-text)_4%,var(--color-surface))]">
-        {/* Mobile logo bar — matches page, no separate header color */}
-        <header className="md:hidden flex h-14 items-center px-4 border-b border-[var(--color-text)]/8 bg-[var(--color-background)]">
-          {logo}
-        </header>
-
-        <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8 sm:py-16">
-          <div className="w-full max-w-[440px]">
-            <div className="rounded-xl border border-[var(--color-text)]/6 bg-[var(--color-surface)] p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-              {children}
+        <div className="flex flex-1 flex-col bg-[color-mix(in_srgb,var(--color-text)_4%,var(--color-surface))]">
+          <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8 sm:py-16">
+            <div className="w-full max-w-[440px]">
+              <div className="rounded-xl border border-[var(--color-text)]/6 bg-[var(--color-surface)] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:p-8">
+                {children}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

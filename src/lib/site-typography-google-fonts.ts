@@ -34,6 +34,15 @@ export const SITE_ESSENTIALS_GOOGLE_FONT_NAMES = [
   "Instrument Sans",
   "Afacad",
   "Figtree",
+  "Source Sans 3",
+  "Nunito Sans",
+  "Libre Caslon Display",
+  "Karla",
+  "Marcellus",
+  "Public Sans",
+  "Jost",
+  "Archivo",
+  "Baloo 2",
 ] as const;
 
 const GOOGLE_SET = new Set<string>(SITE_ESSENTIALS_GOOGLE_FONT_NAMES);
@@ -50,6 +59,8 @@ const SERIF_GOOGLE_FONT_NAMES = new Set<string>([
   "DM Serif Display",
   "Crimson Text",
   "EB Garamond",
+  "Libre Caslon Display",
+  "Marcellus",
 ]);
 
 export function siteEssentialsGoogleFontStack(name: string): string {

@@ -225,7 +225,7 @@ export default function LocationGrid({
 
                 <span
                   className={cn(
-                    "absolute left-2 top-2 z-[1] inline-flex rounded-full bg-[var(--color-primary)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--color-primary-foreground)] shadow-sm",
+                    "absolute left-2 top-2 z-[1] inline-flex rounded-full bg-[var(--color-secondary)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--color-secondary-foreground)] shadow-sm",
                     !narrowPreview &&
                       "md:left-4 md:top-4 md:px-2.5 md:py-1 md:text-[11px]",
                   )}

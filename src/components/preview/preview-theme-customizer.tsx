@@ -16,7 +16,6 @@ import {
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
   AlertTriangle,
-  Check,
   Loader2,
   Palette,
   RotateCcw,
@@ -46,10 +45,12 @@ import {
   mergeColorPaletteIntoValues,
   mergeGoogleOnlyFontsIntoValues,
   mergePresetFontsIntoValues,
+  mergeFullPresetIntoValues,
   siteEssentialsColorsMatch,
   siteEssentialsFontPairKey,
   tryThemeColorGridOptionStorageKey,
   tryThemeFontGridOptionStorageKey,
+  isVenueThemePresetId,
   type SiteThemePresetId,
   type TryThemeColorGridOption,
   type TryThemeFontGridOption,
@@ -131,7 +132,122 @@ const SECTION_LABEL_CLASS =
 /** Consistent one-line helper text used under section labels. */
 const SECTION_HINT_CLASS = "text-[11px] leading-snug text-slate-400";
 
-/** Full-width segmented control shared by the hero align/valign pickers. */
+function ColorPresetCard({
+  opt,
+  active,
+  showRecent,
+  layout,
+  fontLabel,
+  onSelect,
+}: {
+  opt: TryThemeColorGridOption;
+  active: boolean;
+  showRecent: boolean;
+  layout: "recipe" | "compact";
+  fontLabel?: string;
+  onSelect: () => void;
+}) {
+  const [a, b, c] = opt.swatch;
+  const acc = paletteAccessibilityFlags(opt.colors);
+  const contrastWarn = !(acc.bodyTextAa && acc.primaryOnSurfaceUi);
+
+  const statusChip =
+    active ? (
+      <span className="shrink-0 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-medium text-white">
+        In use
+      </span>
+    ) : showRecent ? (
+      <span className="shrink-0 rounded-full border border-slate-200 px-1.5 py-0.5 text-[9px] font-medium text-slate-500">
+        Recent
+      </span>
+    ) : null;
+
+  const swatches = (
+    <div className="flex shrink-0 gap-0.5" aria-hidden>
+      {[a, b, c].map((hex) => (
+        <span
+          key={hex}
+          className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
+          style={{ backgroundColor: hex }}
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <button
+      type="button"
+      aria-current={active ? "true" : undefined}
+      onClick={onSelect}
+      title={`${opt.name}${fontLabel ? ` · ${fontLabel}` : ""}\n${opt.tagline}`}
+      className={cn(
+        "relative rounded-xl border text-left transition-all duration-200",
+        layout === "recipe"
+          ? "flex items-start gap-3 p-3"
+          : "flex flex-col items-center gap-1 p-2 pt-2.5",
+        active
+          ? "border-slate-900/20 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2)] ring-1 ring-slate-900/10"
+          : "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-sm",
+      )}
+    >
+      {layout === "recipe" ? (
+        <>
+          {swatches}
+          <span className="min-w-0 flex-1">
+            <span className="flex items-start justify-between gap-2">
+              <span className="text-[13px] font-semibold leading-snug text-slate-800">
+                {opt.name}
+              </span>
+              {statusChip}
+            </span>
+            {fontLabel ? (
+              <span className="mt-0.5 block text-[10px] text-slate-500">
+                {fontLabel}
+              </span>
+            ) : null}
+            <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
+              {opt.tagline}
+            </span>
+          </span>
+          {contrastWarn ? (
+            <AlertTriangle
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600"
+              aria-label="Contrast may be tight"
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          {statusChip ? (
+            <span className="absolute right-1.5 top-1.5 z-10">{statusChip}</span>
+          ) : null}
+          {contrastWarn ? (
+            <AlertTriangle
+              className="absolute left-1.5 top-1.5 h-3 w-3 text-amber-600"
+              aria-label="Contrast may be tight"
+            />
+          ) : null}
+          <div className={cn("flex gap-0.5", statusChip || contrastWarn ? "mt-4" : "mt-1")}>
+            {[a, b, c].map((hex) => (
+              <span
+                key={hex}
+                className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
+                style={{ backgroundColor: hex }}
+              />
+            ))}
+          </div>
+          <span className="line-clamp-1 w-full text-center text-[11px] font-medium text-slate-700">
+            {opt.name}
+          </span>
+          <span className="line-clamp-2 w-full text-center text-[10px] leading-snug text-slate-500">
+            {opt.tagline}
+          </span>
+        </>
+      )}
+    </button>
+  );
+}
+
 function SegmentGroup<T extends string>({
   ariaLabel,
   value,
@@ -227,6 +343,7 @@ function presetById(
 
 /** Preset ids prefixed `lovable-` are legacy internal keys; UI groups use neutral labels. */
 function presetGroupKeyFromId(id: SiteThemePresetId) {
+  if (isVenueThemePresetId(id)) return "venue";
   return id.startsWith("lovable-") ? "modern" : "classic";
 }
 
@@ -281,10 +398,24 @@ export function PreviewThemeCustomizer({
   const applyColorGridOption = useCallback(
     (opt: TryThemeColorGridOption) => {
       const cur = valuesRef.current;
-      if (siteEssentialsColorsMatch(cur.colors, opt.colors)) {
-        return;
+      if (opt.source === "preset" && isVenueThemePresetId(opt.id)) {
+        const preset = presetById(opt.id);
+        const next = mergeFullPresetIntoValues(cur, preset);
+        const sameColors = siteEssentialsColorsMatch(cur.colors, next.colors);
+        const sameFonts =
+          siteEssentialsFontPairKey(cur.typography) ===
+          siteEssentialsFontPairKey(next.typography);
+        const sameEmphasis =
+          (cur.typography?.headingEmphasis ?? "") ===
+          (next.typography?.headingEmphasis ?? "");
+        if (sameColors && sameFonts && sameEmphasis) return;
+        onValuesChange(next);
+      } else {
+        if (siteEssentialsColorsMatch(cur.colors, opt.colors)) {
+          return;
+        }
+        onValuesChange(mergeColorPaletteIntoValues(cur, opt.colors));
       }
-      onValuesChange(mergeColorPaletteIntoValues(cur, opt.colors));
       const k = tryThemeColorGridOptionStorageKey(opt);
       setLastColorKey(k);
       try {
@@ -411,8 +542,9 @@ export function PreviewThemeCustomizer({
       string,
       { key: string; label: string; items: typeof orderedFontGridOptions }
     > = {
+      venue: { key: "venue", label: "Venue font pairs", items: [] },
       modern: { key: "modern", label: "Marketing font pairs", items: [] },
-      classic: { key: "classic", label: "Core font pairs", items: [] },
+      classic: { key: "classic", label: "More font pairs", items: [] },
       extra: { key: "extra", label: "Extra font pairs", items: [] },
     };
 
@@ -451,8 +583,9 @@ export function PreviewThemeCustomizer({
         items: typeof orderedColorGridOptions;
       }
     > = {
+      venue: { key: "venue", label: "Venue recipes", items: [] },
       modern: { key: "modern", label: "Marketing palettes", items: [] },
-      classic: { key: "classic", label: "Core palettes", items: [] },
+      classic: { key: "classic", label: "More palettes", items: [] },
       extra: { key: "extra", label: "Extra palettes", items: [] },
     };
 
@@ -687,12 +820,13 @@ export function PreviewThemeCustomizer({
                   ))}
                 </div>
                 <p className={SECTION_HINT_CLASS}>
-                  Green badge passes common contrast checks; amber means
-                  double-check in Site Essentials.
+                  Start with a venue recipe — it sets colors, fonts, and
+                  heading style together. Gold/brass is for badges, not body
+                  text. More palettes are collapsed below.
                 </p>
                 <Accordion
                   type="multiple"
-                  defaultValue={["modern", "classic"]}
+                  defaultValue={["venue"]}
                   className="w-full"
                 >
                   {groupedColorGridOptions.map((group) => (
@@ -710,9 +844,15 @@ export function PreviewThemeCustomizer({
                         </span>
                       </AccordionTrigger>
                       <AccordionContent className="pt-0 pb-3">
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        <div
+                          className={cn(
+                            "grid gap-2",
+                            group.key === "venue"
+                              ? "grid-cols-1"
+                              : "grid-cols-2",
+                          )}
+                        >
                           {group.items.map((opt) => {
-                            const [a, b, c] = opt.swatch;
                             const active = siteEssentialsColorsMatch(
                               values.colors,
                               opt.colors,
@@ -720,88 +860,32 @@ export function PreviewThemeCustomizer({
                             const pinned =
                               tryThemeColorGridOptionStorageKey(opt) ===
                               lastColorKey;
-                            const showRecent = pinned && !active;
-                            const acc = paletteAccessibilityFlags(opt.colors);
-                            const contrastOk =
-                              acc.bodyTextAa && acc.primaryOnSurfaceUi;
+                            const presetRow =
+                              opt.source === "preset"
+                                ? SITE_THEME_PRESETS.find(
+                                    (p) => p.id === opt.id,
+                                  )
+                                : undefined;
                             return (
-                              <button
+                              <ColorPresetCard
                                 key={
                                   opt.source === "preset"
                                     ? opt.id
                                     : `extra-${opt.key}`
                                 }
-                                type="button"
-                                aria-current={active ? "true" : undefined}
-                                onClick={() => applyColorGridOption(opt)}
-                                className={cn(
-                                  "relative flex flex-col items-center gap-1 rounded-xl border p-2 pt-2.5 transition-all duration-200",
-                                  active
-                                    ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
-                                    : "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-sm",
-                                )}
-                                title={`${opt.name}\n\n${opt.tagline}`}
-                              >
-                                {active ? (
-                                  <span className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-1.5 py-0.5 text-[8px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-                                    <span
-                                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
-                                      aria-hidden
-                                    />
-                                    In use
-                                  </span>
-                                ) : null}
-                                {showRecent ? (
-                                  <span
-                                    className="absolute right-1.5 top-1.5 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
-                                    title="Last picked this session"
-                                  >
-                                    Recent
-                                  </span>
-                                ) : null}
-                                <span
-                                  className={cn(
-                                    "absolute left-1.5 top-1.5 z-[1] flex h-4 w-4 items-center justify-center rounded-full border shadow-sm",
-                                    contrastOk
-                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                      : "border-amber-200 bg-amber-50 text-amber-700",
-                                  )}
-                                  title={
-                                    contrastOk
-                                      ? "Body text and primary on surface meet common WCAG targets"
-                                      : "Contrast may be tight — verify in Site Essentials"
-                                  }
-                                >
-                                  {contrastOk ? (
-                                    <Check
-                                      className="h-2.5 w-2.5"
-                                      strokeWidth={3}
-                                    />
-                                  ) : (
-                                    <AlertTriangle className="h-2.5 w-2.5" />
-                                  )}
-                                </span>
-                                <div className="mt-2 flex gap-0.5">
-                                  <span
-                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                                    style={{ backgroundColor: a }}
-                                  />
-                                  <span
-                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                                    style={{ backgroundColor: b }}
-                                  />
-                                  <span
-                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                                    style={{ backgroundColor: c }}
-                                  />
-                                </div>
-                                <span className="line-clamp-1 w-full text-center text-[9px] font-medium text-slate-700">
-                                  {opt.name}
-                                </span>
-                                <span className="line-clamp-2 w-full text-center text-[8px] leading-snug text-slate-500">
-                                  {opt.tagline}
-                                </span>
-                              </button>
+                                opt={opt}
+                                active={active}
+                                showRecent={pinned && !active}
+                                layout={
+                                  group.key === "venue" ? "recipe" : "compact"
+                                }
+                                fontLabel={
+                                  presetRow && group.key === "venue"
+                                    ? `${presetRow.headingFontLabel} / ${presetRow.bodyFontLabel}`
+                                    : undefined
+                                }
+                                onSelect={() => applyColorGridOption(opt)}
+                              />
                             );
                           })}
                         </div>
@@ -813,9 +897,13 @@ export function PreviewThemeCustomizer({
 
               <div className="space-y-2.5">
                 <h3 className={SECTION_LABEL_CLASS}>Fonts</h3>
+                <p className={SECTION_HINT_CLASS}>
+                  Venue recipes already include a font pair. Change this only
+                  if you want a different heading/body mix.
+                </p>
                 <Accordion
                   type="multiple"
-                  defaultValue={["modern", "classic"]}
+                  defaultValue={["venue"]}
                   className="w-full"
                 >
                   {groupedFontGridOptions.map((group) => (
@@ -833,7 +921,7 @@ export function PreviewThemeCustomizer({
                         </span>
                       </AccordionTrigger>
                       <AccordionContent className="pt-0 pb-3">
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-2">
                           {group.items.map((opt) => {
                             const active =
                               currentFontKey ===

@@ -1,42 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight, Clock, Sparkles, X } from "lucide-react";
-import { toast } from "sonner";
+import { ChevronRight, Clock, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-/** Clipboard API often fails on non-HTTPS local hosts — keep a legacy fallback. */
-async function copyTextToClipboard(text: string): Promise<boolean> {
-  const value = text.trim();
-  if (!value) return false;
-
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(value);
-      return true;
-    }
-  } catch {
-    // Fall through to execCommand path.
-  }
-
-  try {
-    const input = document.createElement("textarea");
-    input.value = value;
-    input.setAttribute("readonly", "");
-    input.style.position = "fixed";
-    input.style.left = "-9999px";
-    input.style.top = "0";
-    document.body.appendChild(input);
-    input.focus();
-    input.select();
-    input.setSelectionRange(0, value.length);
-    const ok = document.execCommand("copy");
-    document.body.removeChild(input);
-    return ok;
-  } catch {
-    return false;
-  }
-}
 
 /** Matches strip min-height — keep in sync with layout classes. */
 export const EVENT_COUPON_STRIP_HEIGHT = "4.5rem";
@@ -104,7 +70,7 @@ function CountdownUnit({ value, unit }: { value: number; unit: string }) {
 
 /**
  * Promo strip for the public event page — coupon codes only.
- * Layout mirrors a classic offer bar: copy · countdown · code + CTA.
+ * Layout: offer copy · countdown · code + CTA (apply the code at checkout).
  */
 export function EventCouponStrip({
   code = "",
@@ -126,7 +92,6 @@ export function EventCouponStrip({
   }, [endsAt]);
 
   const [now, setNow] = useState(() => Date.now());
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!deadline) return;
@@ -137,38 +102,13 @@ export function EventCouponStrip({
   const parts = deadline ? getCountdownParts(deadline, now) : null;
   const trimmedCode = code.trim();
 
-  const handleCopy = async () => {
-    if (!trimmedCode) {
-      toast.error("No coupon code available to copy.");
-      return false;
-    }
-
-    const ok = await copyTextToClipboard(trimmedCode);
-    if (!ok) {
-      toast.error("Couldn’t copy the code. Please copy it manually.", {
-        description: trimmedCode,
-      });
-      return false;
-    }
-
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2200);
-    toast.success("Coupon code copied", {
-      description: `Use ${trimmedCode} at checkout to apply your offer.`,
-    });
-    return true;
-  };
-
   const handleClaim = () => {
-    void (async () => {
-      await handleCopy();
-      if (onClaim) {
-        onClaim();
-        return;
-      }
-      const booking = document.getElementById("booking");
-      booking?.scrollIntoView({ behavior: "smooth", block: "start" });
-    })();
+    if (onClaim) {
+      onClaim();
+      return;
+    }
+    const booking = document.getElementById("booking");
+    booking?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -252,35 +192,23 @@ export function EventCouponStrip({
           </div>
         ) : null}
 
-        {/* Right — code + CTA */}
+        {/* Right — code (display only) + CTA */}
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              void handleCopy();
-            }}
-            className={cn(
-              "hidden h-8 items-center gap-1 rounded-md px-2.5 sm:inline-flex",
-              "border border-[color:color-mix(in_srgb,var(--color-primary-foreground)_40%,transparent)]",
-              "bg-[color:color-mix(in_srgb,var(--color-primary-foreground)_14%,transparent)]",
-              "text-xs transition-colors",
-              "hover:bg-[color:color-mix(in_srgb,var(--color-primary-foreground)_24%,transparent)]",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary-foreground)]/45",
-            )}
-            aria-label={
-              copied
-                ? "Coupon code copied"
-                : `Copy coupon code ${trimmedCode}`
-            }
-          >
-            <span className="text-[color:var(--color-primary-foreground)]/80">
-              Code:
+          {trimmedCode ? (
+            <span
+              className={cn(
+                "hidden h-8 items-center gap-1 rounded-md px-2.5 sm:inline-flex",
+                "border border-[color:color-mix(in_srgb,var(--color-primary-foreground)_40%,transparent)]",
+                "bg-[color:color-mix(in_srgb,var(--color-primary-foreground)_14%,transparent)]",
+                "text-xs",
+              )}
+            >
+              <span className="text-[color:var(--color-primary-foreground)]/80">
+                Code:
+              </span>
+              <span className="font-bold tracking-wide">{trimmedCode}</span>
             </span>
-            <span className="font-bold tracking-wide">{trimmedCode}</span>
-            {copied ? (
-              <Check className="h-3 w-3 shrink-0" aria-hidden />
-            ) : null}
-          </button>
+          ) : null}
 
           <button
             type="button"
@@ -293,20 +221,11 @@ export function EventCouponStrip({
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
             )}
           >
-            {copied ? (
-              <>
-                Copied
-                <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              </>
-            ) : (
-              <>
-                Claim Now
-                <ChevronRight
-                  className="h-3.5 w-3.5 shrink-0 opacity-70"
-                  aria-hidden
-                />
-              </>
-            )}
+            Claim Now
+            <ChevronRight
+              className="h-3.5 w-3.5 shrink-0 opacity-70"
+              aria-hidden
+            />
           </button>
 
           {dismissible ? (

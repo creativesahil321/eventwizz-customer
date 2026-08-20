@@ -20,6 +20,7 @@ import {
   toUserFacingChatReply,
 } from "../lib/extract-json";
 import {
+  aiRuntimeFailureMeta,
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
@@ -296,12 +297,13 @@ export async function POST(req: NextRequest) {
     if (!result.success) {
       return NextResponse.json(
         {
-          error: "Error from GROQ API",
+          error: "Error from AI provider",
           details: result.error,
           status: result.status || 500,
           modelsTried: result.modelsTried,
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );

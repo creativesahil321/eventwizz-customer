@@ -22,6 +22,26 @@ function roundMoney(n: number): number {
   return Math.round(Math.max(0, n) * 100) / 100;
 }
 
+/** Prefer nested `coupon`, fall back to root `coupon_code`. */
+export function resolveCartEventCoupon(
+  event:
+    | {
+        coupon?: CouponStripSource | null;
+        coupon_code?: string | null;
+      }
+    | null
+    | undefined,
+): CouponStripSource | null {
+  const nested = event?.coupon ?? null;
+  const nestedCode = nested?.coupon_code?.trim() ?? "";
+  const rootCode =
+    typeof event?.coupon_code === "string" ? event.coupon_code.trim() : "";
+  const code = nestedCode || rootCode;
+  if (!code) return nested;
+  if (nested) return { ...nested, coupon_code: code };
+  return { coupon_code: code };
+}
+
 function isCouponExpired(expiresAt: string | null | undefined): boolean {
   const raw = expiresAt?.trim();
   if (!raw) return false;
@@ -169,10 +189,12 @@ export function CheckoutPromoPanel({
     Boolean(apiCode) &&
     value.couponCode === apiCode;
 
-  const handleApply = () => {
-    const normalized = codeInput.trim().toUpperCase();
+  const couponExpired = isCouponExpired(eventCoupon?.expires_at);
+
+  const applyNormalizedCode = (raw: string, emptyMessage: string) => {
+    const normalized = raw.trim().toUpperCase();
     if (!normalized) {
-      setError("Enter a coupon code");
+      setError(emptyMessage);
       return;
     }
     if (!apiCode) {
@@ -183,7 +205,7 @@ export function CheckoutPromoPanel({
       setError("That code isn’t valid for this booking");
       return;
     }
-    if (isCouponExpired(eventCoupon?.expires_at)) {
+    if (couponExpired) {
       setError("This coupon has expired");
       return;
     }
@@ -202,6 +224,9 @@ export function CheckoutPromoPanel({
     setCodeInput("");
     setError(null);
   };
+
+  const handleApply = () => applyNormalizedCode(codeInput, "Enter a coupon code");
+  const handleApplySuggested = () => applyNormalizedCode(apiCode, "Enter a coupon code");
 
   const appliedDateOffers = dateDiscounts.filter(
     (row) => row.status === "applied" && row.amount > 0,
@@ -348,12 +373,50 @@ export function CheckoutPromoPanel({
           </button>
         </div>
       ) : hasCouponOffer ? (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
+          <div
+            className={cn(
+              "flex items-center gap-2.5 rounded-xl border px-3 py-2.5",
+              couponExpired
+                ? "border-gray-200 bg-gray-50/80"
+                : "border-dashed border-[color:var(--checkout-brand-primary)]/35 bg-[color:var(--checkout-brand-primary)]/5",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+                couponExpired
+                  ? "bg-gray-200 text-gray-500"
+                  : "bg-[color:var(--checkout-brand-primary)]/15 text-[color:var(--checkout-brand-primary)]",
+              )}
+            >
+              <Tag className="h-3.5 w-3.5" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-mono text-sm font-bold tracking-wide text-[color:var(--checkout-foreground)]">
+                {apiCode}
+              </p>
+              <p className="truncate text-xs text-[color:var(--checkout-muted-foreground)]">
+                {couponExpired
+                  ? "This coupon has expired"
+                  : couponValueLabel || couponHeading || "Apply at checkout"}
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled || couponExpired}
+              onClick={handleApplySuggested}
+              className="h-8 shrink-0 rounded-lg px-3 text-xs font-semibold"
+            >
+              Apply
+            </Button>
+          </div>
           <label
             htmlFor="checkout-coupon-code"
             className="text-xs font-medium text-[color:var(--checkout-muted-foreground)]"
           >
-            Have a coupon code?
+            Or enter a different code
           </label>
           <div className="flex min-w-0 gap-2">
             <Input
@@ -391,13 +454,7 @@ export function CheckoutPromoPanel({
               Apply
             </Button>
           </div>
-          {error ? (
-            <p className="text-xs text-red-600">{error}</p>
-          ) : couponValueLabel ? (
-            <p className="text-[11px] text-[color:var(--checkout-muted-foreground)]">
-              Available: {couponValueLabel}
-            </p>
-          ) : null}
+          {error ? <p className="text-xs text-red-600">{error}</p> : null}
         </div>
       ) : null}
     </div>

@@ -15,6 +15,16 @@ export const COPYRIGHT_MAX_CHARS = 2000;
 /** Visible-text cap for the copyright rich editor (excludes HTML tags). */
 export const COPYRIGHT_MAX_TEXT_CHARS = 600;
 
+/** Strip Tiptap/HTML so empty `<p></p>` / `&nbsp;` do not count as filled. */
+export function stripSiteEssentialsHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Admin marketing home (white-label) section text limits. Keys are generic so
  * the same fields work for any rebranded platform instance.
@@ -283,7 +293,14 @@ export const siteEssentialsFormSchema = z.object({
     .max(40, "About title must not exceed 40 characters")
     .nullable()
     .optional(),
-  about_description: z.string().nullable().optional(),
+  about_description: z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (s) => stripSiteEssentialsHtml(s ?? "").length > 0,
+      "About section description is required.",
+    ),
   about_link_title: z
     .string()
     .max(18, "Button text must not exceed 18 characters")

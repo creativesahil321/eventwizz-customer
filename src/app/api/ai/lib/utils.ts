@@ -11,9 +11,8 @@ import type { AiRuntimeConfig } from "./provider-config";
  */
 export const MODEL_FALLBACKS = [
   "llama-3.3-70b-versatile",
-  "mixtral-8x7b-32768",
-  "gemma2-9b-it",
-  "llama-3.1-8b-instant",
+  "openai/gpt-oss-120b",
+  "meta-llama/llama-4-scout-17b-16e-instruct",
 ] as const;
 
 // Define the fallback result type
@@ -86,9 +85,11 @@ function isFallbackWorthyGroqError(status: number, message: string | undefined, 
   // 413: request too large for a model context window.
   if (status === 413) return true;
   // Explicit model availability/decommissioning.
+  if (status === 404) return true;
   if (code === "model_decommissioned" || code === "model_not_found") return true;
   if (msg.includes("model_decommissioned")) return true;
   if (msg.includes("model not found") || msg.includes("not found for model")) return true;
+  if (msg.includes("does not exist") || msg.includes("do not have access")) return true;
   if (msg.includes("currently unavailable") || msg.includes("capacity")) return true;
   // Rate limit / quota hints (TPM/TPD).
   if (msg.includes("rate limit")) return true;
@@ -102,18 +103,39 @@ function isFallbackWorthyGroqError(status: number, message: string | undefined, 
   ) {
     return true;
   }
+  // Newer Claude / reasoning models reject temperature etc. After a same-model
+  // retry, leftover 400s should still skip to the next fallback model.
+  if (
+    status === 400 &&
+    (msg.includes("deprecated") || msg.includes("unsupported parameter"))
+  ) {
+    return true;
+  }
   return false;
 }
 
-/** Org/model TPM-TPD — further Groq models usually fail the same way if we keep firing. */
-function isRateLimitStop(status: number, message: string | undefined): boolean {
-  if (status === 429) return true;
+/**
+ * Stop the whole chain only when the *account* is exhausted (quota / daily cap).
+ * A per-model 429 should skip to the next enabled fallback model.
+ */
+function isAccountWideRateLimit(
+  status: number,
+  message: string | undefined,
+  code?: string,
+): boolean {
   const msg = (message || "").toLowerCase();
-  return (
-    msg.includes("tokens per minute") ||
-    msg.includes("tokens per day") ||
-    (msg.includes("rate limit") && status === 413)
-  );
+  const errCode = (code || "").toLowerCase();
+  if (errCode === "insufficient_quota") return true;
+  if (msg.includes("insufficient_quota") || msg.includes("exceeded your current quota")) {
+    return true;
+  }
+  if (msg.includes("tokens per day") || /\btpd\b/.test(msg)) return true;
+  if (msg.includes("monthly") && (msg.includes("limit") || msg.includes("quota"))) {
+    return true;
+  }
+  if (msg.includes("billing") && msg.includes("hard limit")) return true;
+  if (status === 413 && msg.includes("rate limit")) return true;
+  return false;
 }
 
 /** 4k-context / tiny-TPM models cannot complete onboarding/event JSON. */
@@ -157,18 +179,52 @@ const GROQ_MAX_COMPLETION_TOKENS = 8192;
  */
 export const AI_JSON_MAX_TOKENS = 4096;
 
+type CompletionTokenParam = "max_completion_tokens" | "max_tokens";
+
+function completionTokenLimit(
+  body: Record<string, unknown>,
+  cap: number,
+): number | undefined {
+  const fromCompletion =
+    typeof body.max_completion_tokens === "number"
+      ? body.max_completion_tokens
+      : undefined;
+  const fromTokens =
+    typeof body.max_tokens === "number" ? body.max_tokens : undefined;
+  const raw = fromCompletion ?? fromTokens;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return undefined;
+  return Math.min(raw, cap);
+}
+
+/** Groq + current OpenAI chat models want this; never send both fields. */
+function completionTokenParam(
+  baseUrl: string,
+  model: unknown,
+): CompletionTokenParam {
+  if (/groq\.com/i.test(baseUrl)) return "max_completion_tokens";
+  if (/openai\.com/i.test(baseUrl)) return "max_completion_tokens";
+  const id = typeof model === "string" ? model.toLowerCase() : "";
+  if (/^(gpt-4\.1|gpt-5|o[1-9]|chatgpt)/.test(id)) {
+    return "max_completion_tokens";
+  }
+  return "max_completion_tokens";
+}
+
+/**
+ * OpenAI (gpt-4.1 / gpt-5) 400s if both token fields are set. Groq historically
+ * wanted max_completion_tokens copied from max_tokens — never send both.
+ */
 function clampCompletionTokens(
   body: Record<string, unknown>,
   cap = GROQ_MAX_COMPLETION_TOKENS,
+  param: CompletionTokenParam = "max_completion_tokens",
 ): Record<string, unknown> {
   const next = { ...body };
-  if (typeof next.max_tokens === "number") {
-    next.max_tokens = Math.min(next.max_tokens, cap);
-  }
-  if (typeof next.max_completion_tokens === "number") {
-    next.max_completion_tokens = Math.min(next.max_completion_tokens, cap);
-  } else if (typeof next.max_tokens === "number") {
-    next.max_completion_tokens = next.max_tokens;
+  const limit = completionTokenLimit(body, cap);
+  delete next.max_tokens;
+  delete next.max_completion_tokens;
+  if (typeof limit === "number") {
+    next[param] = limit;
   }
   return next;
 }
@@ -195,6 +251,40 @@ function stripUnsupportedChatParams(
     ...rest
   } = body;
   return rest;
+}
+
+function omitKeys(
+  body: Record<string, unknown>,
+  keys: string[],
+): Record<string, unknown> {
+  const next = { ...body };
+  for (const key of keys) delete next[key];
+  return next;
+}
+
+function isRejectedRequestParam(
+  message: string | undefined,
+  param: string,
+): boolean {
+  const msg = (message || "").toLowerCase();
+  if (!msg.includes(param.toLowerCase())) return false;
+  return (
+    msg.includes("deprecated") ||
+    msg.includes("unsupported") ||
+    msg.includes("not supported") ||
+    msg.includes("not allowed") ||
+    msg.includes("unknown parameter")
+  );
+}
+
+/** Claude 4.5 / Sonnet 5 and some reasoning models reject sampling params. */
+function modelRejectsTemperature(model: string): boolean {
+  const id = model.toLowerCase();
+  return (
+    id.includes("claude") ||
+    id.includes("sonnet") ||
+    id.includes("opus-4")
+  );
 }
 
 function hasUnsupportedChatParams(body: Record<string, unknown>): boolean {
@@ -235,44 +325,59 @@ async function callProvider(
       .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => ({ role: m.role, content: m.content }));
 
-    const response = await fetch(`${baseUrl}/messages`, {
-      method: "POST",
-      headers: {
-        "x-api-key": config.apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens:
-          typeof requestBody.max_tokens === "number"
-            ? requestBody.max_tokens
-            : 1024,
-        ...(typeof requestBody.temperature === "number"
-          ? { temperature: requestBody.temperature }
-          : {}),
-        ...(system ? { system } : {}),
-        messages: chat,
-      }),
-    });
+    const postAnthropic = async (includeTemperature: boolean) => {
+      const response = await fetch(`${baseUrl}/messages`, {
+        method: "POST",
+        headers: {
+          "x-api-key": config.apiKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens:
+            typeof requestBody.max_tokens === "number"
+              ? requestBody.max_tokens
+              : 1024,
+          ...(includeTemperature && typeof requestBody.temperature === "number"
+            ? { temperature: requestBody.temperature }
+            : {}),
+          ...(system ? { system } : {}),
+          messages: chat,
+        }),
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      const blocks = Array.isArray(data?.content) ? data.content : [];
-      const content = blocks
-        .filter((b: { type?: string }) => b?.type === "text")
-        .map((b: { text?: string }) => b.text ?? "")
-        .join("");
-      return { ok: true, status: response.status, content };
-    }
+      if (response.ok) {
+        const data = await response.json();
+        const blocks = Array.isArray(data?.content) ? data.content : [];
+        const content = blocks
+          .filter((b: { type?: string }) => b?.type === "text")
+          .map((b: { text?: string }) => b.text ?? "")
+          .join("");
+        return { ok: true as const, status: response.status, content };
+      }
 
-    const errorData = await response.json().catch(() => ({}));
-    return {
-      ok: false,
-      status: response.status,
-      errorMessage: errorData?.error?.message,
-      errorCode: errorData?.error?.type,
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        ok: false as const,
+        status: response.status,
+        errorMessage: errorData?.error?.message as string | undefined,
+        errorCode: errorData?.error?.type as string | undefined,
+      };
     };
+
+    const useTemp =
+      typeof requestBody.temperature === "number" &&
+      !modelRejectsTemperature(model);
+    let anthropicResult = await postAnthropic(useTemp);
+    if (
+      !anthropicResult.ok &&
+      anthropicResult.status === 400 &&
+      isRejectedRequestParam(anthropicResult.errorMessage, "temperature")
+    ) {
+      anthropicResult = await postAnthropic(false);
+    }
+    return anthropicResult;
   }
 
   // OpenAI-compatible (Groq, OpenAI, xAI, Together, DeepSeek, Mistral, …)
@@ -286,32 +391,91 @@ async function callProvider(
     errorMessage?: string;
     errorCode?: string;
   }> => {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(clampCompletionTokens(body, tokenCap)),
-    });
+    const send = async (payload: Record<string, unknown>) => {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      const msg = (data?.choices?.[0]?.message ?? {}) as Record<string, unknown>;
+      if (response.ok) {
+        const data = await response.json();
+        const choiceMsg = (data?.choices?.[0]?.message ?? {}) as Record<
+          string,
+          unknown
+        >;
+        return {
+          ok: true as const,
+          status: response.status,
+          content: visibleAssistantText(choiceMsg),
+        };
+      }
+
+      const errorData = await response.json().catch(() => ({}));
       return {
-        ok: true,
+        ok: false as const,
         status: response.status,
-        content: visibleAssistantText(msg),
+        errorMessage: errorData?.error?.message as string | undefined,
+        errorCode: errorData?.error?.code as string | undefined,
       };
+    };
+
+    const param = completionTokenParam(baseUrl, body.model);
+    const cap = tokenCap ?? GROQ_MAX_COMPLETION_TOKENS;
+    const modelId = typeof body.model === "string" ? body.model : "";
+    const firstBody = modelRejectsTemperature(modelId)
+      ? omitKeys(body, ["temperature", "top_p"])
+      : body;
+    let result = await send(clampCompletionTokens(firstBody, cap, param));
+
+    const err = (result.errorMessage ?? "").toLowerCase();
+    if (
+      !result.ok &&
+      result.status === 400 &&
+      err.includes("max_tokens") &&
+      err.includes("max_completion_tokens")
+    ) {
+      result = await send(
+        clampCompletionTokens(firstBody, cap, "max_completion_tokens"),
+      );
+    }
+    if (
+      !result.ok &&
+      result.status === 400 &&
+      /unsupported parameter.*max_completion_tokens/i.test(
+        result.errorMessage ?? "",
+      )
+    ) {
+      result = await send(clampCompletionTokens(firstBody, cap, "max_tokens"));
+    }
+    if (
+      !result.ok &&
+      result.status === 400 &&
+      /unsupported parameter.*['"]max_tokens['"]/i.test(result.errorMessage ?? "")
+    ) {
+      result = await send(
+        clampCompletionTokens(firstBody, cap, "max_completion_tokens"),
+      );
+    }
+    if (
+      !result.ok &&
+      result.status === 400 &&
+      (isRejectedRequestParam(result.errorMessage, "temperature") ||
+        isRejectedRequestParam(result.errorMessage, "top_p"))
+    ) {
+      result = await send(
+        clampCompletionTokens(
+          omitKeys(body, ["temperature", "top_p"]),
+          cap,
+          param,
+        ),
+      );
     }
 
-    const errorData = await response.json().catch(() => ({}));
-    return {
-      ok: false,
-      status: response.status,
-      errorMessage: errorData?.error?.message,
-      errorCode: errorData?.error?.code,
-    };
+    return result;
   };
 
   const withTokenCapRetry = async (
@@ -363,7 +527,8 @@ function toRuntimeConfig(
     providerType: input.providerType,
     baseUrl: input.baseUrl,
     apiKey: input.apiKey,
-    models: input.models.length > 0 ? input.models : [...MODEL_FALLBACKS],
+    // Never inject Groq model ids onto OpenAI / Anthropic / custom endpoints.
+    models: input.models,
   };
 }
 
@@ -379,6 +544,19 @@ export async function tryModelsWithFallback(
   requestBody: Record<string, unknown>
 ): Promise<FallbackResult> {
   const config = toRuntimeConfig(configOrApiKey);
+  if (config.models.length === 0) {
+    return {
+      success: false,
+      error:
+        "No chat models configured for this AI provider. Set a default model in Admin Settings.",
+      lastError: {
+        type: "no_models",
+        message: "Runtime config had an empty models list",
+      },
+      modelsTried: [],
+    };
+  }
+
   let lastError: unknown = null;
   const modelsTried: string[] = [];
   let lastStatus: number | undefined;
@@ -427,7 +605,12 @@ export async function tryModelsWithFallback(
 
       // Capture retry-after if the provider hints one (useful for TPD exhaustion).
       const parsedRetry = parseRetryAfterMsFromGroqMessage(errorMessage);
-      if (typeof parsedRetry === "number") retryAfterMs = parsedRetry;
+      if (typeof parsedRetry === "number") {
+        retryAfterMs =
+          typeof retryAfterMs === "number"
+            ? Math.min(retryAfterMs, parsedRetry)
+            : parsedRetry;
+      }
 
       if (errorCode === "model_decommissioned") {
         lastError = {
@@ -452,11 +635,13 @@ export async function tryModelsWithFallback(
           status: result.status,
           details: errorMessage,
         };
-        if (isRateLimitStop(result.status, errorMessage)) {
+        if (result.status === 429) {
           stoppedForRateLimit = true;
+        }
+        if (isAccountWideRateLimit(result.status, errorMessage, errorCode)) {
           lastError = {
             type: "rate_limit",
-            message: errorMessage || `Rate limited on ${model}`,
+            message: errorMessage || `Account quota exhausted on ${model}`,
             model,
             status: result.status,
             details: errorMessage,

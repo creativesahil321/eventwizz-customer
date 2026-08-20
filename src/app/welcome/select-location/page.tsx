@@ -34,7 +34,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { logout } from "@/lib/auth/logout";
 import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
-import { LocationActiveEventsCount } from "@/components/location-selector/active-events-count";
+import {
+  LocationActiveEventsCount,
+  formatLiveEventsLabel,
+} from "@/components/location-selector/active-events-count";
 
 export default function WelcomeLocationSelectionPage() {
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
@@ -191,10 +194,9 @@ export default function WelcomeLocationSelectionPage() {
                     </p>
                     <p className="text-white/50 text-xs">
                       currently selected ·{" "}
-                      {selectedLocation.active_events_count ?? 0} active event
-                      {(selectedLocation.active_events_count ?? 0) === 1
-                        ? ""
-                        : "s"}
+                      {formatLiveEventsLabel(
+                        selectedLocation.active_events_count,
+                      )}
                     </p>
                   </div>
                 </div>

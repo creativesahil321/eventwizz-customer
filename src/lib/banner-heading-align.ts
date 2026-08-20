@@ -55,6 +55,38 @@ export function vendorHomeTrustRowClass(align: BannerHeadingAlign): string {
   );
 }
 
+/**
+ * Query container for hero type. `cqi` tracks this box (phone width, laptop
+ * window, preview frame) instead of jumping at Tailwind `sm`/`md`/`lg`.
+ */
+export const heroHeadingMeasureClass = "@container/hero min-w-0 w-full";
+
+const heroHeadingWrapClass =
+  "min-w-0 max-w-full text-pretty break-words [overflow-wrap:anywhere] [word-break:break-word]";
+
+/**
+ * Fluid hero H1 — phones stay compact, then scale with the hero container.
+ * Preview device frames stay compact via `@container/preview`.
+ */
+export const heroBannerHeadingTypeClass = cn(
+  heroHeadingWrapClass,
+  "!leading-[1.28] sm:!leading-[1.24] lg:!leading-[1.22]",
+  "!text-[clamp(1.3rem,0.45rem+6.2cqi,1.7rem)]",
+  "sm:!text-[clamp(1.5rem,0.5rem+5.2cqi,2.35rem)]",
+  "lg:!text-[clamp(1.85rem,0.4rem+4.4cqi,3.25rem)]",
+  "@max-lg/preview:!text-[1.65rem] @max-lg/preview:!leading-[1.28]",
+);
+
+/** Multi-location home hero — slightly smaller cap than the location banner. */
+export const heroHomeHeadingTypeClass = cn(
+  heroHeadingWrapClass,
+  "!leading-[1.28] sm:!leading-[1.24] lg:!leading-[1.22]",
+  "!text-[clamp(1.3rem,0.45rem+6cqi,1.65rem)]",
+  "sm:!text-[clamp(1.5rem,0.5rem+4.8cqi,2.15rem)]",
+  "lg:!text-[clamp(1.75rem,0.4rem+4cqi,3rem)]",
+  "@max-lg/preview:!text-[1.65rem] @max-lg/preview:!leading-[1.28]",
+);
+
 /* ---- Hero band height (location page + multi-location home) ---- */
 
 /**

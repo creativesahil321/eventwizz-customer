@@ -13,7 +13,9 @@ import {
   heroBandHeightClass,
   heroBandMediaOverlayClass,
   heroBandVerticalClass,
+  heroBannerHeadingTypeClass,
   heroBannerStackClass,
+  heroHeadingMeasureClass,
   heroBannerSubheadingClass,
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
@@ -200,7 +202,8 @@ export default function HeroBanner({
 
       <div
         className={cn(
-          "relative z-10 mx-auto w-full max-w-7xl overflow-visible px-4",
+          "relative z-10 mx-auto max-w-7xl overflow-visible px-3 sm:px-4",
+          heroHeadingMeasureClass,
           heroBandContentPadClass(heroValign, {
             withBottomChrome: Boolean(heroFooter),
           }),
@@ -220,7 +223,8 @@ export default function HeroBanner({
             variant="onDark"
             align={textAlign}
             className={cn(
-              "mb-4 max-w-full min-w-0 break-words font-black !text-3xl !leading-[1.15] tracking-tight sm:!text-4xl md:!text-5xl lg:!text-6xl",
+              "mb-4 font-black tracking-tight",
+              heroBannerHeadingTypeClass,
               textAlign === "left"
                 ? "max-w-[min(100%,30rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
                 : "max-w-4xl",

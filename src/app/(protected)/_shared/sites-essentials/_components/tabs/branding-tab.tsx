@@ -1081,7 +1081,8 @@ export function BrandingTab({
             render={({ field }) => (
               <FormItem className="space-y-2">
                 <FormLabel className="text-base font-medium">
-                  About Section Description
+                  About Section Description{" "}
+                  <span className="text-destructive">*</span>
                 </FormLabel>
                 <FormControl>
                   <TiptapEditor

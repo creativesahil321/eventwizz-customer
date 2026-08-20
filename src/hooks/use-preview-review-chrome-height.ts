@@ -1,20 +1,28 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
-/** CSS var read by the public footer so copyright clears the fixed review bar. */
+/** CSS var read by the public footer and chatbot so they clear the review bar. */
 export const PREVIEW_REVIEW_CHROME_HEIGHT_VAR =
   "--preview-review-chrome-height";
 
 /**
+ * Lift a viewport-fixed widget (chatbot launcher / panel) above the review bar.
+ * No-op on live pages where the var is unset.
+ */
+export const previewReviewChromeLiftStyle = {
+  marginBottom: `var(${PREVIEW_REVIEW_CHROME_HEIGHT_VAR}, 0px)`,
+} as const;
+
+/**
  * Measures the fixed preview review chrome and publishes its height as a
- * document CSS variable. Footer padding uses the same var so clearance matches
- * the bar (no hidden copyright, no oversized empty gap).
+ * document CSS variable. Footer padding and the chatbot use the same var so
+ * clearance matches the bar (no clipped launcher, no hidden copyright).
  */
 export function usePreviewReviewChromeHeight<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
 

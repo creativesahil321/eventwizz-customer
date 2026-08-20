@@ -27,6 +27,7 @@ import {
 } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { VenueLocation } from "@/types/api.types";
 import { StepEightType } from "../schema";
+import { formatLiveEventsLabel } from "@/components/location-selector/active-events-count";
 
 type DuplicateLocationFieldsProps = {
   form: UseFormReturn<StepEightType>;
@@ -39,7 +40,7 @@ function formatLocationOptionLabel(location: VenueLocation): string {
   const label =
     location.city?.trim() || location.name?.trim() || `Location ${location.id}`;
   const count = location.active_events_count ?? 0;
-  return `${label} · ${count} active`;
+  return `${label} · ${formatLiveEventsLabel(count)}`;
 }
 
 function applyExistingLocation(

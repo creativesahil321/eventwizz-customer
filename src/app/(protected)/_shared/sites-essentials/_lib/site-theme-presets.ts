@@ -1,6 +1,7 @@
 import type { UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import type { SiteEssentialsFormValues } from "./schema";
 import { normalizeCustomFontStylesheetUrls } from "@/lib/site-custom-font-stylesheets";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import {
   collectSiteEssentialsGoogleFamilies,
   siteEssentialsGoogleFontStack,
@@ -70,7 +71,18 @@ export type SiteThemePresetId =
   | "lovable-warm-sand"
   | "lovable-mint-fresh"
   | "lovable-rose-petal"
-  | "lovable-clean-white";
+  | "lovable-clean-white"
+  | "venue-estate-green"
+  | "venue-wine-candlelight"
+  | "venue-midnight-navy-brass"
+  | "venue-terracotta-sage"
+  | "venue-rosewood-blush"
+  | "venue-slate-copper"
+  | "venue-noir-champagne";
+
+export function isVenueThemePresetId(id: SiteThemePresetId): boolean {
+  return id.startsWith("venue-");
+}
 
 export interface SiteThemePreset {
   id: SiteThemePresetId;
@@ -80,6 +92,8 @@ export interface SiteThemePreset {
   bodyFontLabel: string;
   swatch: [string, string, string];
   colors: SiteEssentialsFormValues["colors"];
+  /** Landing / site-wide heading style this recipe is designed for. */
+  headingEmphasis?: HeadingEmphasis;
   typography: Pick<
     SiteEssentialsFormValues["typography"],
     "fontFamily" | "customFontStylesheetUrls"
@@ -1027,6 +1041,148 @@ const PRESET_SHELLS: readonly PresetShell[] = [
       socialLogin: { ...SOCIAL_LOGIN_LIGHT },
     },
   },
+  // Venue recipes from the Stock Brook / customer-site brand audit.
+  // Tapping one in Try theme applies colors + fonts + heading emphasis together.
+  {
+    id: "venue-estate-green",
+    name: "Estate Green",
+    tagline: "Country club default",
+    headingFontLabel: "Fraunces",
+    bodyFontLabel: "Source Sans 3",
+    headingEmphasis: "accent_tail",
+    swatch: ["#10231B", "#1E4B3B", "#C29A3B"],
+    colors: {
+      primary: "#1E4B3B",
+      secondary: "#C29A3B",
+      header: "#10231B",
+      footer: "#0C1811",
+      background: "#F6F4EE",
+      surface: "#FFFFFF",
+      text: "#1F2A24",
+      textDimmed: "#5E6B63",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-wine-candlelight",
+    name: "Wine & Candlelight",
+    tagline: "Christmas & concerts",
+    headingFontLabel: "Cormorant Garamond",
+    bodyFontLabel: "Karla",
+    headingEmphasis: "accent_tail",
+    swatch: ["#2A1218", "#6B2231", "#D9A441"],
+    colors: {
+      primary: "#6B2231",
+      secondary: "#D9A441",
+      header: "#2A1218",
+      footer: "#1E0D12",
+      background: "#FAF6F1",
+      surface: "#FFFFFF",
+      text: "#2A1B1E",
+      textDimmed: "#6E5A5E",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-midnight-navy-brass",
+    name: "Midnight Navy",
+    tagline: "Corporate dinners",
+    headingFontLabel: "Marcellus",
+    bodyFontLabel: "Work Sans",
+    headingEmphasis: "uniform",
+    swatch: ["#0F1929", "#1C2E4A", "#C9A961"],
+    colors: {
+      primary: "#1C2E4A",
+      secondary: "#C9A961",
+      header: "#0F1929",
+      footer: "#0A111C",
+      background: "#F4F5F7",
+      surface: "#FFFFFF",
+      text: "#1B2430",
+      textDimmed: "#5B6572",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-terracotta-sage",
+    name: "Terracotta Sage",
+    tagline: "Summer garden parties",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "Public Sans",
+    headingEmphasis: "accent_tail",
+    swatch: ["#3A2A22", "#A84B25", "#4E5F45"],
+    colors: {
+      primary: "#A84B25",
+      secondary: "#4E5F45",
+      header: "#3A2A22",
+      footer: "#2A1E18",
+      background: "#FAF5EF",
+      surface: "#FFFFFF",
+      text: "#2E2620",
+      textDimmed: "#6E6259",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-rosewood-blush",
+    name: "Rosewood Blush",
+    tagline: "Weddings & afternoon tea",
+    headingFontLabel: "EB Garamond",
+    bodyFontLabel: "Jost",
+    headingEmphasis: "accent_tail",
+    swatch: ["#33141E", "#8A3B4A", "#D4A054"],
+    colors: {
+      primary: "#8A3B4A",
+      secondary: "#D4A054",
+      header: "#33141E",
+      footer: "#25101A",
+      background: "#FBF5F3",
+      surface: "#FFFFFF",
+      text: "#2E1B21",
+      textDimmed: "#6E5D66",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-slate-copper",
+    name: "Slate & Copper",
+    tagline: "Modern boathouse",
+    headingFontLabel: "Archivo",
+    bodyFontLabel: "Karla",
+    headingEmphasis: "uniform",
+    swatch: ["#171B1E", "#2F3A3F", "#C17A4F"],
+    colors: {
+      primary: "#2F3A3F",
+      secondary: "#C17A4F",
+      header: "#171B1E",
+      footer: "#101315",
+      background: "#F3F2F0",
+      surface: "#FFFFFF",
+      text: "#23282B",
+      textDimmed: "#5D6468",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-noir-champagne",
+    name: "Noir & Champagne",
+    tagline: "Black tie & NYE",
+    headingFontLabel: "Fraunces",
+    bodyFontLabel: "Source Sans 3",
+    headingEmphasis: "uniform",
+    swatch: ["#0B0D0E", "#14181A", "#C7A24B"],
+    colors: {
+      primary: "#14181A",
+      secondary: "#C7A24B",
+      header: "#0B0D0E",
+      footer: "#070808",
+      background: "#F7F6F2",
+      surface: "#FFFFFF",
+      text: "#16181A",
+      textDimmed: "#5C5F63",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
 ];
 
 export const SITE_THEME_PRESETS: SiteThemePreset[] =
@@ -1350,6 +1506,9 @@ export function applySiteThemePreset(
       customFontStylesheetUrls: [
         ...(preset.typography.customFontStylesheetUrls ?? []) as string[],
       ],
+      ...(preset.headingEmphasis
+        ? { headingEmphasis: preset.headingEmphasis }
+        : {}),
     },
     opts,
   );
@@ -1538,6 +1697,24 @@ export function mergePresetFontsIntoValues(
       customFontStylesheetUrls: [
         ...(preset.typography.customFontStylesheetUrls ?? []),
       ],
+    },
+  };
+}
+
+/** Full venue recipe: colors + fonts + recommended heading emphasis. */
+export function mergeFullPresetIntoValues(
+  values: SiteEssentialsFormValues,
+  preset: SiteThemePreset,
+): SiteEssentialsFormValues {
+  const withFonts = mergePresetFontsIntoValues(values, preset);
+  return {
+    ...withFonts,
+    colors: { ...preset.colors },
+    typography: {
+      ...withFonts.typography,
+      ...(preset.headingEmphasis
+        ? { headingEmphasis: preset.headingEmphasis }
+        : {}),
     },
   };
 }

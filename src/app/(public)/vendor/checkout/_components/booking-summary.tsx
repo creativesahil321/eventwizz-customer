@@ -67,6 +67,7 @@ import OrderViewBreakdown from "./order-view-breakdown";
 import PerDatePaymentSelection from "./per-date-payment-selection";
 import {
   CheckoutPromoPanel,
+  resolveCartEventCoupon,
   resolveCheckoutPromoTotals,
   type CheckoutPromoApplied,
 } from "./checkout-promo-panel";
@@ -352,7 +353,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
     const bookingFinalTotal = totalToday + totalLater;
     return resolveCheckoutPromoTotals(
       checkoutPromo,
-      currentEventApiData?.coupon ?? null,
+      resolveCartEventCoupon(currentEventApiData),
       bookingFinalTotal,
       dateOfferSavings,
     ).totalDiscount;
@@ -1032,7 +1033,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
   const bookingGrandTotal = totalToday + totalLater;
   const hasPayableTotal = bookingGrandTotal > 0;
-  const eventCoupon = currentEventApiData?.coupon ?? null;
+  const eventCoupon = resolveCartEventCoupon(currentEventApiData);
   const getEditableDateForPromo = (dateKey: string) =>
     currentEventSlug ? getDateData(currentEventSlug, dateKey) : null;
   const dateDiscountRows = resolveCartDateDiscounts(
