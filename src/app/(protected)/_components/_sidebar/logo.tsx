@@ -6,6 +6,7 @@ import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 import { addCacheBusting } from "@/lib/image-utils";
+import { BrandLogoImage } from "./brand-logo-image";
 
 interface LogoProps {
   collapsed: boolean;
@@ -14,8 +15,6 @@ interface LogoProps {
 const Logo: React.FC<LogoProps> = ({ collapsed }) => {
   const { theme } = useContext(ServerContext);
 
-  // Determine logo path based on theme, with fallback
-  // Use the same logo in both expanded and collapsed states for brand consistency
   const logoPath =
     theme?.logo?.startsWith("/") ||
     theme?.logo?.startsWith("data:") ||
@@ -24,6 +23,8 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
     theme?.logo?.startsWith("blob")
       ? theme.logo
       : appConfig.logo;
+
+  const brandName = theme?.name || "EventWizz";
 
   return (
     <nav
@@ -38,16 +39,15 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
           <span className="h-8 w-8 block" aria-hidden />
         ) : (
           <Link href="/">
-            <img
-              className="h-8 w-auto object-contain"
+            <BrandLogoImage
               src={addCacheBusting(logoPath)}
-              alt={theme?.name || "EventWizz"}
+              alt={brandName}
+              headerBackground={theme?.colors?.header}
+              className="h-8 w-auto"
             />
           </Link>
         )}
-        <span className="sr-only text-sm font-semibold">
-          {theme?.name || "EventWizz"}
-        </span>
+        <span className="sr-only text-sm font-semibold">{brandName}</span>
       </span>
     </nav>
   );

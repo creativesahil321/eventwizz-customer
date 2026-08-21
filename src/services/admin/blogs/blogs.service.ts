@@ -4,6 +4,7 @@ import type {
   AdminBlogDetailResponse,
   AdminBlogListParams,
   AdminBlogListResponse,
+  AdminBlogUploadImageResponse,
   AdminBlogWritePayload,
 } from "./types";
 
@@ -35,6 +36,17 @@ function buildFormData(payload: AdminBlogWritePayload): FormData {
 const multipartHeaders = {
   "Content-Type": "multipart/form-data",
 };
+
+function resolveInlineImageUrl(
+  response: AdminBlogUploadImageResponse | null | undefined,
+): string | null {
+  const nested = response?.data?.url;
+  if (typeof nested === "string" && nested.trim()) return nested.trim();
+  if (typeof response?.url === "string" && response.url.trim()) {
+    return response.url.trim();
+  }
+  return null;
+}
 
 export const adminBlogsService = {
   list: (params: AdminBlogListParams = {}) => {
@@ -90,5 +102,24 @@ export const adminBlogsService = {
     return api.delete<AdminBlogDetailResponse>(url, {
       returnFullResponse: true,
     });
+  },
+
+  uploadImage: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await api.post<AdminBlogUploadImageResponse>(
+      API_ENDPOINTS.ADMIN.BLOGS.UPLOAD_IMAGE,
+      formData,
+      {
+        headers: multipartHeaders,
+        returnFullResponse: true,
+        suppressSuccessToast: true,
+      },
+    );
+    const url = resolveInlineImageUrl(response);
+    if (!url || url.startsWith("data:")) {
+      throw new Error("Image upload failed. Please try again.");
+    }
+    return url;
   },
 };

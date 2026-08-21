@@ -98,6 +98,15 @@ export const blogFormSchema = z
       });
     }
 
+    if (/data:image\//i.test(values.content)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["content"],
+        message:
+          "Inline images must be uploaded. Use the image button instead of pasting files.",
+      });
+    }
+
     if (values.status !== "published") return;
 
     if (!values.published_at) {

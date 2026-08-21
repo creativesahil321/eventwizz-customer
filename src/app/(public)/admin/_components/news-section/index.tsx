@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
+import { Button } from "@/components/ui/button";
 import type { AdminHomeContent } from "@/lib/admin-cms-content";
-import { BLOG_HOME_PER_PAGE } from "@/lib/blogs";
+import { BLOG_HOME_PER_PAGE, blogPublicPaths } from "@/lib/blogs";
 import { usePublicBlogs } from "@/services/common/blogs";
 import {
   BlogPostGrid,
@@ -14,7 +17,11 @@ export default function NewsSection({
 }: {
   content: AdminHomeContent["news"];
 }) {
-  const { data: articles = [], isLoading } = usePublicBlogs(BLOG_HOME_PER_PAGE);
+  const { data, isLoading } = usePublicBlogs(BLOG_HOME_PER_PAGE + 1);
+  const articles = (data?.posts ?? []).slice(0, BLOG_HOME_PER_PAGE);
+  const hasMore =
+    (data?.total ?? 0) > BLOG_HOME_PER_PAGE ||
+    (data?.posts?.length ?? 0) > BLOG_HOME_PER_PAGE;
 
   if (!isLoading && articles.length === 0) {
     return null;
@@ -44,6 +51,17 @@ export default function NewsSection({
         ) : (
           <BlogPostGrid posts={articles} />
         )}
+
+        {!isLoading && hasMore ? (
+          <div className="mt-10 flex justify-center sm:mt-12">
+            <Button asChild variant="event-outline" size="lg" className="rounded-md px-8">
+              <Link href={blogPublicPaths.list}>
+                View more
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        ) : null}
       </div>
     </section>
   );

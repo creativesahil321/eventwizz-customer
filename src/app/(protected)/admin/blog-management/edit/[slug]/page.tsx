@@ -1,25 +1,15 @@
-"use client";
-
-import { useParams, useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { Shell } from "@/components/shell";
 import { BackButton } from "@/components/ui/back-button";
-import { BlogForm } from "../../../../_shared/blog-management/_components/blog-form";
-import { BlogFormSkeleton } from "../../../../_shared/blog-management/_components/skeleton-loader";
 import { blogAdminPaths } from "@/lib/blogs";
-import { useAdminBlog } from "@/services/admin/blogs";
+import { EditBlogContent } from "../../../../_shared/blog-management/_components/edit-blog-content";
 
-export default function EditBlogPage() {
-  const params = useParams();
-  const router = useRouter();
-  const slug = typeof params.slug === "string" ? params.slug : "";
-  const { data: post, isLoading, isError } = useAdminBlog(slug);
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
 
-  useEffect(() => {
-    if (!slug || (!isLoading && (isError || !post))) {
-      router.replace(blogAdminPaths.list);
-    }
-  }, [isError, isLoading, post, router, slug]);
+export default async function EditBlogPage({ params }: PageProps) {
+  const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug);
 
   return (
     <section className="page bg-[var(--color-background,#f3f4f6)]">
@@ -34,15 +24,12 @@ export default function EditBlogPage() {
             Edit blog post
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Update content, imagery, SEO meta, and publish status.
+            Update the article content, featured image, publication status, and
+            SEO meta. Preview the public card before saving.
           </p>
         </div>
 
-        {isLoading || !post ? (
-          <BlogFormSkeleton />
-        ) : (
-          <BlogForm mode="edit" initialPost={post} />
-        )}
+        <EditBlogContent slug={decodedSlug} />
       </Shell>
     </section>
   );

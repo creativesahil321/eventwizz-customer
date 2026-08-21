@@ -25,6 +25,7 @@ import {
   List,
   ListOrdered,
   ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { Button } from "./button";
 import { Toggle } from "./toggle";
@@ -76,6 +77,11 @@ interface TiptapEditorProps {
   enableRichBlocks?: boolean;
   /** Allows inserting images into the body (file picker → inline image). */
   enableImages?: boolean;
+  /**
+   * When set, images are uploaded and inserted as URLs (never base64).
+   * Used by blog create/edit. Other editors keep the local file-reader path.
+   */
+  onUploadImage?: (file: File) => Promise<string>;
 }
 
 export function TiptapEditor({
@@ -91,11 +97,94 @@ export function TiptapEditor({
   readOnly = false,
   enableRichBlocks = false,
   enableImages = false,
+  onUploadImage,
 }: TiptapEditorProps) {
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const onUploadImageRef = useRef(onUploadImage);
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+  const uploadingImageRef = useRef(false);
+
+  onUploadImageRef.current = onUploadImage;
+
+  const insertUploadedImage = React.useCallback(
+    async (file: File, pos?: number) => {
+      const upload = onUploadImageRef.current;
+      const currentEditor = editorRef.current;
+      if (!upload || !currentEditor) return;
+
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please choose an image file");
+        return;
+      }
+      if (
+        !["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(
+          file.type.toLowerCase(),
+        ) &&
+        !/\.(jpe?g|png|webp)$/i.test(file.name)
+      ) {
+        toast.error("Use a JPG, PNG or WebP image.");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image must be 5MB or less.");
+        return;
+      }
+      if (uploadingImageRef.current) {
+        toast.info("Please wait for the current image to finish uploading");
+        return;
+      }
+
+      uploadingImageRef.current = true;
+      setIsUploadingImage(true);
+      try {
+        const src = await upload(file);
+        if (!src || src.startsWith("data:")) {
+          toast.error("Image upload did not return a valid URL");
+          return;
+        }
+
+        const size = currentEditor.state.doc.content.size;
+        const insertPos =
+          typeof pos === "number" ? Math.max(0, Math.min(pos, size)) : null;
+
+        if (insertPos == null) {
+          currentEditor
+            .chain()
+            .focus()
+            .setImage({ src, alt: file.name })
+            .run();
+        } else {
+          currentEditor
+            .chain()
+            .focus()
+            .insertContentAt(insertPos, {
+              type: "image",
+              attrs: { src, alt: file.name },
+            })
+            .run();
+        }
+      } catch (error) {
+        const axiosLike =
+          typeof error === "object" &&
+          error !== null &&
+          "isAxiosError" in error;
+        if (!axiosLike && error instanceof Error && error.message) {
+          toast.error(error.message);
+        }
+      } finally {
+        uploadingImageRef.current = false;
+        setIsUploadingImage(false);
+      }
+    },
+    [],
+  );
+
+  const insertUploadedImageRef = useRef(insertUploadedImage);
+  insertUploadedImageRef.current = insertUploadedImage;
 
   const editor = useEditor({
     extensions: [
@@ -131,7 +220,7 @@ export function TiptapEditor({
         ? [
             Image.configure({
               inline: false,
-              allowBase64: true,
+              allowBase64: !onUploadImage,
               HTMLAttributes: {
                 class: "my-4 h-auto max-w-full rounded-sm",
               },
@@ -154,8 +243,46 @@ export function TiptapEditor({
           className
         ),
       },
+      handleDOMEvents: {
+        dragover: (_view, event) => {
+          if (!onUploadImageRef.current) return false;
+          if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        },
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved || !onUploadImageRef.current) return false;
+        const file = Array.from(event.dataTransfer?.files ?? []).find((item) =>
+          item.type.startsWith("image/"),
+        );
+        if (!file) return false;
+        event.preventDefault();
+        const pos = view.posAtCoords({
+          left: event.clientX,
+          top: event.clientY,
+        })?.pos;
+        void insertUploadedImageRef.current(file, pos);
+        return true;
+      },
+      handlePaste: (_view, event) => {
+        if (!onUploadImageRef.current) return false;
+        const items = Array.from(event.clipboardData?.items ?? []);
+        const fileItem = items.find(
+          (item) => item.kind === "file" && item.type.startsWith("image/"),
+        );
+        const file = fileItem?.getAsFile();
+        if (!file) return false;
+        event.preventDefault();
+        void insertUploadedImageRef.current(file);
+        return true;
+      },
     },
   });
+
+  editorRef.current = editor;
 
   // Update editor content when value prop changes
   React.useEffect(() => {
@@ -183,6 +310,11 @@ export function TiptapEditor({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || !editor) return;
+
+    if (onUploadImageRef.current) {
+      void insertUploadedImage(file);
+      return;
+    }
 
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image file");
@@ -414,15 +546,24 @@ export function TiptapEditor({
                 variant="ghost"
                 className="h-8 px-2"
                 onClick={() => imageInputRef.current?.click()}
+                disabled={isUploadingImage}
                 aria-label="Insert image"
                 title="Insert image"
               >
-                <ImageIcon className="h-4 w-4" />
+                {isUploadingImage ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImageIcon className="h-4 w-4" />
+                )}
               </Button>
               <input
                 ref={imageInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
+                accept={
+                  onUploadImage
+                    ? "image/png,image/jpeg,image/jpg,image/webp"
+                    : "image/png,image/jpeg,image/webp,image/gif"
+                }
                 className="hidden"
                 onChange={handleInsertImage}
               />

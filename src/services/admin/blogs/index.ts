@@ -11,5 +11,6 @@ export type {
   AdminBlogDetailResponse,
   AdminBlogListParams,
   AdminBlogListResponse,
+  AdminBlogUploadImageResponse,
   AdminBlogWritePayload,
 } from "./types";

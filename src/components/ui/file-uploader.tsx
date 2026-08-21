@@ -557,7 +557,7 @@ export function FileUploader(props: FileUploaderProps) {
           });
         }
       } finally {
-        if (!cropDialogOpen && !enableCropping) {
+        if (!openedCropper) {
           setImageWorkflowBusyState(false);
         }
       }
@@ -571,7 +571,6 @@ export function FileUploader(props: FileUploaderProps) {
       enableCropping,
       autoCompress,
       autoCompressMaxSizeMB,
-      cropDialogOpen,
       setImageWorkflowBusyState,
     ],
   );
@@ -604,7 +603,7 @@ export function FileUploader(props: FileUploaderProps) {
     imageWorkflowBusy;
 
   const showDropzoneBusyOverlay =
-    imageWorkflowBusy && (files?.length ?? 0) === 0;
+    imageWorkflowBusy && (files?.length ?? 0) === 0 && !cropDialogOpen;
 
   return (
     <>

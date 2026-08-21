@@ -11,7 +11,7 @@ export const blogPublicPaths = {
   article: (slug: string) => `/blog/${encodeURIComponent(slug)}`,
 } as const;
 
-export const BLOG_HOME_PER_PAGE = 3;
+export const BLOG_HOME_PER_PAGE = 4;
 export const BLOG_LIST_PER_PAGE = 12;
 export const BLOG_ADMIN_PER_PAGE = 12;
 export const BLOG_TITLE_MIN = 3;

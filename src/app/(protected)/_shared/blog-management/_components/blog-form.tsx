@@ -33,6 +33,7 @@ import {
 import {
   useCreateAdminBlog,
   useUpdateAdminBlog,
+  adminBlogsService,
 } from "@/services/admin/blogs";
 import {
   BLOG_EXCERPT_MAX,
@@ -96,6 +97,14 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
 
   const watched = form.watch();
   const slugPreview = slugifyTitle(watched.title || "untitled-post");
+
+  const uploadInlineImage = React.useCallback(async (file: File) => {
+    const imageError = getBlogImageError(file);
+    if (imageError) {
+      throw new Error(imageError);
+    }
+    return adminBlogsService.uploadImage(file);
+  }, []);
 
   React.useEffect(() => {
     return () => {
@@ -472,6 +481,7 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                         placeholder="Write your article content..."
                         enableRichBlocks
                         enableImages
+                        onUploadImage={uploadInlineImage}
                         showAIButton={false}
                         className="min-h-[220px] sm:min-h-[280px]"
                         maxLength={50000}

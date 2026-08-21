@@ -52,6 +52,14 @@ export function pickReadableForeground(background: string): string {
   return darkRatio >= lightRatio ? DARK_FG : LIGHT_FG;
 }
 
+/**
+ * Dark chrome (public header/footer) is where the logo pipeline emits a light
+ * mark. Dashboard sidebars are white — invert those marks so they stay visible.
+ */
+export function isDarkSurface(background: string, threshold = 0.45): boolean {
+  return relativeLuminance(getAnchorColor(background)) < threshold;
+}
+
 const HERO_OVERLAY_FALLBACK = "#0F172A";
 
 /**

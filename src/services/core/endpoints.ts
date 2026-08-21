@@ -345,6 +345,7 @@ export const API_ENDPOINTS = {
       SHOW: "/admin/blogs/{slug}",
       UPDATE: "/admin/blogs/update/{slug}",
       DELETE: "/admin/blogs/delete/{slug}",
+      UPLOAD_IMAGE: "/admin/blogs/upload-image",
     },
     /** Default platform commission; per-venue overrides live on venue detail (PUT /admin/venues/{id}). */
     PAYMENT_SETTINGS: {

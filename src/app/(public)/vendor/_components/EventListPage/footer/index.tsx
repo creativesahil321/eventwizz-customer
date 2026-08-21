@@ -67,13 +67,20 @@ const VISIT_LINKS: Array<{ href: string; label: string }> = [
 
 function SocialRow({
   links,
+  className,
 }: {
   links: Array<{ icon: typeof Facebook; href: string; id: string }>;
+  className?: string;
 }) {
   if (links.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-start gap-1.5">
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-center gap-1.5",
+        className,
+      )}
+    >
       {links.map(({ icon: Icon, href, id }) => (
         <Link
           key={id}
@@ -336,14 +343,20 @@ export default function FooterSection({
           : undefined
       }
     >
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-14">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-14">
         <div
           className={cn(
-            "grid grid-cols-1 gap-10 text-left",
-            !narrowPreview && "sm:grid-cols-2 lg:grid-cols-4 lg:gap-8",
+            "grid grid-cols-2 gap-x-6 gap-y-8 text-left",
+            !narrowPreview && "lg:grid-cols-4 lg:gap-8",
           )}
         >
-          <div className="min-w-0">
+          <div
+            className={cn(
+              "col-span-2 flex min-w-0 flex-col items-center text-center",
+              !narrowPreview &&
+                "sm:col-span-1 sm:items-start sm:text-left",
+            )}
+          >
             <FooterBrand
               logoPath={logoPath}
               brandName={brandName}
@@ -356,15 +369,31 @@ export default function FooterSection({
             ) : null}
             {socialLinks.length > 0 ? (
               <div className="mt-5">
-                <SocialRow links={socialLinks} />
+                <SocialRow
+                  links={socialLinks}
+                  className={
+                    !narrowPreview ? "sm:justify-start" : "justify-center"
+                  }
+                />
               </div>
             ) : null}
           </div>
 
           {locationLinks.length > 0 ? (
-            <div className="min-w-0">
+            <div
+              className={cn(
+                "col-span-2 min-w-0",
+                !narrowPreview && "sm:col-span-1",
+              )}
+            >
               <FooterColumnHeading>Locations</FooterColumnHeading>
-              <nav aria-label="Venue locations" className="flex flex-col gap-2">
+              <nav
+                aria-label="Venue locations"
+                className={cn(
+                  "grid grid-cols-2 gap-x-4 gap-y-2",
+                  !narrowPreview && "lg:flex lg:flex-col lg:gap-2",
+                )}
+              >
                 {locationLinks.map((link) => (
                   <FooterTextLink
                     key={link.href}
@@ -403,14 +432,23 @@ export default function FooterSection({
       </div>
 
       <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)]">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
+        <div
+          className={cn(
+            "mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-4 text-center",
+            !narrowPreview &&
+              "sm:flex-row sm:items-center sm:px-6 sm:text-left",
+          )}
+        >
           <div
-            className="break-words text-left text-[11px] leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
+            className="break-words text-[11px] leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
             dangerouslySetInnerHTML={{ __html: resolvedCopyright }}
           />
           <FooterPageLinks
             isPreviewMode={isPreviewMode}
-            className="justify-start sm:justify-end"
+            className={cn(
+              "justify-center",
+              !narrowPreview && "sm:justify-end",
+            )}
           />
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import {
   Dialog,
@@ -60,6 +60,7 @@ export function CropDialog({
   const [isOpen, setIsOpen] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const finishedRef = useRef(false);
 
   // Merge with default config
   const mergedConfig = { ...DEFAULT_CROPPER_CONFIG, ...config };
@@ -159,6 +160,8 @@ export function CropDialog({
 
   const finishWithResult = useCallback(
     (croppedImage: Awaited<ReturnType<typeof getOptimizedFullImage>>) => {
+      if (finishedRef.current) return;
+      finishedRef.current = true;
       if (croppedImage.compressionRatio > 0.1) {
         toast.success(
           `Image optimized! ${formatFileSize(
@@ -219,17 +222,30 @@ export function CropDialog({
     }
   };
 
-  // Handle cancel
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
+    if (finishedRef.current) {
+      setIsOpen(false);
+      return;
+    }
+    finishedRef.current = true;
     setIsOpen(false);
     onCancel();
+  }, [onCancel]);
+
+  const handleOpenChange = (open: boolean) => {
+    if (isProcessing) return;
+    if (!open) {
+      handleCancel();
+      return;
+    }
+    setIsOpen(true);
   };
 
   const showAspectToggle = recommendedAspect !== undefined;
   const isFreeActive = activeAspect === undefined;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
         className={cn("max-w-4xl h-[90vh] flex flex-col", className)}
         onInteractOutside={(e) => e.preventDefault()}

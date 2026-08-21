@@ -21,6 +21,14 @@ export interface AdminBlogListResponse extends ApiResponse<BlogApiPost[]> {
 
 export type AdminBlogDetailResponse = ApiResponse<BlogApiPost>;
 
+export interface AdminBlogUploadImageData {
+  url: string;
+  path?: string;
+}
+
+export type AdminBlogUploadImageResponse = ApiResponse<AdminBlogUploadImageData> &
+  Partial<AdminBlogUploadImageData>;
+
 export interface AdminBlogWritePayload {
   title: string;
   status: BlogStatus;

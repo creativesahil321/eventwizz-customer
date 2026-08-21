@@ -28,7 +28,7 @@ export function BlogPostGrid({ posts }: { posts: BlogPost[] }) {
   );
 }
 
-export function BlogPostGridSkeleton({ count = 3 }: { count?: number }) {
+export function BlogPostGridSkeleton({ count = 4 }: { count?: number }) {
   const more = Math.max(0, count - 1);
 
   return (

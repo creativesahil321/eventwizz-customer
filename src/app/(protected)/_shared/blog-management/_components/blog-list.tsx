@@ -208,15 +208,19 @@ export function BlogList() {
       ) : (
         <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full table-fixed text-left text-sm">
               <thead className="border-b border-[var(--color-border)] bg-slate-50 text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 font-medium">#</th>
-                  <th className="px-4 py-3 font-medium">Post</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Published</th>
-                  <th className="px-4 py-3 font-medium">Meta</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                  <th className="w-12 px-3 py-3 font-medium sm:px-4">#</th>
+                  <th className="px-3 py-3 font-medium sm:px-4">Post</th>
+                  <th className="w-28 px-3 py-3 font-medium sm:px-4">Status</th>
+                  <th className="w-32 px-3 py-3 font-medium sm:px-4">
+                    Published
+                  </th>
+                  <th className="w-28 px-3 py-3 font-medium sm:px-4">Meta</th>
+                  <th className="w-32 px-3 py-3 font-medium text-right sm:px-4">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -225,11 +229,13 @@ export function BlogList() {
                     key={post.slug}
                     className="border-b border-[var(--color-border)] last:border-0 hover:bg-slate-50/80"
                   >
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {(page - 1) * (meta?.per_page ?? BLOG_ADMIN_PER_PAGE) + index + 1}
+                    <td className="px-3 py-3 text-muted-foreground sm:px-4">
+                      {(page - 1) * (meta?.per_page ?? BLOG_ADMIN_PER_PAGE) +
+                        index +
+                        1}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                    <td className="max-w-0 px-3 py-3 sm:px-4">
+                      <div className="flex min-w-0 items-center gap-3">
                         <div className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md bg-slate-100">
                           {post.cover_image ? (
                             <Image
@@ -244,23 +250,23 @@ export function BlogList() {
                             />
                           ) : null}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1 overflow-hidden">
                           <p className="truncate font-semibold text-foreground">
                             {post.title}
                           </p>
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="mt-0.5 line-clamp-2 break-words text-xs text-muted-foreground">
                             {post.excerpt}
                           </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       <StatusBadge status={post.status} />
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="px-3 py-3 text-muted-foreground sm:px-4">
                       {formatBlogDate(post.published_at)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       {post.meta_title || post.meta_description ? (
                         <Badge variant="outline" className="font-normal">
                           SEO set
@@ -271,7 +277,7 @@ export function BlogList() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           type="button"
