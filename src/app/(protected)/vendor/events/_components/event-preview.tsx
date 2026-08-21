@@ -28,6 +28,7 @@ import { buildSiteEssentialsContactTheme } from "@/app/(protected)/_shared/sites
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import {
   getAnchorColor,
+  pickHeroOverlayColor,
   pickReadableForeground,
   relativeLuminance,
 } from "@/lib/color-contrast";
@@ -55,6 +56,12 @@ import {
   buildEventSectionNavItems,
 } from "@/components/public/event-section-nav";
 import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
+import { slugToShortLabel } from "@/lib/slug-short-label";
+import {
+  formatEventHeroDateRange,
+  formatEventHeroTimeRange,
+  readEventCategoryLabel,
+} from "@/lib/event-hero-meta";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
@@ -312,6 +319,7 @@ export function EventPreview({
     "--color-secondary": secondaryHex,
     "--color-header": headerHex,
     "--color-footer": footerHex,
+    "--color-hero-overlay": pickHeroOverlayColor(headerHex, footerHex),
     "--color-background": backgroundHex,
     "--color-text": themeColors.text || "#0F172A",
     "--color-text-dimmed": themeColors.textDimmed || "#64748B",
@@ -454,6 +462,25 @@ export function EventPreview({
     String(activePackage?.event_schedular_title ?? "").trim().length > 0 ||
     timelineRows.length > 0;
 
+  const heroCityLabel = (() => {
+    const slug = footerLocationSlug?.trim();
+    if (!slug) return null;
+    const fromLocations = siteEssentials?.locations?.find(
+      (loc) => loc.slug?.trim() === slug,
+    )?.city?.trim();
+    return fromLocations || slugToShortLabel(slug);
+  })();
+  const heroCategoryLabel = readEventCategoryLabel({
+    ...s1,
+    category_name: s1?.category_name,
+  });
+  const heroDateLabel = formatEventHeroDateRange(
+    (datesForSection ?? []).map((d) => d.event_date),
+  );
+  const heroTimeLabel = formatEventHeroTimeRange(
+    timelineRows.map((row) => row.time),
+  );
+
   const showGallery = (galleryImages?.length ?? 0) > 0;
   const sectionNavItems = useMemo(
     () =>
@@ -571,6 +598,17 @@ export function EventPreview({
             bannerVideo={bannerVideo}
             cacheBustImage
             imageAlt={eventName}
+            breadcrumbs={[
+              { label: "Home" },
+              ...(heroCityLabel ? [{ label: heroCityLabel }] : []),
+              { label: eventName },
+            ]}
+            categoryLabel={heroCategoryLabel}
+            meta={{
+              date: heroDateLabel,
+              time: heroTimeLabel,
+              location: heroCityLabel,
+            }}
           />
         </div>
 
@@ -730,6 +768,11 @@ export function EventPreview({
           locationSlug={footerLocationSlug}
           contactTheme={footerContactTheme}
           socialLinksOverride={siteEssentials?.socialLinks}
+          brandDescription={
+            siteEssentials?.about_description ||
+            siteEssentials?.seo?.description ||
+            ""
+          }
         />
       </div>
     </CartConflictProvider>

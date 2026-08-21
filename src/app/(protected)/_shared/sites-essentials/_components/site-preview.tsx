@@ -83,10 +83,19 @@ export function SitePreview({
       ? null
       : getPreviewUrl(formValues.cover_video);
 
+  const contactOverride = resolveSiteEssentialsPreviewContact(
+    formValues,
+    slug,
+  );
+  const contactTheme = buildSiteEssentialsContactTheme(formValues);
+
   const locationData: LocationData = {
     latitude: "",
     longitude: "",
-    address: "",
+    address: contactOverride?.address ?? "",
+    email: contactOverride?.email ?? null,
+    phone: contactOverride?.phone ?? null,
+    phone_number: contactOverride?.phone ?? null,
     slug,
     city,
     cover_image: coverImage,
@@ -106,11 +115,6 @@ export function SitePreview({
     event_gallery: galleryImages,
   };
 
-  const contactOverride = resolveSiteEssentialsPreviewContact(
-    formValues,
-    slug,
-  );
-  const contactTheme = buildSiteEssentialsContactTheme(formValues);
   const headerPhone =
     contactOverride?.phone?.trim() ||
     formValues.company_phone?.trim() ||
@@ -151,6 +155,9 @@ export function SitePreview({
         footerContactOverride={contactOverride}
         footerContactTheme={contactTheme}
         footerSocialLinksOverride={formValues.socialLinks}
+        footerBrandDescription={
+          formValues.about_description || formValues.seo?.description || ""
+        }
       />
     </div>
   );

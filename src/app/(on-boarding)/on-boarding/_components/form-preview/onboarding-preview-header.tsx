@@ -13,6 +13,7 @@ type OnboardingPreviewHeaderProps = {
   showRoomSelector?: boolean;
   roomSelectorVisible?: boolean;
   onRoomChange?: (index: number) => void;
+  roomSelectorStickyTop?: string;
 };
 
 /**
@@ -27,6 +28,7 @@ export function OnboardingPreviewHeader({
   showRoomSelector = false,
   roomSelectorVisible = false,
   onRoomChange,
+  roomSelectorStickyTop,
 }: OnboardingPreviewHeaderProps) {
   return (
     <>
@@ -42,6 +44,7 @@ export function OnboardingPreviewHeader({
         <PreviewRoomFloatingSelector
           visible={roomSelectorVisible}
           onRoomChange={onRoomChange}
+          stickyTop={roomSelectorStickyTop}
         />
       ) : null}
     </>

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,8 @@ import { ForceLogoutModal } from "./force-logout-modal";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
 import { VenueComments } from "./venue-comments";
 import { usePermission } from "@/hooks/usePermission";
+import { toast } from "sonner";
+import { adminVenuesKeys } from "../../_lib/use-admin-venues";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -176,16 +179,22 @@ export function ManageVenueDetails({ venue }: ManageVenueDetailsProps) {
   );
 
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const deleteVenueMutation = useMutation({
     mutationFn: () => adminVenuesService.deleteVenue(venue.id),
-    onSuccess: () => {
-      // Invalidate venue lists so this disappears from tables
-      queryClient.invalidateQueries({ queryKey: ["admin", "venues"] });
-      queryClient.invalidateQueries({
+    onSuccess: (response) => {
+      if (response?.status !== true) return;
+
+      queryClient.invalidateQueries({ queryKey: adminVenuesKeys.all });
+      queryClient.removeQueries({
         queryKey: ["admin", "venue", String(venue.id)],
       });
+      if (!response.message) {
+        toast.success("Venue deleted successfully");
+      }
       setDeleteOpen(false);
+      router.replace("/admin/vendors");
     },
   });
 

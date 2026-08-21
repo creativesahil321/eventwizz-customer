@@ -52,6 +52,25 @@ export function pickReadableForeground(background: string): string {
   return darkRatio >= lightRatio ? DARK_FG : LIGHT_FG;
 }
 
+const HERO_OVERLAY_FALLBACK = "#0F172A";
+
+/**
+ * Photo-hero wash color — darker of header vs footer chrome.
+ * Matches Lovable `bg-maroon/70` without using a light header as a 70% white veil.
+ */
+export function pickHeroOverlayColor(
+  header: string,
+  footer: string,
+  fallback = HERO_OVERLAY_FALLBACK,
+): string {
+  const candidates = [header, footer, fallback].map((value) =>
+    getAnchorColor(value),
+  );
+  return candidates.reduce((darkest, next) =>
+    relativeLuminance(next) < relativeLuminance(darkest) ? next : darkest,
+  );
+}
+
 /** All hex color stops in a CSS color string (solid or gradient). */
 export function extractHexStops(value: string): string[] {
   const matches = value.match(/#[0-9A-Fa-f]{3,8}/gi) ?? [];

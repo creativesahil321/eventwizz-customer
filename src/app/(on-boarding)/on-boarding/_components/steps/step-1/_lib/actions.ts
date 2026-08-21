@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { UseFormReturn } from "react-hook-form";
 import { StepOneType } from "../../../form-provider/schema";
+import { cityFromGoogleAddressComponents } from "../../step-7/address-autocomplete";
 
 export const fetchPlaceDetails = (
   form: UseFormReturn<StepOneType>,
@@ -54,19 +55,11 @@ export const fetchPlaceDetails = (
       });
 
       // Extract city from address components if available
-      if (place.address_components) {
-        const cityComponent = place.address_components.find(
-          (component) =>
-            component.types.includes("locality") ||
-            component.types.includes("postal_town") ||
-            component.types.includes("administrative_area_level_1")
-        );
-
-        if (cityComponent) {
-          form.setValue("city", cityComponent.long_name, {
-            shouldValidate: true,
-          });
-        }
+      const city = cityFromGoogleAddressComponents(place.address_components);
+      if (city) {
+        form.setValue("city", city, {
+          shouldValidate: true,
+        });
       }
 
       // Set a generic description if business is operational

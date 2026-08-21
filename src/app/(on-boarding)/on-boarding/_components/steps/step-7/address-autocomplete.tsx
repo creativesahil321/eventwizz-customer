@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef, forwardRef } from "react";
+import { Loader } from "@googlemaps/js-api-loader";
 import { Input } from "@/components/ui/input";
+import { env } from "@/env";
 
 interface Suggestion {
   description: string;
@@ -9,10 +11,32 @@ interface Suggestion {
   formatted_address?: string;
 }
 
+export function cityFromGoogleAddressComponents(
+  components: google.maps.GeocoderAddressComponent[] | undefined,
+): string | null {
+  if (!components?.length) return null;
+  const pick = (...types: string[]) =>
+    components.find((component) =>
+      types.some((type) => component.types.includes(type)),
+    )?.long_name;
+  return (
+    pick("postal_town", "locality") ||
+    pick("administrative_area_level_2") ||
+    pick("administrative_area_level_1") ||
+    null
+  );
+}
+
 interface AddressAutocompleteProps {
   value: string;
   onChange: (address: string) => void;
   onSelect?: (placeId: string, address: string) => void;
+  /** Extra place bits (city) after Google details resolve. */
+  onResolved?: (details: {
+    placeId: string;
+    address: string;
+    city: string | null;
+  }) => void;
   onFocus?: () => void;
   placeholder?: string;
   className?: string;
@@ -23,6 +47,8 @@ interface AddressAutocompleteProps {
   suggestionsClassName?: string;
   /** Use "dark" for dark backgrounds (e.g. review card) */
   variant?: "default" | "dark";
+  noResultsMessage?: string;
+  unavailableMessage?: string;
 }
 
 const AddressAutocomplete = forwardRef<
@@ -33,6 +59,7 @@ const AddressAutocomplete = forwardRef<
     value,
     onChange,
     onSelect,
+    onResolved,
     onFocus,
     placeholder = "Type to search for a UK address or location...",
     className = "",
@@ -40,6 +67,8 @@ const AddressAutocomplete = forwardRef<
     inputClassName,
     suggestionsClassName,
     variant = "default",
+    noResultsMessage,
+    unavailableMessage,
   },
   ref,
 ) {
@@ -94,29 +123,47 @@ const AddressAutocomplete = forwardRef<
     }
   }, [autoFocus]);
 
-  // Initialize Google Places services
+  // Load Places if another field has not already (brand-mode step 1 has no venue search).
   useEffect(() => {
-    const initializeServices = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        try {
-          autocompleteService.current =
-            new google.maps.places.AutocompleteService();
+    let cancelled = false;
 
-          const hiddenDiv = document.createElement("div");
-          document.body.appendChild(hiddenDiv);
-          placesService.current = new google.maps.places.PlacesService(
-            hiddenDiv,
-          );
-        } catch (error) {
-          console.error("Error initializing Google Places services:", error);
-        }
+    const attachServices = () => {
+      if (!window.google?.maps?.places) return false;
+      try {
+        autocompleteService.current =
+          new google.maps.places.AutocompleteService();
+        const hiddenDiv = document.createElement("div");
+        document.body.appendChild(hiddenDiv);
+        placesService.current = new google.maps.places.PlacesService(hiddenDiv);
+        return true;
+      } catch (error) {
+        console.error("Error initializing Google Places services:", error);
+        return false;
       }
     };
 
-    initializeServices();
-    const timeout = setTimeout(initializeServices, 1000);
+    if (attachServices()) return;
 
-    return () => clearTimeout(timeout);
+    const apiKey = env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return;
+
+    const loader = new Loader({
+      apiKey,
+      libraries: ["places"],
+    });
+
+    loader
+      .load()
+      .then(() => {
+        if (!cancelled) attachServices();
+      })
+      .catch((error) => {
+        console.error("Failed to load Google Maps Places:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -203,23 +250,36 @@ const AddressAutocomplete = forwardRef<
     setSearchQuery("");
     setIsSelected(true);
 
-    if (onSelect && placesService.current) {
-      placesService.current.getDetails(
-        {
+    if (onSelect || onResolved) {
+      const finish = (address: string, city: string | null) => {
+        onSelect?.(suggestion.place_id, address);
+        onResolved?.({
           placeId: suggestion.place_id,
-          fields: ["formatted_address", "geometry"],
-        },
-        (place, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-            onSelect(
-              suggestion.place_id,
-              place.formatted_address || suggestion.description,
-            );
-          } else {
-            onSelect(suggestion.place_id, suggestion.description);
-          }
-        },
-      );
+          address,
+          city,
+        });
+      };
+
+      if (placesService.current) {
+        placesService.current.getDetails(
+          {
+            placeId: suggestion.place_id,
+            fields: ["formatted_address", "geometry", "address_components"],
+          },
+          (place, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+              finish(
+                place.formatted_address || suggestion.description,
+                cityFromGoogleAddressComponents(place.address_components),
+              );
+            } else {
+              finish(suggestion.description, null);
+            }
+          },
+        );
+      } else {
+        finish(suggestion.description, null);
+      }
     }
   };
 
@@ -289,6 +349,12 @@ const AddressAutocomplete = forwardRef<
         placeholder={isSelected ? "" : placeholder}
         readOnly={isSelected}
         autoFocus={autoFocus}
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        name="head-office-address-search"
+        data-1p-ignore
+        data-lpignore="true"
       />
 
       {isSearching && !isSelected && (
@@ -340,8 +406,8 @@ const AddressAutocomplete = forwardRef<
             <div className="flex items-center space-x-2">
               <span>🔍</span>
               <span className="text-sm">
-                No UK addresses found. Try a different search term or use the
-                map below to set your location manually.
+                {noResultsMessage ??
+                  "No UK addresses found. Try a different search term or use the map below to set your location manually."}
               </span>
             </div>
           </div>
@@ -355,8 +421,8 @@ const AddressAutocomplete = forwardRef<
             <div className="flex items-center space-x-2">
               <span>⚠️</span>
               <span className="text-sm">
-                Address search is temporarily unavailable. Please use the map
-                below to set your location.
+                {unavailableMessage ??
+                  "Address search is temporarily unavailable. Please use the map below to set your location."}
               </span>
             </div>
           </div>

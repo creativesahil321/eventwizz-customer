@@ -74,6 +74,7 @@ export type SiteThemePresetId =
   | "lovable-clean-white"
   | "venue-estate-green"
   | "venue-wine-candlelight"
+  | "venue-manor-burgundy"
   | "venue-midnight-navy-brass"
   | "venue-terracotta-sage"
   | "venue-rosewood-blush"
@@ -1067,19 +1068,39 @@ const PRESET_SHELLS: readonly PresetShell[] = [
     id: "venue-wine-candlelight",
     name: "Wine & Candlelight",
     tagline: "Christmas & concerts",
-    headingFontLabel: "Cormorant Garamond",
-    bodyFontLabel: "Karla",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "Inter",
     headingEmphasis: "accent_tail",
-    swatch: ["#2A1218", "#6B2231", "#D9A441"],
+    swatch: ["#3D1F24", "#D4B896", "#FAF6F1"],
     colors: {
-      primary: "#6B2231",
-      secondary: "#D9A441",
-      header: "#2A1218",
-      footer: "#1E0D12",
+      primary: "#D4B896",
+      secondary: "#3D1F24",
+      header: "#3D1F24",
+      footer: "#3C1D1A",
       background: "#FAF6F1",
       surface: "#FFFFFF",
       text: "#2A1B1E",
       textDimmed: "#6E5A5E",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-manor-burgundy",
+    name: "Manor Burgundy",
+    tagline: "Country houses, festive dining, gold on cream",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "Inter",
+    headingEmphasis: "accent_tail",
+    swatch: ["#3D1F24", "#C4A574", "#F7F3E8"],
+    colors: {
+      primary: "#C4A574",
+      secondary: "#3D1F24",
+      header: "#3D1F24",
+      footer: "#3C1D1A",
+      background: "#F7F3E8",
+      surface: "#FFFDF8",
+      text: "#2A1816",
+      textDimmed: "#6E5A54",
       socialLogin: { ...SOCIAL_LOGIN_LIGHT },
     },
   },

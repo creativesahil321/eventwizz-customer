@@ -258,7 +258,7 @@ export function LocationSearchBar({
   return (
     <div
       id={id}
-      className={cn("mx-auto w-full max-w-3xl scroll-mt-24", className)}
+      className={cn("w-full max-w-3xl scroll-mt-24", className)}
     >
       <form
         onSubmit={(event) => {
@@ -529,7 +529,7 @@ export function LocationSearchBar({
             <button
               type="submit"
               className={cn(
-                "inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-primary-foreground)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:h-9 sm:px-4",
+                "inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--color-footer)] px-4 text-sm font-semibold text-[var(--color-on-footer)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:h-9 sm:px-5",
                 !hideCity && "col-span-2 sm:col-span-1",
                 hideCity
                   ? previewSearchSubmitUntilSm
@@ -538,7 +538,7 @@ export function LocationSearchBar({
                 isPreviewMobile && !hideCity && "!col-span-2",
               )}
             >
-              Search
+              Search events
               <ArrowRight className="h-4 w-4" aria-hidden />
             </button>
           </div>

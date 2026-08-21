@@ -1,5 +1,9 @@
 import type { CSSProperties } from "react";
-import { darkenHex, pickReadableForeground } from "@/lib/color-contrast";
+import {
+  darkenHex,
+  pickHeroOverlayColor,
+  pickReadableForeground,
+} from "@/lib/color-contrast";
 import type { SiteEssentialsFormValues } from "./schema";
 
 /** CSS variable bundle for Site Essentials / onboarding live preview roots. */
@@ -20,6 +24,7 @@ export function siteEssentialsToPreviewRootStyle(
     "--color-secondary": secondary,
     "--color-header": header,
     "--color-footer": footer,
+    "--color-hero-overlay": pickHeroOverlayColor(header, footer),
     "--color-background": background,
     "--color-text": text,
     "--color-text-dimmed": textDimmed,

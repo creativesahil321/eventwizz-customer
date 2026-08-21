@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
 import { cn } from "@/lib/utils";
 
-export const EVENT_SECTION_NAV_HEIGHT = "2.75rem";
-export const EVENT_SECTION_NAV_HEIGHT_PX = 44;
+export const EVENT_SECTION_NAV_HEIGHT = "3.5rem";
+export const EVENT_SECTION_NAV_HEIGHT_PX = 56;
 
 export const EVENT_SECTION_IDS = {
   about: "event-about",
@@ -60,6 +60,8 @@ type EventSectionNavProps = {
   stickyTop: string;
   headerOffsetPx: number;
   scrollContainerRef?: RefObject<HTMLElement | null>;
+  /** Extra action after jumping to the section (e.g. open the onboarding form). */
+  onItemClick?: (id: string) => void;
 };
 
 function scrollToSection(
@@ -94,6 +96,7 @@ export function EventSectionNav({
   stickyTop,
   headerOffsetPx,
   scrollContainerRef,
+  onItemClick,
 }: EventSectionNavProps) {
   const [activeId, setActiveId] = useState(items[0]?.id ?? "");
   const itemKey = useMemo(() => items.map((item) => item.id).join("|"), [items]);
@@ -130,28 +133,29 @@ export function EventSectionNav({
   return (
     <nav
       aria-label="Event sections"
-      className="sticky z-40 border-b border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 backdrop-blur-md"
-      style={{ top: stickyTop, height: EVENT_SECTION_NAV_HEIGHT }}
+      className="sticky z-40 border-y border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.45)] backdrop-blur-md"
+      style={{ top: stickyTop, minHeight: EVENT_SECTION_NAV_HEIGHT }}
     >
-      <div className="mx-auto flex h-full max-w-5xl items-center justify-start gap-1 overflow-x-auto px-3 sm:justify-center sm:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mx-auto flex min-h-[3.5rem] max-w-5xl items-center justify-center gap-5 overflow-x-auto px-4 py-2.5 sm:gap-7 sm:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const isActive = item.id === activeId;
           return (
             <button
               key={item.id}
               type="button"
-              onClick={() =>
+              onClick={() => {
                 scrollToSection(
                   item.id,
                   headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX,
                   scrollContainerRef?.current ?? null,
-                )
-              }
+                );
+                onItemClick?.(item.id);
+              }}
               className={cn(
-                "shrink-0 rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                "shrink-0 border-b-2 pb-1 text-[13px] font-medium tracking-wide transition-colors sm:text-sm",
                 isActive
-                  ? "bg-[color:color-mix(in_srgb,var(--color-primary)_14%,transparent)] text-[color:var(--color-primary)]"
-                  : "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]",
+                  ? "border-[color:var(--color-primary)] text-[var(--color-text)]"
+                  : "border-transparent text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]",
               )}
               aria-current={isActive ? "true" : undefined}
             >

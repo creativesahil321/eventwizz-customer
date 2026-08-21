@@ -2,6 +2,7 @@ import { ThemeSchema } from "@/types/theme.types";
 import {
   getAnchorColor,
   normalizeHex,
+  pickHeroOverlayColor,
   pickReadableForeground,
 } from "@/lib/color-contrast";
 
@@ -78,12 +79,13 @@ export function generateThemeCSS(theme: ThemeSchema | null): string {
     };`;
 
     // Add layout colors
-    css += `--color-header: ${
-      theme.colors.header || defaultThemeConstants.colors.header
-    };`;
-    css += `--color-footer: ${
-      theme.colors.footer || defaultThemeConstants.colors.footer
-    };`;
+    const headerColor =
+      theme.colors.header || defaultThemeConstants.colors.header;
+    const footerColor =
+      theme.colors.footer || defaultThemeConstants.colors.footer;
+    css += `--color-header: ${headerColor};`;
+    css += `--color-footer: ${footerColor};`;
+    css += `--color-hero-overlay: ${pickHeroOverlayColor(headerColor, footerColor)};`;
 
     // Add dimmed text color
     css += `--color-text-dimmed: ${
@@ -119,8 +121,6 @@ export function generateThemeCSS(theme: ThemeSchema | null): string {
     css += `--color-secondary-focus: ${secondaryColor};`;
     css += `--color-secondary-foreground: ${pickReadableForeground(secondaryColor)};`;
 
-    const headerColor = theme.colors.header || defaultThemeConstants.colors.header;
-    const footerColor = theme.colors.footer || defaultThemeConstants.colors.footer;
     const surfaceColor = theme.colors.surface || defaultThemeConstants.colors.surface;
     const backgroundColor =
       theme.colors.background || defaultThemeConstants.colors.background;
@@ -186,6 +186,10 @@ export function getDefaultThemeCSS(): string {
   --color-secondary: ${defaultThemeConstants.colors.secondary};
   --color-header: ${defaultThemeConstants.colors.header};
   --color-footer: ${defaultThemeConstants.colors.footer};
+  --color-hero-overlay: ${pickHeroOverlayColor(
+    defaultThemeConstants.colors.header,
+    defaultThemeConstants.colors.footer,
+  )};
   --color-background: ${defaultThemeConstants.colors.background};
   --color-surface: ${defaultThemeConstants.colors.surface};
   --color-text: ${defaultThemeConstants.colors.text};

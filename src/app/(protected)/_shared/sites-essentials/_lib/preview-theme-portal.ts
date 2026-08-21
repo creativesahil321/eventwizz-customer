@@ -14,6 +14,7 @@ const PREVIEW_THEME_CSS_VARS = [
   "--color-secondary-foreground",
   "--color-header",
   "--color-footer",
+  "--color-hero-overlay",
   "--color-background",
   "--color-surface",
   "--color-text",

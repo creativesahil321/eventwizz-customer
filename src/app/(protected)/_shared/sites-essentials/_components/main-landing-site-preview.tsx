@@ -6,7 +6,10 @@ import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { SiteEssentialsFormValues } from "../_lib/schema";
 import { siteEssentialsToPreviewRootStyle } from "../_lib/preview-root-style";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
-import { resolveSiteEssentialsPreviewContact } from "../_lib/preview-contact";
+import {
+  buildSiteEssentialsContactTheme,
+  resolveSiteEssentialsPreviewContact,
+} from "../_lib/preview-contact";
 import type { LocationData } from "@/types/theme.types";
 
 interface MainLandingSitePreviewProps {
@@ -101,7 +104,11 @@ export function MainLandingSitePreview({
       copyright={formValues.copyright}
       footerLogo={logoUrl || null}
       contactOverride={resolveSiteEssentialsPreviewContact(formValues)}
+      contactTheme={buildSiteEssentialsContactTheme(formValues)}
       socialLinksOverride={formValues.socialLinks}
+      brandDescription={
+        formValues.about_description || formValues.seo?.description || ""
+      }
       exploreCitiesSectionId="explore-cities-preview"
     />
   );

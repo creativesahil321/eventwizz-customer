@@ -27,6 +27,16 @@ import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-lay
 import { EventHeroBand } from "@/components/public/event-hero-band";
 import { EventRoomChooser } from "@/components/public/event-room-chooser";
 import { RoomContentTransition } from "@/components/public/room-content-transition";
+import {
+  EventSectionNav,
+  EVENT_SECTION_IDS,
+  EVENT_SECTION_NAV_HEIGHT,
+  buildEventSectionNavItems,
+} from "@/components/public/event-section-nav";
+import {
+  formatEventHeroDateRange,
+  formatEventHeroTimeRange,
+} from "@/lib/event-hero-meta";
 import { Image as ImageIcon } from "lucide-react";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { normalizeSlug } from "@/lib/utils";
@@ -35,6 +45,12 @@ import { useRoomManager } from "../rooms/use-room-manager";
 import { listOnboardingPreviewRoomSummaries } from "../rooms/list-onboarding-preview-room-summaries";
 import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
 import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
+import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "./preview-layout-constants";
+import {
+  PreviewEditHit,
+  PREVIEW_SECTION_EDITOR,
+  type PreviewEditorTarget,
+} from "./preview-edit-hit";
 
 const HEADER_OFFSET_PX = 72;
 
@@ -104,6 +120,31 @@ function resolveOnboardingLogoUrl(
   return null;
 }
 
+/**
+ * Onboarding catering types do not declare a menu background. Persistence / room
+ * payloads may still include one — read it without assuming the form union has it.
+ */
+function resolvePreviewMenuBackground(catering: unknown): string | undefined {
+  if (!catering || typeof catering !== "object") return undefined;
+  if (!("menu_background_image" in catering)) return undefined;
+  const raw = (catering as { menu_background_image?: unknown })
+    .menu_background_image;
+  if (!raw) return undefined;
+  if (typeof raw === "string") return raw;
+  if (raw instanceof File) {
+    return (raw as File & { preview?: string }).preview ?? undefined;
+  }
+  if (
+    typeof raw === "object" &&
+    raw !== null &&
+    "preview" in raw &&
+    typeof (raw as { preview?: string }).preview === "string"
+  ) {
+    return (raw as { preview: string }).preview;
+  }
+  return undefined;
+}
+
 /** Same steps as `form-layout` `splitLayoutSteps` — live preview with tenant theme styles. */
 const ONBOARDING_THEME_PREVIEW_STEPS = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
 /** Event preview onward — room floating selector is for event pages only, not Site (step 2). */
@@ -120,7 +161,7 @@ const EMPTY_ONBOARDING_FOOTER_SOCIAL_LINKS = {
 
 // Only load components needed for the current step
 export default function FormPreview() {
-  const { form, activeStep, activeField, previewTheme, setActiveStep } =
+  const { form, activeStep, activeField, previewTheme, setActiveStep, setActiveField } =
     useFormContext();
   const currencySymbol = useCurrencySymbol();
   const [formState, setFormState] = useState<OnboardingFormData>(
@@ -346,6 +387,19 @@ export default function FormPreview() {
     void setActiveStep(3);
     previewContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, [setActiveStep]);
+
+  const jumpToEditor = useCallback(
+    (target: PreviewEditorTarget) => {
+      const go = async () => {
+        if (activeStep !== target.step) {
+          await setActiveStep(target.step);
+        }
+        window.setTimeout(() => setActiveField(target.field), 80);
+      };
+      void go();
+    },
+    [activeStep, setActiveStep, setActiveField],
+  );
 
   const {
     enabled: roomsEnabled,
@@ -836,27 +890,48 @@ export default function FormPreview() {
     );
 
     const showDatesPreview = activeStep === 5 || datesPreviewItems.length > 0;
+    const showGalleryPreview = galleryPreviewItems.length > 0;
+    const showMenuPreview = (activePreviewCatering?.menus?.length ?? 0) > 0;
+    const sectionNavItems = buildEventSectionNavItems({
+      about: true,
+      rooms: showRoomChooser,
+      schedule: showTimelineSection,
+      dates: showDatesPreview,
+      gallery: showGalleryPreview,
+      menu: showMenuPreview,
+      faqs: hasPreviewFaqs,
+    });
+    const showSectionNav = sectionNavItems.length > 0;
+    const sectionNavStickyTop = ONBOARDING_PREVIEW_HEADER_OFFSET;
+    const roomSelectorStickyTop = showSectionNav
+      ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
+      : ONBOARDING_PREVIEW_HEADER_OFFSET;
+    const sectionAnchorClass =
+      "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
+    const heroCityLabel = formState.stepOne?.city?.trim() || "";
+    const heroEventLabel =
+      formState.stepThree?.event_name?.trim() ||
+      formState.stepThree?.event_banner_heading?.trim() ||
+      "Event";
+    const heroDateLabel = formatEventHeroDateRange(
+      datesPreviewItems.map((d) => d.event_date),
+    );
+    const heroTimeLabel = formatEventHeroTimeRange(
+      timelineRows.map((row) => row.time),
+    );
 
-    const menuBackgroundImage = (() => {
-      const raw = activePreviewCatering?.menu_background_image;
-      if (!raw) return undefined;
-      if (typeof raw === "string") return raw;
-      if (raw instanceof File) {
-        return (raw as File & { preview?: string }).preview ?? undefined;
-      }
-      if (
-        typeof raw === "object" &&
-        raw !== null &&
-        "preview" in raw &&
-        typeof (raw as { preview?: string }).preview === "string"
-      ) {
-        return (raw as { preview: string }).preview;
-      }
-      return undefined;
-    })();
+    const menuBackgroundImage =
+      resolvePreviewMenuBackground(activePreviewCatering);
 
     return (
-      <div className="event-detail-page">
+      <div
+        className="event-detail-page"
+        style={{
+          ["--event-sticky-offset" as string]: showSectionNav
+            ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
+            : ONBOARDING_PREVIEW_HEADER_OFFSET,
+        }}
+      >
         {/* Same header chrome as live event detail (`EventDetailClient`); non-interactive when inside PreviewProvider. */}
         <OnboardingPreviewHeader
           scrollContainerRef={previewContainerRef}
@@ -866,6 +941,7 @@ export default function FormPreview() {
           showRoomSelector={showRoomFloatingSelector}
           roomSelectorVisible={showRoomChooser && roomSelectorScrollVisible}
           onRoomChange={handleRoomChange}
+          roomSelectorStickyTop={roomSelectorStickyTop}
         />
 
         <div
@@ -889,6 +965,26 @@ export default function FormPreview() {
             }
             accentHint={tryHeroPreviewProps?.bannerHeadingAccent ?? null}
             headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
+            breadcrumbs={[
+              { label: "Home" },
+              ...(heroCityLabel ? [{ label: heroCityLabel }] : []),
+              { label: heroEventLabel },
+            ]}
+            meta={{
+              date: heroDateLabel,
+              time: heroTimeLabel,
+              location: heroCityLabel || null,
+            }}
+            onEditHero={() =>
+              jumpToEditor({ step: 3, field: "event_banner_heading" })
+            }
+            onEditMeta={(key) => {
+              if (key === "date" || key === "time") {
+                jumpToEditor({ step: 5, field: "dates" });
+                return;
+              }
+              jumpToEditor({ step: 7, field: "event_address" });
+            }}
             emptyMediaSlot={
               <div className="flex flex-col items-center gap-2">
                 <ImageIcon size={40} className="text-white/40" aria-hidden />
@@ -900,14 +996,34 @@ export default function FormPreview() {
           />
         </div>
 
+        {showSectionNav ? (
+          <EventSectionNav
+            items={sectionNavItems}
+            stickyTop={sectionNavStickyTop}
+            headerOffsetPx={HEADER_OFFSET_PX}
+            scrollContainerRef={previewContainerRef}
+            onItemClick={(id) => {
+              const target = PREVIEW_SECTION_EDITOR[id];
+              if (target) jumpToEditor(target);
+            }}
+          />
+        ) : null}
+
         {/* About Event */}
         <div
           ref={aboutEventRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          id={EVENT_SECTION_IDS.about}
+          className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
             3,
             "about_event",
           )}`}
         >
+          <PreviewEditHit
+            step={3}
+            field="about_event_heading"
+            label="About"
+            onEdit={jumpToEditor}
+          >
           <Suspense fallback={<SectionLoader />}>
             <AboutEventSec
               about_event_sub_heading={
@@ -927,10 +1043,22 @@ export default function FormPreview() {
               }
             />
           </Suspense>
+          </PreviewEditHit>
         </div>
 
         {showRoomChooser ? (
-          <div ref={chooserRef}>
+          <div
+            ref={chooserRef}
+            id={EVENT_SECTION_IDS.rooms}
+            className={sectionAnchorClass}
+          >
+            <PreviewEditHit
+              step={4}
+              field="event_schedular_title"
+              label="Rooms"
+              onEdit={jumpToEditor}
+              skipButtons
+            >
             <EventRoomChooser
               rooms={roomSummaries}
               currentRoomIndex={currentRoomIndex}
@@ -939,6 +1067,7 @@ export default function FormPreview() {
                 tryHeroPreviewProps?.headingEmphasis ?? undefined
               }
             />
+            </PreviewEditHit>
           </div>
         ) : null}
 
@@ -946,11 +1075,18 @@ export default function FormPreview() {
         {showTimelineSection && (
           <div
             ref={timelineRef}
-            className={`transition-all duration-300 ${getHighlightClass(
+            id={EVENT_SECTION_IDS.schedule}
+            className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
               4,
               "event_schedular",
             )}`}
           >
+            <PreviewEditHit
+              step={4}
+              field="event_schedular"
+              label="Schedule"
+              onEdit={jumpToEditor}
+            >
             <Suspense fallback={<SectionLoader />}>
               <RoomContentTransition roomKey={roomContentKey}>
                 <Timeline
@@ -971,6 +1107,7 @@ export default function FormPreview() {
                 />
               </RoomContentTransition>
             </Suspense>
+            </PreviewEditHit>
           </div>
         )}
 
@@ -983,6 +1120,12 @@ export default function FormPreview() {
               "package",
             )}`}
           >
+            <PreviewEditHit
+              step={4}
+              field="package_title"
+              label="Package"
+              onEdit={jumpToEditor}
+            >
             <Suspense fallback={<SectionLoader />}>
               <RoomContentTransition roomKey={roomContentKey}>
                 <PackageSection
@@ -1009,6 +1152,7 @@ export default function FormPreview() {
                 />
               </RoomContentTransition>
             </Suspense>
+            </PreviewEditHit>
           </div>
         ) : (
           <div ref={packageRef} className="hidden" aria-hidden />
@@ -1019,11 +1163,17 @@ export default function FormPreview() {
           <div
             id="booking"
             ref={datesRef}
-            className={`${EVENT_BOOKING_SECTION_CLASSNAME} transition-all duration-300 ${getHighlightClass(
+            className={`${EVENT_BOOKING_SECTION_CLASSNAME} ${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
               5,
               "dates",
             )}`}
           >
+            <PreviewEditHit
+              step={5}
+              field="dates"
+              label="Dates"
+              onEdit={jumpToEditor}
+            >
             <Suspense fallback={<SectionLoader />}>
               <RoomContentTransition roomKey={roomContentKey}>
                 <DatesSection
@@ -1036,6 +1186,7 @@ export default function FormPreview() {
                 />
               </RoomContentTransition>
             </Suspense>
+            </PreviewEditHit>
           </div>
         ) : (
           <div id="booking" ref={datesRef} className="hidden" aria-hidden />
@@ -1044,24 +1195,39 @@ export default function FormPreview() {
         {/* Event Gallery — optional; hidden until at least one image is uploaded */}
         <div
           ref={galleryRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          id={EVENT_SECTION_IDS.gallery}
+          className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
             4,
             "gallery",
           )}`}
         >
           {galleryPreviewItems.length > 0 && (
+            <PreviewEditHit
+              step={4}
+              field="gallery"
+              label="Gallery"
+              onEdit={jumpToEditor}
+            >
             <Suspense fallback={<SectionLoader />}>
               <EventGallery gallery={galleryPreviewItems} />
             </Suspense>
+            </PreviewEditHit>
           )}
         </div>
 
         {/* Catering Options — same visibility rule as live event page */}
         <div
           ref={menuRef}
-          className={`transition-all duration-300 ${getHighlightClass(6, "")}`}
+          id={EVENT_SECTION_IDS.menu}
+          className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(6, "")}`}
         >
           {(activePreviewCatering?.menus?.length ?? 0) > 0 && (
+            <PreviewEditHit
+              step={6}
+              field="menu_title"
+              label="Menu"
+              onEdit={jumpToEditor}
+            >
             <Suspense fallback={<SectionLoader />}>
               <MenuSection
                 menu_title={activePreviewCatering?.menu_title || ""}
@@ -1071,6 +1237,7 @@ export default function FormPreview() {
                 menu_background_image={menuBackgroundImage}
               />
             </Suspense>
+            </PreviewEditHit>
           )}
         </div>
 
@@ -1083,6 +1250,12 @@ export default function FormPreview() {
           )}`}
         >
           {(activePreviewDrinks?.packages?.length ?? 0) > 0 && (
+            <PreviewEditHit
+              step={8}
+              field="drink_title"
+              label="Drinks"
+              onEdit={jumpToEditor}
+            >
             <Suspense fallback={<SectionLoader />}>
               <DrinkSection
                 title={activePreviewDrinks?.drink_title || ""}
@@ -1100,6 +1273,7 @@ export default function FormPreview() {
                 defaultExpanded
               />
             </Suspense>
+            </PreviewEditHit>
           )}
         </div>
 
@@ -1111,27 +1285,42 @@ export default function FormPreview() {
             "more_info",
           )}`}
         >
+          <PreviewEditHit
+            step={7}
+            field="event_address"
+            label="Location"
+            onEdit={jumpToEditor}
+          >
           <BrochureSection
             location={activePreviewBrochureLocation}
             price={activePreviewBrochurePrice}
           />
+          </PreviewEditHit>
         </div>
 
         {/* FAQs — same visibility rule as live event page */}
         <div
           ref={faqRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          id={EVENT_SECTION_IDS.faqs}
+          className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
             9,
             "faqs",
           )}`}
         >
           {hasPreviewFaqs && (
+            <PreviewEditHit
+              step={9}
+              field="question"
+              label="FAQs"
+              onEdit={jumpToEditor}
+            >
             <Suspense fallback={<SectionLoader />}>
               <FaqSection
                 faqs={formState.stepNine?.faqs || []}
                 defaultExpanded
               />
             </Suspense>
+            </PreviewEditHit>
           )}
         </div>
 
@@ -1140,6 +1329,11 @@ export default function FormPreview() {
           copyright={tryThemePreviewValues?.copyright ?? undefined}
           contactOverride={onboardingFooterContact}
           socialLinksOverride={onboardingFooterSocialLinks}
+          brandDescription={
+            formState.stepTwo?.about_description ||
+            formState.stepOne?.description ||
+            ""
+          }
         />
       </div>
     );

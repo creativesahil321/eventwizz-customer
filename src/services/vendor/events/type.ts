@@ -81,6 +81,7 @@ export interface EventDetailStepOne {
   vendor_location_id?: number;
   event_name?: string;
   event_category_id?: number;
+  category_name?: string | null;
   event_banner_image?: string | null;
   event_banner_video?: string | null;
   event_banner_heading?: string;

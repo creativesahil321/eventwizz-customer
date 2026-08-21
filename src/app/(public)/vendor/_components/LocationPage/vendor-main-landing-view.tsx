@@ -30,20 +30,20 @@ import {
 } from "@/lib/heading-emphasis";
 import {
   heroBandContentPadClass,
-  heroBandHeightCompactMobileClass,
+  heroBandHeightClass,
+  heroBandMediaOverlayClass,
   heroBandVerticalClass,
-  heroBandViewToggleOffsetClass,
+  heroBannerBodyClass,
+  heroBannerEyebrowClass,
   heroBannerStackClass,
   heroHeadingMeasureClass,
   heroHomeHeadingTypeClass,
-  vendorHomeSubheroClass,
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import type { LocationData } from "@/types/theme.types";
 import type { ThemeSchema } from "@/types/theme.types";
 import type { VenueContactOverride } from "@/lib/resolve-venue-contact";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
-import { useImageLuminance } from "@/hooks/use-image-luminance";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { usePublicSearch } from "@/services/common/public-search";
@@ -55,7 +55,7 @@ export type VendorMainLandingViewProps = {
   heroHeading: string;
   heroSubheading: string;
   heroAccentHint?: string | null;
-  heroBadgeLabel: string;
+  heroBadgeLabel?: string;
   headingEmphasis?: HeadingEmphasis | string | null;
   locationsListTitle: string;
   locationsListSubtitle: string;
@@ -73,6 +73,7 @@ export type VendorMainLandingViewProps = {
       string
     >
   > | null;
+  brandDescription?: string | null;
   /** Unique section id for Explore cities scroll target. */
   exploreCitiesSectionId?: string;
   style?: CSSProperties;
@@ -93,7 +94,6 @@ export function VendorMainLandingView({
   heroHeading,
   heroSubheading,
   heroAccentHint = null,
-  heroBadgeLabel,
   headingEmphasis,
   locationsListTitle,
   locationsListSubtitle,
@@ -105,6 +105,7 @@ export function VendorMainLandingView({
   contactOverride,
   contactTheme,
   socialLinksOverride,
+  brandDescription,
   exploreCitiesSectionId = "explore-cities",
   style,
   className,
@@ -260,13 +261,13 @@ export function VendorMainLandingView({
    */
   const resolvedHeadingEmphasis = normalizeHeadingEmphasis(headingEmphasis);
 
-  /**
-   * Auto-contrast: sample the cover so the headline flips black/white to stay
-   * readable on whatever the vendor uploads. Defaults to `dark` (white text +
-   * dark scrim) — the safe majority — until the reading lands.
-   */
-  const heroTone = useImageLuminance(heroImageSrc, "dark");
-  const heroIsLight = heroTone === "light";
+  const citiesEyebrow = useMemo(() => {
+    if (vendorCities.length === 0) return null;
+    const shown = vendorCities.slice(0, 4);
+    return shown.length < vendorCities.length
+      ? `${shown.join(" · ")} · \u2026`
+      : shown.join(" · ");
+  }, [vendorCities]);
 
   return (
     <div
@@ -282,44 +283,23 @@ export function VendorMainLandingView({
 
       <section
         className={cn(
-          "relative mx-auto flex w-full min-w-0 justify-center overflow-hidden bg-[var(--color-background)]",
-          heroBandHeightCompactMobileClass,
+          "relative mx-auto flex w-full min-w-0 justify-center overflow-hidden",
+          heroBandHeightClass,
           heroBandVerticalClass(heroValign),
         )}
       >
-        {/*
-          Vivid hero image band + adaptive scrim. The image renders at full
-          strength (LCP via HeroCoverImage); a tone-matched scrim guarantees the
-          headline stays readable on any cover — dark scrim for dark images,
-          light scrim for light images — so vendors can't break contrast.
-          The mask fades the band into the page background at the bottom.
-        */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[520px] sm:h-[580px]"
-          style={{
-            WebkitMaskImage: "linear-gradient(#000000 62%, #00000000 100%)",
-            maskImage: "linear-gradient(#000000 62%, #00000000 100%)",
-          }}
-        >
-          {heroImageSrc ? <HeroCoverImage src={heroImageSrc} /> : null}
-          <div
-            className={cn(
-              "absolute inset-0 transition-opacity duration-500",
-              heroIsLight
-                ? "bg-gradient-to-b from-white/72 via-white/45 to-transparent"
-                : "bg-gradient-to-b from-black/55 via-black/28 to-transparent",
-            )}
-          />
+        <div className="absolute inset-0 overflow-hidden">
+          {heroImageSrc ? (
+            <HeroCoverImage src={heroImageSrc} className="scale-105" />
+          ) : null}
+          <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
         </div>
 
         <div
           className={cn(
             "relative z-10 mx-auto min-w-0 max-w-[1180px] overflow-visible px-3 sm:px-6",
             heroHeadingMeasureClass,
-            heroBandContentPadClass(heroValign),
-            "pt-24 sm:pt-28 md:pt-32",
-            hideMapView ? "pb-12 sm:pb-16" : "pb-16 sm:pb-20 xl:pb-24",
+            heroBandContentPadClass(heroValign, { withBottomChrome: true }),
           )}
         >
           <motion.div
@@ -331,33 +311,29 @@ export function VendorMainLandingView({
               "w-full min-w-0 overflow-visible",
             )}
           >
+            {citiesEyebrow ? (
+              <p className={heroBannerEyebrowClass(heroAlign)}>{citiesEyebrow}</p>
+            ) : null}
+
             <SiteHeading
               level={1}
               title={heroHeading}
               accentHint={heroAccentHint}
               emphasis={resolvedHeadingEmphasis}
-              variant={heroIsLight ? "onLight" : "onDark"}
+              variant="onDark"
               align={heroAlign}
               className={cn(
-                "mb-2.5 w-full max-w-5xl font-bold",
+                "mb-4 w-full max-w-5xl font-bold",
                 heroHomeHeadingTypeClass,
-                !isPreviewNarrow && "sm:mb-4",
               )}
             />
 
-            <p
-              className={cn(
-                vendorHomeSubheroClass(heroAlign),
-                "!mb-8 px-1 text-sm transition-colors duration-500",
-                !isPreviewNarrow && "sm:!mb-10 sm:text-base md:text-lg",
-                heroIsLight
-                  ? "!text-[color:color-mix(in_srgb,#0c0d10_78%,transparent)]"
-                  : "!text-white/85 [text-shadow:0_1px_10px_rgba(0,0,0,0.45)]",
-              )}
-            >
-              {heroSubheading}
-            </p>
+            <p className={heroBannerBodyClass(heroAlign)}>{heroSubheading}</p>
+          </motion.div>
+        </div>
 
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3 pb-4 sm:px-4 sm:pb-5 md:pb-6">
+          <div className="pointer-events-auto mx-auto w-full max-w-3xl">
             <LocationSearchBar
               className="w-full max-w-3xl px-0"
               cities={vendorCities}
@@ -379,21 +355,16 @@ export function VendorMainLandingView({
               }}
             />
             {nearMeActive ? (
-              <p className="mt-3 text-center text-xs text-[var(--color-text-dimmed)] sm:text-sm">
+              <p className="mt-3 text-center text-xs text-white/75 sm:text-sm">
                 Showing events nearest to you
               </p>
             ) : null}
-          </motion.div>
+          </div>
         </div>
       </section>
 
       {!hideMapView && !showApiResults ? (
-        <section
-          className={cn(
-            "relative z-20 flex justify-center bg-transparent px-4 pb-5 pt-0 sm:px-6",
-            heroBandViewToggleOffsetClass,
-          )}
-        >
+        <section className="relative z-20 flex justify-center bg-[var(--color-background)] px-4 pb-5 pt-4 sm:px-6">
           <div
             className="rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-0.5 shadow-[0_8px_24px_-18px_rgba(0,0,0,0.35)]"
             role="tablist"
@@ -617,6 +588,7 @@ export function VendorMainLandingView({
         contactOverride={contactOverride}
         contactTheme={contactTheme}
         socialLinksOverride={socialLinksOverride}
+        brandDescription={brandDescription}
       />
     </div>
   );

@@ -10,12 +10,15 @@ interface PreviewRoomFloatingSelectorProps {
   visible?: boolean;
   /** Override room change (e.g. scroll to dates after select). */
   onRoomChange?: (index: number) => void;
+  /** Stick below header, or below header + event jump nav. */
+  stickyTop?: string;
 }
 
 export function PreviewRoomFloatingSelector({
   className,
   visible = false,
   onRoomChange,
+  stickyTop = ONBOARDING_PREVIEW_HEADER_OFFSET,
 }: PreviewRoomFloatingSelectorProps) {
   const { enabled, rooms, currentRoomIndex, setCurrentRoomIndex } =
     useRoomManager();
@@ -33,7 +36,7 @@ export function PreviewRoomFloatingSelector({
       visible={visible}
       minRooms={1}
       layout="sticky"
-      stickyTop={ONBOARDING_PREVIEW_HEADER_OFFSET}
+      stickyTop={stickyTop}
       label="Choose Room"
       size="sm"
       className={cn("mx-auto w-full max-w-full", className)}

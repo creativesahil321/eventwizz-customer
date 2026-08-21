@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { BannerHeadingAlign } from "@/lib/banner-heading-align";
+import { heroHeadingAlignClass } from "@/lib/banner-heading-align";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { usePreviewDeviceStore } from "@/store/preview-device.store";
@@ -35,6 +36,11 @@ export type SiteHeadingProps = {
    * via `text-left` / `text-center` / `text-right` so wrapped lines align with the hero.
    */
   align?: BannerHeadingAlign;
+  /**
+   * Phone stays `text-center`; `md+` uses `align`.
+   * Location / event heroes only — home stays fully centered.
+   */
+  alignFromMd?: boolean;
   className?: string;
 };
 
@@ -85,6 +91,7 @@ export function SiteHeading({
   emphasis: emphasisProp,
   variant = "onDark",
   align,
+  alignFromMd = false,
   className,
 }: SiteHeadingProps) {
   const { theme } = useTheme();
@@ -133,9 +140,7 @@ export function SiteHeading({
     align === "center" || align === "right" || align === "left"
       ? cn(
           "block w-full max-w-full",
-          align === "center" && "text-center",
-          align === "right" && "text-right",
-          align === "left" && "text-left",
+          heroHeadingAlignClass(align, { fromMd: alignFromMd }),
         )
       : headingBox;
 
@@ -188,9 +193,7 @@ export function SiteHeading({
     <Tag
       className={cn(
         "block w-full min-w-0 max-w-full overflow-visible",
-        align === "right" && "text-right",
-        align === "center" && "text-center",
-        align !== "right" && align !== "center" && "text-left",
+        heroHeadingAlignClass(align ?? "left", { fromMd: alignFromMd }),
         headingLine,
         !compactType && levelClass[level],
         "py-[0.14em] pl-[0.12em] pr-[0.4em]",

@@ -5,13 +5,10 @@ import {
   Facebook,
   Instagram,
   Linkedin,
-  MapPin,
-  Phone,
-  Mail,
   Twitter,
   Youtube,
 } from "lucide-react";
-import { useContext, useMemo } from "react";
+import { useContext, useMemo, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
@@ -29,7 +26,7 @@ import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
-import { hasPlainText } from "@/lib/plain-text-length";
+import { hasPlainText, toPlainSnippet } from "@/lib/plain-text-length";
 import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
 
 interface FooterSectionProps {
@@ -55,7 +52,18 @@ interface FooterSectionProps {
       string
     >
   > | null;
+  /**
+   * Vendor about copy under the logo. Preview shells must pass this so the
+   * host EventWizz SEO description cannot leak into the footer.
+   */
+  brandDescription?: string | null;
 }
+
+const VISIT_LINKS: Array<{ href: string; label: string }> = [
+  { href: "/", label: "All venues" },
+  { href: "/contact", label: "Contact" },
+  { href: "/customer/bookings", label: "My bookings" },
+];
 
 function SocialRow({
   links,
@@ -65,7 +73,7 @@ function SocialRow({
   if (links.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-1.5">
+    <div className="flex flex-wrap items-center justify-start gap-1.5">
       {links.map(({ icon: Icon, href, id }) => (
         <Link
           key={id}
@@ -82,16 +90,50 @@ function SocialRow({
   );
 }
 
-function FooterPageLinks() {
-  // Info pages (/policies, /contact) have no site-preview surface — hide the
-  // links so vendors aren't taken out of the preview review flow.
-  const isPreviewMode = useIsPreviewMode();
+function FooterColumnHeading({ children }: { children: ReactNode }) {
+  return (
+    <h6 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--color-primary)]">
+      {children}
+    </h6>
+  );
+}
+
+function FooterTextLink({
+  href,
+  children,
+  isPreviewMode,
+}: {
+  href: string;
+  children: ReactNode;
+  isPreviewMode: boolean;
+}) {
+  const className =
+    "block text-sm leading-relaxed text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]";
+
+  if (isPreviewMode) {
+    return <span className={className}>{children}</span>;
+  }
+
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  );
+}
+
+function FooterPageLinks({
+  isPreviewMode,
+  className,
+}: {
+  isPreviewMode: boolean;
+  className?: string;
+}) {
   if (isPreviewMode) return null;
 
   return (
     <nav
       aria-label="Footer pages"
-      className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
+      className={cn("flex flex-wrap items-center gap-x-4 gap-y-1", className)}
     >
       {VENDOR_FOOTER_PAGE_LINKS.map((link) => (
         <Link
@@ -106,19 +148,23 @@ function FooterPageLinks() {
   );
 }
 
-function ContactLines({ contact }: { contact: ResolvedVenueContact }) {
+function EnquiriesLines({ contact }: { contact: ResolvedVenueContact }) {
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex flex-col items-start gap-1.5 text-left">
       {contact.phone ? (
         <Link
           href={`tel:${contact.phone}`}
-          className="inline-flex max-w-full items-center gap-1.5 text-[13px] leading-snug text-[var(--color-on-footer)]/75 transition-colors hover:text-[color:var(--color-primary)]"
+          className="text-sm leading-relaxed text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
         >
-          <Phone
-            className="h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
-            aria-hidden
-          />
-          <span className="break-words">{contact.phone}</span>
+          {contact.phone}
+        </Link>
+      ) : null}
+      {contact.email ? (
+        <Link
+          href={`mailto:${contact.email}`}
+          className="break-all text-sm leading-relaxed text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
+        >
+          {contact.email}
         </Link>
       ) : null}
       {contact.address ? (
@@ -126,28 +172,10 @@ function ContactLines({ contact }: { contact: ResolvedVenueContact }) {
           href={buildMapsDirectionsUrl(contact.address)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex max-w-full items-start gap-1.5 text-[13px] leading-snug text-[var(--color-on-footer)]/75 transition-colors hover:text-[color:var(--color-primary)] hover:underline hover:underline-offset-2"
+          className="text-sm leading-relaxed text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)] hover:underline hover:underline-offset-2"
         >
-          <MapPin
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
-            aria-hidden
-          />
-          <span className="break-words text-left sm:text-center">
-            {contact.address}
-          </span>
+          {contact.address}
         </a>
-      ) : null}
-      {contact.email ? (
-        <Link
-          href={`mailto:${contact.email}`}
-          className="inline-flex max-w-full items-center gap-1.5 text-[13px] leading-snug text-[var(--color-on-footer)]/75 transition-colors hover:text-[color:var(--color-primary)]"
-        >
-          <Mail
-            className="h-3.5 w-3.5 shrink-0 text-[color:var(--color-primary)]"
-            aria-hidden
-          />
-          <span className="break-words">{contact.email}</span>
-        </Link>
       ) : null}
     </div>
   );
@@ -166,7 +194,7 @@ function FooterBrand({
   const image = (
     <img
       src={addCacheBusting(logoPath, mediaVersion)}
-      className="h-8 w-auto max-w-[min(100%,10rem)] object-contain"
+      className="h-10 w-auto max-w-[min(100%,12rem)] object-contain sm:h-11"
       alt={brandName}
     />
   );
@@ -189,6 +217,7 @@ export default function FooterSection({
   contactOverride,
   contactTheme,
   socialLinksOverride,
+  brandDescription,
 }: FooterSectionProps = {}) {
   const { theme: serverTheme } = useContext(ServerContext);
   const { domain } = useDomain();
@@ -262,19 +291,39 @@ export default function FooterSection({
     [themeForContact, locationSlug, contactOverride],
   );
 
-  const isSingleContactFooter = contactBlocks.length <= 1;
-  const singleContact = isSingleContactFooter
-    ? contactBlocks[0]?.contact
-    : null;
+  const enquiriesContact = contactBlocks[0]?.contact ?? null;
+  const hasEnquiries =
+    enquiriesContact &&
+    (enquiriesContact.phone ||
+      enquiriesContact.email ||
+      enquiriesContact.address);
+
+  const locationLinks = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Array<{ href: string; label: string }> = [];
+    for (const location of themeForContact?.locations ?? []) {
+      const label = location.city?.trim();
+      const slug = location.slug?.trim();
+      if (!label || !slug || seen.has(slug.toLowerCase())) continue;
+      seen.add(slug.toLowerCase());
+      list.push({ href: `/${slug}`, label });
+    }
+    return list;
+  }, [themeForContact?.locations]);
+
+  const brandBlurb = toPlainSnippet(
+    hasPlainText(brandDescription)
+      ? brandDescription
+      : isPreviewMode
+        ? null
+        : vendorTheme?.about_description || vendorTheme?.seo?.description,
+    180,
+  );
 
   const resolvedCopyright =
     (hasPlainText(copyright) ? copyright : null) ||
     (hasPlainText(vendorTheme?.copyright) ? vendorTheme?.copyright : null) ||
-    `© ${currentYear} ${brandName}. All rights reserved.`;
-
-  const hasSingleContact =
-    singleContact &&
-    (singleContact.phone || singleContact.address || singleContact.email);
+    `© ${currentYear} ${brandName}`;
 
   return (
     <footer
@@ -287,63 +336,81 @@ export default function FooterSection({
           : undefined
       }
     >
-      <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-8">
-        <div className="flex flex-col items-center text-center">
-          <FooterBrand
-            logoPath={logoPath}
-            brandName={brandName}
-            isPreviewMode={isPreviewMode}
-          />
-
-          {socialLinks.length > 0 ? (
-            <div className="mt-3">
-              <SocialRow links={socialLinks} />
-            </div>
-          ) : null}
-
-          {isSingleContactFooter && hasSingleContact ? (
-            <div className="mt-4 w-full max-w-md">
-              <ContactLines contact={singleContact} />
-            </div>
-          ) : null}
-
-          {!isSingleContactFooter ? (
-            <div
-              className={cn(
-                "mt-5 grid w-full max-w-2xl grid-cols-1 gap-5",
-                !narrowPreview && "sm:grid-cols-2 sm:gap-8",
-              )}
-            >
-              {contactBlocks.map((block, index) => (
-                <div
-                  key={block.id}
-                  className={cn(
-                    "min-w-0",
-                    !narrowPreview &&
-                      index > 0 &&
-                      "sm:border-l sm:border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)] sm:pl-8",
-                  )}
-                >
-                  <h6 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--color-on-footer)]/50">
-                    {block.label}
-                  </h6>
-                  <ContactLines contact={block.contact} />
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-4">
-            <FooterPageLinks />
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-14">
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-10 text-left",
+            !narrowPreview && "sm:grid-cols-2 lg:grid-cols-4 lg:gap-8",
+          )}
+        >
+          <div className="min-w-0">
+            <FooterBrand
+              logoPath={logoPath}
+              brandName={brandName}
+              isPreviewMode={isPreviewMode}
+            />
+            {brandBlurb ? (
+              <p className="mt-4 max-w-xs text-sm leading-relaxed text-[var(--color-on-footer)]/75">
+                {brandBlurb}
+              </p>
+            ) : null}
+            {socialLinks.length > 0 ? (
+              <div className="mt-5">
+                <SocialRow links={socialLinks} />
+              </div>
+            ) : null}
           </div>
+
+          {locationLinks.length > 0 ? (
+            <div className="min-w-0">
+              <FooterColumnHeading>Locations</FooterColumnHeading>
+              <nav aria-label="Venue locations" className="flex flex-col gap-2">
+                {locationLinks.map((link) => (
+                  <FooterTextLink
+                    key={link.href}
+                    href={link.href}
+                    isPreviewMode={isPreviewMode}
+                  >
+                    {link.label}
+                  </FooterTextLink>
+                ))}
+              </nav>
+            </div>
+          ) : null}
+
+          <div className="min-w-0">
+            <FooterColumnHeading>Visit</FooterColumnHeading>
+            <nav aria-label="Visit" className="flex flex-col gap-2">
+              {VISIT_LINKS.map((link) => (
+                <FooterTextLink
+                  key={link.href}
+                  href={link.href}
+                  isPreviewMode={isPreviewMode}
+                >
+                  {link.label}
+                </FooterTextLink>
+              ))}
+            </nav>
+          </div>
+
+          {hasEnquiries ? (
+            <div className="min-w-0">
+              <FooterColumnHeading>Enquiries</FooterColumnHeading>
+              <EnquiriesLines contact={enquiriesContact} />
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_8%,transparent)]">
-        <div className="mx-auto max-w-5xl px-4 py-3 sm:px-6">
+      <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)]">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
           <div
-            className="break-words text-center text-[11px] leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
+            className="break-words text-left text-[11px] leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
             dangerouslySetInnerHTML={{ __html: resolvedCopyright }}
+          />
+          <FooterPageLinks
+            isPreviewMode={isPreviewMode}
+            className="justify-start sm:justify-end"
           />
         </div>
       </div>

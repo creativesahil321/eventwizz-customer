@@ -17,6 +17,7 @@ import { useFormContext } from "../../form-provider";
 import { shouldShowStepOneLocationGate } from "../../form-provider/hydrate-onboarding-from-api";
 import { stepOneSchema, StepOneType } from "../../form-provider/schema";
 import GoogleBusinessSearch from "./google-business";
+import AddressAutocomplete from "../step-7/address-autocomplete";
 import { env } from "@/env";
 import { fetchPlaceDetails } from "./_lib/actions";
 import { useEffect, useMemo, useState } from "react";
@@ -433,12 +434,30 @@ export default function StepOne() {
                                 {isBrandMode ? "Address" : "Venue address"}
                               </FormLabel>
                               <FormControl>
-                                <Input
-                                  placeholder="e.g. Stock Brook Country Club"
-                                  className="bg-white/5"
-                                  {...field}
+                                <AddressAutocomplete
+                                  variant="dark"
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  onResolved={({ address, city }) => {
+                                    field.onChange(address);
+                                    if (city) {
+                                      form.setValue("city", city, {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                    }
+                                  }}
+                                  placeholder="Start typing a UK street, postcode, or place…"
+                                  inputClassName="bg-white/5"
+                                  noResultsMessage="No UK addresses found. Try a street, postcode, or place name."
+                                  unavailableMessage="Address search is unavailable. Check your connection and try again."
                                 />
                               </FormControl>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {isBrandMode
+                                  ? "Search Google for your head office or main site address."
+                                  : "Auto-filled when you pick a venue — or search Google to set it yourself."}
+                              </p>
                               <FormMessage />
                             </FormItem>
                           )}

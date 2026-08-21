@@ -2,21 +2,26 @@
 
 import { useContext, type ReactNode } from "react";
 import { motion } from "framer-motion";
+import { MapPin, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { SiteHeading } from "@/components/public/site-heading";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
 import {
   heroBandContentPadClass,
   heroBandHeightClass,
   heroBandMediaOverlayClass,
   heroBandVerticalClass,
+  heroBannerBodyClass,
+  heroBannerContactRowClass,
+  heroBannerEyebrowClass,
   heroBannerHeadingTypeClass,
   heroBannerStackClass,
+  heroFooterDockClass,
   heroHeadingMeasureClass,
-  heroBannerSubheadingClass,
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
   type BannerHeadingAlign,
@@ -61,6 +66,13 @@ interface HeroBannerProps {
    * alignment never moves it.
    */
   heroFooter?: ReactNode;
+  /** Small-caps line above the title (city / region). */
+  eyebrow?: string | null;
+  /** Address + phone under the description (location covers). */
+  heroContact?: {
+    address?: string | null;
+    phone?: string | null;
+  } | null;
 }
 
 export default function HeroBanner({
@@ -74,6 +86,8 @@ export default function HeroBanner({
   bannerHeadingAlign: bannerHeadingAlignProp,
   bannerHeadingValign: bannerHeadingValignProp,
   heroFooter,
+  eyebrow,
+  heroContact,
 }: HeroBannerProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
   const vendorTheme = theme as ThemeSchema | null;
@@ -142,7 +156,7 @@ export default function HeroBanner({
       ? bannerHeadingValignProp
       : vendorTheme?.banner_heading_valign,
   );
-  const stackClass = heroBannerStackClass(textAlign);
+  const stackClass = heroBannerStackClass(textAlign, { fromMd: true });
 
   return (
     <section
@@ -156,7 +170,7 @@ export default function HeroBanner({
          * would otherwise shrink-wrap and center the column). Do NOT stretch for top/bottom
          * valign — that overrides items-start/items-end and pins copy to the top of a tall box.
          */
-        textAlign === "left" && heroValign === "center" && "!items-stretch",
+        textAlign === "left" && heroValign === "center" && "md:!items-stretch",
       )}
     >
       {/* Video background if video URL exists and should be used */}
@@ -190,16 +204,6 @@ export default function HeroBanner({
         </div>
       ) : null}
 
-      {/* Soft brand gradient orbs */}
-      <div
-        className="pointer-events-none absolute left-1/4 top-20 h-96 w-96 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] blur-[120px]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute bottom-20 right-1/4 h-96 w-96 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_12%,transparent)] blur-[100px]"
-        aria-hidden
-      />
-
       <div
         className={cn(
           "relative z-10 mx-auto max-w-7xl overflow-visible px-3 sm:px-4",
@@ -215,6 +219,13 @@ export default function HeroBanner({
           transition={{ duration: 0.8 }}
           className={cn(stackClass, "overflow-visible")}
         >
+          {eyebrow?.trim() &&
+          eyebrow.trim().toLowerCase() !== bannerHeading.trim().toLowerCase() ? (
+            <p className={heroBannerEyebrowClass(textAlign, { fromMd: true })}>
+              {eyebrow.trim()}
+            </p>
+          ) : null}
+
           <SiteHeading
             level={1}
             title={bannerHeading}
@@ -222,38 +233,71 @@ export default function HeroBanner({
             emphasis={headingEmphasis}
             variant="onDark"
             align={textAlign}
+            alignFromMd
             className={cn(
               "mb-4 font-black tracking-tight",
               heroBannerHeadingTypeClass,
               textAlign === "left"
-                ? "max-w-[min(100%,30rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
+                ? "max-w-4xl md:max-w-3xl"
                 : "max-w-4xl",
             )}
           />
 
-          {/* Sub-heading: wide-tracking small caps */}
           {bannerSubheading ? (
-            <p
-              className={cn(
-                "text-[11px] font-semibold uppercase tracking-[0.22em] text-white/65 sm:text-xs",
-                heroBannerSubheadingClass(textAlign),
-                "max-w-sm sm:max-w-md",
-              )}
-            >
+            <p className={heroBannerBodyClass(textAlign, { fromMd: true })}>
               {bannerSubheading}
             </p>
           ) : null}
+
+          <HeroBannerContactMeta contact={heroContact} align={textAlign} />
         </motion.div>
       </div>
 
       {/* Independent of heading align/valign — always bottom-centered */}
       {heroFooter ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3 pb-4 sm:px-4 sm:pb-5 md:pb-6">
-          <div className="pointer-events-auto mx-auto w-full max-w-3xl">
-            {heroFooter}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
+          <div className="mx-auto w-full max-w-7xl px-3 pb-4 sm:px-4 sm:pb-5 md:pb-6">
+            <div className={heroFooterDockClass(textAlign)}>{heroFooter}</div>
           </div>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function HeroBannerContactMeta({
+  contact,
+  align,
+}: {
+  contact?: HeroBannerProps["heroContact"];
+  align: BannerHeadingAlign;
+}) {
+  const address = contact?.address?.trim() || null;
+  const phone = contact?.phone?.trim() || null;
+  if (!address && !phone) return null;
+
+  return (
+    <div className={heroBannerContactRowClass(align, { fromMd: true })}>
+      {address ? (
+        <a
+          href={buildMapsDirectionsUrl(address)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex max-w-full items-start gap-2 transition-colors hover:text-white"
+        >
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span className="min-w-0 break-words">{address}</span>
+        </a>
+      ) : null}
+      {phone ? (
+        <a
+          href={`tel:${phone}`}
+          className="inline-flex items-center gap-2 transition-colors hover:text-white"
+        >
+          <Phone className="h-4 w-4 shrink-0" aria-hidden />
+          <span>{phone}</span>
+        </a>
+      ) : null}
+    </div>
   );
 }

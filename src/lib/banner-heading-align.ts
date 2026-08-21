@@ -16,22 +16,155 @@ export function normalizeBannerHeadingAlign(v: unknown): BannerHeadingAlign {
   return isBannerHeadingAlign(v) ? v : "center";
 }
 
-/** Hero block: heading + subheading share alignment. */
-export function heroBannerStackClass(align: BannerHeadingAlign): string {
+export type HeroAlignScope = {
+  /**
+   * Phone stays centered (current compact layout). Desktop (`md+`) uses `align`
+   * from Site Essentials / theme — location + event heroes only.
+   */
+  fromMd?: boolean;
+};
+
+function stackAlignClass(
+  align: BannerHeadingAlign,
+  fromMd?: boolean,
+): string {
+  if (!fromMd) {
+    return cn(
+      align === "left" && "items-start text-left",
+      align === "center" && "items-center text-center",
+      align === "right" && "items-end text-right",
+    );
+  }
   return cn(
-    "flex w-full max-w-full flex-col",
-    align === "left" && "items-start text-left",
-    align === "center" && "items-center text-center",
-    align === "right" && "items-end text-right",
+    "items-center text-center",
+    align === "left" && "md:items-start md:text-left",
+    align === "center" && "md:items-center md:text-center",
+    align === "right" && "md:items-end md:text-right",
   );
 }
 
-export function heroBannerSubheadingClass(align: BannerHeadingAlign): string {
+function measureAlignClass(
+  align: BannerHeadingAlign,
+  fromMd?: boolean,
+): string {
+  if (!fromMd) {
+    return cn(
+      align === "center" && "mx-auto",
+      align === "left" && "mr-auto",
+      align === "right" && "ml-auto",
+    );
+  }
+  return cn(
+    "mx-auto",
+    align === "left" && "md:ml-0 md:mr-auto",
+    align === "center" && "md:mx-auto",
+    align === "right" && "md:ml-auto md:mr-0",
+  );
+}
+
+/** Hero block: heading + subheading share alignment. */
+export function heroBannerStackClass(
+  align: BannerHeadingAlign,
+  scope?: HeroAlignScope,
+): string {
+  return cn(
+    "flex w-full max-w-full flex-col",
+    stackAlignClass(align, scope?.fromMd),
+  );
+}
+
+export function heroBannerSubheadingClass(
+  align: BannerHeadingAlign,
+  scope?: HeroAlignScope,
+): string {
   return cn(
     "w-full max-w-2xl overflow-visible break-words text-pretty [overflow-wrap:anywhere]",
-    align === "center" && "mx-auto",
-    align === "left" && "mr-auto",
-    align === "right" && "ml-auto",
+    measureAlignClass(align, scope?.fromMd),
+  );
+}
+
+/** Small-caps line above the hero title (cities / region). */
+export function heroBannerEyebrowClass(
+  align: BannerHeadingAlign,
+  scope?: HeroAlignScope,
+): string {
+  return cn(
+    "mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70 sm:mb-4 sm:text-xs",
+    measureAlignClass(align, scope?.fromMd),
+    !scope?.fromMd && align === "center" && "text-center",
+    !scope?.fromMd && align === "left" && "text-left",
+    !scope?.fromMd && align === "right" && "text-right",
+    scope?.fromMd && "text-center",
+    scope?.fromMd && align === "left" && "md:text-left",
+    scope?.fromMd && align === "center" && "md:text-center",
+    scope?.fromMd && align === "right" && "md:text-right",
+  );
+}
+
+/** Hero description under the title — readable sentence case, not small caps. */
+export function heroBannerBodyClass(
+  align: BannerHeadingAlign,
+  scope?: HeroAlignScope,
+): string {
+  return cn(
+    "w-full max-w-xl overflow-visible break-words text-pretty text-sm leading-relaxed text-white/85 [overflow-wrap:anywhere] sm:max-w-2xl sm:text-base sm:leading-relaxed",
+    measureAlignClass(align, scope?.fromMd),
+    !scope?.fromMd && align === "center" && "text-center",
+    !scope?.fromMd && align === "left" && "text-left",
+    !scope?.fromMd && align === "right" && "text-right",
+    scope?.fromMd && "text-center",
+    scope?.fromMd && align === "left" && "md:text-left",
+    scope?.fromMd && align === "center" && "md:text-center",
+    scope?.fromMd && align === "right" && "md:text-right",
+  );
+}
+
+export function heroBannerContactRowClass(
+  align: BannerHeadingAlign,
+  scope?: HeroAlignScope,
+): string {
+  return cn(
+    "mt-5 flex max-w-2xl flex-wrap items-start gap-x-6 gap-y-2 text-sm text-white/90 sm:mt-6",
+    measureAlignClass(align, scope?.fromMd),
+    !scope?.fromMd && align === "center" && "justify-center text-center",
+    !scope?.fromMd && align === "left" && "justify-start text-left",
+    !scope?.fromMd && align === "right" && "justify-end text-right",
+    scope?.fromMd && "justify-center text-center",
+    scope?.fromMd && align === "left" && "md:justify-start md:text-left",
+    scope?.fromMd && align === "center" && "md:justify-center md:text-center",
+    scope?.fromMd && align === "right" && "md:justify-end md:text-right",
+  );
+}
+
+/** Search dock at the bottom of a location hero — follows heading align from `md`. */
+export function heroFooterDockClass(
+  align: BannerHeadingAlign,
+  scope?: HeroAlignScope,
+): string {
+  return cn(
+    "pointer-events-auto w-full max-w-3xl",
+    measureAlignClass(align, scope?.fromMd ?? true),
+  );
+}
+
+/** SiteHeading text alignment; `fromMd` keeps phones centered. */
+export function heroHeadingAlignClass(
+  align: BannerHeadingAlign | undefined,
+  scope?: HeroAlignScope,
+): string {
+  if (!align) return "";
+  if (!scope?.fromMd) {
+    return cn(
+      align === "center" && "text-center",
+      align === "right" && "text-right",
+      align === "left" && "text-left",
+    );
+  }
+  return cn(
+    "text-center",
+    align === "left" && "md:text-left",
+    align === "center" && "md:text-center",
+    align === "right" && "md:text-right",
   );
 }
 
@@ -102,8 +235,13 @@ export const heroBandHeightClass =
 export const heroBandHeightCompactClass =
   "h-[min(62dvh,660px)] min-h-[340px] max-h-[700px]";
 
+/**
+ * Theme-tinted photo wash — same idea as Lovable `bg-maroon/70`
+ * (`color-mix(in oklab, var(--maroon) 70%, transparent)`).
+ * `--color-hero-overlay` is the darker of header/footer from the vendor theme.
+ */
 export const heroBandMediaOverlayClass =
-  "bg-gradient-to-b from-black/60 via-black/30 to-black/85";
+  "bg-[color:color-mix(in_oklab,var(--color-hero-overlay)_70%,transparent)]";
 
 /**
  * Soft hero dissolve: keep the image solid through the search, then ease

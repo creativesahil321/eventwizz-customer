@@ -257,6 +257,9 @@ export interface EventDetail {
   logo: string | File | null | undefined;
   event_name: string;
   slug: string;
+  category?: PublicEventCardCategory | string | null;
+  category_name?: string | null;
+  event_category_name?: string | null;
   event_banner_image: string;
   event_banner_video: string | null;
   event_banner_heading: string;

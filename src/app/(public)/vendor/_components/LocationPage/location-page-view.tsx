@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode, RefObject } from "react";
+import { useContext, useMemo, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import type {
   BannerHeadingAlign,
@@ -8,7 +8,11 @@ import type {
 } from "@/lib/banner-heading-align";
 import type { GalleryImage, LocationData } from "@/services/common/events/type";
 import type { ThemeSchema } from "@/types/theme.types";
-import type { VenueContactOverride } from "@/lib/resolve-venue-contact";
+import {
+  resolvePublicPageContact,
+  type VenueContactOverride,
+} from "@/lib/resolve-venue-contact";
+import { ServerContext } from "@/lib/server-context";
 import CommonHeader from "@/components/shared/common-header";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import HeroBanner from "../EventListPage/hero-banner";
@@ -54,6 +58,7 @@ type LocationPageViewProps = {
   footerSocialLinksOverride?: Partial<
     Record<"facebook" | "twitter" | "instagram" | "linkedin" | "youtube", string>
   > | null;
+  footerBrandDescription?: string | null;
 };
 
 /**
@@ -76,9 +81,35 @@ export function LocationPageView({
   footerContactOverride,
   footerContactTheme,
   footerSocialLinksOverride,
+  footerBrandDescription,
 }: LocationPageViewProps) {
+  const { theme } = useContext(ServerContext) || { theme: null };
   const latestEvents = locationData.latest_events || [];
   const upcomingEvents = locationData.upcoming_events || [];
+  const heroContact = useMemo(
+    () =>
+      resolvePublicPageContact({
+        theme: footerContactTheme ?? theme,
+        locationSlug,
+        override:
+          footerContactOverride ?? {
+            address: locationData.address,
+            phone: locationData.phone,
+            phone_number: locationData.phone_number,
+            email: locationData.email,
+          },
+      }),
+    [
+      theme,
+      footerContactTheme,
+      footerContactOverride,
+      locationSlug,
+      locationData.address,
+      locationData.phone,
+      locationData.phone_number,
+      locationData.email,
+    ],
+  );
   const {
     filters,
     setFilters,
@@ -177,6 +208,11 @@ export function LocationPageView({
             bannerHeadingValign={
               settings?.banner_heading_valign as BannerHeadingValign | null | undefined
             }
+            eyebrow={locationData.city || cityLabel || null}
+            heroContact={{
+              address: heroContact.address,
+              phone: heroContact.phone,
+            }}
             heroFooter={searchBar}
           />
           <LocationMarketingBody
@@ -205,9 +241,19 @@ export function LocationPageView({
         copyright={settings?.copyright}
         logo={typeof headerLogo === "string" ? headerLogo : settings?.logo}
         locationSlug={locationSlug}
-        contactOverride={footerContactOverride}
+        contactOverride={
+          footerContactOverride ?? {
+            address: locationData.address,
+            phone: locationData.phone,
+            phone_number: locationData.phone_number,
+            email: locationData.email,
+          }
+        }
         contactTheme={footerContactTheme}
         socialLinksOverride={footerSocialLinksOverride}
+        brandDescription={
+          footerBrandDescription ?? locationData.about_description
+        }
       />
     </>
   );

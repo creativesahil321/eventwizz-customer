@@ -10,9 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { EventHeroBand } from "@/components/public/event-hero-band";
 import {
   EventCouponStrip,
@@ -48,11 +46,15 @@ import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
-import { normalizeBannerHeadingAlign } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { slugToShortLabel } from "@/lib/slug-short-label";
+import {
+  formatEventHeroDateRange,
+  formatEventHeroTimeRange,
+  readEventCategoryLabel,
+} from "@/lib/event-hero-meta";
 import {
   firstBookablePublicRoomIndex,
   isPublicEventRoomMode,
@@ -214,9 +216,6 @@ export default function EventDetailClient({
     theme: null,
   };
   const vendorTheme = serverTheme as ThemeSchema | null;
-  const bannerAlign = normalizeBannerHeadingAlign(
-    vendorTheme?.banner_heading_align,
-  );
   const headingEmphasisFromSite =
     vendorTheme?.typography?.headingEmphasis != null
       ? normalizeHeadingEmphasis(vendorTheme.typography.headingEmphasis)
@@ -298,6 +297,15 @@ export default function EventDetailClient({
   const sectionAnchorClass =
     "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
 
+  const cityLabel = slugToShortLabel(locationSlug);
+  const heroCategoryLabel = readEventCategoryLabel(eventData);
+  const heroDateLabel = formatEventHeroDateRange(
+    (slices.dates ?? []).map((d) => d.event_date),
+  );
+  const heroTimeLabel = formatEventHeroTimeRange(
+    (slices.event_schedular ?? []).map((row) => row.time),
+  );
+
   const activeRoomId = slices.activeRoom?.room_id;
   const roomContentKey = activeRoomId ?? `room-${currentRoomIndex}`;
 
@@ -350,22 +358,22 @@ export default function EventDetailClient({
             bannerVideo={eventData.event_banner_video || null}
             cacheBustImage
             imageAlt={eventData.event_name || "Event banner"}
-            beforeTitle={
-              <Link
-                href={`/${locationSlug}`}
-                className={cn(
-                  "mb-6 inline-flex items-center gap-1.5 text-sm font-medium transition-all duration-200",
-                  "rounded-full px-3 py-1.5 text-white/80",
-                  "hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:shadow-md",
-                  bannerAlign === "left" && "-ml-3",
-                  bannerAlign === "center" && "mx-auto",
-                  bannerAlign === "right" && "ml-auto",
-                )}
-              >
-                <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-                Back to {slugToShortLabel(locationSlug)}
-              </Link>
-            }
+            breadcrumbs={[
+              { label: "Home", href: "/" },
+              { label: cityLabel, href: `/${locationSlug}` },
+              {
+                label:
+                  eventData.event_name?.trim() ||
+                  eventData.event_banner_heading?.trim() ||
+                  "Event",
+              },
+            ]}
+            categoryLabel={heroCategoryLabel}
+            meta={{
+              date: heroDateLabel,
+              time: heroTimeLabel,
+              location: cityLabel,
+            }}
           />
         </div>
 
