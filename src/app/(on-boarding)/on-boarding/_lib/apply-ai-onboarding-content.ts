@@ -168,13 +168,14 @@ async function applyAIGeneratedOnboardingContentInner({
   updateSession,
   onApplyStepChange,
 }: ApplyAIOnboardingParams): Promise<void> {
+  const vendorHints = parseVendorDescriptionHints(
+    venueInput.description,
+    venueInput.room_names,
+  );
   const editedContent = clampAiStepNineFaqs(
     fillOnboardingContentDefaults(normalizeAIGeneratedContent(content), {
       ...venueInput,
-      bookingFacts: parseVendorDescriptionHints(
-        venueInput.description,
-        venueInput.room_names,
-      ).bookingFacts,
+      bookingFacts: vendorHints.bookingFacts,
     }),
   );
 
@@ -441,10 +442,7 @@ async function applyAIGeneratedOnboardingContentInner({
 
   // --- Step 5: Dates, Tickets & Tables ---
   setStep(4);
-  const bookingFacts = parseVendorDescriptionHints(
-    venueInput.description,
-    venueInput.room_names,
-  ).bookingFacts;
+  const bookingFacts = vendorHints.bookingFacts;
   const ensuredDates = ensureOnboardingDates(
     editedContent.stepFive?.dates,
     bookingFacts,
@@ -518,8 +516,9 @@ async function applyAIGeneratedOnboardingContentInner({
 
   // --- Step 6: Menu ---
   setStep(5);
-  const hasMenus = (editedContent.stepSix?.menus?.length ?? 0) > 0;
-  const menuRemoved = removedSections.has("menu");
+  const hasMenus =
+    !vendorHints.omitCatering && (editedContent.stepSix?.menus?.length ?? 0) > 0;
+  const menuRemoved = removedSections.has("menu") || vendorHints.omitCatering;
 
   const roomsForMenuCategories = useRoomSystem
     ? (globalForm.getValues("multiSpace")?.rooms ?? [])
@@ -734,7 +733,9 @@ async function applyAIGeneratedOnboardingContentInner({
   const resolvedDrinkPackages =
     drinkPackages.length > 0
       ? drinkPackages
-      : [
+      : vendorHints.omitDrinks
+        ? []
+        : [
           {
             title: "House pours",
             description: "Selected beers, wines and soft drinks",
@@ -749,7 +750,7 @@ async function applyAIGeneratedOnboardingContentInner({
           },
         ];
   const hasDrinkPackages = resolvedDrinkPackages.length > 0;
-  const drinksRemoved = removedSections.has("drinks");
+  const drinksRemoved = removedSections.has("drinks") || vendorHints.omitDrinks;
   const stepEightData = {
     step: 8 as const,
     event_id: eventId,

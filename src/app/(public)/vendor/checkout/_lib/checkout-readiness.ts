@@ -129,10 +129,9 @@ export function resolveCheckoutCtaState(
   } else if (input.hasValidationErrors) {
     label = "Complete selections";
     mobileLabel = "Complete selections";
-  } else if (!input.hasSelectedGateway) {
-    label = "Select payment method";
-    mobileLabel = "Choose payment";
   } else {
+    // Keep "Pay $X" even before a gateway is chosen — tapping Pay opens the
+    // picker instead of starting checkout (needsGatewaySelection).
     label = `Pay ${input.formatMoney(input.finalTotalWithFee)} now`;
     mobileLabel = `Pay ${input.formatMoney(input.finalTotalWithFee)}`;
   }

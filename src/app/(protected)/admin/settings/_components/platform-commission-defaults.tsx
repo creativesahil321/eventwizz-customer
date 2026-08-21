@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { adminPaymentCommissionService } from "@/services/admin/payment-commission/payment-commission.service";
 import { cn } from "@/lib/utils";
 import { SettingsSectionCard } from "./settings-section-card";
+import { GocardlessCollectionInterval } from "./gocardless-collection-interval";
 
 const QUERY_KEY = ["admin", "payment-settings", "commission"] as const;
 
@@ -84,9 +85,10 @@ export function PlatformCommissionDefaults() {
   return (
     <SettingsSectionCard
       title="Payment Settings"
-      description="Configure the default platform commission applied when a venue has not set a custom rate."
+      description="Platform commission and GoCardless auto-debit defaults. These apply across EventWizz and cannot be changed by venues."
     >
-      <div className="max-w-md space-y-4">
+      <div className="space-y-8">
+        <div className="max-w-md space-y-4">
         <div className="space-y-1">
           <p className="text-sm font-medium text-foreground">
             Default platform commission
@@ -169,6 +171,11 @@ export function PlatformCommissionDefaults() {
             {errorMessage}
           </p>
         ) : null}
+        </div>
+
+        <div className="border-t border-slate-100 pt-6">
+          <GocardlessCollectionInterval />
+        </div>
       </div>
     </SettingsSectionCard>
   );

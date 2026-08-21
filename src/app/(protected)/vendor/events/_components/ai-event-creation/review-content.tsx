@@ -33,6 +33,11 @@ import {
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import { applyAIGeneratedEventToBackend } from "../../_lib/apply-ai-generated-event";
+import { fillAiEventGeneratedDefaults } from "../../_lib/fill-ai-event-content";
+import {
+  inferAiEventRemovedSections,
+  parseAiEventVendorIntent,
+} from "../../_lib/ai-event-vendor-intent";
 import { AIEventApplyOverlay } from "./ai-event-apply-overlay";
 import { toast } from "sonner";
 import {
@@ -84,9 +89,18 @@ export default function AIEventReviewContent({
   onRegenerate,
   onBack,
 }: ReviewContentProps) {
-  const [editedContent, setEditedContent] = useState<AIEventGeneratedContent>(content);
+  const [editedContent, setEditedContent] = useState<AIEventGeneratedContent>(
+    () => fillAiEventGeneratedDefaults(content, eventInput),
+  );
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["stepOne"]));
-  const [removedSections, setRemovedSections] = useState<Set<string>>(new Set());
+  const [removedSections, setRemovedSections] = useState<Set<string>>(() =>
+    inferAiEventRemovedSections(
+      parseAiEventVendorIntent(
+        eventInput.eventDescription,
+        eventInput.room_names,
+      ),
+    ),
+  );
   const [isApplying, setIsApplying] = useState(false);
   const [applyStep, setApplyStep] = useState(-1);
   const [applyDone, setApplyDone] = useState(false);
@@ -121,7 +135,7 @@ export default function AIEventReviewContent({
     (step: keyof AIEventGeneratedContent, field: string, value: unknown) => {
       setEditedContent((prev) => ({
         ...prev,
-        [step]: { ...prev[step], [field]: value },
+        [step]: { ...(prev[step] ?? {}), [field]: value },
       }));
     },
     []
@@ -1420,7 +1434,7 @@ function StepSixEditor({
           Event address
         </label>
         <AddressAutocomplete
-          value={content.event_address || ""}
+          value={content?.event_address || ""}
           onChange={(address) => onChange("event_address", address)}
           onSelect={(_, address) => onChange("event_address", address)}
           placeholder="Type to search for a UK address or location…"
@@ -1442,7 +1456,7 @@ function StepSevenEditor({
   content: AIEventGeneratedContent["stepSeven"];
   onChange: (v: AIEventGeneratedContent["stepSeven"]) => void;
 }) {
-  const { faqs } = content;
+  const faqs = content?.faqs ?? [];
 
   const updateFaq = (idx: number, field: "question" | "answer", value: string) => {
     onChange({

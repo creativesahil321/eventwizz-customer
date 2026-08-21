@@ -21,7 +21,8 @@ import {
 } from "@/lib/event-form-limits";
 import type { AIDate, AIRoomDates, AIRoomDrinks } from "@/app/api/ai/generate-onboarding/route";
 import {
-  applyVendorBookingFactsToDates,
+  ensureOnboardingDates,
+  hasUsableOnboardingDates,
   normalizeAIDatePaymentFields,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import {
@@ -37,6 +38,7 @@ import {
   type AIEventRoomMenu,
   type AIEventRoomPackage,
 } from "@/app/(protected)/vendor/events/_lib/ai-event-vendor-intent";
+import { fillAiEventGeneratedDefaults } from "@/app/(protected)/vendor/events/_lib/fill-ai-event-content";
 
 export interface AIEventInput {
   eventName: string;
@@ -259,28 +261,39 @@ export async function POST(req: NextRequest) {
       if (content.stepTwo) {
         content.stepTwo.package_title = truncate(content.stepTwo.package_title, 40);
         content.stepTwo.package_description = truncate(content.stepTwo.package_description, 160);
-        if (content.stepTwo.package_details) {
+        if (Array.isArray(content.stepTwo.package_details)) {
           content.stepTwo.package_details = content.stepTwo.package_details.map((d) => ({
             title: truncate(d.title, 40),
           }));
-          content.stepTwo.event_schedular_title = truncate(content.stepTwo.event_schedular_title, 40);
-          content.stepTwo.event_schedule_subtitle = truncate(content.stepTwo.event_schedule_subtitle, 160);
-          if (content.stepTwo.event_schedular) {
-            content.stepTwo.event_schedular = content.stepTwo.event_schedular.map((s) => ({
+        }
+        content.stepTwo.event_schedular_title = truncate(content.stepTwo.event_schedular_title, 40);
+        content.stepTwo.event_schedule_subtitle = truncate(content.stepTwo.event_schedule_subtitle, 160);
+        if (Array.isArray(content.stepTwo.event_schedular)) {
+          content.stepTwo.event_schedular = content.stepTwo.event_schedular
+            .map((s) => ({
               title: truncate(s.title, 40),
               time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time) ? s.time : "12:00",
-            }));
+            }))
+            .sort((a, b) => {
+              const [ha, ma] = a.time.split(":").map(Number);
+              const [hb, mb] = b.time.split(":").map(Number);
+              return ha * 60 + ma - (hb * 60 + mb);
+            });
+          if (content.stepTwo.event_schedular.length === 0) {
+            content.stepTwo.event_schedular = [
+              { title: "Doors Open", time: "19:00" },
+            ];
           }
-          content.stepTwo.event_schedular.sort((a, b) => {
-            const [ha, ma] = a.time.split(":").map(Number);
-            const [hb, mb] = b.time.split(":").map(Number);
-            return ha * 60 + ma - (hb * 60 + mb);
-          });
+        } else {
+          content.stepTwo.event_schedular = [
+            { title: "Doors Open", time: "19:00" },
+          ];
         }
       }
 
-      // Enforce stepThree date validation
-      if (content.stepThree?.dates) {
+      // Enforce stepThree date validation. Empty arrays are truthy — only
+      // sanitize when at least one date has a usable YYYY-MM-DD (onboarding).
+      if (hasUsableOnboardingDates(content.stepThree?.dates as AIDate[])) {
         const now = new Date();
         content.stepThree.dates = content.stepThree.dates.map((date, idx) => {
           const futureDate = new Date(now);
@@ -382,45 +395,27 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        const d1 = new Date();
-        d1.setMonth(d1.getMonth() + 2);
         content.stepThree = {
-          dates: [
-            {
-              event_date: d1.toISOString().split("T")[0],
-              booking_type: "both",
-              tickets: [
-                { title: "General Admission", description: "Standard entry with full access", total_capacity: "100", price: "50" },
-                { title: "VIP Pass", description: "Premium access with exclusive perks", total_capacity: "30", price: "120" },
-              ],
-              tables: [
-                { min_persons: "2", max_persons: "6", price: "150", total_tables: "15" },
-                { min_persons: "6", max_persons: "10", price: "250", total_tables: "8" },
-              ],
-              payment_type: "full",
-              is_deposit_enabled: false,
-            },
-          ],
+          ...content.stepThree,
+          dates: ensureOnboardingDates(
+            content.stepThree?.dates as AIDate[] | undefined,
+            vendorHints.bookingFacts,
+          ) as AIEventDate[],
         };
       }
 
-      if (content.stepThree?.dates) {
-        content.stepThree.dates = applyVendorBookingFactsToDates(
-          content.stepThree.dates as AIDate[],
-          vendorHints.bookingFacts,
-        ) as AIEventDate[];
-      }
+      content.stepThree.dates = ensureOnboardingDates(
+        content.stepThree.dates as AIDate[],
+        vendorHints.bookingFacts,
+      ) as AIEventDate[];
 
       if (hasRoomSystem && content.stepThree) {
-        const baseDates = (content.stepThree.dates ?? []) as AIDate[];
-        const sanitizeRoomDates = (dates: AIDate[] | undefined): AIDate[] =>
-          (dates ?? []).map((d) => normalizeAIDatePaymentFields(d));
-
+        const baseDates = content.stepThree.dates as AIDate[];
         const filteredRooms = Array.isArray(content.stepThree.rooms)
           ? content.stepThree.rooms
               .map((room) => ({
                 room_name: truncate(String(room.room_name ?? "").trim(), 80),
-                dates: sanitizeRoomDates(room.dates as AIDate[]),
+                dates: Array.isArray(room.dates) ? (room.dates as AIDate[]) : [],
               }))
               .filter((room) => room.room_name.length > 0)
           : [];
@@ -430,14 +425,17 @@ export async function POST(req: NextRequest) {
           normalizedRoomNames,
           baseDates,
           vendorHints,
-          (dates, _offset) => {
-            const sanitized = sanitizeRoomDates(dates as AIDate[]);
-            return sanitized.length > 0 ? sanitized : baseDates;
-          },
+          (dates) =>
+            ensureOnboardingDates(
+              hasUsableOnboardingDates(dates as AIDate[])
+                ? (dates as AIDate[])
+                : baseDates,
+              vendorHints.bookingFacts,
+            ),
         ).map((room) => ({
           ...room,
-          dates: applyVendorBookingFactsToDates(
-            (room.dates as AIDate[] | undefined)?.length
+          dates: ensureOnboardingDates(
+            hasUsableOnboardingDates(room.dates as AIDate[])
               ? (room.dates as AIDate[])
               : baseDates,
             vendorHints.bookingFacts,
@@ -447,7 +445,23 @@ export async function POST(req: NextRequest) {
         content.stepThree.rooms = [];
       }
 
-      if (content.stepFour) {
+      if (vendorHints.omitCatering) {
+        content.stepFour = {
+          catering_option: 0,
+          menu_title: "",
+          menu_description: "",
+          menus: [],
+          rooms: hasRoomSystem
+            ? normalizedRoomNames.map((room_name) => ({
+                room_name,
+                catering_option: 0,
+                menu_title: "",
+                menu_description: "",
+                menus: [],
+              }))
+            : [],
+        };
+      } else if (content.stepFour) {
         content.stepFour.menu_title = truncate(content.stepFour.menu_title, 40);
         content.stepFour.menu_description = truncate(content.stepFour.menu_description, 160);
         content.stepFour.catering_option = content.stepFour.catering_option === 0 ? 0 : 1;
@@ -455,7 +469,21 @@ export async function POST(req: NextRequest) {
         content.stepFour = { catering_option: 0, menu_title: "", menu_description: "", menus: [] };
       }
 
-      if (content.stepFive) {
+      if (vendorHints.omitDrinks) {
+        content.stepFive = {
+          drink_title: "",
+          drink_description: "",
+          packages: [],
+          rooms: hasRoomSystem
+            ? normalizedRoomNames.map((room_name) => ({
+                room_name,
+                drink_title: "",
+                drink_description: "",
+                packages: [],
+              }))
+            : [],
+        };
+      } else if (content.stepFive) {
         content.stepFive.drink_title = truncate(
           content.stepFive.drink_title,
           DRINK_SECTION_TITLE_MAX_CHARS
@@ -504,7 +532,9 @@ export async function POST(req: NextRequest) {
         content.stepFive.rooms = [];
       }
 
-      if (content.stepSeven?.faqs) {
+      if (vendorHints.omitFaqs) {
+        content.stepSeven = { faqs: [] };
+      } else if (content.stepSeven?.faqs) {
         content.stepSeven.faqs = content.stepSeven.faqs
           .slice(0, STEP_NINE_MAX_FAQS)
           .map((f) => ({
@@ -513,8 +543,10 @@ export async function POST(req: NextRequest) {
           }));
       }
 
+      const filled = fillAiEventGeneratedDefaults(content, input);
+
       return NextResponse.json({
-        content,
+        content: filled,
         model: result.model,
         modelUsed: result.modelUsed,
       });

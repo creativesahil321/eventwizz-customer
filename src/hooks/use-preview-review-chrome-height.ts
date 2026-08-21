@@ -6,6 +6,10 @@ import { useLayoutEffect, useRef } from "react";
 export const PREVIEW_REVIEW_CHROME_HEIGHT_VAR =
   "--preview-review-chrome-height";
 
+/** Height of the checkout mobile sticky bar — lifts the chat launcher above Pay. */
+export const CHECKOUT_MOBILE_CHROME_HEIGHT_VAR =
+  "--checkout-mobile-chrome-height";
+
 /**
  * Lift a viewport-fixed widget (chatbot launcher / panel) above the review bar.
  * No-op on live pages where the var is unset.
@@ -41,6 +45,36 @@ export function usePreviewReviewChromeHeight<T extends HTMLElement>() {
       observer.disconnect();
       document.documentElement.style.removeProperty(
         PREVIEW_REVIEW_CHROME_HEIGHT_VAR,
+      );
+    };
+  }, []);
+
+  return ref;
+}
+
+/** Publishes the checkout sticky-bar height so the chat widget can sit above it. */
+export function useCheckoutMobileChromeHeight<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const publish = () => {
+      document.documentElement.style.setProperty(
+        CHECKOUT_MOBILE_CHROME_HEIGHT_VAR,
+        `${el.offsetHeight}px`,
+      );
+    };
+
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty(
+        CHECKOUT_MOBILE_CHROME_HEIGHT_VAR,
       );
     };
   }, []);

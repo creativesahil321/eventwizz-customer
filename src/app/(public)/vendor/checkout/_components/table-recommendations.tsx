@@ -10,6 +10,7 @@ import {
   hasViableTablePlan,
   isGuestCountBelowTableMinimum,
   getLowestTableMinimum,
+  resolveCheckoutGroupSize,
 } from "../_lib/table-recommendations";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { resolveVenueContact } from "@/lib/resolve-venue-contact";
@@ -199,7 +200,11 @@ export default function TableRecommendations({
     resolveVenueContact(settings);
 
   const dateData = getDateData(eventSlug, date);
-  const peopleCount = dateData?.peopleCount || 20;
+  const peopleCount = resolveCheckoutGroupSize({
+    peopleCount: dateData?.peopleCount,
+    tickets: dateData?.tickets,
+    tables: dateData?.tables ?? tables,
+  });
   const tableSeatingSkipped = dateData?.tableSeatingSkipped ?? false;
 
   // Auto-apply the best table match on first load when nothing is selected yet.

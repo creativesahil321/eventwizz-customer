@@ -350,6 +350,10 @@ export const API_ENDPOINTS = {
     PAYMENT_SETTINGS: {
       GET_COMMISSION: "/admin/payment-settings/commission",
       UPDATE_COMMISSION: "/admin/payment-settings/commission",
+      GET_GOCARDLESS_COLLECTION_INTERVAL:
+        "/admin/payment-settings/gocardless-collection-interval",
+      UPDATE_GOCARDLESS_COLLECTION_INTERVAL:
+        "/admin/payment-settings/gocardless-collection-interval",
     },
     VENUES: {
       ALL: "/admin/venues?status={status}&search={search}",

@@ -39,6 +39,12 @@ export interface VendorDescriptionHints {
   wantsRoomSpecificDrinks: boolean;
   /** Vendor asks the second room to be non-alcoholic */
   wantsSecondRoomNonAlcoholDrinks: boolean;
+  /** Vendor asked to skip catering / menus */
+  omitCatering: boolean;
+  /** Vendor asked to skip drink / bar packages */
+  omitDrinks: boolean;
+  /** Vendor asked to skip FAQs */
+  omitFaqs: boolean;
   bookingFacts: VendorBookingFacts;
 }
 
@@ -401,11 +407,18 @@ export function parseVendorDescriptionHints(
       lower,
     );
 
-  // Mention room names in description for model context
-  const names = normalizeAiRoomNames(roomNames);
-  if (names.length > 0 && sanitizedDescription) {
-    // hints already in sanitized text
-  }
+  const omitCatering =
+    /\b(no (catering|menus?|food service)|without (catering|menus?)|don'?t (want|add|include|need) .{0,40}(catering|menus?)|do not (want|add|include|need) .{0,40}(catering|menus?)|skip (the )?(catering|menus?)|not to add .{0,30}(catering|menus?)|exclude (the )?(catering|menus?))\b/i.test(
+      lower,
+    );
+  const omitDrinks =
+    /\b(no (drinks?|drink packages?|bar packages?|other packages)|without (drinks?|bar packages?)|don'?t (want|add|include|need) .{0,40}(drinks?|bar packages?|other packages)|do not (want|add|include|need) .{0,40}(drinks?|bar packages?)|skip (the )?(drinks?|other packages)|not to add .{0,30}(drinks?|other packages))\b/i.test(
+      lower,
+    );
+  const omitFaqs =
+    /\b(no faqs?|without faqs?|don'?t (want|add|include|need) faqs?|do not (want|add|include|need) faqs?|skip (the )?faqs?)\b/i.test(
+      lower,
+    );
 
   return {
     sanitizedDescription,
@@ -416,6 +429,9 @@ export function parseVendorDescriptionHints(
     prefersTablesBooking,
     wantsRoomSpecificDrinks,
     wantsSecondRoomNonAlcoholDrinks,
+    omitCatering,
+    omitDrinks,
+    omitFaqs,
     bookingFacts,
   };
 }
@@ -742,11 +758,16 @@ export function buildAiOnboardingUserPrompt(
   const datesHint = hints.wantsSameDatesAllRooms
     ? "Vendor wants SAME dates on ALL rooms — duplicate the same dates array for every room in stepFive.rooms."
     : "Rooms may have different dates unless vendor specified otherwise.";
-  const drinksHint = hints.wantsSecondRoomNonAlcoholDrinks
-    ? "Vendor wants SECOND room non-alcohol drinks — keep room 2 packages non-alcoholic and use stepSeven.rooms."
-    : hints.wantsRoomSpecificDrinks
-      ? "Vendor wants different drinks by room — use stepSeven.rooms."
-      : "Drinks can be shared across rooms unless explicitly different.";
+  const drinksHint = hints.omitDrinks
+    ? "Vendor does NOT want drink packages — set stepSeven.packages to []."
+    : hints.wantsSecondRoomNonAlcoholDrinks
+      ? "Vendor wants SECOND room non-alcohol drinks — keep room 2 packages non-alcoholic and use stepSeven.rooms."
+      : hints.wantsRoomSpecificDrinks
+        ? "Vendor wants different drinks by room — use stepSeven.rooms."
+        : "Drinks can be shared across rooms unless explicitly different.";
+  const cateringHint = hints.omitCatering
+    ? "Vendor does NOT want catering/menus — set stepSix.menus to []."
+    : "stepSix menus: fill a realistic menu unless vendor said no catering.";
 
   const factsBlock = formatVendorFactsForPrompt(hints.bookingFacts);
   const descriptionBlock = hints.sanitizedDescription
@@ -771,12 +792,13 @@ ${roomSystemOn ? `- Room names (use EXACTLY, ${AI_ONBOARDING_MIN_ROOMS}-${AI_ONB
 - ${datesHint}
 - ${paymentHint}
 - ${bookingHint}
+- ${cateringHint}
 - ${drinksHint}
 - stepFive.rooms rule: ${roomSystemOn ? `Include exactly ${roomNames.length} room objects, one per name above` : "Return stepFive.rooms as []"}
 
 ${jsonSchemaBlock}
 
-stepNine.faqs: max ${stepNineMaxFaqs} items. Return ONLY JSON.`;
+stepNine.faqs: ${hints.omitFaqs ? "return [] — vendor does not want FAQs." : `max ${stepNineMaxFaqs} items`}. Return ONLY JSON.`;
 }
 
 const DEFAULT_TIMELINE = [
@@ -1015,6 +1037,10 @@ export function fillOnboardingContentDefaults(
   const venue = input.venueName.trim() || "the venue";
   const kind = input.venueType.trim() || "events";
   const next = { ...content };
+  const omitHints = parseVendorDescriptionHints(
+    input.description,
+    input.room_names,
+  );
 
   next.stepFour = {
     package_title: next.stepFour?.package_title || "What's included",
@@ -1076,7 +1102,15 @@ export function fillOnboardingContentDefaults(
   const sevenIsBrochure =
     typeof sevenRaw?.event_address === "string" ||
     typeof sevenRaw?.price_start_from === "string";
-  const drinkDefaults = {
+  const drinkDefaults = omitHints.omitDrinks
+    ? {
+        drink_title: "",
+        drink_description: "",
+        packages: [] as NonNullable<
+          import("@/app/api/ai/generate-onboarding/route").AIGeneratedContent["stepSeven"]
+        >["packages"],
+      }
+    : {
     drink_title: next.stepSeven?.drink_title || "Drinks packages",
     drink_description:
       next.stepSeven?.drink_description ||
@@ -1108,11 +1142,18 @@ export function fillOnboardingContentDefaults(
   }
 
   const hasMenus =
+    !omitHints.omitCatering &&
     Array.isArray(next.stepSix?.menus) &&
     next.stepSix.menus.some(
       (m) => m.name?.trim() && Array.isArray(m.items) && m.items.length > 0,
     );
-  next.stepSix = {
+  next.stepSix = omitHints.omitCatering
+    ? {
+        menu_title: "",
+        menu_description: "",
+        menus: [],
+      }
+    : {
     menu_title: next.stepSix?.menu_title || "Dining menu",
     menu_description:
       next.stepSix?.menu_description ||
@@ -1161,8 +1202,9 @@ export function fillOnboardingContentDefaults(
     ? next.stepNine.faqs.filter((f) => f.question?.trim() && f.answer?.trim())
     : [];
   next.stepNine = {
-    faqs:
-      faqs.length > 0
+    faqs: omitHints.omitFaqs
+      ? []
+      : faqs.length > 0
         ? faqs
         : [
             {

@@ -17,6 +17,7 @@ import { persist } from "zustand/middleware";
 const CART_EDIT_STORAGE_KEY = "cart-edit-storage";
 import {
   resolveBestTableSelection,
+  resolveCheckoutGroupSize,
   type ResolvedTableSelection,
 } from "@/app/(public)/vendor/checkout/_lib/table-recommendations";
 import {
@@ -257,23 +258,31 @@ function mapApiDrinksToEditable(
 function derivePeopleCountFromApiDate(
   dateData: Record<string, unknown>,
   tables: EditableItem[],
+  tickets: EditableItem[],
 ): number {
   const fromApi = Number(dateData.people_quantity);
   if (Number.isFinite(fromApi) && fromApi >= 1) {
     return Math.min(500, Math.floor(fromApi));
   }
 
-  let total = 0;
+  let tableGuests = 0;
   for (const table of tables) {
     if (table.quantity <= 0) continue;
     if (table.allocation?.length) {
-      total += table.allocation.reduce((sum, guests) => sum + guests, 0);
+      tableGuests += table.allocation.reduce((sum, guests) => sum + guests, 0);
     } else {
-      total += (table.minPersons || 1) * table.quantity;
+      tableGuests += (table.minPersons || 1) * table.quantity;
     }
   }
+  if (tableGuests > 0) return Math.min(500, tableGuests);
 
-  return total > 0 ? Math.min(500, total) : 20;
+  const ticketQty = tickets.reduce(
+    (sum, ticket) => sum + Math.max(0, ticket.quantity || 0),
+    0,
+  );
+  if (ticketQty >= 1) return Math.min(500, ticketQty);
+
+  return 0;
 }
 
 /** Map one API date bucket (flat or per-room) into Zustand editable state. */
@@ -310,7 +319,7 @@ function mapApiDateBucketToEditableDate(
     tickets,
     drinks,
     hasChanges: false,
-    peopleCount: derivePeopleCountFromApiDate(dateData, tables),
+    peopleCount: derivePeopleCountFromApiDate(dateData, tables, tickets),
     specialRequest: String(dateData.special_request ?? "").trim(),
     confirmedTableIds: tables
       .filter(
@@ -1532,14 +1541,29 @@ export const useCartEditStore = create<CartEditState>()(
             return state;
           }
 
-          const peopleCount = dateData.peopleCount || 20;
+          const peopleCount = resolveCheckoutGroupSize(dateData);
           const selection = resolveBestTableSelection(
             dateData.tables,
             peopleCount,
           );
 
           if (tablesAlreadyMatchSelection(dateData.tables, selection)) {
-            return state;
+            if (dateData.peopleCount === peopleCount) {
+              return state;
+            }
+
+            return {
+              editingData: {
+                ...state.editingData,
+                [eventSlug]: {
+                  ...state.editingData[eventSlug],
+                  [date]: {
+                    ...dateData,
+                    peopleCount,
+                  },
+                },
+              },
+            };
           }
 
           if (!selection) {
@@ -1556,6 +1580,7 @@ export const useCartEditStore = create<CartEditState>()(
                   ...state.editingData[eventSlug],
                   [date]: {
                     ...dateData,
+                    peopleCount,
                     tables: clearedTables,
                     confirmedTableIds: [],
                     // Keep seating active so UI can show "no tables for group size"
@@ -1590,6 +1615,7 @@ export const useCartEditStore = create<CartEditState>()(
                 ...state.editingData[eventSlug],
                 [date]: {
                   ...dateData,
+                  peopleCount,
                   tables: updatedTables,
                   confirmedTableIds: [],
                   tableSeatingSkipped: false,
@@ -1729,7 +1755,14 @@ export const useCartEditStore = create<CartEditState>()(
       resumeTableSeating: (eventSlug: string, date: string) => {
         set((state) => {
           const dateData = state.editingData[eventSlug]?.[date];
-          if (!dateData) return state;
+          if (!dateData || !dateData.tableSeatingSkipped) return state;
+
+          // Ignore a stale persisted group size (often 20) when seating starts from tickets.
+          const peopleCount = resolveCheckoutGroupSize({
+            tickets: dateData.tickets,
+            tables: dateData.tables,
+            peopleCount: undefined,
+          });
 
           return {
             editingData: {
@@ -1739,6 +1772,7 @@ export const useCartEditStore = create<CartEditState>()(
                 [date]: {
                   ...dateData,
                   tableSeatingSkipped: false,
+                  peopleCount,
                 },
               },
             },

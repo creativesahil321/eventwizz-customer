@@ -191,8 +191,8 @@ CRITICAL RULES:
    - booking_type "tables" or "both": payment_type required ("full" or "deposit")
    - deposit: is_deposit_enabled true, deposit_type amount|percentage, deposit_value (percentage 20-80), deposit_due_date BEFORE event_date
 9. stepThree.dates: YYYY-MM-DD, ascending, no duplicates, today or future
-10. stepFour/stepFive optional when vendor says no food/drinks
-11. stepSeven.faqs: max ${maxFaqs}; when vendor asks for 10+ FAQs, provide ${maxFaqs} strong relevant FAQs
+10. stepFour/stepFive optional when vendor says no food/drinks — if they say no catering/menus, set catering_option 0 and menus []. If they say no drinks, set packages [].
+11. stepSeven.faqs: max ${maxFaqs}; when vendor asks for 10+ FAQs, provide ${maxFaqs} strong relevant FAQs. If they say no FAQs, return faqs [].
 12. ROOM SYSTEM (when YES):
     - Use EXACT room names provided (${AI_EVENT_MIN_ROOMS}-${AI_EVENT_MAX_ROOMS} rooms)
     - stepThree.rooms: one entry per room_name with its own dates[] when dates differ per room
@@ -370,15 +370,19 @@ export function buildAiEventUserPrompt(params: {
       ? "DIFFERENT dates per room — put each room's dates ONLY in stepThree.rooms; stepThree.dates can mirror first room or stay minimal."
       : "Assign dates per vendor text; use stepThree.rooms when rooms differ.";
 
-  const menuHint = hints.wantsPerRoomMenus
-    ? "DIFFERENT menus per room — fill stepFour.rooms with room-specific menus (e.g. Italian in both if stated)."
-    : "Shared menu in stepFour unless vendor specifies per-room differences.";
+  const menuHint = hints.omitCatering
+    ? "Vendor does NOT want catering/menus — set stepFour.catering_option 0, empty menus, do not invent a menu."
+    : hints.wantsPerRoomMenus
+      ? "DIFFERENT menus per room — fill stepFour.rooms with room-specific menus (e.g. Italian in both if stated)."
+      : "Shared menu in stepFour unless vendor specifies per-room differences.";
 
-  const drinksHint = hints.wantsPerRoomDrinks
-    ? "DIFFERENT drink packages per room — use stepFive.rooms (e.g. whisky/beverages in one room, soft drinks only in another)."
-    : hints.wantsSecondRoomNonAlcoholDrinks
-      ? "Second room: non-alcoholic packages only in stepFive.rooms."
-      : "Shared drinks in stepFive unless vendor specifies per-room packages.";
+  const drinksHint = hints.omitDrinks
+    ? "Vendor does NOT want drink/bar packages — set stepFive.packages [] and empty per-room packages."
+    : hints.wantsPerRoomDrinks
+      ? "DIFFERENT drink packages per room — use stepFive.rooms (e.g. whisky/beverages in one room, soft drinks only in another)."
+      : hints.wantsSecondRoomNonAlcoholDrinks
+        ? "Second room: non-alcoholic packages only in stepFive.rooms."
+        : "Shared drinks in stepFive unless vendor specifies per-room packages.";
 
   const packagesHint = hints.wantsPerRoomPackages
     ? "DIFFERENT package features per room — use stepTwo.rooms with distinct package_details (e.g. drink packages vs exclusive packages)."
@@ -388,7 +392,9 @@ export function buildAiEventUserPrompt(params: {
     ? "Brochure/location copy per room — fill stepSix.rooms with location_description per room_name."
     : "Shared stepSix location unless vendor asks per-room brochure info.";
 
-  const faqHint = `Provide at least ${hints.requestedMinFaqs} FAQs (max ${maxFaqs}) covering pricing, deposits, what's included, room differences, and policies from vendor text.`;
+  const faqHint = hints.omitFaqs
+    ? "Vendor does NOT want FAQs — return stepSeven.faqs as []."
+    : `Provide at least ${hints.requestedMinFaqs} FAQs (max ${maxFaqs}) covering pricing, deposits, what's included, room differences, and policies from vendor text.`;
 
   const factsBlock = formatVendorFactsForPrompt(hints.bookingFacts);
   const descriptionBlock = hints.sanitizedDescription
@@ -520,6 +526,16 @@ export function resolveRoomBrochureDescription(
 ): string {
   const match = matchRoomByName(roomBrochures, roomName);
   return match?.location_description?.trim() || defaultDescription;
+}
+
+export function inferAiEventRemovedSections(
+  hints: Pick<AiEventVendorIntent, "omitCatering" | "omitDrinks" | "omitFaqs">,
+): Set<string> {
+  const removed = new Set<string>();
+  if (hints.omitCatering) removed.add("stepFour");
+  if (hints.omitDrinks) removed.add("stepFive");
+  if (hints.omitFaqs) removed.add("stepSeven");
+  return removed;
 }
 
 export const AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER =

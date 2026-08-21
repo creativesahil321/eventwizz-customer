@@ -350,8 +350,13 @@ export default function DateAccordion({
           toast.error(
             "Invalid data. Please check your selections and try again.",
           );
-        } else if (error.message.includes("500")) {
+        } else if (
+          error.message.includes("500") ||
+          error.message.includes("Internal Server Error")
+        ) {
+          toast.error("Couldn't save your cart. Please try again.");
         } else {
+          toast.error("Couldn't save your cart. Please try again.");
         }
       } else {
         toast.error(

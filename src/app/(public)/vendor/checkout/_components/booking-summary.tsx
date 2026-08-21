@@ -7,15 +7,12 @@ import { Button } from "@/components/ui/button";
 import BookingSummarySkeleton from "./booking-summary-skeleton-loader";
 import {
   CreditCard,
-  Shield,
   ChevronUp,
   ChevronDown,
   Lock,
-  Zap,
   HelpCircle,
   AlertCircle,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useGetCartData } from "@/services/customer/cart/query";
 import { useIsPreviewMode } from "@/contexts/preview-context";
@@ -34,6 +31,7 @@ import {
   calculateEditableDateDrinksTotal,
   isDepositChoiceAvailable,
   hasUnconfirmedTableSeating,
+  calculateUnconfirmedTablesTotal,
   getDateGuestCount,
   resolveCartDateDiscounts,
 } from "../_lib/cart-calculations";
@@ -77,22 +75,26 @@ import {
 import { focusCheckoutDate } from "../_lib/checkout-date-focus";
 import { cn } from "@/lib/utils";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { useCheckoutMobileChromeHeight } from "@/hooks/use-preview-review-chrome-height";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   assessCheckoutDatesReadiness,
   resolveCheckoutCtaState,
 } from "../_lib/checkout-readiness";
 
-const checkoutPayButtonClass = (
-  disabled: boolean,
-  variant: "default" | "gateway-prompt" = "default",
-) =>
+const checkoutPayButtonClass = (disabled: boolean) =>
   cn(
     "rounded-xl font-bold shadow-lg transition-all duration-200 disabled:opacity-100",
     disabled
       ? "cursor-not-allowed border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)] text-[color:var(--checkout-muted-foreground)] hover:bg-[color:var(--checkout-muted)] hover:text-[color:var(--checkout-muted-foreground)]"
-      : variant === "gateway-prompt"
-        ? "border border-[color:var(--checkout-brand-accent)] bg-[color:var(--checkout-brand-accent)] text-white shadow-[color:var(--checkout-brand-accent)]/25 hover:!bg-[color:var(--checkout-brand-accent)] hover:!text-white hover:brightness-110 active:scale-[0.98]"
-        : "bg-[color:var(--checkout-brand-primary)] text-white shadow-[color:var(--checkout-brand-primary)]/20 hover:!bg-[color:var(--checkout-brand-primary)] hover:!text-white hover:brightness-110 active:scale-[0.98]",
+      : "bg-[color:var(--checkout-brand-primary)] text-white shadow-[color:var(--checkout-brand-primary)]/20 hover:!bg-[color:var(--checkout-brand-primary)] hover:!text-white hover:brightness-110 active:scale-[0.98]",
   );
 
 type BookingSummaryProps = Record<string, never>;
@@ -104,6 +106,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showViewBreakdown, setShowViewBreakdown] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  const isMobileViewport = useMediaQuery("(max-width: 1023px)");
+
+  useEffect(() => {
+    if (!isMobileViewport) setShowMobileDrawer(false);
+  }, [isMobileViewport]);
   const couponCode = useCheckoutPromoStore((s) => s.couponCode);
   const setCouponCode = useCheckoutPromoStore((s) => s.setCouponCode);
   const checkoutPromo: CheckoutPromoApplied = {
@@ -748,6 +755,16 @@ export default function BookingSummary({}: BookingSummaryProps) {
     );
   }, [availableDates, currentEventSlug, editingData, getDateData]);
 
+  const pendingUnconfirmedSeatingTotal = useMemo(() => {
+    if (!currentEventSlug) return 0;
+    return availableDates.reduce((sum, dateKey) => {
+      return (
+        sum +
+        calculateUnconfirmedTablesTotal(getDateData(currentEventSlug, dateKey))
+      );
+    }, 0);
+  }, [availableDates, currentEventSlug, editingData, getDateData]);
+
   const totalGuests = useMemo(() => {
     if (!currentEventSlug) return 0;
     return availableDates.reduce((sum, dateKey) => {
@@ -875,13 +892,24 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return () => root.removeAttribute("data-pending-payment");
   }, [hasPendingStripePayment, showExpiredPaymentNotice]);
 
+  useEffect(() => {
+    const root = document.querySelector(".checkout-page");
+    if (!root) return;
+    if (pendingUnconfirmedSeatingTotal > 0) {
+      root.setAttribute("data-unconfirmed-seating", "true");
+    } else {
+      root.removeAttribute("data-unconfirmed-seating");
+    }
+    return () => root.removeAttribute("data-unconfirmed-seating");
+  }, [pendingUnconfirmedSeatingTotal]);
+
   const focusPaymentMethodPicker = useCallback(() => {
     setShowMobileDrawer(true);
     window.setTimeout(() => {
       document
         .getElementById("checkout-payment-method")
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 320);
+    }, 400);
   }, []);
 
   const renderExpiredPaymentBanner = (
@@ -1033,30 +1061,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
     isPending ||
     processCheckoutMutation.isPending ||
     resumeCheckoutMutation.isPending;
-  const hasPayableTotalForChrome = totalToday + totalLater > 0;
-  const needsGatewaySelectionForChrome =
-    !selectedGateway &&
-    hasPayableTotalForChrome &&
-    !hasValidationErrors &&
-    !hasPendingStripePayment &&
-    !isCheckoutBusy;
 
   // Do not auto-open the payment drawer when the first item is added —
   // customers often still have other dates to fill.
-
-  // Reserve page padding for the mobile "choose payment" prompt strip.
-  useEffect(() => {
-    const root = document.querySelector(".checkout-page");
-    if (!root) return;
-    const showPrompt =
-      needsGatewaySelectionForChrome && !showMobileDrawer;
-    if (showPrompt) {
-      root.setAttribute("data-mobile-gateway-prompt", "true");
-    } else {
-      root.removeAttribute("data-mobile-gateway-prompt");
-    }
-    return () => root.removeAttribute("data-mobile-gateway-prompt");
-  }, [needsGatewaySelectionForChrome, showMobileDrawer]);
 
   // Show skeleton only on first visit — never again after delete/refetch.
   const isInitialLoad =
@@ -1459,6 +1466,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
             </span>
           )}
         </div>
+        {pendingUnconfirmedSeatingTotal > 0 ? (
+          <p className="text-[11px] leading-snug text-amber-800">
+            +{formatMoney(pendingUnconfirmedSeatingTotal)} after you confirm
+            seating
+          </p>
+        ) : null}
       </div>
 
       {!options?.prioritizePaymentMethod ? (
@@ -1486,12 +1499,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
             disabled={ctaState.disabled}
             className={cn(
               "h-12 w-full text-sm",
-              checkoutPayButtonClass(
-                ctaState.disabled,
-                ctaState.needsGatewaySelection
-                  ? "gateway-prompt"
-                  : "default",
-              ),
+              checkoutPayButtonClass(ctaState.disabled),
             )}
           >
             {ctaState.loading ? (
@@ -1572,63 +1580,48 @@ export default function BookingSummary({}: BookingSummaryProps) {
         </div>
       </div>
 
-      {/* ── MOBILE: Fixed Bottom Bar + Expandable Drawer ── */}
+      {/* ── MOBILE: sticky bar + summary sheet ── */}
+      {isMobileViewport ? (
+        <Sheet open={showMobileDrawer} onOpenChange={setShowMobileDrawer}>
+          <SheetContent
+            side="bottom"
+            className="checkout-page checkout-summary-sheet z-[101] gap-0 rounded-t-2xl border-[color:var(--checkout-border)] p-0 shadow-lg"
+            style={{
+              paddingBottom:
+                "calc(var(--checkout-mobile-chrome-height, 9rem) + 0.5rem)",
+            }}
+          >
+            <SheetHeader className="border-b border-[color:var(--checkout-border)] px-4 py-3 text-left">
+              <SheetTitle className="text-base font-semibold text-[color:var(--checkout-brand-primary)]">
+                Order Summary
+              </SheetTitle>
+              <SheetDescription className="sr-only">
+                Review your booking totals and choose how to pay. The cart
+                stays behind this sheet.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [-webkit-overflow-scrolling:touch]">
+              {renderOrderSummaryContent({
+                omitSessionBanners: true,
+                prioritizePaymentMethod: !hasValidationErrors,
+              })}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+
       <div className="lg:hidden">
-        {/* Fixed Bottom Bar */}
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[color:var(--checkout-border)] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-          {/* Always-visible pending / expired payment strip (not hidden in drawer) */}
+        <CheckoutMobileStickyBar>
           {renderExpiredPaymentBanner("mobile-sticky")}
           {renderPendingPaymentBanner("mobile-sticky")}
 
-          {/* When drawer is closed, surface a clear path to available gateways */}
-          {!showMobileDrawer && ctaState.needsGatewaySelection ? (
-            <button
-              type="button"
-              onClick={focusPaymentMethodPicker}
-              className="flex w-full items-center justify-between gap-2 border-b border-[color:var(--checkout-brand-accent)]/25 bg-[color:var(--checkout-brand-accent)]/10 px-3 py-2.5 text-left sm:px-4"
-            >
-              <span className="text-xs font-semibold text-[color:var(--checkout-brand-primary)]">
-                {formatCheckoutGatewayContinuePrompt(
-                  currentEventApiData?.payment_gateways as
-                    | Array<{ slug: string }>
-                    | undefined,
-                )}
-              </span>
-              <ChevronUp className="h-4 w-4 shrink-0 text-[color:var(--checkout-brand-accent)]" />
-            </button>
-          ) : null}
-
-          {/* Expandable Drawer */}
-          <AnimatePresence>
-            {showMobileDrawer && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="overflow-hidden border-b border-gray-100"
-              >
-                <div className="max-h-[min(65vh,560px)] overflow-y-auto overscroll-contain p-4 pb-2 [-webkit-overflow-scrolling:touch]">
-                  <h2 className="mb-4 text-base font-semibold text-[color:var(--checkout-brand-primary)]">
-                    Order Summary
-                  </h2>
-                  {renderOrderSummaryContent({
-                    omitSessionBanners: true,
-                    prioritizePaymentMethod: true,
-                  })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Bottom Bar — stack total + full-width CTA so long labels never overlap */}
           <div className="flex flex-col gap-2.5 px-4 pt-3 pb-[max(0.75rem,var(--checkout-mobile-safe-bottom))]">
             <button
               type="button"
-              onClick={() => setShowMobileDrawer(!showMobileDrawer)}
+              onClick={() => setShowMobileDrawer((open) => !open)}
               className="flex w-full min-w-0 items-center gap-3 text-left"
               aria-expanded={showMobileDrawer}
-              aria-label="Toggle order summary"
+              aria-label="Open order summary"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
@@ -1648,6 +1641,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
                     {summaryMetaLine}
                   </p>
                 ) : null}
+                {pendingUnconfirmedSeatingTotal > 0 ? (
+                  <p className="mt-0.5 text-[11px] leading-snug text-amber-800">
+                    +{formatMoney(pendingUnconfirmedSeatingTotal)} after you
+                    confirm seating
+                  </p>
+                ) : null}
               </div>
               {showMobileDrawer ? (
                 <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
@@ -1661,12 +1660,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               disabled={ctaState.disabled}
               className={cn(
                 "h-12 w-full px-4 text-sm font-semibold",
-                checkoutPayButtonClass(
-                  ctaState.disabled,
-                  ctaState.needsGatewaySelection
-                    ? "gateway-prompt"
-                    : "default",
-                ),
+                checkoutPayButtonClass(ctaState.disabled),
               )}
             >
               {ctaState.loading ? (
@@ -1684,10 +1678,23 @@ export default function BookingSummary({}: BookingSummaryProps) {
               )}
             </Button>
           </div>
-        </div>
+        </CheckoutMobileStickyBar>
       </div>
 
       {stripePaymentModal}
     </>
+  );
+}
+
+function CheckoutMobileStickyBar({ children }: { children: React.ReactNode }) {
+  const ref = useCheckoutMobileChromeHeight<HTMLDivElement>();
+
+  return (
+    <div
+      ref={ref}
+      className="fixed inset-x-0 bottom-0 z-[110] border-t border-[color:var(--checkout-border)] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+    >
+      {children}
+    </div>
   );
 }

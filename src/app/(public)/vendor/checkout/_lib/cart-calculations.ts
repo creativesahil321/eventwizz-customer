@@ -547,6 +547,27 @@ export function getBillableTables(
   );
 }
 
+/** Display-only: unconfirmed table cost that is not yet in the payable total. */
+export function calculateUnconfirmedTablesTotal(
+  dateData:
+    | Pick<
+        EditableDateData,
+        "tables" | "confirmedTableIds" | "tableSeatingSkipped"
+      >
+    | null
+    | undefined,
+): number {
+  if (!dateData || dateData.tableSeatingSkipped) return 0;
+
+  let total = 0;
+  for (const table of dateData.tables) {
+    if (table.quantity <= 0) continue;
+    if (isTableSeatingConfirmed(dateData, table)) continue;
+    total += tableLineTotal(table);
+  }
+  return total;
+}
+
 /** Guest count for display — only when table seating is active and billable. */
 export function getDateGuestCount(
   dateData: Pick<

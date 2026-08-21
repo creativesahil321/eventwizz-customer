@@ -1330,6 +1330,10 @@ Is there anything else I can help you with?`,
     return null;
   }
 
+  const isVendorCheckout =
+    pathname === "/vendor/checkout" ||
+    Boolean(pathname?.startsWith("/vendor/checkout/"));
+
   // User dismissed the launcher for this page load only (comes back on refresh).
   if (isDismissed) {
     return null;
@@ -1359,8 +1363,13 @@ Is there anything else I can help you with?`,
             }
             exit={motionSafe ? { opacity: 0, scale: 0.85, y: 12 } : undefined}
             transition={{ type: "spring", stiffness: 420, damping: 24 }}
-            className="fixed bottom-20 right-4 z-50 sm:bottom-8 sm:right-6"
-            style={previewReviewChromeLiftStyle}
+            className={cn(
+              "fixed right-4 z-40 sm:right-6",
+              isVendorCheckout
+                ? "bottom-[calc(var(--checkout-mobile-chrome-height,9rem)+0.75rem)] lg:bottom-8"
+                : "bottom-20 sm:bottom-8",
+            )}
+            style={isVendorCheckout ? undefined : previewReviewChromeLiftStyle}
           >
             <motion.button
               type="button"
@@ -1450,7 +1459,10 @@ Is there anything else I can help you with?`,
             }
             transition={{ type: "spring", stiffness: 380, damping: 28 }}
             className={cn(
-              "fixed bottom-10 right-4 z-50 flex w-[min(100vw-2rem,22rem)] flex-col overflow-hidden sm:right-6 md:w-96",
+              "fixed right-4 z-40 flex w-[min(100vw-2rem,22rem)] flex-col overflow-hidden sm:right-6 md:w-96",
+              isVendorCheckout
+                ? "bottom-[calc(var(--checkout-mobile-chrome-height,9rem)+0.5rem)] lg:bottom-10"
+                : "bottom-10",
               "rounded-2xl border border-slate-200 bg-white",
               "shadow-[0_16px_48px_rgba(15,23,42,0.16)]",
               "origin-bottom-right",
@@ -1458,7 +1470,7 @@ Is there anything else I can help you with?`,
             )}
             style={{
               transition: "height 300ms ease-out",
-              ...previewReviewChromeLiftStyle,
+              ...(isVendorCheckout ? {} : previewReviewChromeLiftStyle),
             }}
           >
             <div className="flex h-14 shrink-0 items-center justify-between gap-2 bg-slate-800 px-3.5 text-white">

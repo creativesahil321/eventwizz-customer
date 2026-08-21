@@ -36,12 +36,21 @@ import type { StepFiveSavePayload } from "@/services/vendor/events/events.servic
 import { persistAiEventDraftId } from "./ai-event-draft-storage";
 import type { StepThreeType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import {
+  AI_EVENT_MAX_ROOMS,
+  AI_EVENT_MIN_ROOMS,
+  inferAiEventRemovedSections,
+  parseAiEventVendorIntent,
   resolveRoomBrochureDescription,
   resolveRoomMenuFields,
   resolveRoomPackageFields,
   type AIEventRoomBrochure,
 } from "./ai-event-vendor-intent";
 import type { AIDate } from "@/app/api/ai/generate-onboarding/route";
+import {
+  ensureOnboardingDates,
+  hasUsableOnboardingDates,
+} from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
+import { fillAiEventGeneratedDefaults } from "./fill-ai-event-content";
 
 export const AI_EVENT_APPLY_STEPS = [
   { label: "Event details and schedule", icon: "📅" },
@@ -62,8 +71,14 @@ export type ApplyAIGeneratedEventResult = {
   isRooms: boolean;
 };
 
-const AI_EVENT_MIN_ROOMS = 2;
-const AI_EVENT_MAX_ROOMS = 3;
+const FALLBACK_DRINK_TITLE = "Drinks & Packages";
+const FALLBACK_DRINK_DESCRIPTION =
+  "Drink packages available with this event.";
+
+function requiredText(value: unknown, fallback: string): string {
+  const t = String(value ?? "").trim();
+  return t.length > 0 ? t : fallback;
+}
 
 type AiStepTwoPackageFields = {
   package_title: string;
@@ -226,8 +241,16 @@ async function applyAIGeneratedEventToBackendInner(params: {
   onProgress?: ApplyAIEventProgress;
   onEventCreated?: (eventId: number) => void;
 }): Promise<ApplyAIGeneratedEventResult> {
-  const { content: s, eventInput, categoryId, onProgress } = params;
-  const removedSections = params.removedSections ?? new Set<string>();
+  const { eventInput, categoryId, onProgress } = params;
+  const s = fillAiEventGeneratedDefaults(params.content, eventInput);
+  const vendorIntent = parseAiEventVendorIntent(
+    eventInput.eventDescription,
+    eventInput.room_names,
+  );
+  const removedSections = new Set([
+    ...(params.removedSections ?? []),
+    ...inferAiEventRemovedSections(vendorIntent),
+  ]);
 
   const eventType = eventInput.eventType || "other";
   const dummyImages =
@@ -391,16 +414,16 @@ async function applyAIGeneratedEventToBackendInner(params: {
 
   onProgress?.(2);
   if (!removedSections.has("stepThree")) {
-    const rawDates = s.stepThree.dates || [];
+    const bookingFacts = vendorIntent.bookingFacts;
+    const rawDates = hasUsableOnboardingDates(s.stepThree.dates as AIDate[])
+      ? (s.stepThree.dates as AIDate[])
+      : ensureOnboardingDates(s.stepThree.dates as AIDate[], bookingFacts);
     const perRoomDates = s.stepThree.rooms ?? [];
     const defaultRoomId =
       useRoomSystem && createdRooms[0]?.id ? createdRooms[0].id : undefined;
 
     const datesForForm = cleanVendorStepThreeDatesForForm(
-      mapAiDatesToFormDates(rawDates as AIDate[], defaultRoomId) as StepThreeType["dates"],
-    );
-    const datesForApi = datesForForm.map((date) =>
-      formatVendorStepThreeDateForApi(date),
+      mapAiDatesToFormDates(rawDates, defaultRoomId) as StepThreeType["dates"],
     );
 
     if (useRoomSystem && createdRooms.length > 0) {
@@ -411,8 +434,9 @@ async function applyAIGeneratedEventToBackendInner(params: {
         is_rooms: 1,
         rooms: createdRooms.map((room) => {
           const aiRoom = matchAiRoomName(perRoomDates, room.name);
-          const roomRawDates =
-            aiRoom?.dates?.length ? (aiRoom.dates as AIDate[]) : (rawDates as AIDate[]);
+          const roomRawDates = hasUsableOnboardingDates(aiRoom?.dates as AIDate[])
+            ? (aiRoom!.dates as AIDate[])
+            : rawDates;
           const roomDatesForForm = cleanVendorStepThreeDatesForForm(
             mapAiDatesToFormDates(roomRawDates, room.id) as StepThreeType["dates"],
           );
@@ -438,11 +462,18 @@ async function applyAIGeneratedEventToBackendInner(params: {
   await sleep(300);
 
   onProgress?.(3);
-  const cateringOption = removedSections.has("stepFour")
-    ? 0
-    : s.stepFour.catering_option === 1
-      ? 1
-      : 0;
+  const hasMenuItems = (s.stepFour.menus ?? []).some(
+    (menu) =>
+      String(menu.name ?? "").trim().length > 0 &&
+      Array.isArray(menu.items) &&
+      menu.items.some((item) => String(item.title ?? "").trim().length > 0),
+  );
+  const cateringOption =
+    removedSections.has("stepFour") || !hasMenuItems
+      ? 0
+      : s.stepFour.catering_option === 1
+        ? 1
+        : 0;
   const hasCatering = cateringOption === 1;
   const menus = hasCatering ? (s.stepFour.menus ?? []) : [];
 
@@ -551,8 +582,8 @@ async function applyAIGeneratedEventToBackendInner(params: {
   }
   await sleep(300);
 
-  const stepFiveAny = s.stepFive as Record<string, unknown>;
-  const stepSixAny = s.stepSix as Record<string, unknown>;
+  const stepFiveAny = (s.stepFive ?? {}) as Record<string, unknown>;
+  const stepSixAny = (s.stepSix ?? {}) as Record<string, unknown>;
   const legacyAiShape =
     typeof stepFiveAny.drink_title === "string" || Array.isArray(stepFiveAny.packages);
 
@@ -650,83 +681,90 @@ async function applyAIGeneratedEventToBackendInner(params: {
       price: p.price ?? 0,
       available_quantity: p.available_quantity ?? 0,
     }));
+  const perRoomDrinks = s.stepFive?.rooms ?? [];
+  const mapRoomPackages = (
+    packages:
+      | Array<{
+          title?: string;
+          description?: string;
+          price?: number;
+          available_quantity?: number;
+        }>
+      | undefined,
+  ) =>
+    (packages ?? [])
+      .filter((p) => String(p.title ?? "").trim() !== "")
+      .map((p) => ({
+        title: p.title || "",
+        description: p.description || "",
+        price: p.price ?? 0,
+        available_quantity: p.available_quantity ?? 0,
+      }));
+  const anyRoomDrinkPackages = perRoomDrinks.some(
+    (room) => mapRoomPackages(room.packages).length > 0,
+  );
   const hasUsableDrinksContent =
     !drinksSectionRemoved &&
-    String(drinksSource.drink_title ?? "").trim() !== "" &&
-    String(drinksSource.drink_description ?? "").trim() !== "" &&
-    mappedDrinkPackages.length > 0;
+    (mappedDrinkPackages.length > 0 || anyRoomDrinkPackages);
 
-  const placeholderDrinkPackages = [
-    {
-      title: "Standard",
-      description: "Standard package",
-      price: 50,
-      available_quantity: 100,
-    },
-  ];
-
-  const perRoomDrinks = s.stepFive.rooms ?? [];
-
-  await eventsService.storeStepSixData(
-    useRoomSystem && createdRooms.length > 0
-      ? {
-          step: 6 as const,
-          event_id: eventId,
-          is_rooms: 1,
-          rooms: createdRooms.map((room) => {
-            const aiDrink = matchAiRoomName(perRoomDrinks, room.name);
-            const roomPackages =
-              aiDrink?.packages?.length
-                ? aiDrink.packages.map((p) => ({
-                    title: p.title || "",
-                    description: p.description || "",
-                    price: p.price ?? 0,
-                    available_quantity: p.available_quantity ?? 0,
-                  }))
-                : hasUsableDrinksContent
-                  ? mappedDrinkPackages
-                  : placeholderDrinkPackages;
-            const roomHasDrinks =
-              String(aiDrink?.drink_title ?? drinksSource.drink_title ?? "").trim() !== "" &&
-              roomPackages.length > 0;
-            return {
-              room_id: room.id,
-              drink_title: roomHasDrinks
-                ? String(aiDrink?.drink_title ?? drinksSource.drink_title).trim()
-                : "Drinks",
-              drink_description: roomHasDrinks
-                ? String(
-                    aiDrink?.drink_description ?? drinksSource.drink_description,
-                  ).trim()
-                : "Drink packages",
-              packages: roomHasDrinks ? roomPackages : placeholderDrinkPackages,
-            };
-          }),
-          drink_title: hasUsableDrinksContent
-            ? String(drinksSource.drink_title).trim()
-            : "Drinks",
-          drink_description: hasUsableDrinksContent
-            ? String(drinksSource.drink_description).trim()
-            : "Drink packages",
-          packages: hasUsableDrinksContent
-            ? mappedDrinkPackages
-            : placeholderDrinkPackages,
-        }
-      : {
-          step: 6 as const,
-          event_id: eventId,
-          is_rooms: 0,
-          drink_title: hasUsableDrinksContent
-            ? String(drinksSource.drink_title).trim()
-            : "Drinks",
-          drink_description: hasUsableDrinksContent
-            ? String(drinksSource.drink_description).trim()
-            : "Drink packages",
-          packages: hasUsableDrinksContent
-            ? mappedDrinkPackages
-            : placeholderDrinkPackages,
-        },
-  );
+  if (hasUsableDrinksContent) {
+    const packagesForSave =
+      mappedDrinkPackages.length > 0
+        ? mappedDrinkPackages
+        : mapRoomPackages(
+            perRoomDrinks.find((room) => mapRoomPackages(room.packages).length > 0)
+              ?.packages,
+          );
+    await eventsService.storeStepSixData(
+      useRoomSystem && createdRooms.length > 0
+        ? {
+            step: 6 as const,
+            event_id: eventId,
+            is_rooms: 1,
+            rooms: createdRooms.map((room) => {
+              const aiDrink = matchAiRoomName(perRoomDrinks, room.name);
+              const roomPackages = mapRoomPackages(aiDrink?.packages);
+              const packages =
+                roomPackages.length > 0 ? roomPackages : packagesForSave;
+              return {
+                room_id: room.id,
+                drink_title: requiredText(
+                  aiDrink?.drink_title ?? drinksSource.drink_title,
+                  FALLBACK_DRINK_TITLE,
+                ),
+                drink_description: requiredText(
+                  aiDrink?.drink_description ?? drinksSource.drink_description,
+                  FALLBACK_DRINK_DESCRIPTION,
+                ),
+                packages,
+              };
+            }),
+            drink_title: requiredText(
+              drinksSource.drink_title,
+              FALLBACK_DRINK_TITLE,
+            ),
+            drink_description: requiredText(
+              drinksSource.drink_description,
+              FALLBACK_DRINK_DESCRIPTION,
+            ),
+            packages: packagesForSave,
+          }
+        : {
+            step: 6 as const,
+            event_id: eventId,
+            is_rooms: 0,
+            drink_title: requiredText(
+              drinksSource.drink_title,
+              FALLBACK_DRINK_TITLE,
+            ),
+            drink_description: requiredText(
+              drinksSource.drink_description,
+              FALLBACK_DRINK_DESCRIPTION,
+            ),
+            packages: packagesForSave,
+          },
+    );
+  }
   await sleep(300);
 
   onProgress?.(6);
@@ -734,7 +772,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
     await eventsService.storeStepSevenData({
       step: 7 as const,
       event_id: eventId,
-      faqs: s.stepSeven.faqs.slice(0, STEP_NINE_MAX_FAQS),
+      faqs: (s.stepSeven?.faqs ?? []).slice(0, STEP_NINE_MAX_FAQS),
     });
   }
 
