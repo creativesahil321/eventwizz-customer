@@ -4,6 +4,7 @@ import type {
   AIEventInput,
 } from "@/app/api/ai/generate-event/route";
 import {
+  applyTicketsOnlyToDates,
   coerceAiStepFiveRooms,
   ensureOnboardingDates,
   hasUsableOnboardingDates,
@@ -71,10 +72,11 @@ export function fillAiEventGeneratedDefaults(
     rooms: src.stepTwo?.rooms,
   };
 
-  const dates = ensureOnboardingDates(
-    src.stepThree?.dates,
-    vendorHints.bookingFacts,
-  );
+  const dates = vendorHints.prefersTicketsOnly
+    ? applyTicketsOnlyToDates(
+        ensureOnboardingDates(src.stepThree?.dates, vendorHints.bookingFacts),
+      )
+    : ensureOnboardingDates(src.stepThree?.dates, vendorHints.bookingFacts);
   const existingRooms = coerceAiStepFiveRooms(src.stepThree?.rooms);
   const stepThree = {
     dates,
@@ -83,14 +85,17 @@ export function fillAiEventGeneratedDefaults(
           const existing = existingRooms.find(
             (room) => room.room_name.toLowerCase() === name.toLowerCase(),
           );
+          const roomDates = ensureOnboardingDates(
+            hasUsableOnboardingDates(existing?.dates)
+              ? existing!.dates
+              : dates,
+            vendorHints.bookingFacts,
+          );
           return {
             room_name: name,
-            dates: ensureOnboardingDates(
-              hasUsableOnboardingDates(existing?.dates)
-                ? existing!.dates
-                : dates,
-              vendorHints.bookingFacts,
-            ),
+            dates: vendorHints.prefersTicketsOnly
+              ? applyTicketsOnlyToDates(roomDates)
+              : roomDates,
           };
         })
       : [],

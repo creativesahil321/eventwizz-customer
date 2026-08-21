@@ -61,6 +61,13 @@ import {
   resolvePublicRoomIndexFromId,
 } from "@/lib/resolve-public-event-room-slices";
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
+import {
+  EventSectionNav,
+  EVENT_SECTION_IDS,
+  EVENT_SECTION_NAV_HEIGHT,
+  EVENT_SECTION_NAV_HEIGHT_PX,
+  buildEventSectionNavItems,
+} from "@/components/public/event-section-nav";
 
 /** Sticky site header height — keep scroll targets / triggers clear of the header. */
 const BASE_HEADER_OFFSET_PX = 72;
@@ -156,7 +163,7 @@ export default function EventDetailClient({
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           scrollToElementIfNeeded(bookingRef.current, {
-            headerOffsetPx,
+            headerOffsetPx: headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX,
           });
         });
       });
@@ -266,12 +273,44 @@ export default function EventDetailClient({
     [slices.event_galley],
   );
 
+  const showGallery = (galleryItems?.length ?? 0) > 0;
+  const showMenu = Boolean(slices.menus && slices.menus.length > 0);
+  const showFaqs = Boolean(eventData.faqs && eventData.faqs.length > 0);
+
+  const sectionNavItems = useMemo(
+    () =>
+      buildEventSectionNavItems({
+        about: true,
+        rooms: showRoomSelector,
+        schedule: showTimeline,
+        dates: true,
+        gallery: showGallery,
+        menu: showMenu,
+        faqs: showFaqs,
+      }),
+    [showRoomSelector, showTimeline, showGallery, showMenu, showFaqs],
+  );
+  const showSectionNav = sectionNavItems.length > 0;
+  const sectionNavStickyTop = roomBarStickyTop;
+  const roomSelectorStickyTop = showSectionNav
+    ? `calc(${roomBarStickyTop} + ${EVENT_SECTION_NAV_HEIGHT})`
+    : roomBarStickyTop;
+  const sectionAnchorClass =
+    "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
+
   const activeRoomId = slices.activeRoom?.room_id;
   const roomContentKey = activeRoomId ?? `room-${currentRoomIndex}`;
 
   return (
     <CartConflictProvider>
-      <div className="event-detail-page">
+      <div
+        className="event-detail-page"
+        style={{
+          ["--event-sticky-offset" as string]: showSectionNav
+            ? `calc(${roomBarStickyTop} + ${EVENT_SECTION_NAV_HEIGHT})`
+            : roomBarStickyTop,
+        }}
+      >
         <CommonHeader
           variant="default"
           headerDownloads={pdfDownloadLinks}
@@ -294,7 +333,7 @@ export default function EventDetailClient({
             currentRoomIndex={currentRoomIndex}
             onRoomChange={handleRoomChange}
             visible={roomSelectorVisible}
-            stickyTop={roomBarStickyTop}
+            stickyTop={roomSelectorStickyTop}
           />
         ) : null}
 
@@ -330,7 +369,19 @@ export default function EventDetailClient({
           />
         </div>
 
-        <div ref={aboutRef}>
+        {showSectionNav ? (
+          <EventSectionNav
+            items={sectionNavItems}
+            stickyTop={sectionNavStickyTop}
+            headerOffsetPx={headerOffsetPx}
+          />
+        ) : null}
+
+        <div
+          ref={aboutRef}
+          id={EVENT_SECTION_IDS.about}
+          className={sectionAnchorClass}
+        >
           <AboutEventSec
             about_event_heading={eventData.about_event_heading}
             about_event_sub_heading={eventData.about_event_sub_heading}
@@ -341,7 +392,7 @@ export default function EventDetailClient({
         </div>
 
         {showRoomSelector ? (
-          <div ref={chooserRef}>
+          <div ref={chooserRef} id={EVENT_SECTION_IDS.rooms} className={sectionAnchorClass}>
             <EventRoomChooser
               rooms={roomSummaries}
               currentRoomIndex={currentRoomIndex}
@@ -352,7 +403,7 @@ export default function EventDetailClient({
         ) : null}
 
         {showTimeline ? (
-          <div ref={timelineRef}>
+          <div ref={timelineRef} id={EVENT_SECTION_IDS.schedule} className={sectionAnchorClass}>
             <RoomContentTransition roomKey={roomContentKey}>
               <Timeline
                 eventSchedular={timelineRows}
@@ -382,8 +433,8 @@ export default function EventDetailClient({
 
         <div
           ref={bookingRef}
-          id="booking"
-          className={EVENT_BOOKING_SECTION_CLASSNAME}
+          id={EVENT_SECTION_IDS.dates}
+          className={cn(EVENT_BOOKING_SECTION_CLASSNAME, sectionAnchorClass)}
         >
           <RoomContentTransition roomKey={roomContentKey}>
             <DatesSection
@@ -401,13 +452,17 @@ export default function EventDetailClient({
           </RoomContentTransition>
         </div>
 
-        <EventGallery
-          gallery={galleryItems}
-          headingEmphasis={headingEmphasisFromSite}
-        />
+        {showGallery ? (
+          <div id={EVENT_SECTION_IDS.gallery} className={sectionAnchorClass}>
+            <EventGallery
+              gallery={galleryItems}
+              headingEmphasis={headingEmphasisFromSite}
+            />
+          </div>
+        ) : null}
 
         {slices.menus && slices.menus.length > 0 && (
-          <div ref={menuRef}>
+          <div ref={menuRef} id={EVENT_SECTION_IDS.menu} className={sectionAnchorClass}>
             <RoomContentTransition roomKey={roomContentKey}>
               <LazyMenuSection
                 menu_title={slices.menu_title}
@@ -464,7 +519,7 @@ export default function EventDetailClient({
         </div>
 
         {eventData.faqs && eventData.faqs.length > 0 && (
-          <div ref={faqRef}>
+          <div ref={faqRef} id={EVENT_SECTION_IDS.faqs} className={sectionAnchorClass}>
             <LazyFaqSection
               faqs={eventData.faqs}
               headingEmphasis={headingEmphasisFromSite}

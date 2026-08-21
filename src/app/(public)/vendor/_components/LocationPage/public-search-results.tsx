@@ -26,6 +26,10 @@ import type {
 } from "@/services/common/public-search";
 import type { LocationSearchFilters } from "./_lib/search-filters";
 import { LocationEventCard } from "../EventListPage/location-event-card";
+import {
+  getEventCardDateLabel,
+  getEventCardTimeLabel,
+} from "../EventListPage/event-card-utils";
 import { LOCATION_EVENTS_ANCHOR_ID } from "./location-page-hero-search";
 
 const FALLBACK_IMAGE =
@@ -332,9 +336,7 @@ export function PublicSearchResults({
                 !Number.isNaN(Number(event.lowest_price))
                   ? formatMoneyCompact(Number(event.lowest_price), currencySym)
                   : null;
-              const dateLabel = event.next_available_date
-                ? formatSlotDate(event.next_available_date)
-                : null;
+              const dateLabel = getEventCardDateLabel(event);
               const cardKey = `${item.location.slug}:${event.slug}`;
 
               return (
@@ -344,6 +346,7 @@ export function PublicSearchResults({
                       title: event.name || "",
                       price,
                       dateLabel,
+                      timeLabel: getEventCardTimeLabel(event),
                       category: event.category?.name ?? null,
                       image: event.banner_image || FALLBACK_IMAGE,
                       slug: event.slug || "",

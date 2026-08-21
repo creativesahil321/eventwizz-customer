@@ -1,29 +1,158 @@
 import type { Event } from "@/services/common/events/type";
+import {
+  formatMoneyCompact,
+  resolveCurrencySymbol,
+} from "@/lib/currency-format";
+import type { LocationEventCardModel } from "./location-event-card";
+
+const CLOCK_RE =
+  /(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)(?:\s*[-–]\s*(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?))?/;
+
+export type EventCardTimeSource = Pick<
+  Event,
+  | "start_time"
+  | "end_time"
+  | "event_time"
+  | "formatted_time"
+  | "time"
+  | "next_available_date"
+  | "next_event_date"
+  | "event_date"
+  | "formatted_date"
+  | "date"
+  | "start_date"
+>;
+
+function firstNonEmpty(
+  ...values: Array<string | null | undefined>
+): string | null {
+  for (const value of values) {
+    if (value == null) continue;
+    const trimmed = String(value).trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+function formatClock(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+
+  const twentyFour = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (twentyFour) {
+    return `${twentyFour[1].padStart(2, "0")}:${twentyFour[2]}`;
+  }
+
+  const ampm = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])$/);
+  if (ampm) {
+    let hours = Number.parseInt(ampm[1], 10);
+    const minutes = ampm[2];
+    const isPm = ampm[3].toLowerCase() === "pm";
+    if (isPm && hours < 12) hours += 12;
+    if (!isPm && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+
+  return t;
+}
+
+function timeFromDateLike(raw: string): string | null {
+  const iso = raw.match(/T(\d{2}:\d{2})(?::\d{2})?/);
+  if (iso) return iso[1];
+
+  const match = raw.match(CLOCK_RE);
+  if (!match) return null;
+  const start = formatClock(match[1]);
+  const end = match[2] ? formatClock(match[2]) : null;
+  if (start && end) return `${start} – ${end}`;
+  return start;
+}
+
+function stripTimeFromDateLabel(value: string): string {
+  return value
+    .replace(
+      /[,\s]*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?(?:\s*[-–]\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)?\s*$/,
+      "",
+    )
+    .replace(/T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/, "")
+    .trim();
+}
+
+function parseCardDate(raw: string): Date | null {
+  const isoDay = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (isoDay) {
+    const parsed = new Date(
+      Number(isoDay[1]),
+      Number(isoDay[2]) - 1,
+      Number(isoDay[3]),
+    );
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 /**
  * Label for event list cards when the API sends a date (any common key).
  */
-export function getEventCardDateLabel(event: Event): string | null {
-  const raw =
-    event.event_date ??
-    event.formatted_date ??
-    event.date ??
-    event.start_date;
-  if (raw == null || String(raw).trim() === "") return null;
-  const s = String(raw).trim();
-  if (/^[A-Za-z]{3}\s+\d{1,2}/.test(s)) return s;
-  const d = new Date(s);
-  if (!Number.isNaN(d.getTime())) {
-    return d.toLocaleDateString("en-GB", {
-      month: "short",
+export function getEventCardDateLabel(event: EventCardTimeSource): string | null {
+  const raw = firstNonEmpty(
+    event.next_available_date,
+    event.next_event_date,
+    event.event_date,
+    event.formatted_date,
+    event.date,
+    event.start_date,
+  );
+  if (!raw) return null;
+
+  const withoutTime = stripTimeFromDateLabel(raw);
+  if (/^[A-Za-z]{3}\s+\d{1,2}/.test(withoutTime)) return withoutTime;
+
+  const parsed = parseCardDate(raw);
+  if (parsed) {
+    return parsed.toLocaleDateString("en-GB", {
+      weekday: "short",
       day: "numeric",
+      month: "short",
+      year: "numeric",
     });
   }
-  return s;
+
+  return withoutTime || raw;
+}
+
+/** Time range for event list cards when the API sends a start/end (or embeds it in a date). */
+export function getEventCardTimeLabel(event: EventCardTimeSource): string | null {
+  const start = formatClock(
+    firstNonEmpty(
+      event.start_time,
+      event.event_time,
+      event.formatted_time,
+      event.time,
+    ) ?? "",
+  );
+  const end = formatClock(firstNonEmpty(event.end_time) ?? "");
+  if (start && end) return `${start} – ${end}`;
+  if (start) return start;
+
+  const dateRaw = firstNonEmpty(
+    event.formatted_date,
+    event.next_available_date,
+    event.next_event_date,
+    event.event_date,
+    event.date,
+    event.start_date,
+  );
+  return dateRaw ? timeFromDateLike(dateRaw) : null;
 }
 
 /** Category label for event list cards (e.g. Christmas, Lipstick). */
 export function getEventCardCategoryLabel(event: Event): string | null {
+  const fromSearchCategory = event.category?.name?.trim();
+  if (fromSearchCategory) return fromSearchCategory;
+
   const fromName = event.event_category_name?.trim();
   if (fromName) return fromName;
 
@@ -35,4 +164,31 @@ export function getEventCardCategoryLabel(event: Event): string | null {
   }
 
   return null;
+}
+
+export function formatEventCardFromPrice(price: string | null): string | null {
+  if (!price?.trim()) return null;
+  const trimmed = price.trim();
+  if (/^from\s+/i.test(trimmed)) return trimmed;
+  return `from ${trimmed}`;
+}
+
+export function toLocationEventCardModel(
+  event: Event,
+  currencySym: string,
+  imageFallback: string,
+): LocationEventCardModel {
+  const symbol = resolveCurrencySymbol(currencySym);
+  return {
+    title: event.name || "",
+    price:
+      event.lowest_price != null && !Number.isNaN(Number(event.lowest_price))
+        ? formatMoneyCompact(Number(event.lowest_price), symbol)
+        : null,
+    dateLabel: getEventCardDateLabel(event),
+    timeLabel: getEventCardTimeLabel(event),
+    category: getEventCardCategoryLabel(event),
+    image: event.banner_image || imageFallback,
+    slug: event.slug || "",
+  };
 }

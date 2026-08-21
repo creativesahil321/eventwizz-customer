@@ -10,6 +10,8 @@ function normalize(value: string | null | undefined): string {
 
 function eventDateRaw(event: Event): string | null {
   const candidates = [
+    event.next_available_date,
+    event.next_event_date,
     event.event_date,
     event.formatted_date,
     event.date,
@@ -30,6 +32,9 @@ function parseEventDate(raw: string | null): Date | null {
 }
 
 function categoryLabel(event: Event): string {
+  if (typeof event.category?.name === "string") {
+    return event.category.name;
+  }
   if (typeof event.event_category_name === "string") {
     return event.event_category_name;
   }

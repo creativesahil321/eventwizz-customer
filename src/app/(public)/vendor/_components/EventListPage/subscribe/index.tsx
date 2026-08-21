@@ -44,9 +44,9 @@ export default function SubscribeSection({ emphasis }: SubscribeSectionProps = {
     "h-[42px] rounded-xl border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-background)]/90 text-[var(--color-text)] placeholder:text-[var(--color-text-dimmed)] focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]";
 
   return (
-    <section className="relative overflow-hidden border-t border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[var(--color-background)] py-16 md:py-20">
+    <section className="relative overflow-hidden bg-[var(--color-surface)] py-16 md:py-20">
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,color-mix(in_srgb,var(--color-primary)_10%,transparent),transparent)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,color-mix(in_srgb,var(--color-primary)_8%,transparent),transparent)]"
         aria-hidden
       />
       <div className="relative z-10 mx-auto w-full max-w-[1180px] px-4 text-center sm:px-6">

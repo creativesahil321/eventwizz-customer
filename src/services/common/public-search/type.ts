@@ -31,6 +31,8 @@ export type PublicSearchEventCard = {
   lowest_price: number | null;
   category: PublicSearchCategory | null;
   next_available_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
 };
 
 export type SearchEventResult = {

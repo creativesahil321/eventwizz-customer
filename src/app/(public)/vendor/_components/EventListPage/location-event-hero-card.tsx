@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Loader2 } from "lucide-react";
+import { Calendar, Clock, Loader2 } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -88,10 +88,20 @@ export function LocationEventHeroCard({
             "transition-colors duration-300 group-hover:!text-[color:var(--color-primary)]",
           )}
         />
-        {event.dateLabel ? (
-          <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
-            <Calendar className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
-            <span>{event.dateLabel}</span>
+        {event.dateLabel || event.timeLabel ? (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-white/90 sm:text-sm">
+            {event.dateLabel ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
+                {event.dateLabel}
+              </span>
+            ) : null}
+            {event.timeLabel ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
+                {event.timeLabel}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>

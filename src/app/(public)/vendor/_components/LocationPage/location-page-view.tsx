@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode, RefObject } from "react";
-import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import type {
   BannerHeadingAlign,
   BannerHeadingValign,
@@ -14,6 +14,7 @@ import { LocationMarketingBody } from "@/components/public/location-marketing-se
 import HeroBanner from "../EventListPage/hero-banner";
 import ExperienceSection from "../EventListPage/experience";
 import FooterSection from "../EventListPage/footer";
+import SubscribeSection from "../EventListPage/subscribe";
 import { LocationEventSearchResults } from "./location-event-search-results";
 import { PublicSearchResults } from "./public-search-results";
 import {
@@ -100,6 +101,10 @@ export function LocationPageView({
   });
 
   const cityLabel = locationData.city || settings?.name || "";
+  const headingEmphasis =
+    settings?.typography?.headingEmphasis != null
+      ? normalizeHeadingEmphasis(settings.typography.headingEmphasis)
+      : undefined;
   const searchBar = (
     <LocationPageHeroSearch
       cityLabel={locationData.city || cityLabel || null}
@@ -165,11 +170,7 @@ export function LocationPageView({
             bannerHeading={locationData.banner_heading}
             bannerSubHeading={locationData.banner_sub_heading}
             bannerHeadingAccent={settings?.banner_heading_accent}
-            headingEmphasis={
-              settings?.typography?.headingEmphasis as
-                | HeadingEmphasis
-                | undefined
-            }
+            headingEmphasis={headingEmphasis}
             bannerHeadingAlign={
               settings?.banner_heading_align as BannerHeadingAlign | null | undefined
             }
@@ -197,6 +198,8 @@ export function LocationPageView({
           />
         </>
       )}
+
+      <SubscribeSection emphasis={headingEmphasis} />
 
       <FooterSection
         copyright={settings?.copyright}

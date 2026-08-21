@@ -10,21 +10,40 @@ import type { CouponStripSource } from "@/lib/coupon-strip-props";
 import type { PublicEventDateDiscount } from "@/components/public/date-card-offer";
 
 /**
- * Event definition for location pages
+ * Public listing card category (`latest_events` / `upcoming_events` / search).
+ */
+export type PublicEventCardCategory = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
+/**
+ * Event row on location listings (`latest_events` / `upcoming_events`).
+ * Live API: name, slug, banner_image, lowest_price, category, next_available_date,
+ * start_time, end_time. Extra date/time aliases are preview / older payloads only.
  */
 export interface Event {
   name: string;
   slug: string;
   banner_image: string;
   lowest_price: number;
-  /** Event category label for marketing cards (e.g. Christmas, Lipstick) */
+  category?: PublicEventCardCategory | null;
+  next_available_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  /** @deprecated Live listings send `category.name` */
   event_category_name?: string | null;
   event_category?: string | { name?: string | null } | null;
-  /** Human-readable date for marketing cards when API provides it */
+  /** @deprecated Live listings send `next_available_date` */
   event_date?: string | null;
+  next_event_date?: string | null;
   formatted_date?: string | null;
   date?: string | null;
   start_date?: string | null;
+  event_time?: string | null;
+  formatted_time?: string | null;
+  time?: string | null;
 }
 
 /**

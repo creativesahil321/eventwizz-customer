@@ -47,6 +47,14 @@ import {
   resolveVendorPreviewActiveSlices,
 } from "../_lib/resolve-vendor-preview-room-slices";
 import { VendorPreviewRoomSelector } from "./vendor-preview-room-selector";
+import {
+  EventSectionNav,
+  EVENT_SECTION_IDS,
+  EVENT_SECTION_NAV_HEIGHT,
+  EVENT_SECTION_NAV_HEIGHT_PX,
+  buildEventSectionNavItems,
+} from "@/components/public/event-section-nav";
+import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
@@ -159,7 +167,7 @@ export function EventPreview({
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           scrollToElementIfNeeded(bookingRef.current, {
-            headerOffsetPx: HEADER_OFFSET_PX,
+            headerOffsetPx: HEADER_OFFSET_PX + EVENT_SECTION_NAV_HEIGHT_PX,
             scrollContainer: previewContainerRef.current,
           });
         });
@@ -446,6 +454,28 @@ export function EventPreview({
     String(activePackage?.event_schedular_title ?? "").trim().length > 0 ||
     timelineRows.length > 0;
 
+  const showGallery = (galleryImages?.length ?? 0) > 0;
+  const sectionNavItems = useMemo(
+    () =>
+      buildEventSectionNavItems({
+        about: true,
+        rooms: showRoomSelector,
+        schedule: showTimeline,
+        dates: true,
+        gallery: showGallery,
+        menu: showMenu,
+        faqs: showFaqs,
+      }),
+    [showRoomSelector, showTimeline, showGallery, showMenu, showFaqs],
+  );
+  const showSectionNav = sectionNavItems.length > 0;
+  const sectionNavStickyTop = ONBOARDING_PREVIEW_HEADER_OFFSET;
+  const roomSelectorStickyTop = showSectionNav
+    ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
+    : ONBOARDING_PREVIEW_HEADER_OFFSET;
+  const sectionAnchorClass =
+    "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
+
   const brochureAddress =
     slices.eventAddress ||
     activeBrochure?.event_address ||
@@ -484,8 +514,17 @@ export function EventPreview({
                 ...previewStyles,
                 background: themeColors.background,
                 fontFamily: "var(--font-body)",
+                ["--event-sticky-offset" as string]: showSectionNav
+                  ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
+                  : ONBOARDING_PREVIEW_HEADER_OFFSET,
               }
-            : { ...previewStyles, fontFamily: "var(--font-body)" }
+            : {
+                ...previewStyles,
+                fontFamily: "var(--font-body)",
+                ["--event-sticky-offset" as string]: showSectionNav
+                  ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
+                  : ONBOARDING_PREVIEW_HEADER_OFFSET,
+              }
         }
       >
         <SiteEssentialsGoogleFontsLoader
@@ -516,6 +555,7 @@ export function EventPreview({
             onRoomChange={handleRoomChange}
             visible={roomSelectorVisible}
             layout="sticky"
+            stickyTop={roomSelectorStickyTop}
           />
         ) : null}
 
@@ -534,16 +574,27 @@ export function EventPreview({
           />
         </div>
 
-        <AboutEventSec
-          about_event_heading={s1?.about_event_heading || ""}
-          about_event_sub_heading={s1?.about_event_sub_heading || ""}
-          about_event_description={s1?.about_event_description || ""}
-          headingEmphasis={headingEmphasisForHero}
-          aboutHeadingAccentHint={heroAccentHint}
-        />
+        {showSectionNav ? (
+          <EventSectionNav
+            items={sectionNavItems}
+            stickyTop={sectionNavStickyTop}
+            headerOffsetPx={HEADER_OFFSET_PX}
+            scrollContainerRef={previewContainerRef}
+          />
+        ) : null}
+
+        <div id={EVENT_SECTION_IDS.about} className={sectionAnchorClass}>
+          <AboutEventSec
+            about_event_heading={s1?.about_event_heading || ""}
+            about_event_sub_heading={s1?.about_event_sub_heading || ""}
+            about_event_description={s1?.about_event_description || ""}
+            headingEmphasis={headingEmphasisForHero}
+            aboutHeadingAccentHint={heroAccentHint}
+          />
+        </div>
 
         {showRoomSelector ? (
-          <div ref={chooserRef}>
+          <div ref={chooserRef} id={EVENT_SECTION_IDS.rooms} className={sectionAnchorClass}>
             <EventRoomChooser
               rooms={roomSummaries}
               currentRoomIndex={currentRoomIndex}
@@ -554,20 +605,22 @@ export function EventPreview({
         ) : null}
 
         {showTimeline ? (
-          <RoomContentTransition roomKey={roomContentKey}>
-            <Timeline
-              eventSchedular={timelineRows}
-              eventSchedularTitle={activePackage?.event_schedular_title || ""}
-              eventSchedularCopy={activePackage?.event_schedule_subtitle || ""}
-              eventSchedularBackgroundImage={
-                typeof activePackage?.event_schedular_background_image ===
-                "string"
-                  ? activePackage.event_schedular_background_image
-                  : undefined
-              }
-              headingEmphasis={headingEmphasisForHero}
-            />
-          </RoomContentTransition>
+          <div id={EVENT_SECTION_IDS.schedule} className={sectionAnchorClass}>
+            <RoomContentTransition roomKey={roomContentKey}>
+              <Timeline
+                eventSchedular={timelineRows}
+                eventSchedularTitle={activePackage?.event_schedular_title || ""}
+                eventSchedularCopy={activePackage?.event_schedule_subtitle || ""}
+                eventSchedularBackgroundImage={
+                  typeof activePackage?.event_schedular_background_image ===
+                  "string"
+                    ? activePackage.event_schedular_background_image
+                    : undefined
+                }
+                headingEmphasis={headingEmphasisForHero}
+              />
+            </RoomContentTransition>
+          </div>
         ) : null}
 
         <RoomContentTransition roomKey={roomContentKey}>
@@ -587,7 +640,7 @@ export function EventPreview({
         <div
           ref={bookingRef}
           id="booking"
-          className={EVENT_BOOKING_SECTION_CLASSNAME}
+          className={`${EVENT_BOOKING_SECTION_CLASSNAME} ${sectionAnchorClass}`}
         >
           <RoomContentTransition roomKey={roomContentKey}>
             <DatesSection
@@ -602,27 +655,33 @@ export function EventPreview({
           </RoomContentTransition>
         </div>
 
-        <EventGallery
-          gallery={galleryImages}
-          galleryTitle={siteEssentials?.event_gallery_title || undefined}
-          headingEmphasis={headingEmphasisForHero}
-        />
-
-        {showMenu && (
-          <RoomContentTransition roomKey={roomContentKey}>
-            <LazyMenuSection
-              menu_title={activeMenu?.menu_title || ""}
-              menu_description={activeMenu?.menu_description || ""}
-              menus={menus}
-              catering_option={1}
-              menu_background_image={
-                typeof activeMenu?.menu_background_image === "string"
-                  ? activeMenu.menu_background_image
-                  : (activeMenu?.menu_background_image ?? undefined)
-              }
+        {showGallery ? (
+          <div id={EVENT_SECTION_IDS.gallery} className={sectionAnchorClass}>
+            <EventGallery
+              gallery={galleryImages}
+              galleryTitle={siteEssentials?.event_gallery_title || undefined}
               headingEmphasis={headingEmphasisForHero}
             />
-          </RoomContentTransition>
+          </div>
+        ) : null}
+
+        {showMenu && (
+          <div id={EVENT_SECTION_IDS.menu} className={sectionAnchorClass}>
+            <RoomContentTransition roomKey={roomContentKey}>
+              <LazyMenuSection
+                menu_title={activeMenu?.menu_title || ""}
+                menu_description={activeMenu?.menu_description || ""}
+                menus={menus}
+                catering_option={1}
+                menu_background_image={
+                  typeof activeMenu?.menu_background_image === "string"
+                    ? activeMenu.menu_background_image
+                    : (activeMenu?.menu_background_image ?? undefined)
+                }
+                headingEmphasis={headingEmphasisForHero}
+              />
+            </RoomContentTransition>
+          </div>
         )}
 
         {showDrinks && (
@@ -657,10 +716,12 @@ export function EventPreview({
         />
 
         {showFaqs && (
-          <LazyFaqSection
-            faqs={faqs}
-            headingEmphasis={headingEmphasisForHero}
-          />
+          <div id={EVENT_SECTION_IDS.faqs} className={sectionAnchorClass}>
+            <LazyFaqSection
+              faqs={faqs}
+              headingEmphasis={headingEmphasisForHero}
+            />
+          </div>
         )}
 
         <FooterSection

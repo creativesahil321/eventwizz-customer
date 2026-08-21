@@ -12,6 +12,7 @@ type VendorPreviewRoomSelectorProps = {
   visible?: boolean;
   /** Sticky below site header (default). `inline` for full-page preview under chrome. */
   layout?: "sticky" | "inline";
+  stickyTop?: string;
   className?: string;
 };
 
@@ -22,6 +23,7 @@ export function VendorPreviewRoomSelector({
   onRoomChange,
   visible = true,
   layout = "sticky",
+  stickyTop,
   className,
 }: VendorPreviewRoomSelectorProps) {
   return (
@@ -37,7 +39,9 @@ export function VendorPreviewRoomSelector({
       minRooms={2}
       layout={layout}
       stickyTop={
-        layout === "sticky" ? ONBOARDING_PREVIEW_HEADER_OFFSET : undefined
+        layout === "sticky"
+          ? (stickyTop ?? ONBOARDING_PREVIEW_HEADER_OFFSET)
+          : undefined
       }
       label="Choose Room"
       size="sm"

@@ -48,6 +48,28 @@ export interface VendorDescriptionHints {
   bookingFacts: VendorBookingFacts;
 }
 
+export function isTicketsOnlyIntent(text: string | undefined): boolean {
+  const lower = String(text ?? "").toLowerCase();
+  return /\b(tickets? only|ticket[- ]only|no tables|without tables|ticket booking only|don'?t (want|add|include|need) tables?|do not (want|add|include|need) tables?|skip tables?)\b/i.test(
+    lower,
+  );
+}
+
+export function applyTicketsOnlyToDates(dates: AIDate[] | undefined): AIDate[] {
+  return (dates ?? []).map((date) =>
+    normalizeAIDatePaymentFields({
+      ...date,
+      booking_type: "tickets",
+      tables: [],
+      payment_type: "full",
+      is_deposit_enabled: false,
+      deposit_type: undefined,
+      deposit_value: "",
+      deposit_due_date: "",
+    }),
+  );
+}
+
 /** Strip unsafe / noisy text; keep vendor intent readable for the model */
 export function sanitizeVendorDescription(
   raw: string | undefined,
@@ -190,6 +212,7 @@ export function coerceAiStepFiveRooms(rooms: unknown): AIRoomDates[] {
 export function extractVendorBookingFacts(description: string): VendorBookingFacts {
   const text = description.replace(/\s+/g, " ").trim();
   const lower = text.toLowerCase();
+  const ticketsOnly = isTicketsOnlyIntent(lower);
   const eventDates: string[] = [];
 
   for (const m of text.matchAll(/\b(20\d{2})-(\d{2})-(\d{2})\b/g)) {
@@ -233,7 +256,9 @@ export function extractVendorBookingFacts(description: string): VendorBookingFac
     pushMonthDays(m[2], m[1], m[3]);
   }
 
-  const tableCountMatch = lower.match(/\b(\d{1,3})\s+tab[a-z]{2,8}\b/);
+  const tableCountMatch = ticketsOnly
+    ? null
+    : lower.match(/\b(\d{1,3})\s+tab[a-z]{2,8}\b/);
   const tableCount = tableCountMatch ? Number(tableCountMatch[1]) : undefined;
 
   const ticketPriceMatch =
@@ -249,12 +274,13 @@ export function extractVendorBookingFacts(description: string): VendorBookingFac
     ? Number(ticketPriceMatch[1])
     : undefined;
 
-  const tablePpMatch =
-    lower.match(
+  const tablePpMatch = ticketsOnly
+    ? null
+    : lower.match(
       /(?:each|every|per)\s+table.{0,40}?(\d+(?:\.\d+)?)\s*(?:£|\$|€)?\s*(?:per person|pp|\/person|a head)/,
     ) ||
     lower.match(
-      /tables?.{0,40}(\d+(?:\.\d+)?)\s*(?:£|\$|€)?\s*(?:per person|pp|\/person|a head)/,
+      /(?:\d+\s+tables?|tables?\s+at|table price|table booking).{0,40}(\d+(?:\.\d+)?)\s*(?:£|\$|€)?\s*(?:per person|pp|\/person|a head)/,
     ) ||
     lower.match(
       /(\d+(?:\.\d+)?)\s*(?:£|\$|€)?\s*(?:per person|pp).{0,24}tables?/,
@@ -265,16 +291,18 @@ export function extractVendorBookingFacts(description: string): VendorBookingFac
   const tablePricePerPerson = tablePpMatch ? Number(tablePpMatch[1]) : undefined;
 
   const tableFlatMatch =
-    !tablePricePerPerson
-      ? lower.match(
+    ticketsOnly || tablePricePerPerson
+      ? null
+      : lower.match(
           /\btables?\s+(?:are|is|at|@|:)?\s*(?:£|\$|€)?\s*(\d+(?:\.\d+)?)\b/,
-        )
-      : null;
+        );
   const tablePrice = tableFlatMatch ? Number(tableFlatMatch[1]) : undefined;
 
-  const coversMatch = lower.match(
-    /\b(?:tables?|covers?)\s+(?:for|of)\s+(\d{1,2})\s*[–\-to]+\s*(\d{1,2})\b/,
-  );
+  const coversMatch = ticketsOnly
+    ? null
+    : lower.match(
+        /\b(?:tables?|covers?)\s+(?:for|of)\s+(\d{1,2})\s*[–\-to]+\s*(\d{1,2})\b/,
+      );
   const minPersons = coversMatch ? Number(coversMatch[1]) : undefined;
   const maxPersons = coversMatch ? Number(coversMatch[2]) : undefined;
 
@@ -379,25 +407,18 @@ export function parseVendorDescriptionHints(
       )) &&
     !/\b(full payment only|no deposit|pay in full)\b/i.test(lower);
 
-  const prefersTicketsOnly =
-    bookingFacts.ticketPrice != null &&
-    bookingFacts.tableCount == null &&
-    bookingFacts.tablePrice == null &&
-    bookingFacts.tablePricePerPerson == null
-      ? /\b(tickets? only|no tables|ticket booking only)\b/i.test(lower)
-      : /\b(tickets? only|no tables|ticket booking only)\b/i.test(lower) &&
-        bookingFacts.tableCount == null &&
-        bookingFacts.tablePricePerPerson == null;
+  const prefersTicketsOnly = isTicketsOnlyIntent(lower);
 
   const prefersTablesBooking =
-    (bookingFacts.tableCount != null ||
-      bookingFacts.tablePrice != null ||
-      bookingFacts.tablePricePerPerson != null) &&
-    bookingFacts.ticketPrice == null
-      ? true
-      : /\b(tables? only|table booking|reserved tables?)\b/i.test(lower) &&
-        !prefersTicketsOnly &&
-        bookingFacts.ticketPrice == null;
+    prefersTicketsOnly
+      ? false
+      : (bookingFacts.tableCount != null ||
+          bookingFacts.tablePrice != null ||
+          bookingFacts.tablePricePerPerson != null) &&
+          bookingFacts.ticketPrice == null
+        ? true
+        : /\b(tables? only|table booking|reserved tables?)\b/i.test(lower) &&
+          bookingFacts.ticketPrice == null;
   const wantsRoomSpecificDrinks =
     /\b(drinks? (are|is) not same|different drinks?|room[- ]?specific drinks?|per[- ]?room drinks?)\b/i.test(
       lower,
@@ -1094,8 +1115,13 @@ export function fillOnboardingContentDefaults(
       })
     : [];
   next.stepFive = {
-    dates,
-    rooms,
+    dates: omitHints.prefersTicketsOnly ? applyTicketsOnlyToDates(dates) : dates,
+    rooms: omitHints.prefersTicketsOnly
+      ? rooms.map((room) => ({
+          ...room,
+          dates: applyTicketsOnlyToDates(room.dates),
+        }))
+      : rooms,
   };
 
   const sevenRaw = next.stepSeven as unknown as Record<string, unknown> | undefined;

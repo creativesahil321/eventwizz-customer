@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  getEventCardCategoryLabel,
-  getEventCardDateLabel,
-} from "../event-card-utils";
+import { toLocationEventCardModel } from "../event-card-utils";
 import { LocationEventCard } from "../location-event-card";
 import { useMemo, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -22,10 +19,7 @@ const eventImages = [
 import { EventComponentProps } from "../event-types";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { SitePreviewDummyEventSection } from "../site-preview-dummy-events";
-import {
-  formatMoneyCompact,
-  resolveCurrencySymbol,
-} from "@/lib/currency-format";
+import { resolveCurrencySymbol } from "@/lib/currency-format";
 import {
   eventCarouselNavButtonClass,
   eventListingManyScrollItemClass,
@@ -56,19 +50,10 @@ export default function UpcomingEvents({
   // Use API events - no more dummy data
   const events = mapApiEventsToUI(apiEvents || []);
 
-  // Helper function to map API event format to UI format
   function mapApiEventsToUI(apiEvents: Event[]) {
-    return apiEvents.map((event) => ({
-      title: event.name || "",
-      price:
-        event.lowest_price != null && !Number.isNaN(Number(event.lowest_price))
-          ? formatMoneyCompact(Number(event.lowest_price), currencySym)
-          : null,
-      dateLabel: getEventCardDateLabel(event),
-      category: getEventCardCategoryLabel(event),
-      image: event.banner_image || eventImages[0],
-      slug: event.slug || "",
-    }));
+    return apiEvents.map((event) =>
+      toLocationEventCardModel(event, currencySym, eventImages[0]),
+    );
   }
 
   const scrollWatchKey = useMemo(

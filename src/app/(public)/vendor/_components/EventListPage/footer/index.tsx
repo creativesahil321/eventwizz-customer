@@ -278,7 +278,7 @@ export default function FooterSection({
 
   return (
     <footer
-      className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)] bg-[color:var(--color-footer)] text-[var(--color-on-footer)]"
+      className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]"
       style={
         needsReviewChromePadding
           ? {

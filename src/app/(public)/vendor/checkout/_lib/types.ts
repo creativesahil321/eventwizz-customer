@@ -37,5 +37,11 @@ export interface CheckoutHeaderProps {
   settings?: {
     logo?: string;
     name?: string;
+    colors?: {
+      header?: string;
+      footer?: string;
+      primary?: string;
+      text?: string;
+    };
   };
 }

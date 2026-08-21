@@ -21,6 +21,7 @@ import {
 } from "@/lib/event-form-limits";
 import type { AIDate, AIRoomDates, AIRoomDrinks } from "@/app/api/ai/generate-onboarding/route";
 import {
+  applyTicketsOnlyToDates,
   ensureOnboardingDates,
   hasUsableOnboardingDates,
   normalizeAIDatePaymentFields,
@@ -365,7 +366,11 @@ export async function POST(req: NextRequest) {
           })
           .map((d) => normalizeAIDatePaymentFields(d as AIDate) as AIEventDate);
 
-        if (vendorHints.wantsBothTicketsAndTables) {
+        if (vendorHints.prefersTicketsOnly) {
+          content.stepThree.dates = applyTicketsOnlyToDates(
+            content.stepThree.dates as AIDate[],
+          ) as AIEventDate[];
+        } else if (vendorHints.wantsBothTicketsAndTables) {
           content.stepThree.dates = content.stepThree.dates.map((d) => {
             if (d.booking_type === "tickets") {
               return normalizeAIDatePaymentFields({
@@ -443,6 +448,18 @@ export async function POST(req: NextRequest) {
         }));
       } else if (content.stepThree?.rooms) {
         content.stepThree.rooms = [];
+      }
+
+      if (vendorHints.prefersTicketsOnly && content.stepThree) {
+        content.stepThree.dates = applyTicketsOnlyToDates(
+          content.stepThree.dates as AIDate[],
+        ) as AIEventDate[];
+        if (Array.isArray(content.stepThree.rooms)) {
+          content.stepThree.rooms = content.stepThree.rooms.map((room) => ({
+            ...room,
+            dates: applyTicketsOnlyToDates(room.dates as AIDate[]),
+          }));
+        }
       }
 
       if (vendorHints.omitCatering) {

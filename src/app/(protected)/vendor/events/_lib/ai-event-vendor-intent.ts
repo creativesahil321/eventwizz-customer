@@ -120,15 +120,15 @@ export function parseAiEventVendorIntent(
     );
 
   const wantsBothTicketsAndTables =
-    (base.bookingFacts.ticketPrice != null &&
+    !base.prefersTicketsOnly &&
+    ((base.bookingFacts.ticketPrice != null &&
       (base.bookingFacts.tableCount != null ||
         base.bookingFacts.tablePrice != null ||
         base.bookingFacts.tablePricePerPerson != null)) ||
-    (/\b(tickets?\s+and\s+tables?|tables?\s+and\s+tickets?|both tickets and tables)\b/i.test(
-      lower,
-    ) &&
-      !base.prefersTicketsOnly &&
-      !base.prefersTablesBooking);
+      (/\b(tickets?\s+and\s+tables?|tables?\s+and\s+tickets?|both tickets and tables)\b/i.test(
+        lower,
+      ) &&
+        !base.prefersTablesBooking));
 
   const faqMatch = lower.match(
     /\b(at least|minimum|min\.?)\s*(\d{1,2})\s*(faq|faqs|frequently asked)\b/i,

@@ -16,6 +16,7 @@ export function buildPreviewSampleEventCard(
     slug: "preview-sample-event",
     image: PREVIEW_SAMPLE_EVENT_IMAGES[1],
     price: `From ${formatPrice(28)}`,
-    dateLabel: "Jun 20",
+    dateLabel: "Sat 20 Jun 2026",
+    timeLabel: "19:00 – 22:00",
   };
 }

@@ -5,17 +5,11 @@ import { format } from "date-fns";
 import { SearchX } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { ServerContext } from "@/lib/server-context";
-import {
-  formatMoneyCompact,
-  resolveCurrencySymbol,
-} from "@/lib/currency-format";
+import { resolveCurrencySymbol } from "@/lib/currency-format";
 import type { ThemeSchema } from "@/types/theme.types";
 import type { Event } from "@/services/common/events/type";
 import type { LocationSearchFilters } from "./_lib/search-filters";
-import {
-  getEventCardCategoryLabel,
-  getEventCardDateLabel,
-} from "../EventListPage/event-card-utils";
+import { toLocationEventCardModel } from "../EventListPage/event-card-utils";
 import { LocationEventCard } from "../EventListPage/location-event-card";
 import { LOCATION_EVENTS_ANCHOR_ID } from "./location-page-hero-search";
 
@@ -57,18 +51,9 @@ export function LocationEventSearchResults({
 
   const cards = useMemo(
     () =>
-      events.map((event) => ({
-        title: event.name || "",
-        price:
-          event.lowest_price != null &&
-          !Number.isNaN(Number(event.lowest_price))
-            ? formatMoneyCompact(Number(event.lowest_price), currencySym)
-            : null,
-        dateLabel: getEventCardDateLabel(event),
-        category: getEventCardCategoryLabel(event),
-        image: event.banner_image || FALLBACK_IMAGE,
-        slug: event.slug || "",
-      })),
+      events.map((event) =>
+        toLocationEventCardModel(event, currencySym, FALLBACK_IMAGE),
+      ),
     [events, currencySym],
   );
 
