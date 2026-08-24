@@ -235,6 +235,9 @@ export interface EventDetailData {
   is_rooms?: boolean | number | string;
   approval_status?: string;
   vendor_location_id?: number;
+  /** Parent location hero position (public EventResource / site-essentials event preview). */
+  banner_heading_align?: "left" | "center" | "right" | null;
+  banner_heading_valign?: "top" | "center" | "bottom" | null;
   logo?: string | null;
   email?: string;
   contact_number?: string;

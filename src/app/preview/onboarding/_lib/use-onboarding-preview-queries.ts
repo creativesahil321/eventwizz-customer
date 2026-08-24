@@ -20,6 +20,9 @@ export type OnboardingPreviewEventData = SiteEssentials & {
     event_banner_video?: string | null;
     event_banner_heading?: string;
     event_banner_sub_heading?: string;
+    /** Parent location hero position on `?event_slug=` payloads. */
+    banner_heading_align?: "left" | "center" | "right" | null;
+    banner_heading_valign?: "top" | "center" | "bottom" | null;
     about_event_heading?: string;
     about_event_sub_heading?: string;
     about_event_description?: string;

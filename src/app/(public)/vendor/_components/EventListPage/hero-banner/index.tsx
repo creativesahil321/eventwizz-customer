@@ -162,15 +162,9 @@ export default function HeroBanner({
     <section
       id="hero"
       className={cn(
-        "relative mx-auto flex w-full justify-center overflow-hidden",
+        "relative mx-auto flex w-full overflow-hidden",
         heroBandHeightClass,
         heroBandVerticalClass(heroValign),
-        /*
-         * Left + center: stretch cross-axis so the block is full-width (row flex-col hero
-         * would otherwise shrink-wrap and center the column). Do NOT stretch for top/bottom
-         * valign — that overrides items-start/items-end and pins copy to the top of a tall box.
-         */
-        textAlign === "left" && heroValign === "center" && "md:!items-stretch",
       )}
     >
       {/* Video background if video URL exists and should be used */}
@@ -235,7 +229,7 @@ export default function HeroBanner({
             align={textAlign}
             alignFromMd
             className={cn(
-              "mb-4 font-black tracking-tight",
+              "font-black tracking-tight",
               heroBannerHeadingTypeClass,
               textAlign === "left"
                 ? "max-w-4xl md:max-w-3xl"

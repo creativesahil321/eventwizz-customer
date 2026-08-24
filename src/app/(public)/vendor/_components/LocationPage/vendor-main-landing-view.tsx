@@ -283,7 +283,7 @@ export function VendorMainLandingView({
 
       <section
         className={cn(
-          "relative mx-auto flex w-full min-w-0 justify-center overflow-hidden",
+          "relative mx-auto flex w-full min-w-0 overflow-hidden",
           heroBandHeightClass,
           heroBandVerticalClass(heroValign),
         )}
@@ -323,7 +323,7 @@ export function VendorMainLandingView({
               variant="onDark"
               align={heroAlign}
               className={cn(
-                "mb-4 w-full max-w-5xl font-bold",
+                "w-full max-w-5xl font-bold",
                 heroHomeHeadingTypeClass,
               )}
             />

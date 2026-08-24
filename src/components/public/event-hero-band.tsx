@@ -207,12 +207,9 @@ export function EventHeroBand({
     <section
       ref={sectionRef}
       className={cn(
-        "relative mx-auto flex w-full justify-center overflow-hidden",
+        "relative mx-auto flex w-full overflow-hidden",
         "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
         heroBandVerticalClass(bannerValign),
-        bannerAlign === "left" &&
-          bannerValign === "center" &&
-          "md:!items-stretch",
         onEditHero && "group/preview-edit cursor-pointer",
         className,
       )}
@@ -310,7 +307,7 @@ export function EventHeroBand({
             <nav
               aria-label="Breadcrumb"
               className={cn(
-                "mb-4 text-xs font-medium tracking-wide text-white/80 sm:text-sm",
+                "text-xs font-medium tracking-wide text-white/80 sm:text-sm",
                 heroHeadingAlignClass(bannerAlign, { fromMd: true }),
               )}
             >
@@ -354,7 +351,7 @@ export function EventHeroBand({
           {chip ? (
             <p
               className={cn(
-                "mb-4 inline-flex rounded-full border border-white/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/95",
+                "inline-flex rounded-full border border-white/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/95",
                 bannerAlign === "left" && "md:self-start",
                 bannerAlign === "right" && "md:self-end",
               )}
@@ -371,7 +368,7 @@ export function EventHeroBand({
             align={bannerAlign}
             alignFromMd
             className={cn(
-              "mb-4 font-black tracking-tight",
+              "font-black tracking-tight",
               heroBannerHeadingTypeClass,
               bannerAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
             )}

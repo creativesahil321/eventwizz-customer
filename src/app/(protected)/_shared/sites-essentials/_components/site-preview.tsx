@@ -18,9 +18,7 @@ interface SitePreviewProps {
   scrollContainerRef?: RefObject<HTMLElement | null>;
 }
 
-function getPreviewUrl(
-  value: string | File | null | undefined,
-): string | null {
+function getPreviewUrl(value: string | File | null | undefined): string | null {
   if (!value) return null;
   if (typeof value === "string") return value;
   if (value instanceof File) return URL.createObjectURL(value);
@@ -83,10 +81,7 @@ export function SitePreview({
       ? null
       : getPreviewUrl(formValues.cover_video);
 
-  const contactOverride = resolveSiteEssentialsPreviewContact(
-    formValues,
-    slug,
-  );
+  const contactOverride = resolveSiteEssentialsPreviewContact(formValues, slug);
   const contactTheme = buildSiteEssentialsContactTheme(formValues);
 
   const locationData: LocationData = {
@@ -102,6 +97,8 @@ export function SitePreview({
     cover_video: coverVideo,
     banner_heading: formValues.banner_heading ?? null,
     banner_sub_heading: formValues.banner_sub_heading ?? null,
+    banner_heading_align: formValues.banner_heading_align ?? null,
+    banner_heading_valign: formValues.banner_heading_valign ?? null,
     about_title: formValues.about_title ?? null,
     about_cta_link: null,
     about_description: formValues.about_description ?? null,

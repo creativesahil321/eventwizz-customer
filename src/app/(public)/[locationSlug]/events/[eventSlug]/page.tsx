@@ -88,6 +88,11 @@ export default async function EventDetailPage(props: {
     queryFn: () => eventsService.getEventDetail(eventSlug, host),
     staleTime: 60 * 1000, // Cache for 1 minute to prevent unnecessary refetches during navigation
   });
+  await queryClient.prefetchQuery({
+    queryKey: eventKeys.location(locationSlug, host),
+    queryFn: () => eventsService.getLocationWithEvents(locationSlug, host),
+    staleTime: 1000 * 60 * 5,
+  });
 
   const dehydratedState = dehydrate(queryClient);
 

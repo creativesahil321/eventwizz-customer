@@ -1,10 +1,16 @@
 "use client";
 
-import { useContext, useMemo, type CSSProperties, type ReactNode, type RefObject } from "react";
+import {
+  useContext,
+  useMemo,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
-import type {
-  BannerHeadingAlign,
-  BannerHeadingValign,
+import {
+  normalizeBannerHeadingAlign,
+  normalizeBannerHeadingValign,
 } from "@/lib/banner-heading-align";
 import type { GalleryImage, LocationData } from "@/services/common/events/type";
 import type { ThemeSchema } from "@/types/theme.types";
@@ -56,7 +62,10 @@ type LocationPageViewProps = {
   footerContactOverride?: VenueContactOverride | null;
   footerContactTheme?: Pick<ThemeSchema, "contactDetails" | "locations"> | null;
   footerSocialLinksOverride?: Partial<
-    Record<"facebook" | "twitter" | "instagram" | "linkedin" | "youtube", string>
+    Record<
+      "facebook" | "twitter" | "instagram" | "linkedin" | "youtube",
+      string
+    >
   > | null;
   footerBrandDescription?: string | null;
 };
@@ -91,13 +100,12 @@ export function LocationPageView({
       resolvePublicPageContact({
         theme: footerContactTheme ?? theme,
         locationSlug,
-        override:
-          footerContactOverride ?? {
-            address: locationData.address,
-            phone: locationData.phone,
-            phone_number: locationData.phone_number,
-            email: locationData.email,
-          },
+        override: footerContactOverride ?? {
+          address: locationData.address,
+          phone: locationData.phone,
+          phone_number: locationData.phone_number,
+          email: locationData.email,
+        },
       }),
     [
       theme,
@@ -150,13 +158,12 @@ export function LocationPageView({
     />
   );
 
-  const experienceNode =
-    experience ?? (
-      <ExperienceSection
-        aboutTitle={locationData.about_title}
-        aboutDescription={locationData.about_description}
-      />
-    );
+  const experienceNode = experience ?? (
+    <ExperienceSection
+      aboutTitle={locationData.about_title}
+      aboutDescription={locationData.about_description}
+    />
+  );
 
   return (
     <>
@@ -166,7 +173,9 @@ export function LocationPageView({
         logo={headerLogo === undefined ? undefined : headerLogo}
         contact_number={headerPhone ?? undefined}
         scrollContainerRef={scrollContainerRef}
-        previewBackButtonOffset={headerVariant === "preview" ? false : undefined}
+        previewBackButtonOffset={
+          headerVariant === "preview" ? false : undefined
+        }
       />
 
       {isSearchMode ? (
@@ -202,12 +211,14 @@ export function LocationPageView({
             bannerSubHeading={locationData.banner_sub_heading}
             bannerHeadingAccent={settings?.banner_heading_accent}
             headingEmphasis={headingEmphasis}
-            bannerHeadingAlign={
-              settings?.banner_heading_align as BannerHeadingAlign | null | undefined
-            }
-            bannerHeadingValign={
-              settings?.banner_heading_valign as BannerHeadingValign | null | undefined
-            }
+            bannerHeadingAlign={normalizeBannerHeadingAlign(
+              locationData.banner_heading_align ??
+                settings?.banner_heading_align,
+            )}
+            bannerHeadingValign={normalizeBannerHeadingValign(
+              locationData.banner_heading_valign ??
+                settings?.banner_heading_valign,
+            )}
             eyebrow={locationData.city || cityLabel || null}
             heroContact={{
               address: heroContact.address,

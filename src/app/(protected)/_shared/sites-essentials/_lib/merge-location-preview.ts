@@ -28,6 +28,14 @@ const LOCATION_SCOPED_KEYS = [
   "event_gallery",
 ] as const;
 
+/** Layout fields default when another location's API omits them — never leak the previous city. */
+const LOCATION_LAYOUT_DEFAULTS: Partial<
+  Record<(typeof LOCATION_SCOPED_KEYS)[number], string>
+> = {
+  banner_heading_align: "center",
+  banner_heading_valign: "center",
+};
+
 /** Never replaced by per-location API — main landing review uses these from the editor. */
 const MAIN_LANDING_KEYS = [
   "main_landing_cover_image",
@@ -130,7 +138,13 @@ export function mergeGlobalWithLocationSiteEssentials(
     // instead of leaking across the switch. Keys the API omits entirely
     // (`undefined`) still fall back to the inherited global value.
     const apiVal = perLocation[key as keyof SiteEssentials];
-    if (apiVal === undefined) continue;
+    if (apiVal === undefined) {
+      const layoutDefault = LOCATION_LAYOUT_DEFAULTS[key];
+      if (layoutDefault !== undefined) {
+        (apiFill as Record<string, unknown>)[key] = layoutDefault;
+      }
+      continue;
+    }
     (apiFill as Record<string, unknown>)[key] = apiVal ?? "";
   }
 

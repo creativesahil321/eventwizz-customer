@@ -592,8 +592,16 @@ export function EventPreview({
             subHeading={s1?.event_banner_sub_heading || null}
             accentHint={heroAccentHint}
             headingEmphasis={headingEmphasisForHero}
-            bannerHeadingAlign={siteEssentials?.banner_heading_align ?? null}
-            bannerHeadingValign={siteEssentials?.banner_heading_valign ?? null}
+            bannerHeadingAlign={
+              data.banner_heading_align ??
+              siteEssentials?.banner_heading_align ??
+              null
+            }
+            bannerHeadingValign={
+              data.banner_heading_valign ??
+              siteEssentials?.banner_heading_valign ??
+              null
+            }
             bannerImage={bannerImage || null}
             bannerVideo={bannerVideo}
             cacheBustImage

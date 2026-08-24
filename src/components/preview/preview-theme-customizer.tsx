@@ -69,6 +69,7 @@ import {
   paletteAccessibilityFlags,
 } from "@/lib/wcag-color-contrast";
 import { usePermission } from "@/hooks/usePermission";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 const PREVIEW_TRY_THEME_LAST_FONT_KEY = "eventwizz:preview-try-theme:last-font";
 const PREVIEW_TRY_THEME_LAST_COLOR_KEY =
@@ -272,7 +273,7 @@ function SegmentGroup<T extends string>({
           aria-pressed={value === v}
           onClick={() => onChange(v)}
           className={cn(
-            "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+            "flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:px-2 sm:text-xs",
             value === v
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900",
@@ -362,6 +363,7 @@ export function PreviewThemeCustomizer({
 }: PreviewThemeCustomizerProps) {
   const canPersistSiteEssentials = usePermission("update-site-essential");
   useSiteEssentialsPresetFontsPreload();
+  const isCompactViewport = useMediaQuery("(max-width: 767px)");
   const [open, setOpen] = useState(false);
   const [colorFilter, setColorFilter] = useState<"all" | "dark" | "light">(
     "all",
@@ -652,99 +654,130 @@ export function PreviewThemeCustomizer({
       <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
           id="preview-theme-customizer-sheet"
-          side="right"
+          side={isCompactViewport ? "bottom" : "right"}
           // Sit above the preview review chrome (2-row fixed bar ≈ 9rem) so the
           // pinned Restore footer is never covered. Inline zIndex beats any
           // competing utility / stacking-context quirks from the portal.
           style={{ zIndex: 200 }}
-          className="!inset-y-auto !top-0 !bottom-36 !h-auto !max-h-none z-[200] flex w-full max-w-[380px] flex-col gap-0 overflow-hidden border-l border-slate-200 bg-white p-0 shadow-xl sm:max-w-[380px]"
+          overlayClassName="bg-transparent pointer-events-none"
+          className={cn(
+            "z-[200] flex flex-col gap-0 overflow-hidden bg-white p-0 shadow-xl",
+            isCompactViewport
+              ? "!inset-x-0 !top-auto !bottom-36 !h-auto max-h-[min(52dvh,26rem)] w-full max-w-none rounded-t-2xl border-t border-slate-200"
+              : "!inset-y-auto !top-0 !bottom-36 !h-auto !max-h-none w-full max-w-[380px] border-l border-slate-200 sm:max-w-[380px]",
+          )}
           onPointerDownOutside={(e) => e.preventDefault()}
         >
-          <SheetHeader className="border-b border-slate-100 px-4 pb-4 pt-5 text-left">
-            <SheetTitle className="text-lg text-slate-900">
+          <SheetHeader
+            className={cn(
+              "border-b border-slate-100 text-left",
+              isCompactViewport ? "px-4 pb-2 pt-3 pr-12" : "px-4 pb-4 pt-5",
+            )}
+          >
+            <SheetTitle
+              className={cn(
+                "text-slate-900",
+                isCompactViewport ? "text-base" : "text-lg",
+              )}
+            >
               {brandName}
             </SheetTitle>
-            <SheetDescription className="text-xs leading-relaxed text-slate-600">
+            <SheetDescription
+              className={cn(
+                "text-xs leading-relaxed text-slate-600",
+                isCompactViewport && "line-clamp-2",
+              )}
+            >
               {sheetDescription ?? DEFAULT_SHEET_DESCRIPTION}
             </SheetDescription>
           </SheetHeader>
 
-          {onSaveTheme || importSlot || (showDiscardChanges && onDiscardChanges) ? (
-            <div className="shrink-0 space-y-3 border-b border-slate-100 px-4 py-3">
-              {onSaveTheme ? (
-                <div className="space-y-1.5">
-                  {/*
-                    Must not use the default/event-primary variants — those bind to
-                    preview CSS vars (--color-primary*). On some themes hover sets
-                    white text on a light/white fill and the label vanishes.
-                  */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full border-slate-300 !bg-white !font-medium !text-slate-900 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
-                    disabled={isSavingTheme || !canPersistSiteEssentials}
-                    onClick={() => void onSaveTheme()}
-                  >
-                    {isSavingTheme ? (
-                      <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
-                    ) : null}
-                    {canPersistSiteEssentials ? "Save theme" : "View only"}
-                  </Button>
-                  <p className={SECTION_HINT_CLASS}>
-                    {canPersistSiteEssentials
-                      ? "Publishes colors, fonts & hero layout to Site Essentials."
-                      : "Read-only — needs the update-site-essential permission to save."}
-                  </p>
-                </div>
-              ) : null}
-              {importSlot}
-              {showDiscardChanges && onDiscardChanges ? (
-                <div className="space-y-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full border-slate-300 !bg-white !font-medium !text-slate-700 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
-                    disabled={isSavingTheme}
-                    onClick={onDiscardChanges}
-                  >
-                    <RotateCcw className="mr-2 h-4 w-4 shrink-0" />
-                    Discard changes
-                  </Button>
-                  <p className={SECTION_HINT_CLASS}>
-                    Undo import and theme tries — restores this preview to how
-                    it looked when you opened it.
-                  </p>
-                </div>
-              ) : null}
-            </div>
+          {showHeroLayoutControls ? (
+            <section className="shrink-0 space-y-2 border-b border-slate-100 px-4 py-3">
+              <h3 className={SECTION_LABEL_CLASS}>Hero position</h3>
+              <div className="space-y-2">
+                <span className="block text-[11px] font-medium text-slate-500">
+                  Horizontal
+                </span>
+                <SegmentGroup
+                  ariaLabel="Hero text alignment"
+                  value={currentHeroAlign}
+                  options={HERO_ALIGN_OPTIONS}
+                  onChange={applyHeroAlign}
+                />
+                <span className="block pt-0.5 text-[11px] font-medium text-slate-500">
+                  Vertical
+                </span>
+                <SegmentGroup
+                  ariaLabel="Hero vertical position"
+                  value={currentHeroValign}
+                  options={HERO_VALIGN_OPTIONS}
+                  onChange={applyHeroValign}
+                />
+              </div>
+            </section>
           ) : null}
 
-          <ScrollArea className="flex-1 min-h-0">
+          <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-5 px-4 py-4 pb-8">
-              {showHeroLayoutControls ? (
-                <section className="space-y-2.5">
-                  <h3 className={SECTION_LABEL_CLASS}>Hero position</h3>
-                  <div className="space-y-2">
-                    <span className="block text-[11px] font-medium text-slate-500">
-                      Horizontal
-                    </span>
-                    <SegmentGroup
-                      ariaLabel="Hero text alignment"
-                      value={currentHeroAlign}
-                      options={HERO_ALIGN_OPTIONS}
-                      onChange={applyHeroAlign}
-                    />
-                    <span className="block pt-1 text-[11px] font-medium text-slate-500">
-                      Vertical
-                    </span>
-                    <SegmentGroup
-                      ariaLabel="Hero vertical position"
-                      value={currentHeroValign}
-                      options={HERO_VALIGN_OPTIONS}
-                      onChange={applyHeroValign}
-                    />
-                  </div>
-                </section>
+              {onSaveTheme || importSlot || (showDiscardChanges && onDiscardChanges) ? (
+                <div className="space-y-3">
+                  {onSaveTheme ? (
+                    <div className="space-y-1.5">
+                      {/*
+                        Must not use the default/event-primary variants — those bind to
+                        preview CSS vars (--color-primary*). On some themes hover sets
+                        white text on a light/white fill and the label vanishes.
+                      */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full border-slate-300 !bg-white !font-medium !text-slate-900 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
+                        disabled={isSavingTheme || !canPersistSiteEssentials}
+                        onClick={() => void onSaveTheme()}
+                      >
+                        {isSavingTheme ? (
+                          <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
+                        ) : null}
+                        {canPersistSiteEssentials ? "Save theme" : "View only"}
+                      </Button>
+                      <p
+                        className={cn(
+                          SECTION_HINT_CLASS,
+                          isCompactViewport && "hidden",
+                        )}
+                      >
+                        {canPersistSiteEssentials
+                          ? "Publishes colors, fonts & hero layout to Site Essentials."
+                          : "Read-only — needs the update-site-essential permission to save."}
+                      </p>
+                    </div>
+                  ) : null}
+                  {importSlot}
+                  {showDiscardChanges && onDiscardChanges ? (
+                    <div className="space-y-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full border-slate-300 !bg-white !font-medium !text-slate-700 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
+                        disabled={isSavingTheme}
+                        onClick={onDiscardChanges}
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4 shrink-0" />
+                        Discard changes
+                      </Button>
+                      <p
+                        className={cn(
+                          SECTION_HINT_CLASS,
+                          isCompactViewport && "hidden",
+                        )}
+                      >
+                        Undo import and theme tries — restores this preview to how
+                        it looked when you opened it.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
 
               <div className="space-y-2.5">

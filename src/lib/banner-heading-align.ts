@@ -68,7 +68,7 @@ export function heroBannerStackClass(
   scope?: HeroAlignScope,
 ): string {
   return cn(
-    "flex w-full max-w-full flex-col",
+    "flex w-full max-w-full flex-col gap-3 sm:gap-4",
     stackAlignClass(align, scope?.fromMd),
   );
 }
@@ -89,7 +89,7 @@ export function heroBannerEyebrowClass(
   scope?: HeroAlignScope,
 ): string {
   return cn(
-    "mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70 sm:mb-4 sm:text-xs",
+    "text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70 sm:text-xs",
     measureAlignClass(align, scope?.fromMd),
     !scope?.fromMd && align === "center" && "text-center",
     !scope?.fromMd && align === "left" && "text-left",
@@ -124,7 +124,7 @@ export function heroBannerContactRowClass(
   scope?: HeroAlignScope,
 ): string {
   return cn(
-    "mt-5 flex max-w-2xl flex-wrap items-start gap-x-6 gap-y-2 text-sm text-white/90 sm:mt-6",
+    "flex max-w-2xl flex-wrap items-start gap-x-6 gap-y-2 text-sm text-white/90",
     measureAlignClass(align, scope?.fromMd),
     !scope?.fromMd && align === "center" && "justify-center text-center",
     !scope?.fromMd && align === "left" && "justify-start text-left",
@@ -289,16 +289,20 @@ export function normalizeBannerHeadingValign(v: unknown): BannerHeadingValign {
 }
 
 /**
- * Flex placement for full-width hero sections — alignment ONLY, NO padding.
- * Each hero component adds `heroBandContentPadClass(v)` to its inner content
- * wrapper. This guarantees the heading always clears the fixed header (~72 px)
- * regardless of flex axis or alignment direction.
+ * Vertical placement inside a column flex hero (`flex flex-col` on the section).
+ * Always column + `justify-*` so top/bottom are the same on phone and desktop.
+ * Mixing row `items-start/end` with center `flex-col` inverted Top/Bottom on
+ * narrow screens (wrapped copy + padding overflow).
+ *
+ * Horizontal alignment stays on the inner stack. Do not also put
+ * `justify-center` on the section — that would fight top/bottom.
  */
 export function heroBandVerticalClass(v: BannerHeadingValign): string {
   return cn(
-    v === "top" && "items-start",
-    v === "center" && "flex-col items-center justify-center",
-    v === "bottom" && "items-end",
+    "flex-col items-stretch",
+    v === "top" && "justify-start",
+    v === "center" && "justify-center",
+    v === "bottom" && "justify-end",
   );
 }
 
@@ -316,19 +320,17 @@ export function heroBandContentPadClass(
 
   return cn(
     v === "top" &&
-      (withBottomChrome
-        ? "pt-20 pb-28 sm:pt-24 sm:pb-32 md:pt-28 md:pb-36"
-        : "pt-20 pb-10 sm:pt-24 sm:pb-12 md:pt-28 md:pb-14"),
-    // Center: modest top so section justify-center handles visual centering.
-    // Extra bottom pad when a fixed search dock sits on the hero.
+    (withBottomChrome
+      ? "pt-16 pb-24 sm:pt-24 sm:pb-32 md:pt-28 md:pb-36"
+      : "pt-16 pb-8 sm:pt-24 sm:pb-12 md:pt-28 md:pb-14"),
     v === "center" &&
-      (withBottomChrome
-        ? "pt-20 pb-28 sm:pt-24 sm:pb-32"
-        : "pt-20 pb-8 sm:pt-24 sm:pb-10"),
+    (withBottomChrome
+      ? "pt-16 pb-24 sm:pt-24 sm:pb-32"
+      : "pt-16 pb-8 sm:pt-24 sm:pb-10"),
     v === "bottom" &&
-      (withBottomChrome
-        ? "pt-[4.5rem] pb-32 sm:pb-36 md:pb-40"
-        : "pt-[4.5rem] pb-16 sm:pb-20 md:pb-24"),
+    (withBottomChrome
+      ? "pt-16 pb-24 sm:pt-[4.5rem] sm:pb-36 md:pb-40"
+      : "pt-16 pb-12 sm:pt-[4.5rem] sm:pb-20 md:pb-24"),
   );
 }
 

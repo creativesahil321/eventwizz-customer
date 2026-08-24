@@ -268,6 +268,10 @@ export function mapOnboardingEventToDetailData(
   return {
     slug: event.slug,
     is_rooms: event.is_rooms,
+    banner_heading_align:
+      event.banner_heading_align ?? apiData.banner_heading_align ?? null,
+    banner_heading_valign:
+      event.banner_heading_valign ?? apiData.banner_heading_valign ?? null,
     logo: event.logo,
     email: event.email ?? undefined,
     contact_number: event.phone,

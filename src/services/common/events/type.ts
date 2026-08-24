@@ -70,6 +70,9 @@ export interface LocationData {
   cover_video: string | null;
   banner_heading: string | null;
   banner_sub_heading: string | null;
+  /** Per-location hero position from Site Essentials (`LocationResource`). */
+  banner_heading_align?: "left" | "center" | "right" | null;
+  banner_heading_valign?: "top" | "center" | "bottom" | null;
   about_title: string | null;
   about_cta_link: string | null;
   about_description: string | null;
@@ -266,6 +269,9 @@ export interface EventDetail {
   /** Optional substring of the hero line: accent tail (heading font + primary) when theme uses accent_tail */
   event_banner_heading_accent?: string | null;
   event_banner_sub_heading: string;
+  /** Parent location hero position (`EventResource` copies `vendor_locations`). */
+  banner_heading_align?: "left" | "center" | "right" | null;
+  banner_heading_valign?: "top" | "center" | "bottom" | null;
   about_event_heading: string;
   about_event_sub_heading: string;
   about_event_description: string;

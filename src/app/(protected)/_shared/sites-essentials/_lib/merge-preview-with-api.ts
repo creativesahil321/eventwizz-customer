@@ -2,6 +2,10 @@ import type { SiteEssentials } from "@/services/common/site-essentials/type";
 import type { SiteEssentialsFormValues } from "./schema";
 import type { LocationData } from "@/types/theme.types";
 import {
+  isBannerHeadingAlign,
+  isBannerHeadingValign,
+} from "@/lib/banner-heading-align";
+import {
   normalizeSiteEssentialsEvents,
   normalizeSiteEssentialsGallery,
 } from "./site-essentials-preview-events";
@@ -220,6 +224,16 @@ export function mergeSiteEssentialsPreviewWithApi(
       formData.banner_heading_accent,
       api.banner_heading_accent,
     ),
+    banner_heading_align: isBannerHeadingAlign(formData.banner_heading_align)
+      ? formData.banner_heading_align
+      : isBannerHeadingAlign(api.banner_heading_align)
+        ? api.banner_heading_align
+        : formData.banner_heading_align ?? api.banner_heading_align,
+    banner_heading_valign: isBannerHeadingValign(formData.banner_heading_valign)
+      ? formData.banner_heading_valign
+      : isBannerHeadingValign(api.banner_heading_valign)
+        ? api.banner_heading_valign
+        : formData.banner_heading_valign ?? api.banner_heading_valign,
     about_title: coalesceText(formData.about_title, api.about_title),
     about_description: coalesceText(
       formData.about_description,
