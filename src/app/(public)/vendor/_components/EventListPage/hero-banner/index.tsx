@@ -12,9 +12,9 @@ import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
 import {
   heroBandContentPadClass,
+  heroBandCopyPlacementClass,
   heroBandHeightClass,
   heroBandMediaOverlayClass,
-  heroBandVerticalClass,
   heroBannerBodyClass,
   heroBannerContactRowClass,
   heroBannerEyebrowClass,
@@ -162,9 +162,8 @@ export default function HeroBanner({
     <section
       id="hero"
       className={cn(
-        "relative mx-auto flex w-full overflow-hidden",
+        "relative mx-auto w-full overflow-hidden",
         heroBandHeightClass,
-        heroBandVerticalClass(heroValign),
       )}
     >
       {/* Video background if video URL exists and should be used */}
@@ -200,7 +199,8 @@ export default function HeroBanner({
 
       <div
         className={cn(
-          "relative z-10 mx-auto max-w-7xl overflow-visible px-3 sm:px-4",
+          heroBandCopyPlacementClass(heroValign),
+          "max-w-7xl px-3 sm:px-4",
           heroHeadingMeasureClass,
           heroBandContentPadClass(heroValign, {
             withBottomChrome: Boolean(heroFooter),
@@ -211,7 +211,7 @@ export default function HeroBanner({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className={cn(stackClass, "overflow-visible")}
+          className={cn(stackClass, "min-h-0 max-h-full")}
         >
           {eyebrow?.trim() &&
           eyebrow.trim().toLowerCase() !== bannerHeading.trim().toLowerCase() ? (

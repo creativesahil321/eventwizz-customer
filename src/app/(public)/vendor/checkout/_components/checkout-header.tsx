@@ -6,6 +6,7 @@ import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { resolveCheckoutHeaderSurface } from "../_lib/checkout-header-surface";
+import { useLogoMarkTone } from "../_lib/use-logo-mark-tone";
 import { CheckoutHeaderProps } from "../_lib/types";
 
 const DEFAULT_LOGO = "/assets/images/logos/eventwizz-logo.png";
@@ -29,8 +30,11 @@ export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
   const { mediaVersion } = useTheme();
   const logoPath = resolveSiteLogo(settings?.logo);
   const brandName = settings?.name || "EventWizz";
+  const logoSrc = addCacheBusting(logoPath, mediaVersion);
+  const logoTone = useLogoMarkTone(logoSrc);
   const { background, foreground } = resolveCheckoutHeaderSurface(
     settings?.colors,
+    { logoTone },
   );
 
   return (
@@ -59,7 +63,7 @@ export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
             className="flex min-w-0 items-center"
           >
             <img
-              src={addCacheBusting(logoPath, mediaVersion)}
+              src={logoSrc}
               alt={brandName}
               width={200}
               height={56}

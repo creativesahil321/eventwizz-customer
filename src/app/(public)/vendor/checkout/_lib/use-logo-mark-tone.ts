@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { CheckoutLogoMarkTone } from "./checkout-header-surface";
 
-export type LogoMarkTone = "light" | "dark" | "unknown";
+export type LogoMarkTone = CheckoutLogoMarkTone;
 
 /**
  * Sample opaque pixels to see if a logo is a light mark (white/silver wordmark)

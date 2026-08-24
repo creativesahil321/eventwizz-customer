@@ -6,6 +6,8 @@ import {
 
 const LIGHT_SURFACE = 0.72;
 
+export type CheckoutLogoMarkTone = "light" | "dark" | "unknown";
+
 export type CheckoutHeaderThemeColors = {
   header?: string;
   footer?: string;
@@ -35,16 +37,23 @@ export function checkoutHeaderForeground(background: string): string {
   return pickReadableForeground(background);
 }
 
-/** Brand bar for checkout: never a light plate (vendor logos are usually light). */
+/**
+ * Match the public site header (`colors.header`), including white bars used
+ * with black wordmarks. Only skip a light plate when the logo is a light mark
+ * that would disappear on it.
+ */
 export function resolveCheckoutHeaderSurface(
   colors?: CheckoutHeaderThemeColors | null,
+  options?: { logoTone?: CheckoutLogoMarkTone },
 ): { background: string; foreground: string } {
-  const background = firstDarkSurface(
-    colors?.header,
-    colors?.footer,
-    colors?.primary,
-    colors?.text,
-  );
+  const configured = colors?.header?.trim() || "#FFFFFF";
+  const logoTone = options?.logoTone ?? "unknown";
+
+  const background =
+    logoTone === "light" && isLightSurface(configured)
+      ? firstDarkSurface(colors?.footer, colors?.primary, colors?.text)
+      : configured;
+
   return {
     background,
     foreground: checkoutHeaderForeground(background),

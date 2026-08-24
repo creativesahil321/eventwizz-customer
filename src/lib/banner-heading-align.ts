@@ -289,13 +289,21 @@ export function normalizeBannerHeadingValign(v: unknown): BannerHeadingValign {
 }
 
 /**
- * Vertical placement inside a column flex hero (`flex flex-col` on the section).
- * Always column + `justify-*` so top/bottom are the same on phone and desktop.
- * Mixing row `items-start/end` with center `flex-col` inverted Top/Bottom on
- * narrow screens (wrapped copy + padding overflow).
- *
- * Horizontal alignment stays on the inner stack. Do not also put
- * `justify-center` on the section — that would fight top/bottom.
+ * Pin hero copy to the chosen edge. Long titles on a short (phone) band must
+ * clip — not grow past the band. Flex `justify-end` on an overflowing child
+ * previously showed the heading at the opposite edge (Top/Bottom looked swapped).
+ */
+export function heroBandCopyPlacementClass(v: BannerHeadingValign): string {
+  return cn(
+    "absolute inset-x-0 z-10 mx-auto w-full max-h-full overflow-hidden",
+    v === "top" && "top-0 flex flex-col justify-start",
+    v === "center" && "inset-y-0 flex flex-col justify-center",
+    v === "bottom" && "bottom-0 flex flex-col justify-end",
+  );
+}
+
+/**
+ * Vertical placement when the copy is still in-flow (home mini strips, etc.).
  */
 export function heroBandVerticalClass(v: BannerHeadingValign): string {
   return cn(

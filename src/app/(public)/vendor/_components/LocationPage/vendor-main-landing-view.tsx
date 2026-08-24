@@ -30,9 +30,9 @@ import {
 } from "@/lib/heading-emphasis";
 import {
   heroBandContentPadClass,
+  heroBandCopyPlacementClass,
   heroBandHeightClass,
   heroBandMediaOverlayClass,
-  heroBandVerticalClass,
   heroBannerBodyClass,
   heroBannerEyebrowClass,
   heroBannerStackClass,
@@ -283,9 +283,8 @@ export function VendorMainLandingView({
 
       <section
         className={cn(
-          "relative mx-auto flex w-full min-w-0 overflow-hidden",
+          "relative mx-auto w-full min-w-0 overflow-hidden",
           heroBandHeightClass,
-          heroBandVerticalClass(heroValign),
         )}
       >
         <div className="absolute inset-0 overflow-hidden">
@@ -297,7 +296,8 @@ export function VendorMainLandingView({
 
         <div
           className={cn(
-            "relative z-10 mx-auto min-w-0 max-w-[1180px] overflow-visible px-3 sm:px-6",
+            heroBandCopyPlacementClass(heroValign),
+            "min-w-0 max-w-[1180px] px-3 sm:px-6",
             heroHeadingMeasureClass,
             heroBandContentPadClass(heroValign, { withBottomChrome: true }),
           )}
@@ -308,7 +308,7 @@ export function VendorMainLandingView({
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
               heroBannerStackClass(heroAlign),
-              "w-full min-w-0 overflow-visible",
+              "min-h-0 w-full max-h-full min-w-0",
             )}
           >
             {citiesEyebrow ? (

@@ -13,14 +13,14 @@ import type {
 } from "@/lib/event-hero-meta";
 import {
   heroBandContentPadClass,
-  heroBandVerticalClass,
+  heroBandCopyPlacementClass,
+  heroBandMediaOverlayClass,
   heroBannerContactRowClass,
   heroBannerHeadingTypeClass,
   heroBannerStackClass,
   heroHeadingAlignClass,
   heroHeadingMeasureClass,
   heroBannerSubheadingClass,
-  heroBandMediaOverlayClass,
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
   type BannerHeadingAlign,
@@ -207,9 +207,8 @@ export function EventHeroBand({
     <section
       ref={sectionRef}
       className={cn(
-        "relative mx-auto flex w-full overflow-hidden",
+        "relative mx-auto w-full overflow-hidden",
         "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
-        heroBandVerticalClass(bannerValign),
         onEditHero && "group/preview-edit cursor-pointer",
         className,
       )}
@@ -292,7 +291,8 @@ export function EventHeroBand({
 
       <div
         className={cn(
-          "relative z-20 mx-auto max-w-7xl overflow-visible px-3 sm:px-4",
+          heroBandCopyPlacementClass(bannerValign),
+          "max-w-7xl px-3 sm:px-4",
           heroHeadingMeasureClass,
           heroBandContentPadClass(bannerValign),
         )}
@@ -300,7 +300,7 @@ export function EventHeroBand({
         <div
           className={cn(
             heroBannerStackClass(bannerAlign, { fromMd: true }),
-            "overflow-visible",
+            "min-h-0 max-h-full",
           )}
         >
           {crumbs.length > 0 ? (
