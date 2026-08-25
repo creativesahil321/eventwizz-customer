@@ -105,6 +105,11 @@ export function toMutableSiteEssentialsFormValues(
       source.main_landing_cover_image,
     ),
     typography: normalizeSiteEssentialsTypography(source.typography),
+    theme_preset_id:
+      "theme_preset_id" in source
+        ? ((source as { theme_preset_id?: string | null }).theme_preset_id ??
+          null)
+        : (cloned.theme_preset_id ?? null),
     banner_heading_accent: cloned.banner_heading_accent ?? "",
     banner_heading_align: cloned.banner_heading_align ?? "center",
     banner_heading_valign: cloned.banner_heading_valign ?? "center",

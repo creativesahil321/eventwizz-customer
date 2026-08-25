@@ -59,6 +59,11 @@ export interface SiteEssentialsContactDetails {
 export interface SiteEssentials {
   colors: Colors;
   typography: Typography;
+  /**
+   * Catalog recipe currently applied. `null` = custom colors/fonts.
+   * Palette ids are never stored here.
+   */
+  theme_preset_id?: string | null;
   socialLinks: SocialLinks;
   seo: SEO;
   /** Vendor-level contact (same shape as public theme `contactDetails`) */

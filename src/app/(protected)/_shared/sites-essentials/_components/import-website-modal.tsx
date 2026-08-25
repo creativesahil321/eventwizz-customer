@@ -192,6 +192,7 @@ export function ImportWebsiteModal({
         imported.socialLogin.microsoft,
         { shouldDirty: true },
       );
+      form.setValue("theme_preset_id", null, { shouldDirty: true });
       return;
     }
 
@@ -216,6 +217,7 @@ export function ImportWebsiteModal({
       colorTheme.socialLogin.microsoft,
       { shouldDirty: true },
     );
+    form.setValue("theme_preset_id", null, { shouldDirty: true });
   };
 
   const handleApply = async () => {

@@ -83,6 +83,37 @@ interface DateAccordionProps {
   discountLockedHint?: string | null;
 }
 
+function cartSavePayloadKey(cartData: {
+  event_date: string;
+  room_id?: number;
+  people_quantity?: number;
+  tables?: unknown[];
+  tickets?: unknown[];
+  drink_package?: unknown[];
+}): string {
+  return JSON.stringify({
+    event_date: cartData.event_date,
+    room_id: cartData.room_id ?? null,
+    people_quantity: cartData.people_quantity ?? null,
+    tables: cartData.tables ?? [],
+    tickets: cartData.tickets ?? [],
+    drink_package: cartData.drink_package ?? [],
+  });
+}
+
+function getErrorHttpStatus(error: unknown): number | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof (error as { response?: { status?: unknown } }).response?.status ===
+      "number"
+  ) {
+    return (error as { response: { status: number } }).response.status;
+  }
+  return undefined;
+}
+
 function CheckoutAvailabilityHint({
   maxQuantity,
   quantity = 0,
@@ -136,6 +167,7 @@ export default function DateAccordion({
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
   const pendingFollowUpSaveRef = useRef(false);
+  const lastFailedSaveKeyRef = useRef<string | null>(null);
   const isPreviewMode = useIsPreviewMode();
   const { mutateAsync: storeEventBooking } = useStoreEventBooking();
 
@@ -177,6 +209,11 @@ export default function DateAccordion({
     ) {
       autoSaveTimerRef.current = setTimeout(async () => {
         if (isSavingRef.current) return;
+        const pendingKey = cartSavePayloadKey(
+          getItemsForAPI(eventSlug, date, roomId),
+        );
+        // Same payload already saved or failed — wait until the cart changes.
+        if (lastFailedSaveKeyRef.current === pendingKey) return;
         try {
           setIsAutoSaving(true);
           await handleSaveDate();
@@ -269,10 +306,6 @@ export default function DateAccordion({
       }
 
       if (canPersist) {
-        if (!hasItems) {
-          toast.info(`Removing all items for ${formatDateMobile(date)}`);
-        }
-
         if (process.env.NODE_ENV === "development") {
           console.log(`🔍 Saving ${formatDateMobile(date)}:`, cartData);
         }
@@ -299,10 +332,16 @@ export default function DateAccordion({
               skipInvalidation: true,
             });
             if (response?.status === true) {
+              lastFailedSaveKeyRef.current = cartSavePayloadKey(
+                sanitizedCartData,
+              );
               markDateAsSaved(eventSlug, date);
               await new Promise((resolve) => setTimeout(resolve, 150));
               succeeded = true;
             } else {
+              lastFailedSaveKeyRef.current = cartSavePayloadKey(
+                sanitizedCartData,
+              );
               console.error("API Error Response:", response);
             }
           }
@@ -312,15 +351,20 @@ export default function DateAccordion({
             skipInvalidation: true,
           });
           if (response?.status === true) {
+            lastFailedSaveKeyRef.current = cartSavePayloadKey(cartData);
             markDateAsSaved(eventSlug, date);
             await new Promise((resolve) => setTimeout(resolve, 150));
             succeeded = true;
           } else {
+            lastFailedSaveKeyRef.current = cartSavePayloadKey(cartData);
             console.error("API Error Response:", response);
           }
         }
       }
     } catch (error) {
+      lastFailedSaveKeyRef.current = cartSavePayloadKey(
+        getItemsForAPI(eventSlug, date, roomId),
+      );
       console.error("Error saving date cart data:", {
         error,
         eventSlug,
@@ -328,7 +372,11 @@ export default function DateAccordion({
         timestamp: new Date().toISOString(),
       });
 
-      if (error instanceof Error) {
+      const httpStatus = getErrorHttpStatus(error);
+      // 400/422 are already toasted by the API interceptor with the server message.
+      if (httpStatus === 400 || httpStatus === 422) {
+        // no extra toast
+      } else if (error instanceof Error) {
         if (
           error.message.includes("Network Error") ||
           error.message.includes("Failed to fetch")
@@ -342,13 +390,6 @@ export default function DateAccordion({
         ) {
           toast.error(
             "Session expired. Please refresh the page and log in again.",
-          );
-        } else if (
-          error.message.includes("400") ||
-          error.message.includes("Bad Request")
-        ) {
-          toast.error(
-            "Invalid data. Please check your selections and try again.",
           );
         } else if (
           error.message.includes("500") ||
@@ -370,8 +411,13 @@ export default function DateAccordion({
 
       if (pendingFollowUpSaveRef.current) {
         pendingFollowUpSaveRef.current = false;
-        const followUpSucceeded = await handleSaveDate();
-        succeeded = followUpSucceeded || succeeded;
+        const followUpKey = cartSavePayloadKey(
+          getItemsForAPI(eventSlug, date, roomId),
+        );
+        if (lastFailedSaveKeyRef.current !== followUpKey) {
+          const followUpSucceeded = await handleSaveDate();
+          succeeded = followUpSucceeded || succeeded;
+        }
       }
     }
 

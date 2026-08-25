@@ -74,6 +74,7 @@ export function mergeSiteEssentialsDefaultTheme(
         defaults.typography.headingEmphasis ??
         values.typography?.headingEmphasis,
     },
+    theme_preset_id: SITE_ESSENTIALS_DEFAULT_PRESET_ID,
   };
 }
 
@@ -87,6 +88,7 @@ export function applySiteEssentialsDefaultTheme(
 
   setValue("colors", next.colors, opts);
   setValue("typography", next.typography, opts);
+  setValue("theme_preset_id", SITE_ESSENTIALS_DEFAULT_PRESET_ID, opts);
 
   return SITE_ESSENTIALS_DEFAULT_PRESET_ID;
 }

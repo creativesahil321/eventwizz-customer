@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
     },
     THEME: {
       SETTINGS: "/theme/settings",
+      PRESETS: "/theme/presets",
     },
     CONTACT_STORE: "/contact/store",
     PERMISSIONS: {
@@ -158,6 +159,8 @@ export const API_ENDPOINTS = {
       GET: "/vendor/site-essentials",
       UPDATE: "/vendor/site-essentials/update",
       RESET_THEME_DEFAULT: "/vendor/site-essentials/reset-theme-default",
+      THEME_PRESETS: "/vendor/site-essentials/theme-presets",
+      APPLY_THEME_PRESET: "/vendor/site-essentials/apply-theme-preset",
     },
     /** Public per-page CMS content for the vendor tenant site (SSR/SEO). */
     INFO_PAGES: "/vendor/info-pages",
@@ -336,6 +339,8 @@ export const API_ENDPOINTS = {
       GET: "/admin/site-essentials",
       UPDATE: "/admin/site-essentials/update",
       RESET_THEME_DEFAULT: "/admin/site-essentials/reset-theme-default",
+      THEME_PRESETS: "/admin/site-essentials/theme-presets",
+      APPLY_THEME_PRESET: "/admin/site-essentials/apply-theme-preset",
     },
     /** Public per-page CMS content for the main admin marketing site (SSR/SEO). */
     INFO_PAGES: "/admin/info-pages",

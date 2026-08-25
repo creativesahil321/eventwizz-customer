@@ -29,57 +29,7 @@ const SOCIAL_LOGIN_LIGHT: SocialLoginColors = {
   microsoft: PRESET_SOCIAL_FACEBOOK_BG,
 };
 
-export type SiteThemePresetId =
-  | "dark-elegant"
-  | "royal-blue"
-  | "emerald-night"
-  | "warm-sunset"
-  | "minimal-light"
-  | "onyx-teal"
-  | "rose-noir"
-  | "navy-gold"
-  | "sage-earth"
-  | "wine-rust"
-  | "arctic-frost"
-  | "slate-ember"
-  | "violet-aurora"
-  | "espresso-cream"
-  | "script-soiree"
-  | "vibes-script"
-  | "allura-garden"
-  | "pinyon-formal"
-  | "ivory-luxe"
-  | "fuchsia-velvet"
-  | "copper-forge"
-  | "indigo-depth"
-  | "crimson-eclipse"
-  | "peach-serenade"
-  | "editorial-slate"
-  | "blush-clay"
-  | "spa-mint"
-  | "golden-amber"
-  | "forest-jade"
-  | "lilac-atelier"
-  | "lovable-purple-magenta"
-  | "lovable-ocean-blue"
-  | "lovable-golden-fire"
-  | "lovable-emerald-night"
-  | "lovable-red-rose"
-  | "lovable-midnight-indigo"
-  | "lovable-lavender-light"
-  | "lovable-sky-breeze"
-  | "lovable-warm-sand"
-  | "lovable-mint-fresh"
-  | "lovable-rose-petal"
-  | "lovable-clean-white"
-  | "venue-estate-green"
-  | "venue-wine-candlelight"
-  | "venue-manor-burgundy"
-  | "venue-midnight-navy-brass"
-  | "venue-terracotta-sage"
-  | "venue-rosewood-blush"
-  | "venue-slate-copper"
-  | "venue-noir-champagne";
+export type SiteThemePresetId = string;
 
 export function isVenueThemePresetId(id: SiteThemePresetId): boolean {
   return id.startsWith("venue-");
@@ -1204,6 +1154,168 @@ const PRESET_SHELLS: readonly PresetShell[] = [
       socialLogin: { ...SOCIAL_LOGIN_LIGHT },
     },
   },
+  // Light-page luxury siblings of Rosewood Blush (Lovable gallery).
+  // Cream/linen page + deep family header + gold/metal accent.
+  {
+    id: "venue-olive-grove",
+    name: "Olive Grove",
+    tagline: "Country estate lawns and clubhouse dining",
+    headingFontLabel: "Cormorant Garamond",
+    bodyFontLabel: "Outfit",
+    headingEmphasis: "accent_tail",
+    swatch: ["#232B18", "#5A6B3B", "#C9AE79"],
+    colors: {
+      primary: "#5A6B3B",
+      secondary: "#C9AE79",
+      header: "#232B18",
+      footer: "#1A2011",
+      background: "#F7F4EC",
+      surface: "#FFFFFF",
+      text: "#22281B",
+      textDimmed: "#66705B",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-ink-ivory",
+    name: "Ink & Ivory",
+    tagline: "Black-tie corporate dinners and awards",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "DM Sans",
+    headingEmphasis: "accent_tail",
+    swatch: ["#151E33", "#2C3E63", "#B08D49"],
+    colors: {
+      primary: "#2C3E63",
+      secondary: "#B08D49",
+      header: "#151E33",
+      footer: "#101726",
+      background: "#F8F6F1",
+      surface: "#FFFFFF",
+      text: "#1D2436",
+      textDimmed: "#5F677A",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-fig-honey",
+    name: "Fig & Honey",
+    tagline: "Candlelit evening receptions",
+    headingFontLabel: "Fraunces",
+    bodyFontLabel: "Source Sans 3",
+    headingEmphasis: "accent_tail",
+    swatch: ["#2A1424", "#6E3550", "#D2A759"],
+    colors: {
+      primary: "#6E3550",
+      secondary: "#D2A759",
+      header: "#2A1424",
+      footer: "#1F0E1A",
+      background: "#FAF5EE",
+      surface: "#FFFFFF",
+      text: "#2B1A26",
+      textDimmed: "#6C5C66",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-cedar-sand",
+    name: "Cedar & Sand",
+    tagline: "Mediterranean courtyards and long tables",
+    headingFontLabel: "Marcellus",
+    bodyFontLabel: "Figtree",
+    headingEmphasis: "accent_tail",
+    swatch: ["#3A241A", "#A3603C", "#C2A06B"],
+    colors: {
+      primary: "#A3603C",
+      secondary: "#C2A06B",
+      header: "#3A241A",
+      footer: "#2B1A12",
+      background: "#F9F3E9",
+      surface: "#FFFFFF",
+      text: "#33231A",
+      textDimmed: "#7A6857",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-sea-glass",
+    name: "Sea Glass",
+    tagline: "Coastal hotels, spa days and slow lunches",
+    headingFontLabel: "Crimson Text",
+    bodyFontLabel: "Karla",
+    headingEmphasis: "accent_tail",
+    swatch: ["#17322F", "#3E6B62", "#C7AE84"],
+    colors: {
+      primary: "#3E6B62",
+      secondary: "#C7AE84",
+      header: "#17322F",
+      footer: "#102523",
+      background: "#F4F6F3",
+      surface: "#FFFFFF",
+      text: "#1C2E2B",
+      textDimmed: "#5E7069",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-hydrangea",
+    name: "Hydrangea",
+    tagline: "Garden weddings under a pale sky",
+    headingFontLabel: "Cormorant Garamond",
+    bodyFontLabel: "Plus Jakarta Sans",
+    headingEmphasis: "accent_tail",
+    swatch: ["#26333F", "#4E627E", "#BFB7A6"],
+    colors: {
+      primary: "#4E627E",
+      secondary: "#BFB7A6",
+      header: "#26333F",
+      footer: "#1C2731",
+      background: "#F5F6F8",
+      surface: "#FFFFFF",
+      text: "#222C36",
+      textDimmed: "#61707E",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-graphite-linen",
+    name: "Graphite Linen",
+    tagline: "Modern gallery spaces and city hotels",
+    headingFontLabel: "Libre Baskerville",
+    bodyFontLabel: "Work Sans",
+    headingEmphasis: "accent_tail",
+    swatch: ["#2A2724", "#5C5A55", "#C6B58A"],
+    colors: {
+      primary: "#5C5A55",
+      secondary: "#C6B58A",
+      header: "#2A2724",
+      footer: "#1E1C1A",
+      background: "#F6F4EF",
+      surface: "#FFFFFF",
+      text: "#26241F",
+      textDimmed: "#6F6A62",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-antique-rose",
+    name: "Antique Rose",
+    tagline: "Bridal showers and quiet celebrations",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "Jost",
+    headingEmphasis: "accent_tail",
+    swatch: ["#4A2B33", "#9A5F6B", "#C4A173"],
+    colors: {
+      primary: "#9A5F6B",
+      secondary: "#C4A173",
+      header: "#4A2B33",
+      footer: "#382028",
+      background: "#FAF4F2",
+      surface: "#FFFFFF",
+      text: "#332226",
+      textDimmed: "#77646A",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
 ];
 
 export const SITE_THEME_PRESETS: SiteThemePreset[] =
@@ -1533,6 +1645,7 @@ export function applySiteThemePreset(
     },
     opts,
   );
+  setValue("theme_preset_id", preset.id, opts);
 }
 
 /** Distinct heading/body pairs from presets — preview customizer font grid. */
@@ -1681,6 +1794,7 @@ export function mergeGoogleOnlyFontsIntoValues(
 ): SiteEssentialsFormValues {
   return {
     ...values,
+    theme_preset_id: null,
     typography: {
       ...values.typography,
       fontFamily: { heading: headingStack, body: bodyStack },
@@ -1695,6 +1809,7 @@ export function mergeColorPaletteIntoValues(
 ): SiteEssentialsFormValues {
   return {
     ...values,
+    theme_preset_id: null,
     colors: { ...colors },
   };
 }
@@ -1712,6 +1827,7 @@ export function mergePresetFontsIntoValues(
 ): SiteEssentialsFormValues {
   return {
     ...values,
+    theme_preset_id: null,
     typography: {
       ...values.typography,
       fontFamily: { ...preset.typography.fontFamily },
@@ -1730,6 +1846,7 @@ export function mergeFullPresetIntoValues(
   const withFonts = mergePresetFontsIntoValues(values, preset);
   return {
     ...withFonts,
+    theme_preset_id: preset.id,
     colors: { ...preset.colors },
     typography: {
       ...withFonts.typography,

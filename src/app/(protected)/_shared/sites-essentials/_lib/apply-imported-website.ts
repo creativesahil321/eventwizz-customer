@@ -115,6 +115,7 @@ export async function applyImportedWebsite(
   }
 
   if (selection.typography) {
+    form.setValue("theme_preset_id", null, { shouldDirty: true });
     if (typography.heading) {
       form.setValue("typography.fontFamily.heading", typography.heading, {
         shouldDirty: true,

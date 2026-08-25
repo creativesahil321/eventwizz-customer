@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { FacebookIcon } from "lucide-react";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { withThemeCustomChange } from "../../_lib/mark-theme-custom";
 
 export function ColorsTab() {
   const { readOnly } = useSiteEssentialsUpdateGate();
@@ -194,7 +195,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>
@@ -217,7 +218,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>
@@ -262,7 +263,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>
@@ -283,7 +284,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>
@@ -298,15 +299,30 @@ export function ColorsTab() {
                 <GradientPicker
                   label="Background"
                   useGradient={useBackgroundGradient}
-                  onUseGradientChange={setUseBackgroundGradient}
+                  onUseGradientChange={withThemeCustomChange(
+                    form,
+                    setUseBackgroundGradient,
+                  )}
                   solidColor={solidBackgroundColor}
-                  onSolidColorChange={setSolidBackgroundColor}
+                  onSolidColorChange={withThemeCustomChange(
+                    form,
+                    setSolidBackgroundColor,
+                  )}
                   gradientStartColor={gradientStartColor}
-                  onGradientStartColorChange={setGradientStartColor}
+                  onGradientStartColorChange={withThemeCustomChange(
+                    form,
+                    setGradientStartColor,
+                  )}
                   gradientEndColor={gradientEndColor}
-                  onGradientEndColorChange={setGradientEndColor}
+                  onGradientEndColorChange={withThemeCustomChange(
+                    form,
+                    setGradientEndColor,
+                  )}
                   gradientDirection={gradientDirection}
-                  onGradientDirectionChange={setGradientDirection}
+                  onGradientDirectionChange={withThemeCustomChange(
+                    form,
+                    setGradientDirection,
+                  )}
                   disabled={readOnly}
                 />
               </FormControl>
@@ -326,7 +342,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>
@@ -347,7 +363,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>
@@ -368,7 +384,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>
@@ -433,7 +449,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>
@@ -457,7 +473,7 @@ export function ColorsTab() {
                   <FormControl>
                     <ColorPicker
                       value={ensureColor(field.value)}
-                      onChange={field.onChange}
+                      onChange={withThemeCustomChange(form, field.onChange)}
                       disabled={readOnly}
                     />
                   </FormControl>

@@ -45,7 +45,24 @@ export const SITE_ESSENTIALS_GOOGLE_FONT_NAMES = [
   "Baloo 2",
 ] as const;
 
-const GOOGLE_SET = new Set<string>(SITE_ESSENTIALS_GOOGLE_FONT_NAMES);
+const GENERIC_CSS_FAMILIES = new Set([
+  "serif",
+  "sans-serif",
+  "monospace",
+  "cursive",
+  "fantasy",
+  "system-ui",
+  "ui-sans-serif",
+  "ui-serif",
+  "ui-monospace",
+  "ui-rounded",
+  "emoji",
+  "math",
+  "fangsong",
+  "inherit",
+  "initial",
+  "unset",
+]);
 
 /** Google families loaded with a serif fallback in CSS stacks */
 const SERIF_GOOGLE_FONT_NAMES = new Set<string>([
@@ -93,7 +110,9 @@ export function collectSiteEssentialsGoogleFamilies(
   for (const stack of stacks) {
     if (!stack) continue;
     const primary = primaryFontFamilyFromStack(stack);
-    if (GOOGLE_SET.has(primary)) out.add(primary);
+    if (!primary) continue;
+    if (GENERIC_CSS_FAMILIES.has(primary.toLowerCase())) continue;
+    out.add(primary);
   }
   return [...out];
 }

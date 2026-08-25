@@ -145,6 +145,9 @@ export interface ThemeSchema {
     headingEmphasis?: HeadingEmphasis;
   };
 
+  /** Catalog recipe id, or null when the vendor customized tokens. */
+  theme_preset_id?: string | null;
+
   logo?: string;
   favicon?: string;
   /**

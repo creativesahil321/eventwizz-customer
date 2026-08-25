@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import siteEssentialsService from "@/services/common/site-essentials/site-essentials.service";
 import type { SiteEssentials } from "@/services/common/site-essentials/type";
+import { getThemePresetsCatalog } from "@/services/common/theme/theme-presets.service";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { SiteEssentialsFormValues } from "./schema";
 import { toSiteEssentialsUpdatePayload } from "./payload";
@@ -14,6 +15,11 @@ export const siteEssentialsKeys = {
   details: () => [...siteEssentialsKeys.all, "details"] as const,
   bySlug: (slug: string) =>
     [...siteEssentialsKeys.all, "by-slug", slug] as const,
+};
+
+export const themePresetsKeys = {
+  all: ["theme-presets"] as const,
+  catalog: () => [...themePresetsKeys.all, "catalog"] as const,
 };
 
 /** Shared stale window for by-slug location preview fetches. */
@@ -59,6 +65,18 @@ export const useSiteEssentialsBySlugQuery = (
 /**
  * Hook to update site essentials with TanStack Query mutation
  */
+/** Public catalog for Try theme. Refetch on mount so a backend seed is not stuck behind a 30‑min cache. */
+export const useThemePresetsCatalogQuery = () => {
+  return useQuery({
+    queryKey: themePresetsKeys.catalog(),
+    queryFn: getThemePresetsCatalog,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+    refetchOnMount: "always",
+    retry: 1,
+  });
+};
+
 /** Reset theme (colors + typography) to platform defaults — persists via API. */
 export const useResetSiteEssentialsThemeMutation = () => {
   const queryClient = useQueryClient();
@@ -67,6 +85,22 @@ export const useResetSiteEssentialsThemeMutation = () => {
     mutationFn: () => siteEssentialsService.resetSiteEssentialsThemeToDefault(),
     onSuccess: (data) => {
       queryClient.setQueryData(siteEssentialsKeys.details(), data);
+      void queryClient.invalidateQueries({ queryKey: siteEssentialsKeys.all });
+      void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+    },
+  });
+};
+
+/** Apply a catalog recipe (tokens + theme_preset_id). Logo/copy unchanged. */
+export const useApplyThemePresetMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (themePresetId: string) =>
+      siteEssentialsService.applySiteEssentialsThemePreset(themePresetId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(siteEssentialsKeys.details(), data);
+      void queryClient.invalidateQueries({ queryKey: siteEssentialsKeys.all });
       void queryClient.invalidateQueries({ queryKey: themeKeys.all });
     },
   });

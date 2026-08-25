@@ -215,6 +215,8 @@ export const siteEssentialsFormSchema = z.object({
       .enum(HEADING_EMPHASIS_VALUES)
       .optional(),
   }),
+  /** Catalog recipe currently applied. Null = custom theme. */
+  theme_preset_id: z.string().nullable().optional(),
 
   socialLinks: z.object({
     facebook: z

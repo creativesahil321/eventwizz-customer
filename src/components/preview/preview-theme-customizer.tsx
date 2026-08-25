@@ -36,12 +36,10 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import {
-  SITE_THEME_PRESETS,
-  TRY_THEME_COLOR_GRID_OPTIONS,
-  TRY_THEME_FONT_GRID_OPTIONS,
   mergeColorPaletteIntoValues,
   mergeGoogleOnlyFontsIntoValues,
   mergePresetFontsIntoValues,
@@ -50,11 +48,15 @@ import {
   siteEssentialsFontPairKey,
   tryThemeColorGridOptionStorageKey,
   tryThemeFontGridOptionStorageKey,
-  isVenueThemePresetId,
-  type SiteThemePresetId,
-  type TryThemeColorGridOption,
-  type TryThemeFontGridOption,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/site-theme-presets";
+import {
+  buildTryThemeCatalogView,
+  isRecipeColorOption,
+  type CatalogColorGridOption,
+  type CatalogFontGridOption,
+  type ThemePresetGroupKey,
+} from "@/app/(protected)/_shared/sites-essentials/_lib/theme-preset-catalog";
+import { useThemePresetsCatalogQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import {
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
@@ -64,10 +66,7 @@ import {
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { useSiteEssentialsPresetFontsPreload } from "@/hooks/use-site-essentials-preset-fonts-preload";
-import {
-  isLightUiBackground,
-  paletteAccessibilityFlags,
-} from "@/lib/wcag-color-contrast";
+import { paletteAccessibilityFlags } from "@/lib/wcag-color-contrast";
 import { usePermission } from "@/hooks/usePermission";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
@@ -141,7 +140,7 @@ function ColorPresetCard({
   fontLabel,
   onSelect,
 }: {
-  opt: TryThemeColorGridOption;
+  opt: CatalogColorGridOption;
   active: boolean;
   showRecent: boolean;
   layout: "recipe" | "compact";
@@ -332,20 +331,30 @@ type PreviewThemeCustomizerProps = {
   showDiscardChanges?: boolean;
 };
 
-function presetById(
-  id: SiteThemePresetId,
-): (typeof SITE_THEME_PRESETS)[number] {
-  const p = SITE_THEME_PRESETS.find((x) => x.id === id);
-  if (!p) {
-    throw new Error(`Unknown theme preset: ${id}`);
+function groupLabelForColors(key: ThemePresetGroupKey): string {
+  switch (key) {
+    case "venue":
+      return "Venue recipes";
+    case "modern":
+      return "Marketing palettes";
+    case "classic":
+      return "More palettes";
+    default:
+      return "Extra palettes";
   }
-  return p;
 }
 
-/** Preset ids prefixed `lovable-` are legacy internal keys; UI groups use neutral labels. */
-function presetGroupKeyFromId(id: SiteThemePresetId) {
-  if (isVenueThemePresetId(id)) return "venue";
-  return id.startsWith("lovable-") ? "modern" : "classic";
+function groupLabelForFonts(key: ThemePresetGroupKey): string {
+  switch (key) {
+    case "venue":
+      return "Venue font pairs";
+    case "modern":
+      return "Marketing font pairs";
+    case "classic":
+      return "More font pairs";
+    default:
+      return "Extra font pairs";
+  }
 }
 
 export function PreviewThemeCustomizer({
@@ -362,7 +371,15 @@ export function PreviewThemeCustomizer({
   showDiscardChanges = false,
 }: PreviewThemeCustomizerProps) {
   const canPersistSiteEssentials = usePermission("update-site-essential");
-  useSiteEssentialsPresetFontsPreload();
+  const catalogQuery = useThemePresetsCatalogQuery();
+  const catalogView = useMemo(() => {
+    if (catalogQuery.isPending && !catalogQuery.data) return null;
+    return buildTryThemeCatalogView(catalogQuery.data);
+  }, [catalogQuery.data, catalogQuery.isPending]);
+  useSiteEssentialsPresetFontsPreload(
+    catalogView?.googleFamilies ?? [],
+    catalogView?.cdnStylesheetUrls ?? [],
+  );
   const isCompactViewport = useMediaQuery("(max-width: 767px)");
   const [open, setOpen] = useState(false);
   const [colorFilter, setColorFilter] = useState<"all" | "dark" | "light">(
@@ -398,10 +415,11 @@ export function PreviewThemeCustomizer({
   };
 
   const applyColorGridOption = useCallback(
-    (opt: TryThemeColorGridOption) => {
+    (opt: CatalogColorGridOption) => {
       const cur = valuesRef.current;
-      if (opt.source === "preset" && isVenueThemePresetId(opt.id)) {
-        const preset = presetById(opt.id);
+      if (isRecipeColorOption(opt)) {
+        const preset = catalogView?.recipesById.get(opt.id);
+        if (!preset) return;
         const next = mergeFullPresetIntoValues(cur, preset);
         const sameColors = siteEssentialsColorsMatch(cur.colors, next.colors);
         const sameFonts =
@@ -410,7 +428,8 @@ export function PreviewThemeCustomizer({
         const sameEmphasis =
           (cur.typography?.headingEmphasis ?? "") ===
           (next.typography?.headingEmphasis ?? "");
-        if (sameColors && sameFonts && sameEmphasis) return;
+        const samePreset = cur.theme_preset_id === next.theme_preset_id;
+        if (sameColors && sameFonts && sameEmphasis && samePreset) return;
         onValuesChange(next);
       } else {
         if (siteEssentialsColorsMatch(cur.colors, opt.colors)) {
@@ -426,12 +445,13 @@ export function PreviewThemeCustomizer({
         /* private mode */
       }
     },
-    [onValuesChange],
+    [catalogView, onValuesChange],
   );
 
   const applyFonts = useCallback(
-    (id: SiteThemePresetId) => {
-      const preset = presetById(id);
+    (id: string) => {
+      const preset = catalogView?.recipesById.get(id);
+      if (!preset) return;
       const cur = valuesRef.current;
       const next = mergePresetFontsIntoValues(cur, preset);
       if (
@@ -442,11 +462,11 @@ export function PreviewThemeCustomizer({
       }
       onValuesChange(next);
     },
-    [onValuesChange],
+    [catalogView, onValuesChange],
   );
 
   const applyFontGridOption = useCallback(
-    (opt: TryThemeFontGridOption) => {
+    (opt: CatalogFontGridOption) => {
       if (opt.source === "preset") {
         applyFonts(opt.id);
       } else {
@@ -507,6 +527,7 @@ export function PreviewThemeCustomizer({
       }
       onValuesChange({
         ...cur,
+        theme_preset_id: null,
         typography: {
           ...cur.typography,
           headingEmphasis: emphasis,
@@ -532,72 +553,66 @@ export function PreviewThemeCustomizer({
   const orderedFontGridOptions = useMemo(
     () =>
       sortTryThemeOptionsFirst(
-        TRY_THEME_FONT_GRID_OPTIONS,
+        catalogView?.fontOptions ?? [],
         lastFontKey,
         tryThemeFontGridOptionStorageKey,
       ),
-    [lastFontKey],
+    [catalogView, lastFontKey],
   );
 
   const groupedFontGridOptions = useMemo(() => {
     const groups: Record<
-      string,
-      { key: string; label: string; items: typeof orderedFontGridOptions }
+      ThemePresetGroupKey,
+      { key: ThemePresetGroupKey; label: string; items: typeof orderedFontGridOptions }
     > = {
-      venue: { key: "venue", label: "Venue font pairs", items: [] },
-      modern: { key: "modern", label: "Marketing font pairs", items: [] },
-      classic: { key: "classic", label: "More font pairs", items: [] },
-      extra: { key: "extra", label: "Extra font pairs", items: [] },
+      venue: { key: "venue", label: groupLabelForFonts("venue"), items: [] },
+      modern: { key: "modern", label: groupLabelForFonts("modern"), items: [] },
+      classic: { key: "classic", label: groupLabelForFonts("classic"), items: [] },
+      extra: { key: "extra", label: groupLabelForFonts("extra"), items: [] },
     };
 
     for (const opt of orderedFontGridOptions) {
-      if (opt.source === "preset") {
-        const k = presetGroupKeyFromId(opt.id);
-        groups[k].items.push(opt);
-      } else {
-        groups.extra.items.push(opt);
-      }
+      groups[opt.group].items.push(opt);
     }
 
     return Object.values(groups).filter((g) => g.items.length > 0);
   }, [orderedFontGridOptions]);
 
   const orderedColorGridOptions = useMemo(() => {
-    let list = TRY_THEME_COLOR_GRID_OPTIONS;
+    let list = catalogView?.colorOptions ?? [];
     if (colorFilter === "dark") {
-      list = list.filter((o) => !isLightUiBackground(o.colors.background));
+      list = list.filter((o) => !o.isLight);
     } else if (colorFilter === "light") {
-      list = list.filter((o) => isLightUiBackground(o.colors.background));
+      list = list.filter((o) => o.isLight);
     }
     return sortTryThemeOptionsFirst(
       list,
       lastColorKey,
       tryThemeColorGridOptionStorageKey,
     );
-  }, [colorFilter, lastColorKey]);
+  }, [catalogView, colorFilter, lastColorKey]);
 
   const groupedColorGridOptions = useMemo(() => {
     const groups: Record<
-      string,
+      ThemePresetGroupKey,
       {
-        key: string;
+        key: ThemePresetGroupKey;
         label: string;
         items: typeof orderedColorGridOptions;
       }
     > = {
-      venue: { key: "venue", label: "Venue recipes", items: [] },
-      modern: { key: "modern", label: "Marketing palettes", items: [] },
-      classic: { key: "classic", label: "More palettes", items: [] },
-      extra: { key: "extra", label: "Extra palettes", items: [] },
+      venue: { key: "venue", label: groupLabelForColors("venue"), items: [] },
+      modern: { key: "modern", label: groupLabelForColors("modern"), items: [] },
+      classic: {
+        key: "classic",
+        label: groupLabelForColors("classic"),
+        items: [],
+      },
+      extra: { key: "extra", label: groupLabelForColors("extra"), items: [] },
     };
 
     for (const opt of orderedColorGridOptions) {
-      if (opt.source === "preset") {
-        const k = presetGroupKeyFromId(opt.id);
-        groups[k].items.push(opt);
-      } else {
-        groups.extra.items.push(opt);
-      }
+      groups[opt.group].items.push(opt);
     }
 
     return Object.values(groups).filter((g) => g.items.length > 0);
@@ -857,11 +872,18 @@ export function PreviewThemeCustomizer({
                   heading style together. Gold/brass is for badges, not body
                   text. More palettes are collapsed below.
                 </p>
-                <Accordion
-                  type="multiple"
-                  defaultValue={["venue"]}
-                  className="w-full"
-                >
+                {!catalogView ? (
+                  <div className="space-y-2" aria-hidden>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <Accordion
+                    type="multiple"
+                    defaultValue={["venue"]}
+                    className="w-full"
+                  >
                   {groupedColorGridOptions.map((group) => (
                     <AccordionItem
                       key={group.key}
@@ -886,19 +908,16 @@ export function PreviewThemeCustomizer({
                           )}
                         >
                           {group.items.map((opt) => {
-                            const active = siteEssentialsColorsMatch(
-                              values.colors,
-                              opt.colors,
-                            );
+                            const active = isRecipeColorOption(opt)
+                              ? values.theme_preset_id === opt.id
+                              : !values.theme_preset_id &&
+                                siteEssentialsColorsMatch(
+                                  values.colors,
+                                  opt.colors,
+                                );
                             const pinned =
                               tryThemeColorGridOptionStorageKey(opt) ===
                               lastColorKey;
-                            const presetRow =
-                              opt.source === "preset"
-                                ? SITE_THEME_PRESETS.find(
-                                    (p) => p.id === opt.id,
-                                  )
-                                : undefined;
                             return (
                               <ColorPresetCard
                                 key={
@@ -913,8 +932,10 @@ export function PreviewThemeCustomizer({
                                   group.key === "venue" ? "recipe" : "compact"
                                 }
                                 fontLabel={
-                                  presetRow && group.key === "venue"
-                                    ? `${presetRow.headingFontLabel} / ${presetRow.bodyFontLabel}`
+                                  group.key === "venue" &&
+                                  opt.headingFontLabel &&
+                                  opt.bodyFontLabel
+                                    ? `${opt.headingFontLabel} / ${opt.bodyFontLabel}`
                                     : undefined
                                 }
                                 onSelect={() => applyColorGridOption(opt)}
@@ -925,7 +946,8 @@ export function PreviewThemeCustomizer({
                       </AccordionContent>
                     </AccordionItem>
                   ))}
-                </Accordion>
+                  </Accordion>
+                )}
               </div>
 
               <div className="space-y-2.5">
@@ -934,11 +956,18 @@ export function PreviewThemeCustomizer({
                   Venue recipes already include a font pair. Change this only
                   if you want a different heading/body mix.
                 </p>
-                <Accordion
-                  type="multiple"
-                  defaultValue={["venue"]}
-                  className="w-full"
-                >
+                {!catalogView ? (
+                  <div className="grid grid-cols-2 gap-2" aria-hidden>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Skeleton key={i} className="h-24 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <Accordion
+                    type="multiple"
+                    defaultValue={["venue"]}
+                    className="w-full"
+                  >
                   {groupedFontGridOptions.map((group) => (
                     <AccordionItem
                       key={group.key}
@@ -1032,7 +1061,8 @@ export function PreviewThemeCustomizer({
                       </AccordionContent>
                     </AccordionItem>
                   ))}
-                </Accordion>
+                  </Accordion>
+                )}
               </div>
             </div>
           </ScrollArea>

@@ -517,37 +517,6 @@ export function TableSeatingPanel({
                 </div>
               ) : null}
 
-              {showConfirmButton && (
-                <>
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    Tap{" "}
-                    <span className="font-semibold text-foreground">
-                      Confirm seating
-                    </span>{" "}
-                    to add tables to your order.
-                  </p>
-                  <button
-                    type="button"
-                    className="h-8 w-full rounded-md text-xs font-bold leading-none hover:opacity-[0.92]"
-                    style={{
-                      backgroundColor: "var(--color-success)",
-                      color: "var(--color-primary-foreground, #fff)",
-                    }}
-                    onClick={handleConfirmSeating}
-                  >
-                    Confirm seating
-                  </button>
-                </>
-              )}
-
-              {seatingConfirmed && (
-                <p className="text-[11px] font-semibold text-emerald-700">
-                  Seating confirmed · {draftGuestTotal} guest
-                  {draftGuestTotal === 1 ? "" : "s"} across {tableQuantity}{" "}
-                  table{tableQuantity === 1 ? "" : "s"}
-                </p>
-              )}
-
               <div
                 className={cn(
                   "grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-4",
@@ -599,7 +568,7 @@ export function TableSeatingPanel({
                             {currentValue}
                           </p>
                           <p className="mt-0.5 text-[8px] text-muted-foreground">
-                            Max {maxPersons}
+                            {minPersons}–{maxPersons} guests
                           </p>
                           <p className="mt-1 text-[8px] font-semibold tabular-nums text-foreground">
                             {formatCurrency(pricePerPerson * currentValue)}
@@ -632,6 +601,37 @@ export function TableSeatingPanel({
                   );
                 })}
               </div>
+
+              {showConfirmButton && (
+                <>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Tap{" "}
+                    <span className="font-semibold text-foreground">
+                      Confirm seating
+                    </span>{" "}
+                    to add tables to your order.
+                  </p>
+                  <button
+                    type="button"
+                    className="h-8 w-full rounded-md text-xs font-bold leading-none hover:opacity-[0.92]"
+                    style={{
+                      backgroundColor: "var(--color-success)",
+                      color: "var(--color-primary-foreground, #fff)",
+                    }}
+                    onClick={handleConfirmSeating}
+                  >
+                    Confirm seating
+                  </button>
+                </>
+              )}
+
+              {seatingConfirmed && (
+                <p className="text-[11px] font-semibold text-emerald-700">
+                  Seating confirmed · {draftGuestTotal} guest
+                  {draftGuestTotal === 1 ? "" : "s"} across {tableQuantity}{" "}
+                  table{tableQuantity === 1 ? "" : "s"}
+                </p>
+              )}
 
               {!validation.isValid && validation.errors.length > 0 && (
                 <div className="rounded-lg border border-red-100 bg-red-50 px-2.5 py-2">

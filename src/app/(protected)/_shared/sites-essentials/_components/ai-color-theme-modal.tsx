@@ -260,6 +260,7 @@ export function AIColorThemeModal({
         colorTheme.socialLogin.microsoft,
         { shouldDirty: true }
       );
+      form.setValue("theme_preset_id", null, { shouldDirty: true });
 
       // Close the modal
       onOpenChange(false);

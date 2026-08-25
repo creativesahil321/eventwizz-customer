@@ -12,6 +12,8 @@ type SiteEssentialsEndpoints = {
   GET: string;
   UPDATE: string;
   RESET_THEME_DEFAULT: string;
+  THEME_PRESETS: string;
+  APPLY_THEME_PRESET: string;
 };
 
 export type GetSiteEssentialsOptions = {
@@ -141,7 +143,15 @@ function appendToFormData(
   value: unknown,
   path = "",
 ): void {
-  if (value === null || value === undefined) return;
+  if (value === undefined) return;
+  if (value === null) {
+    // Laravel JSON PATCH needs an explicit null for theme_preset_id (custom theme).
+    // FormData cannot send JSON null — empty string is treated as clear.
+    if (path === "theme_preset_id") {
+      formData.append(path, "");
+    }
+    return;
+  }
 
   if (value instanceof File || value instanceof Blob) {
     if (path) formData.append(path, value);
@@ -178,10 +188,33 @@ function appendToFormData(
   formData.append(path, String(value));
 }
 
+/**
+ * Apply a catalog recipe: writes catalog colors/typography and theme_preset_id.
+ * Does not change logo, copy, or media.
+ */
+export const applySiteEssentialsThemePreset = async (
+  themePresetId: string,
+): Promise<SiteEssentials> => {
+  try {
+    const endpoints =
+      getEndpointsByRole<SiteEssentialsEndpoints>("SITES_ESSENTIALS");
+    const response = await api.post<SiteEssentialsResponse>(
+      endpoints.APPLY_THEME_PRESET,
+      { theme_preset_id: themePresetId },
+      { returnFullResponse: true },
+    );
+    return flattenInfoPages(response.data);
+  } catch (error) {
+    console.error("Error applying site essentials theme preset:", error);
+    throw error;
+  }
+};
+
 const siteEssentialsService = {
   getSiteEssentials,
   updateSiteEssentials,
   resetSiteEssentialsThemeToDefault,
+  applySiteEssentialsThemePreset,
 };
 
 export default siteEssentialsService;

@@ -1399,43 +1399,52 @@ export const useCartEditStore = create<CartEditState>()(
             special_request: undefined,
           };
 
+        const tables = getBillableTables(dateData).map((table) => ({
+          id: table.id,
+          table_size: table.tableSize || table.maxPersons || 20,
+          price_per_person:
+            table.pricePerPerson || table.price / (table.maxPersons || 20),
+          no_tables: table.quantity,
+          allocation:
+            table.allocation && table.allocation.length > 0
+              ? table.allocation
+              : undefined,
+        }));
+
+        const tickets = dateData.tickets
+          .filter((ticket) => ticket.quantity > 0)
+          .map((ticket) => ({
+            id: ticket.id,
+            title: ticket.title,
+            description: ticket.description || "",
+            price_per_ticket: ticket.price,
+            quantity: ticket.quantity,
+          }));
+
+        const drink_package = dateData.drinks
+          .filter((drink) => drink.quantity > 0)
+          .map((drink) => ({
+            id: drink.id,
+            title: drink.title,
+            price: drink.price,
+            quantity: drink.quantity,
+          }));
+
+        const hasLineItems =
+          tables.length > 0 || tickets.length > 0 || drink_package.length > 0;
+
         return {
           slug: eventSlug,
           event_date: actualDate,
           ...(resolvedRoomId != null ? { room_id: resolvedRoomId } : {}),
-          tables: getBillableTables(dateData)
-            .map((table) => ({
-              id: table.id,
-              table_size: table.tableSize || table.maxPersons || 20,
-              price_per_person:
-                table.pricePerPerson || table.price / (table.maxPersons || 20),
-              no_tables: table.quantity,
-              allocation:
-                table.allocation && table.allocation.length > 0
-                  ? table.allocation
-                  : undefined,
-            })),
-
-          tickets: dateData.tickets
-            .filter((ticket) => ticket.quantity > 0)
-            .map((ticket) => ({
-              id: ticket.id,
-              title: ticket.title,
-              description: ticket.description || "",
-              price_per_ticket: ticket.price,
-              quantity: ticket.quantity,
-            })),
-
-          drink_package: dateData.drinks
-            .filter((drink) => drink.quantity > 0)
-            .map((drink) => ({
-              id: drink.id,
-              title: drink.title,
-              price: drink.price,
-              quantity: drink.quantity,
-            })),
-
-          people_quantity: dateData.peopleCount,
+          tables,
+          tickets,
+          drink_package,
+          // Backend requires min 1. Ticket-only carts often have peopleCount 0
+          // (table seating skipped) — fall back to ticket qty / group size.
+          people_quantity: hasLineItems
+            ? resolveCheckoutGroupSize(dateData)
+            : undefined,
           special_request: dateData.specialRequest || "",
         };
       },

@@ -20,6 +20,7 @@ import {
   useSiteEssentialsBySlugQuery,
   useSiteEssentialsMutation,
   useSiteEssentialsQuery,
+  useApplyThemePresetMutation,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreviewProvider } from "@/contexts/preview-context";
@@ -85,6 +86,8 @@ export default function SitePreviewPage() {
     useVendorLocationsList();
   const { mutateAsync: saveSiteEssentials, isPending: isSaving } =
     useSiteEssentialsMutation();
+  const { mutateAsync: applyThemePreset, isPending: isApplyingPreset } =
+    useApplyThemePresetMutation();
   const {
     previewData,
     reviewStep,
@@ -937,10 +940,22 @@ export default function SitePreviewPage() {
       const hydrated = await hydratePreviewMediaForSave(
         toSiteEssentialsUpdatePayload(dataForSave),
       );
-      await saveSiteEssentials({
-        ...hydrated,
-        _method: "PATCH",
-      } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
+      const recipeId = dataForSave.theme_preset_id?.trim();
+      if (recipeId) {
+        await applyThemePreset(recipeId);
+        // Apply writes catalog tokens + id only. Hero layout still lives on PATCH.
+        await saveSiteEssentials({
+          banner_heading_align: dataForSave.banner_heading_align,
+          banner_heading_valign: dataForSave.banner_heading_valign,
+          _method: "PATCH",
+        } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
+      } else {
+        await saveSiteEssentials({
+          ...hydrated,
+          theme_preset_id: null,
+          _method: "PATCH",
+        } as Partial<SiteEssentialsFormValues> & { _method: "PATCH" });
+      }
       await queryClient.invalidateQueries({ queryKey: themeKeys.all });
       await queryClient.invalidateQueries({
         queryKey: siteEssentialsKeys.details(),
@@ -978,6 +993,7 @@ export default function SitePreviewPage() {
     queryClient,
     router,
     saveSiteEssentials,
+    applyThemePreset,
     toast,
   ]);
 
@@ -1133,7 +1149,7 @@ export default function SitePreviewPage() {
             onValuesChange={handlePreviewValuesChange}
             brandName={resolvedGlobalData.name?.trim() || "Site preview"}
             onSaveTheme={handleSaveTheme}
-            isSavingTheme={isSaving}
+            isSavingTheme={isSaving || isApplyingPreset}
             showHeroLayoutControls={effectiveReviewStep === "location"}
             importSlot={
               session?.user?.account_type !== "admin" ? (
