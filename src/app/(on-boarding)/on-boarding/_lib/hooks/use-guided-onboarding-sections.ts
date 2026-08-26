@@ -3,6 +3,50 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
 
+const GUIDED_INPUT_META_KEYS = new Set([
+  "step",
+  "isApproved",
+  "event_id",
+  "eventId",
+  "vendor_location_id",
+  "id",
+  "room_id",
+]);
+
+function getPathValue(source: unknown, path: string): unknown {
+  if (!path) return source;
+  const parts = path.replace(/\[(\d+)\]/g, ".$1").split(".");
+  let current: unknown = source;
+  for (const part of parts) {
+    if (current == null || typeof current !== "object") return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
+/** True when a guided field has user-entered content (not empty defaults). */
+export function fieldHasUserInput(value: unknown): boolean {
+  if (value == null || value === "") return false;
+  if (typeof value === "boolean") return false;
+  if (typeof value === "number") return Number.isFinite(value) && value !== 0;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof File !== "undefined" && value instanceof File) {
+    return value.size > 0;
+  }
+  if (Array.isArray(value)) return value.some(fieldHasUserInput);
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>).some(
+      ([key, nested]) => {
+        if (GUIDED_INPUT_META_KEYS.has(key) || key.startsWith("remove_")) {
+          return false;
+        }
+        return fieldHasUserInput(nested);
+      },
+    );
+  }
+  return false;
+}
+
 /**
  * After `form.trigger()` commits `aria-invalid` / error-message paragraphs to the
  * DOM, scroll the first offending field into the visible sidebar area.
@@ -119,6 +163,16 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
   const allSectionsApproved =
     sectionFlow.length > 0 &&
     approvedSections.size === sectionFlow.length;
+
+  const formValues = form.watch();
+  const currentSectionHasInput = useMemo(() => {
+    if (allSectionsApproved) return true;
+    if (!currentSection) return false;
+    if (currentSection.fields.length === 0) return true;
+    return currentSection.fields.some((path) =>
+      fieldHasUserInput(getPathValue(formValues, String(path))),
+    );
+  }, [allSectionsApproved, currentSection, formValues]);
 
   const canNavigateToIndex = useCallback(
     (index: number) => {
@@ -345,6 +399,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     currentSection,
     approvedSections,
     allSectionsApproved,
+    currentSectionHasInput,
     isSectionActive,
     isChipInteractive,
     handleApproveSection,

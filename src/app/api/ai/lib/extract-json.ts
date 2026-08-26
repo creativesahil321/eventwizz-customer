@@ -42,7 +42,7 @@ export function toUserFacingChatReply(text: string): string {
 }
 
 const MARKETING_META_LINE =
-  /^(thinking process|analyze the request|drafting|attempt\s+\d|role\s*:|task\s*:|input data|constraints|output\s*:|only final text|system prompt|user (asks|wants)|we need to|check against)/i;
+  /^(thinking process|analyze the request|drafting|attempt\s+\d|role\s*:|task\s*:|input data|constraints|output\s*:|only final text|system prompt|user (asks|wants)|we need (a|to)|write a short footer|check against)/i;
 
 function looksLikeScratchpad(text: string): boolean {
   return /thinking process|\*\*role:\*\*|\*\*task:\*\*|analyze the request|drafting\s*[-–]\s*attempt|constraint checklists?/i.test(
@@ -50,10 +50,34 @@ function looksLikeScratchpad(text: string): boolean {
   );
 }
 
+/**
+ * Prompt echo / chain-of-thought that must never land in a public field.
+ * Example: "We need a short footer brand description for 'X'… existing draft mentions Mohali…"
+ */
+export function looksLikeAiInstructionLeak(text: string): boolean {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (!t) return false;
+  if (MARKETING_META_LINE.test(t)) return true;
+  if (looksLikeScratchpad(t)) return true;
+  if (
+    /^(we need (a|to)|write a (short |professional )?(footer|description)|requirements?:|the existing draft)/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  return (
+    /\b(existing draft|footer brand description for|must be warm|plain text only|respond only with|not the about section|which is india|,\s*not uk|max \d+ (words|characters))\b/i.test(
+      t,
+    ) || /'[^']{2,80}',\s*a\s+(uk\s+)?events and hospitality/i.test(t)
+  );
+}
+
 function looksLikeCustomerCopy(text: string): boolean {
   const t = text.trim();
   if (t.length < 40) return false;
   if (looksLikeScratchpad(t)) return false;
+  if (looksLikeAiInstructionLeak(t)) return false;
   if (MARKETING_META_LINE.test(t)) return false;
   if (/\*\*(Role|Task|Input Data|Constraints|Output)\*\*/i.test(t)) return false;
   return /[.!?]/.test(t);
@@ -79,18 +103,20 @@ export function toUserFacingMarketingCopy(text: string): string {
     const line = part.trim();
     if (!line) continue;
     if (MARKETING_META_LINE.test(line)) continue;
+    if (looksLikeAiInstructionLeak(line)) continue;
     if (/\*\*(Role|Task|Input Data|Constraints|Output)\*\*/i.test(line)) continue;
     if (/^\d+\.\s+\*\*Analyze/i.test(line)) continue;
     kept.push(part.trim());
   }
 
   let out = kept.join("\n\n").trim();
-  if (!out || looksLikeScratchpad(out)) {
+  if (!out || looksLikeScratchpad(out) || looksLikeAiInstructionLeak(out)) {
     const prose = [...parts.map((p) => p.trim()).filter(Boolean)]
       .reverse()
       .find((p) => looksLikeCustomerCopy(p));
     out = prose ?? "";
   }
+  if (out && looksLikeAiInstructionLeak(out)) return "";
   return out.trim();
 }
 

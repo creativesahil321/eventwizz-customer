@@ -162,6 +162,12 @@ export interface ThemeSchema {
    */
   website_role?: string;
 
+  /**
+   * Present only for a logged-in customer on this vendor host.
+   * `true` / `false` = subscribed state. Key absent = guest or non-customer.
+   */
+  is_newsletter_subscribed?: boolean;
+
   // Location data
   locations?: LocationData[];
 
@@ -193,6 +199,8 @@ export interface ThemeSchema {
   // About section fields
   about_title?: string;
   about_description?: string;
+  /** Short blurb under the footer logo. Falls back to about_description when empty. */
+  footer_brand_description?: string;
   about_link_title?: string;
   about_cta_link?: string;
 

@@ -15,6 +15,8 @@ export interface WebsiteImportContent {
   about_title?: string;
   /** Plain text (no HTML) — used for the About section description. */
   about_description?: string;
+  /** Short footer blurb under the logo (plain text, max 180 chars). */
+  footer_brand_description?: string;
   event_title_1?: string;
   event_title_2?: string;
   event_gallery_title?: string;

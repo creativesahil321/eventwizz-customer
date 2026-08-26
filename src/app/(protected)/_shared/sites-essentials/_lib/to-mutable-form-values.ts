@@ -1,6 +1,8 @@
 import type { SiteEssentials } from "@/services/common/site-essentials/type";
 import type { SiteEssentialsFormValues } from "./schema";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
+import { toPlainText, wrapPlainTextAsHtml } from "@/lib/plain-text-length";
 
 type MediaField = string | File | null | undefined;
 
@@ -57,6 +59,13 @@ function preserveMediaField(
   return cloned ?? null;
 }
 
+function normalizeFooterBrandDescription(raw: unknown): string {
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  const clipped = clipFooterBrandDescription(raw);
+  if (clipped === toPlainText(raw)) return raw;
+  return wrapPlainTextAsHtml(clipped);
+}
+
 /**
  * FAQ items may arrive as an array (GET) or a JSON string (echoed back from a
  * multipart PATCH). The form always needs a mutable array so `useFieldArray`
@@ -110,6 +119,9 @@ export function toMutableSiteEssentialsFormValues(
         ? ((source as { theme_preset_id?: string | null }).theme_preset_id ??
           null)
         : (cloned.theme_preset_id ?? null),
+    footer_brand_description: normalizeFooterBrandDescription(
+      cloned.footer_brand_description ?? source.footer_brand_description,
+    ),
     banner_heading_accent: cloned.banner_heading_accent ?? "",
     banner_heading_align: cloned.banner_heading_align ?? "center",
     banner_heading_valign: cloned.banner_heading_valign ?? "center",

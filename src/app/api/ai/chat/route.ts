@@ -12,8 +12,13 @@ import {
   buildVendorLiveStatsPromptBlock,
   type VendorChatLiveStats,
 } from "@/lib/chat-vendor-live-stats";
-import { buildLiveEventsPromptBlock } from "@/lib/chat-live-events";
+import { buildCompactLiveEventsPromptBlock, buildLiveEventsPromptBlock } from "@/lib/chat-live-events";
 import type { LiveEvent } from "@/types/theme.types";
+import {
+  buildBookingConciergeInstructions,
+  buildEventBookingPromptBlock,
+  type ChatEventBookingBrief,
+} from "@/lib/chat-event-booking";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import {
   AI_HIDE_REASONING,
@@ -107,6 +112,8 @@ type ChatContext = {
   vendorLiveStats?: VendorChatLiveStats | null;
   /** Theme live_events for public venue storefront booking redirects */
   liveEvents?: LiveEvent[] | null;
+  /** Compact public event detail (dates, rooms, drinks, coupon) for concierge booking */
+  eventBookingBrief?: ChatEventBookingBrief | null;
 };
 
 function buildLoggedInUserContextBlock(context: ChatContext): string {
@@ -184,7 +191,15 @@ function buildSystemPrompt(context: ChatContext): string {
       ? buildVendorLiveStatsPromptBlock(context.vendorLiveStats)
       : "";
   const liveEventsBlock = isVendorStorefront
-    ? buildLiveEventsPromptBlock(context.liveEvents)
+    ? context.eventBookingBrief
+      ? buildCompactLiveEventsPromptBlock(context.liveEvents)
+      : buildLiveEventsPromptBlock(context.liveEvents)
+    : "";
+  const eventBookingBlock = isVendorStorefront
+    ? buildEventBookingPromptBlock(context.eventBookingBrief)
+    : "";
+  const conciergeBlock = isVendorStorefront
+    ? buildBookingConciergeInstructions(Boolean(context.isLoggedInCustomer))
     : "";
 
   if (isVendorStorefront) {
@@ -205,9 +220,17 @@ function buildSystemPrompt(context: ChatContext): string {
       ${liveStatsBlock}
 
       ${liveEventsBlock}
+
+      ${eventBookingBlock}
+
+      ${conciergeBlock}
       
       Use this knowledge to answer questions about the venue site:
-      ${VENDOR_STOREFRONT_KNOWLEDGE}
+      ${
+        context.eventBookingBrief
+          ? "Guests book in chat (room → date → party size → tables/tickets → drinks → coupon), or visit the event page. After a booking exists, rooms cannot be changed. Ticket/table quantities are confirmed on Checkout."
+          : VENDOR_STOREFRONT_KNOWLEDGE
+      }
       
       If you don't know the answer, politely say you don't have that specific information and follow the SUPPORT & CONTACT rules for this user (logged-in → New enquiry link; guest → Contact page + contact details).
       
@@ -277,8 +300,10 @@ export async function POST(req: NextRequest) {
         content: role === "assistant" ? toUserFacingChatReply(content) : content,
       }));
 
-    // Optimize: Only include recent conversation context (last 5 messages)
-    const recentMessages = sanitizedMessages.slice(-5);
+    const isVendorStorefront = context?.websiteRole === "vendor";
+
+    // Optimize: keep the prompt small on venue booking (small models reject long context).
+    const recentMessages = sanitizedMessages.slice(isVendorStorefront ? -6 : -10);
 
     const systemMessage = {
       role: "system" as const,
@@ -289,16 +314,21 @@ export async function POST(req: NextRequest) {
 
     const result: FallbackResult = await tryModelsWithFallback(aiConfig, {
       messages: apiMessages,
-      max_tokens: 800,
+      max_tokens: isVendorStorefront ? 500 : 1100,
       temperature: 0.7,
       ...AI_HIDE_REASONING,
     });
 
     if (!result.success) {
+      const raw = String(result.error ?? "");
+      const isLength =
+        /reduce the length|request too large|context length|maximum context|too many tokens/i.test(
+          raw,
+        );
       return NextResponse.json(
         {
           error: "Error from AI provider",
-          details: result.error,
+          code: isLength ? "context_too_long" : "provider_error",
           status: result.status || 500,
           modelsTried: result.modelsTried,
           retryAfter: result.retryAfterHuman,

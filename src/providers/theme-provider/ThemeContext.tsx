@@ -1,6 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { useAuthStore } from "@/store/auth.store";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import {
   ThemeSettings,
@@ -275,6 +282,35 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     error: queryError,
   } = useThemeQuery(domain, initialTheme);
 
+  const isSessionChecked = useAuthStore((s) => s.isSessionChecked);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const accountType = useAuthStore((s) => s.account_type);
+  const newsletterThemeSyncKeyRef = useRef("");
+
+  // SSR/guest theme cache has no `is_newsletter_subscribed`. Refetch the same
+  // query with the customer token (or without it after logout) so the flag matches.
+  useEffect(() => {
+    if (!isSessionChecked || !domain) return;
+
+    const isCustomer = Boolean(isAuthenticated && accountType === "customer");
+    const hasFlag =
+      typeof queryThemeData?.is_newsletter_subscribed === "boolean";
+    if (isCustomer === hasFlag) return;
+
+    const syncKey = `${isAuthenticated}:${accountType ?? ""}`;
+    if (newsletterThemeSyncKeyRef.current === syncKey) return;
+    newsletterThemeSyncKeyRef.current = syncKey;
+
+    void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+  }, [
+    isSessionChecked,
+    isAuthenticated,
+    accountType,
+    domain,
+    queryThemeData?.is_newsletter_subscribed,
+    queryClient,
+  ]);
+
   // DB-backed; identical on SSR + client (unlike query dataUpdatedAt).
   const mediaUpdatedAt = resolveMediaUpdatedAt(queryThemeData, initialTheme);
   const mediaVersion = mediaUpdatedAtToVersion(mediaUpdatedAt);
@@ -329,7 +365,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 
       // Pre-populate the query cache with a mutable copy so TanStack Query
       // never mutates a read-only (frozen) server object (avoids "Cannot assign to read only property 'primary'").
-      queryClient.setQueryData(themeKeys.all, structuredClone(initialTheme));
+      queryClient.setQueryData(themeKeys.all, (current: ThemeSchema | undefined) => {
+        const next = structuredClone(initialTheme);
+        if (typeof current?.is_newsletter_subscribed === "boolean") {
+          next.is_newsletter_subscribed = current.is_newsletter_subscribed;
+        }
+        return next;
+      });
     }
   }, [initialTheme, queryClient]);
 

@@ -12,6 +12,7 @@ import { SingleLocationHome } from "./_components/single-location-home";
 import { VendorMainLandingView } from "./_components/LocationPage/vendor-main-landing-view";
 import type { LocationData } from "@/types/theme.types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 
 export default function VendorSiteHomePage() {
   const router = useRouter();
@@ -206,8 +207,12 @@ export default function VendorSiteHomePage() {
       onSelectLocation={(slug) => {
         router.push(`/${slug}`);
       }}
-      copyright={settings?.copyright}
-      footerLogo={settings?.logo}
+      copyright={liveTheme?.copyright || settings?.copyright}
+      footerLogo={liveTheme?.logo || settings?.logo}
+      brandDescription={firstFooterBrandDescription(
+        liveTheme?.footer_brand_description,
+        settings?.footer_brand_description,
+      )}
       exploreCitiesSectionId="explore-cities"
     />
   );

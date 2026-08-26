@@ -27,6 +27,7 @@ import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 import { hasPlainText, toPlainSnippet } from "@/lib/plain-text-length";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
 
 interface FooterSectionProps {
@@ -53,8 +54,10 @@ interface FooterSectionProps {
     >
   > | null;
   /**
-   * Vendor about copy under the logo. Preview shells must pass this so the
-   * host EventWizz SEO description cannot leak into the footer.
+   * Dedicated footer blurb under the logo (`footer_brand_description`).
+   * Preview shells must pass this (or the already-resolved fallback chain)
+   * so the host EventWizz SEO description cannot leak into the footer.
+   * Live pages may omit it; the footer then uses theme GET.
    */
   brandDescription?: string | null;
 }
@@ -319,11 +322,12 @@ export default function FooterSection({
   }, [themeForContact?.locations]);
 
   const brandBlurb = toPlainSnippet(
-    hasPlainText(brandDescription)
-      ? brandDescription
-      : isPreviewMode
-        ? null
-        : vendorTheme?.about_description || vendorTheme?.seo?.description,
+    firstFooterBrandDescription(
+      brandDescription,
+      isPreviewMode ? null : vendorTheme?.footer_brand_description,
+      isPreviewMode ? null : vendorTheme?.about_description,
+      isPreviewMode ? null : vendorTheme?.seo?.description,
+    ),
     180,
   );
 
@@ -334,6 +338,7 @@ export default function FooterSection({
 
   return (
     <footer
+      data-preview-footer=""
       className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]"
       style={
         needsReviewChromePadding

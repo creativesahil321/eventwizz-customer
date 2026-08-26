@@ -19,6 +19,8 @@ import {
   useOnboardingPreviewEventQuery,
 } from "./_lib/use-onboarding-preview-queries";
 import { mapOnboardingEventToDetailData } from "./_lib/map-onboarding-event-to-detail";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
+import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
 import {
   OnboardingPreviewReviewChrome,
   type OnboardingPreviewTab,
@@ -85,6 +87,7 @@ export default function OnboardingPreviewPage() {
 function OnboardingPreviewContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const deviceFrameRef = useRef<HTMLDivElement>(null);
 
   /* ── API: Main Landing (also provides locations list, multi-location flag) ── */
   const { data: mainData, isLoading: isLoadingMain } =
@@ -163,6 +166,8 @@ function OnboardingPreviewContent() {
    * Location + event footers need the live theme shape:
    * `locations[]` (venue card) + `contactDetails` (head office).
    * Prefer main landing for those; keep location-scoped fields when present.
+   * Global identity (`footer_brand_description`, copyright, logo) must survive
+   * a slug-scoped GET that omits them.
    */
   const locationSiteEssentials = useMemo(():
     | SiteEssentialsFormValues
@@ -175,10 +180,53 @@ function OnboardingPreviewContent() {
         mainPreviewData?.contactDetails ?? base.contactDetails,
       locations: mainPreviewData?.locations ?? base.locations,
       slug: activeLocationSlug ?? base.slug,
+      copyright:
+        (typeof locationPreviewData?.copyright === "string" &&
+        locationPreviewData.copyright.trim()
+          ? locationPreviewData.copyright
+          : mainPreviewData?.copyright) ?? base.copyright,
+      logo: locationPreviewData?.logo || mainPreviewData?.logo || base.logo,
+      favicon:
+        locationPreviewData?.favicon ||
+        mainPreviewData?.favicon ||
+        base.favicon,
+      footer_brand_description:
+        firstFooterBrandDescription(
+          locationPreviewData?.footer_brand_description,
+          mainPreviewData?.footer_brand_description,
+          base.footer_brand_description,
+        ) ?? "",
     };
   }, [locationPreviewData, mainPreviewData, activeLocationSlug]);
 
-  const eventSiteEssentials = locationSiteEssentials;
+  const eventSiteEssentials = useMemo(():
+    | SiteEssentialsFormValues
+    | undefined => {
+    if (!locationSiteEssentials && !eventApiData) return undefined;
+    const base = locationSiteEssentials;
+    const eventRoot = eventApiData;
+    const eventNested = eventApiData?.event;
+    if (!base && !eventRoot) return undefined;
+    return {
+      ...(base ?? (eventRoot as SiteEssentialsFormValues)),
+      copyright:
+        (typeof eventRoot?.copyright === "string" && eventRoot.copyright.trim()
+          ? eventRoot.copyright
+          : undefined) ||
+        (typeof eventNested?.copyright === "string" &&
+        eventNested.copyright.trim()
+          ? eventNested.copyright
+          : undefined) ||
+        base?.copyright,
+      logo: eventRoot?.logo || eventNested?.logo || base?.logo,
+      footer_brand_description:
+        firstFooterBrandDescription(
+          eventRoot?.footer_brand_description,
+          eventNested?.footer_brand_description,
+          base?.footer_brand_description,
+        ) ?? "",
+    };
+  }, [locationSiteEssentials, eventApiData]);
 
   /* ── Location label ── */
   const locationLabel = useMemo(() => {
@@ -246,7 +294,8 @@ function OnboardingPreviewContent() {
       setHasVisitedEventTab(true);
     }
     setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    deviceFrameRef.current?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
   }, []);
 
   const handlePreviewLocationFromGrid = useCallback(
@@ -256,7 +305,8 @@ function OnboardingPreviewContent() {
       setHasVisitedLocationTab(true);
       setApproved((prev) => ({ ...prev, "main-landing": true }));
       setActiveTab("location");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0 });
+      deviceFrameRef.current?.scrollTo({ top: 0 });
       return true;
     },
     [],
@@ -268,7 +318,8 @@ function OnboardingPreviewContent() {
     setHasVisitedEventTab(true);
     setApproved((prev) => ({ ...prev, location: true }));
     setActiveTab("event");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
+    deviceFrameRef.current?.scrollTo({ top: 0 });
   }, []);
 
   const handlePrimaryAction = useCallback(() => {
@@ -311,7 +362,8 @@ function OnboardingPreviewContent() {
         setHasVisitedEventTab(true);
       }
       setActiveTab(nextTab);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0 });
+      deviceFrameRef.current?.scrollTo({ top: 0 });
     }
   }, [
     activeTab,
@@ -411,13 +463,17 @@ function OnboardingPreviewContent() {
         hasMultipleLocations ? handlePreviewLocationFromGrid : undefined
       }
     >
-      <div className="flex min-h-screen flex-col bg-slate-900 pb-28 sm:pb-32">
-        <div className="pointer-events-none fixed inset-x-0 top-4 z-[60] flex justify-center px-4">
+      <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-slate-900">
+        <div className="flex shrink-0 justify-center px-4 py-3">
           <PreviewDeviceToolbar className="pointer-events-auto" />
         </div>
         <PreviewDeviceFrame
-          stageClassName="min-h-screen items-stretch bg-slate-900 px-2 pb-8 pt-16 sm:px-4"
-          frameClassName="min-h-[calc(100vh-4rem)]"
+          ref={deviceFrameRef}
+          stageClassName="min-h-0 flex-1 items-stretch bg-slate-900 px-2 pb-2 pt-1 sm:px-4"
+          frameClassName="min-h-0"
+          style={{
+            paddingBottom: `var(${PREVIEW_REVIEW_CHROME_HEIGHT_VAR}, 8rem)`,
+          }}
         >
           {/* Main Landing Page */}
           {activeTab === "main-landing" && mainPreviewData && (

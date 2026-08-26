@@ -18,22 +18,26 @@ export const PACKAGE_BUTTON_NAME_MAX_CHARS = 18;
 /** One bullet line in package details. */
 export const PACKAGE_DETAIL_LINE_MAX_CHARS = 40;
 
-/** Menu item title label/placeholder (1-based): "Item title 1", "Item title 2", … */
+/** Menu item field label (1-based): "Item title 1", "Item title 2", … */
 export function menuItemTitleLabel(itemIndex: number): string {
   return `Item title ${itemIndex + 1}`;
 }
 
-export function menuItemTitlePlaceholder(itemIndex: number): string {
-  return menuItemTitleLabel(itemIndex);
+/**
+ * Placeholder shows an example dish, not the label — a value like "Item title 1"
+ * pre-filled into the input reads as saved copy and gets published as-is.
+ */
+export function menuItemTitlePlaceholder(_itemIndex: number): string {
+  return "e.g. Honey glazed ham";
 }
 
 /** Default row when adding an item under Starters, Main Courses, Desserts, etc. */
-export function createDefaultMenuItemRow(itemIndex: number): {
+export function createDefaultMenuItemRow(_itemIndex: number): {
   title: string;
   description: string;
 } {
   return {
-    title: menuItemTitleLabel(itemIndex),
+    title: "",
     description: "",
   };
 }

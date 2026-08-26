@@ -15,6 +15,10 @@ import {
   usePreviewDeviceFramesEnabled,
   usePreviewNarrowLayout,
 } from "@/hooks/use-preview-narrow-layout";
+import {
+  previewDesktopHeaderFlex,
+  previewDesktopHeaderHidden,
+} from "@/lib/preview-container-layout";
 
 interface LocationSelectionHeaderProps {
   logo?: string;
@@ -54,24 +58,24 @@ export default function LocationSelectionHeader({
     : "Dashboard";
 
   /**
-   * Desktop nav from `lg` so tablet / narrow widths use the hamburger instead of
-   * cramming Locations + auth links into ~700px.
+   * Full nav from viewport `xl` / container `@7xl` (1280px). Small desktop
+   * and tablet use the hamburger — `@lg/preview` is only 512px.
    */
   const desktopNavVisibility = isPreviewNarrow
     ? "hidden"
     : deviceFramesEnabled
-      ? "hidden @lg/preview:flex"
-      : "hidden lg:flex";
+      ? previewDesktopHeaderFlex
+      : "hidden xl:flex";
   const hamburgerVisibility = isPreviewNarrow
     ? "inline-flex"
     : deviceFramesEnabled
-      ? "@lg/preview:hidden"
-      : "lg:hidden";
+      ? previewDesktopHeaderHidden
+      : "xl:hidden";
   const mobileMenuVisibility = isPreviewNarrow
     ? "block"
     : deviceFramesEnabled
-      ? "@lg/preview:hidden"
-      : "lg:hidden";
+      ? previewDesktopHeaderHidden
+      : "xl:hidden";
 
   const topBarChromeLinkClass = cn(
     "inline-flex h-9 items-center justify-center rounded-full px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 sm:px-3.5",

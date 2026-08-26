@@ -16,6 +16,7 @@ import PackageSec from "@/app/(on-boarding)/on-boarding/_components/form-preview
 import Timeline from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Time-line";
 import CommonHeader from "@/components/shared/common-header";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { EventDetailData } from "@/services/vendor/events/type";
 import {
   LazyBrochureSection,
@@ -54,6 +55,7 @@ import {
   EVENT_SECTION_NAV_HEIGHT,
   EVENT_SECTION_NAV_HEIGHT_PX,
   buildEventSectionNavItems,
+  getNearestScrollContainer,
 } from "@/components/public/event-section-nav";
 import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
 import { slugToShortLabel } from "@/lib/slug-short-label";
@@ -173,9 +175,13 @@ export function EventPreview({
       setCurrentRoomIndex(index);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
+          const local = previewContainerRef.current;
           scrollToElementIfNeeded(bookingRef.current, {
             headerOffsetPx: HEADER_OFFSET_PX + EVENT_SECTION_NAV_HEIGHT_PX,
-            scrollContainer: previewContainerRef.current,
+            scrollContainer:
+              local && local.scrollHeight > local.clientHeight + 1
+                ? local
+                : getNearestScrollContainer(local),
           });
         });
       });
@@ -191,9 +197,12 @@ export function EventPreview({
 
     const handleScroll = () => {
       const chooser = chooserRef.current;
-      const container = previewContainerRef.current;
-      const useContainer =
-        !!container && container.scrollHeight > container.clientHeight + 1;
+      const local = previewContainerRef.current;
+      const container =
+        local && local.scrollHeight > local.clientHeight + 1
+          ? local
+          : getNearestScrollContainer(local);
+      const useContainer = !!container;
 
       if (!chooser) {
         const scrollTop = useContainer ? container!.scrollTop : window.scrollY;
@@ -219,13 +228,17 @@ export function EventPreview({
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("resize", handleScroll, { passive: true });
-    const container = previewContainerRef.current;
-    container?.addEventListener("scroll", handleScroll, { passive: true });
+    const local = previewContainerRef.current;
+    const scrollRoot =
+      local && local.scrollHeight > local.clientHeight + 1
+        ? local
+        : getNearestScrollContainer(local);
+    scrollRoot?.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
-      container?.removeEventListener("scroll", handleScroll);
+      scrollRoot?.removeEventListener("scroll", handleScroll);
     };
   }, [showRoomSelector]);
 
@@ -771,15 +784,19 @@ export function EventPreview({
         )}
 
         <FooterSection
-          copyright={siteEssentials?.copyright}
+          copyright={siteEssentials?.copyright || data.copyright}
           logo={siteEssentials?.logo || data.logo || undefined}
           locationSlug={footerLocationSlug}
           contactTheme={footerContactTheme}
           socialLinksOverride={siteEssentials?.socialLinks}
           brandDescription={
-            siteEssentials?.about_description ||
-            siteEssentials?.seo?.description ||
-            ""
+            firstFooterBrandDescription(
+              siteEssentials?.footer_brand_description,
+              data.footer_brand_description,
+              siteEssentials?.about_description,
+              data.about_description,
+              siteEssentials?.seo?.description,
+            )
           }
         />
       </div>

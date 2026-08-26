@@ -241,6 +241,10 @@ export interface EventDetailData {
   logo?: string | null;
   email?: string;
   contact_number?: string;
+  /** Global footer blurb when event GET duplicates site identity (admin review). */
+  footer_brand_description?: string | null;
+  copyright?: string | null;
+  about_description?: string | null;
   stepOne?: EventDetailStepOne;
   stepTwo?: EventDetailStepTwo;
   stepThree?: EventDetailStepThree;

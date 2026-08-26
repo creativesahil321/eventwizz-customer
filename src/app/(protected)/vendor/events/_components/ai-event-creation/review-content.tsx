@@ -1232,7 +1232,7 @@ function StepFourEditor({
       {content.menus.map((menu, i) => (
         <div key={i}>
           <span className="text-xs text-slate-500">{menu.name}</span>
-          {menu.items.map((item, j) => (
+          {(menu.items ?? []).map((item, j) => (
             <div key={j} className="text-xs text-slate-400 ml-3 mt-0.5">
               • {item.title}
             </div>

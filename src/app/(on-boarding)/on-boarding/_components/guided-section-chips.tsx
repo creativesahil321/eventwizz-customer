@@ -160,6 +160,7 @@ export function GuidedMultiSectionBottomActions({
   onContinue,
   loading = false,
   continueDisabled = false,
+  hasInput = true,
   labelWhenReady,
   extraActions,
   className,
@@ -169,12 +170,15 @@ export function GuidedMultiSectionBottomActions({
   onContinue: () => void | Promise<void>;
   loading?: boolean;
   continueDisabled?: boolean;
+  /** Hide approve/continue until the current section has user-entered content. */
+  hasInput?: boolean;
   labelWhenReady?: string;
   extraActions?: ReactNode;
   className?: string;
 }) {
   const [approving, setApproving] = useState(false);
   const busy = loading || approving;
+  const showPrimary = allSectionsApproved || hasInput;
 
   const handlePrimaryClick = async () => {
     if (busy || continueDisabled) return;
@@ -198,6 +202,8 @@ export function GuidedMultiSectionBottomActions({
       ? (labelWhenReady ?? "Save & continue")
       : "Validate, approve & continue";
 
+  if (!showPrimary && !extraActions) return null;
+
   return (
     <div
       className={cn(
@@ -205,19 +211,23 @@ export function GuidedMultiSectionBottomActions({
         className,
       )}
     >
-      <GuidedApproveAllStatusMessage
-        allSectionsApproved={allSectionsApproved}
-      />
+      {showPrimary ? (
+        <GuidedApproveAllStatusMessage
+          allSectionsApproved={allSectionsApproved}
+        />
+      ) : null}
       <div className="flex w-full min-w-0 flex-row flex-wrap items-center justify-center gap-3">
-        <Button
-          type="button"
-          variant="event-primary"
-          disabled={busy || continueDisabled}
-          className={guidedOnboardingSaveNextButtonClass}
-          onClick={() => void handlePrimaryClick()}
-        >
-          {primaryLabel}
-        </Button>
+        {showPrimary ? (
+          <Button
+            type="button"
+            variant="event-primary"
+            disabled={busy || continueDisabled}
+            className={guidedOnboardingSaveNextButtonClass}
+            onClick={() => void handlePrimaryClick()}
+          >
+            {primaryLabel}
+          </Button>
+        ) : null}
         {extraActions}
       </div>
     </div>

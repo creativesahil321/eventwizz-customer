@@ -1,4 +1,4 @@
-import { ApiResponse, api } from "../../core/api-client";
+import { ApiResponse, api, type RequestOptions } from "../../core/api-client";
 import { API_ENDPOINTS } from "../../core/endpoints";
 import {
   EventsQueryParams,
@@ -59,7 +59,8 @@ export const eventsService = {
    */
   getEventDetail: async (
     slug: string,
-    domain: string
+    domain: string,
+    options?: Pick<RequestOptions, "suppressErrorToast">,
   ): Promise<EventDetailResponse> => {
     return api.get<EventDetailResponse>(
       API_ENDPOINTS.COMMON.LOCATION.GET_EVENT_BY_SLUG.replace(
@@ -68,6 +69,7 @@ export const eventsService = {
       ).replace("{domain}", domain),
       {
         returnFullResponse: true,
+        suppressErrorToast: options?.suppressErrorToast,
       }
     );
   },

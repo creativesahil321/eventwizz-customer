@@ -173,6 +173,16 @@ export function formatEventCardFromPrice(price: string | null): string | null {
   return `from ${trimmed}`;
 }
 
+/** Listing cards hide 0 / empty — that means “not priced yet”, not a £0 ticket. */
+export function formatEventListingPrice(
+  lowestPrice: unknown,
+  symbol: string,
+): string | null {
+  const n = Number(lowestPrice);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return formatMoneyCompact(n, resolveCurrencySymbol(symbol));
+}
+
 export function toLocationEventCardModel(
   event: Event,
   currencySym: string,
@@ -181,10 +191,7 @@ export function toLocationEventCardModel(
   const symbol = resolveCurrencySymbol(currencySym);
   return {
     title: event.name || "",
-    price:
-      event.lowest_price != null && !Number.isNaN(Number(event.lowest_price))
-        ? formatMoneyCompact(Number(event.lowest_price), symbol)
-        : null,
+    price: formatEventListingPrice(event.lowest_price, symbol),
     dateLabel: getEventCardDateLabel(event),
     timeLabel: getEventCardTimeLabel(event),
     category: getEventCardCategoryLabel(event),

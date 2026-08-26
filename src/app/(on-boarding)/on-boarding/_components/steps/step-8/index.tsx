@@ -82,13 +82,14 @@ export default function StepEight() {
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
 
-  // Predefined package as per the specified format
+  // Start with one blank package row — placeholders guide input so nothing
+  // dummy (title, price, or a stock number) can be published as-is.
   const predefinedPackage = [
     {
-      title: "Package 1",
-      description: "This is a premium service package",
-      price: 20,
-      available_quantity: 100,
+      title: "",
+      description: "",
+      price: 0,
+      available_quantity: undefined as unknown as number,
     },
   ];
 
@@ -891,10 +892,10 @@ export default function StepEight() {
                               variant="outline"
                               onClick={() => {
                                 const newPackage = {
-                                  title: `Package ${fields.length + 1}`,
+                                  title: "",
                                   description: "",
                                   price: 0,
-                                  available_quantity: 100,
+                                  available_quantity: undefined as unknown as number,
                                 };
                                 const currentPackages =
                                   form.getValues("packages") || [];

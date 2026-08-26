@@ -548,7 +548,10 @@ export default function EventDetailClient({
           </div>
         )}
 
-        <FooterSection locationSlug={locationSlug} />
+        <FooterSection
+          locationSlug={locationSlug}
+          brandDescription={vendorTheme?.footer_brand_description}
+        />
       </div>
     </CartConflictProvider>
   );

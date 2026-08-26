@@ -20,6 +20,7 @@ import {
 import { OnboardingPreviewHeader } from "./onboarding-preview-header";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview";
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
@@ -39,6 +40,7 @@ import {
 } from "@/lib/event-hero-meta";
 import { Image as ImageIcon } from "lucide-react";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useEventCategories } from "@/services/vendor/events/query";
 import { normalizeSlug } from "@/lib/utils";
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
 import { useRoomManager } from "../rooms/use-room-manager";
@@ -161,9 +163,18 @@ const EMPTY_ONBOARDING_FOOTER_SOCIAL_LINKS = {
 
 // Only load components needed for the current step
 export default function FormPreview() {
-  const { form, activeStep, activeField, previewTheme, setActiveStep, setActiveField } =
-    useFormContext();
+  const {
+    form,
+    activeStep,
+    activeField,
+    previewTheme,
+    setActiveStep,
+    setActiveField,
+    requestFormFieldFocus,
+  } = useFormContext();
   const currencySymbol = useCurrencySymbol();
+  const { data: categoriesResponse } = useEventCategories();
+  const eventCategories = categoriesResponse?.data ?? [];
   const [formState, setFormState] = useState<OnboardingFormData>(
     form.getValues(),
   );
@@ -171,14 +182,27 @@ export default function FormPreview() {
 
   const tryThemePreviewValues = useMemo((): SiteEssentialsFormValues | null => {
     if (!ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)) return null;
-    return buildOnboardingStepTwoSiteEssentialsValues(formState, previewTheme);
+    const categoryName =
+      eventCategories.find(
+        (category) => category.id === formState.stepThree?.event_category_id,
+      )?.name ?? null;
+    return buildOnboardingStepTwoSiteEssentialsValues(
+      formState,
+      previewTheme,
+      categoryName,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeStep,
     formState.stepOne,
     formState.stepTwo,
+    formState.stepThree,
+    formState.stepFour,
+    formState.stepFive,
+    formState.multiSpace,
     previewTheme,
     formTick,
+    eventCategories,
   ]);
 
   const tryHeroPreviewProps = useMemo(() => {
@@ -394,11 +418,16 @@ export default function FormPreview() {
         if (activeStep !== target.step) {
           await setActiveStep(target.step);
         }
-        window.setTimeout(() => setActiveField(target.field), 80);
+        // Preview scroll (right) + open/scroll the form panel to the field (left).
+        // The delay lets a step switch mount the target step's form first.
+        window.setTimeout(() => {
+          setActiveField(target.field);
+          requestFormFieldFocus(target.field);
+        }, 80);
       };
       void go();
     },
-    [activeStep, setActiveStep, setActiveField],
+    [activeStep, setActiveStep, setActiveField, requestFormFieldFocus],
   );
 
   const {
@@ -682,9 +711,25 @@ export default function FormPreview() {
           activeField.includes("sub_heading")
         ) {
           scrollToElement(heroRef);
+        } else if (activeField.includes("footer_brand_description")) {
+          const container = previewContainerRef.current;
+          const footer = container.querySelector("[data-preview-footer]");
+          if (footer instanceof HTMLElement) {
+            const top =
+              footer.getBoundingClientRect().top -
+              container.getBoundingClientRect().top +
+              container.scrollTop -
+              16;
+            container.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+          } else {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: "smooth",
+            });
+          }
         } else if (
-          activeField.includes("title") ||
-          activeField.includes("description") ||
+          activeField.includes("about_title") ||
+          activeField.includes("about_description") ||
           activeField.includes("link_title")
         ) {
           scrollToElement(aboutRef);
@@ -1330,9 +1375,11 @@ export default function FormPreview() {
           contactOverride={onboardingFooterContact}
           socialLinksOverride={onboardingFooterSocialLinks}
           brandDescription={
-            formState.stepTwo?.about_description ||
-            formState.stepOne?.description ||
-            ""
+            firstFooterBrandDescription(
+              formState.stepTwo?.footer_brand_description,
+              formState.stepTwo?.about_description,
+              formState.stepOne?.description,
+            )
           }
         />
       </div>

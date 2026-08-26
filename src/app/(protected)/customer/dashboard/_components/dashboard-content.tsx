@@ -6,6 +6,7 @@ import { useDomain } from "@/providers/domain-provider/domain-provider";
 import DashboardEvents from "./dashboard-events";
 import DashboardRecentBookings from "./dashboard-recent-bookings";
 import DashboardNearbyEvents from "./dashboard-nearby-events";
+import DashboardNewsletterCard from "./dashboard-newsletter-card";
 import { CustomerDashboardSkeleton } from "./customer-dashboard-skeleton";
 
 /** Event shape expected by DashboardEvents */
@@ -63,6 +64,10 @@ export default function CustomerDashboardContent() {
 
   return (
     <>
+      <section className="w-full relative">
+        <DashboardNewsletterCard />
+      </section>
+
       <section className="w-full relative">
         <DashboardEvents
           title="My Upcoming Events"

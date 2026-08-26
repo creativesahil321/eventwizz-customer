@@ -239,6 +239,10 @@ export function mergeSiteEssentialsPreviewWithApi(
       formData.about_description,
       api.about_description,
     ),
+    footer_brand_description: coalesceText(
+      formData.footer_brand_description,
+      api.footer_brand_description,
+    ),
     about_link_title: coalesceText(
       formData.about_link_title,
       api.about_link_title,

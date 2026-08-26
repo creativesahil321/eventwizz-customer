@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, lazy, Suspense, useState } from "react";
+import React, { useMemo, lazy, Suspense, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useFormContext } from "../form-provider";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -84,6 +84,17 @@ const stepComponents = {
   11: StepEleven,
 };
 
+const FORM_SIDEBAR_ID = "onboarding-form-sidebar";
+
+/** Build a `[name="…"]` selector that is safe for field names with special chars. */
+function fieldNameSelector(field: string): string {
+  const escaped =
+    typeof CSS !== "undefined" && typeof CSS.escape === "function"
+      ? CSS.escape(field)
+      : field.replace(/["\\]/g, "\\$&");
+  return `[name="${escaped}"]`;
+}
+
 const splitLayoutSteps = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
 const centeredSteps = new Set([1, 6, 11, 10]);
 const fullScreenCenteredSteps = new Set([4]); // Remove step 1 from full screen centered
@@ -99,11 +110,49 @@ const SplitLayout = React.memo(
     defaultCollapsed?: boolean;
   }) => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(defaultCollapsed);
-    const { activeStep } = useFormContext();
+    const { activeStep, formFieldFocusRequest } = useFormContext();
 
     const toggleSidebar = () => {
       setIsSidebarCollapsed((prev) => !prev);
     };
+
+    // A preview "Edit …" click asks us to reveal the matching form field. Open the
+    // panel (if collapsed) then scroll/focus the field — retrying briefly so a step
+    // switch that lazy-mounts a new step still lands on the right control.
+    useEffect(() => {
+      if (!formFieldFocusRequest) return;
+      setIsSidebarCollapsed(false);
+
+      const { field } = formFieldFocusRequest;
+      let cancelled = false;
+      let attempts = 0;
+      let timer: number | undefined;
+
+      const tryFocus = () => {
+        if (cancelled) return;
+        const sidebar = document.getElementById(FORM_SIDEBAR_ID);
+        const el = sidebar?.querySelector<HTMLElement>(fieldNameSelector(field));
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          const focusable =
+            (el instanceof HTMLInputElement && el.type !== "file") ||
+            el instanceof HTMLTextAreaElement ||
+            el instanceof HTMLSelectElement;
+          if (focusable) el.focus({ preventScroll: true });
+          return;
+        }
+        if (attempts++ < 12) {
+          timer = window.setTimeout(tryFocus, 60);
+        }
+      };
+
+      // Let React expand the panel + mount the step before the first lookup.
+      timer = window.setTimeout(tryFocus, 80);
+      return () => {
+        cancelled = true;
+        if (timer) window.clearTimeout(timer);
+      };
+    }, [formFieldFocusRequest]);
 
     return (
       <div className="w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -111,7 +160,7 @@ const SplitLayout = React.memo(
 
         <section className="flex w-full h-screen overflow-hidden relative isolate">
           <aside
-            id="onboarding-form-sidebar"
+            id={FORM_SIDEBAR_ID}
             className={`onboarding-dark relative z-20 shrink-0 transition-all duration-500 ease-in-out overflow-hidden ${
               isSidebarCollapsed
                 ? "w-0 min-w-0 max-w-0 ml-0 opacity-0 pointer-events-none"

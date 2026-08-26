@@ -269,7 +269,7 @@ When the customer asks where to go, briefly explain, then **always** include a m
 - Notifications → [Open Notifications](/customer/notifications)
 - Dashboard → [Open Dashboard](/customer/dashboard)
 - Contact → [Contact us](/contact)
-- Checkout → [Open Checkout](/vendor/checkout)
+- Checkout → [Pay in full](/vendor/checkout?pay=full) or [Pay a table deposit](/vendor/checkout?pay=deposit)
 Format exactly as [Label](/path).
 `;
   }
@@ -289,7 +289,7 @@ NAVIGATION LINKS FOR GUESTS (MUST FOLLOW):
 - Register → [Create account](/auth/register/customer)
 - Log in → [Log in](/auth/login)
 - Contact → [Contact us](/contact)
-- Checkout (if they have a cart) → [Open Checkout](/vendor/checkout)
+- Checkout (if they have a cart) → [Pay in full](/vendor/checkout?pay=full) or [Pay a table deposit](/vendor/checkout?pay=deposit)
 - If they ask about bookings/profile/support tickets, tell them to log in first and link [Log in](/auth/login).
 `;
   }

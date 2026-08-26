@@ -18,7 +18,6 @@ const eventImages = [
 
 import { EventComponentProps } from "../event-types";
 import { useIsPreviewMode } from "@/contexts/preview-context";
-import { SitePreviewDummyEventSection } from "../site-preview-dummy-events";
 import { resolveCurrencySymbol } from "@/lib/currency-format";
 import {
   eventCarouselNavButtonClass,
@@ -61,15 +60,11 @@ export default function UpcomingEvents({
     [events],
   );
 
-  // Empty state: Site Essentials preview shows labeled dummy cards; live site keeps coming soon
+  // Empty state: onboarding / Site Essentials preview uses the draft event
+  // when provided. Never fall back to a hardcoded sample card.
   if (events.length === 0) {
     if (isSitePreview) {
-      return (
-        <SitePreviewDummyEventSection
-          sectionTitle={sectionTitleText}
-          sectionLabel="Upcoming Events"
-        />
-      );
+      return null;
     }
 
     return (

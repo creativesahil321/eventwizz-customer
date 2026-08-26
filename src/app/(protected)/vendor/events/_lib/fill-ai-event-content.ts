@@ -13,6 +13,7 @@ import {
   AI_EVENT_MIN_ROOMS,
   parseAiEventVendorIntent,
 } from "./ai-event-vendor-intent";
+import { normalizeVendorStepFourMenus } from "./vendor-step-four-rooms";
 
 function str(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value.trim() : fallback;
@@ -115,12 +116,16 @@ export function fillAiEventGeneratedDefaults(
           menus: [],
         })),
       }
-    : (src.stepFour ?? {
-        catering_option: 0,
-        menu_title: "",
-        menu_description: "",
-        menus: [],
-      });
+    : {
+        catering_option: src.stepFour?.catering_option ?? 0,
+        menu_title: src.stepFour?.menu_title ?? "",
+        menu_description: src.stepFour?.menu_description ?? "",
+        menus: normalizeVendorStepFourMenus(src.stepFour?.menus),
+        rooms: src.stepFour?.rooms?.map((room) => ({
+          ...room,
+          menus: normalizeVendorStepFourMenus(room.menus),
+        })),
+      };
   const hasDrinkPackages =
     (src.stepFive?.packages ?? []).some((p) => str(p.title)) ||
     (src.stepFive?.rooms ?? []).some((room) =>

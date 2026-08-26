@@ -429,8 +429,10 @@ export default function StepTen() {
             </OnboardingTitle>
             <p className="mx-auto max-w-xl text-sm leading-relaxed text-slate-400 sm:mx-0">
               Connect card payments with Stripe or PayPal, and optionally bank
-              transfers with TrueLayer. You can change this later in Payment
-              settings.
+              transfers with TrueLayer. You don&apos;t have to set this up now —
+              skip and connect a provider anytime from Payment settings. Your
+              site still goes live; you just can&apos;t take bookings until a
+              provider is connected.
             </p>
           </CardHeader>
 

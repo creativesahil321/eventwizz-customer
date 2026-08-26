@@ -44,7 +44,7 @@ export type VendorChatDashboardSnapshot = {
   } | null;
   recent_bookings?: Array<{
     booking_id?: number | string;
-    transaction_id?: string;
+    transaction_id?: string | null;
     customer?: string;
     event?: string;
     total?: number;

@@ -46,9 +46,59 @@ import {
 import {
   isLiveEventBookingIntent,
   matchLiveEvents,
+  matchLiveEventsFromConversation,
+  isLiveEventLocationChoiceText,
+  needsLiveEventLocationChoice,
   buildLiveEventsDirectReply,
+  buildLiveEventsNoMatchReply,
+  filterLiveEventsToPublishedLocations,
+  type LiveEventChatMatch,
 } from "@/lib/chat-live-events";
-import type { LiveEvent } from "@/types/theme.types";
+import type { LiveEvent, LocationData } from "@/types/theme.types";
+import {
+  extractBookingQuickActions,
+  asksRoomDifference,
+  asksToChangeOrPickRoom,
+  buildBookingKickoffCopy,
+  buildBookingRecoveryCopy,
+  buildRecoveryQuickActions,
+  CHAT_PAY_DEPOSIT_ID,
+  CHAT_PAY_FULL_ID,
+  isBareEventPageHref,
+  isBookingConciergeFollowUp,
+  isUnsafeChatProviderError,
+  parseMarkdownLinkTarget,
+  parsePublicEventPath,
+  stripInChatChoiceMarkdown,
+  summarizeEventDetailForChat,
+  withDateChoiceQuickActions,
+  withGuaranteedDateChoiceCopy,
+  withGuaranteedRoomChoiceCopy,
+  withRoomChoiceQuickActions,
+  type ChatEventBookingBrief,
+  type ChatQuickActionDraft,
+} from "@/lib/chat-event-booking";
+import {
+  buildHostBookingTurn,
+  isHostBookingUserText,
+  parseChatBookingChoices,
+  parseChatPayMode,
+  toChatQuickActions,
+} from "@/lib/chat-booking-choices";
+import {
+  bookingChoicesReadyForPay,
+  runChatCheckout,
+} from "@/lib/chat-checkout";
+import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
+import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
+import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import {
+  checkoutHandoffNavCopy,
+  persistCheckoutHandoffFromHref,
+} from "@/lib/checkout-chat-handoff";
+import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
+import { eventsService } from "@/services/common/events/events.service";
 import {
   isVendorBookingListIntent,
   fetchVendorBookingListChatReply,
@@ -65,6 +115,8 @@ type QuickAction = {
   label: string;
   /** If set, tapping navigates here (e.g. Register / Log in) */
   href?: string;
+  /** If set, tapping sends this as the next user message (in-chat choice). */
+  sendText?: string;
 };
 
 type Message = {
@@ -167,6 +219,99 @@ function isDeclineIntent(text: string): boolean {
   return DECLINE_INTENT_RE.test(t);
 }
 
+function publishedLocationsFromTheme(
+  themeLocations: LocationData[] | undefined,
+  settings: unknown,
+): LocationData[] {
+  if (themeLocations && themeLocations.length > 0) return themeLocations;
+  if (!settings || typeof settings !== "object") return [];
+  const locations = (settings as { locations?: unknown }).locations;
+  return Array.isArray(locations) ? (locations as LocationData[]) : [];
+}
+
+function inChatChoiceMessage(content: string): {
+  content: string;
+  quickActions?: QuickAction[];
+} {
+  const quickActions = extractBookingQuickActions(content)
+    .filter((action) => Boolean(action.sendText) && !action.href)
+    .map((action) => ({
+      id: action.id,
+      label: action.label,
+      sendText: action.sendText,
+    }));
+  return {
+    content: stripInChatChoiceMarkdown(content),
+    quickActions: quickActions.length > 0 ? quickActions : undefined,
+  };
+}
+
+function toUiQuickActions(actions: ChatQuickActionDraft[]): QuickAction[] {
+  return actions.map((action) => ({
+    id: action.id,
+    label: action.label,
+    href: action.href,
+    sendText: action.sendText,
+  }));
+}
+
+function publicBookingQuickActions(options: {
+  content: string;
+  brief: ChatEventBookingBrief | null;
+  conversation: Array<{ role: string; content: string }>;
+  hostActions?: ChatQuickActionDraft[];
+  recovery?: boolean;
+}): QuickAction[] {
+  const brief = options.brief;
+  if (options.recovery && brief) {
+    const choices = parseChatBookingChoices(options.conversation, brief);
+    return toUiQuickActions(
+      buildRecoveryQuickActions(brief, {
+        roomId: choices.roomId,
+        dates: choices.dates.map((date) => date.date.slice(0, 10)),
+      }),
+    );
+  }
+  if (options.hostActions && options.hostActions.length > 0) {
+    return toUiQuickActions(toChatQuickActions(options.hostActions));
+  }
+  const extracted = extractBookingQuickActions(options.content).filter(
+    (action) => {
+      if (action.id === CHAT_PAY_FULL_ID || action.id === CHAT_PAY_DEPOSIT_ID) {
+        return true;
+      }
+      if (!action.sendText || action.href) return false;
+      if (action.label.replace(/\s+/g, " ").toLowerCase().startsWith("visit ")) {
+        return false;
+      }
+      return true;
+    },
+  );
+  if (!brief) return toUiQuickActions(extracted);
+  const choices = parseChatBookingChoices(options.conversation, brief);
+  const lastUser =
+    [...options.conversation].reverse().find((m) => m.role === "user")
+      ?.content ?? "";
+  return toUiQuickActions(
+    withDateChoiceQuickActions(
+      withRoomChoiceQuickActions(extracted, {
+        brief,
+        roomChosen: choices.roomId != null,
+        hasDates: choices.dates.length > 0,
+        userText: lastUser,
+        reply: options.content,
+        isBookingTurn: true,
+      }),
+      {
+        brief,
+        roomId: choices.roomId,
+        roomChosen: choices.roomId != null,
+        hasDates: choices.dates.length > 0,
+      },
+    ),
+  );
+}
+
 function isValidPhone(value: string): boolean {
   const digits = value.replace(/\D/g, "");
   return digits.length >= 7 && digits.length <= 15;
@@ -231,7 +376,7 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
     : "font-bold text-slate-950";
 
   const pattern =
-    /(\*\*([^*]+)\*\*)|\[([^\]]+)\]\((\/[^)\s]*|https?:\/\/[^)\s]+)\)|(\/(?:vendor|customer|admin|auth|contact|welcome|on-boarding|preview)[^\s]*)/g;
+    /(\*\*([^*]+)\*\*)|\[([^\]]+)\]\((\/?chat(?::[^)]*)?|https?:\/\/[^)\s]+|\/[^)\s]+)\)|(\/(?:vendor|customer|admin|auth|contact|welcome|on-boarding|preview)[^\s]*)/g;
 
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
@@ -253,27 +398,38 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
       const label = match[3];
       const markdownHref = match[4];
       const bareHref = match[5];
-      const href = markdownHref || bareHref || "";
-      const text = label || href;
+      const parsed = markdownHref
+        ? parseMarkdownLinkTarget(markdownHref)
+        : bareHref
+          ? parseMarkdownLinkTarget(bareHref)
+          : null;
 
-      if (href.startsWith("/")) {
+      if (parsed?.kind === "chat") {
         nodes.push(
-          <Link key={`link-${key++}`} href={href} className={linkClass}>
-            {text}
+          <span key={`choice-${key++}`} className={boldClass}>
+            {label || parsed.sendText}
+          </span>,
+        );
+      } else if (parsed?.kind === "href" && parsed.href.startsWith("/")) {
+        nodes.push(
+          <Link key={`link-${key++}`} href={parsed.href} className={linkClass}>
+            {label || parsed.href}
           </Link>,
         );
-      } else if (href) {
+      } else if (parsed?.kind === "href") {
         nodes.push(
           <a
             key={`link-${key++}`}
-            href={href}
+            href={parsed.href}
             target="_blank"
             rel="noopener noreferrer"
             className={linkClass}
           >
-            {text}
+            {label || parsed.href}
           </a>,
         );
+      } else if (markdownHref || bareHref) {
+        nodes.push(label || markdownHref || bareHref);
       }
     }
 
@@ -435,8 +591,11 @@ export function ChatBot() {
   const { data: session, status: sessionStatus } = useSession();
   const authUser = useAuthStore((s) => s.user);
   const vendorLocationId = useAuthStore((s) => s.vendor_location_id);
-  const { website_role: domainWebsiteRole } = useDomainContext();
+  const { website_role: domainWebsiteRole, domain, settings } =
+    useDomainContext();
+  const tenantHost = typeof domain === "string" ? domain : "";
   const createTicket = useCreateCustomerSupportTicket();
+  const currencySymbol = useCurrencySymbol();
 
   const websiteRole =
     domainWebsiteRole ||
@@ -501,9 +660,38 @@ export function ChatBot() {
   }, [theme?.favicon, theme?.logo]);
   const siteName = theme?.name?.trim() || appConfig.name;
   const liveEvents = useMemo(
-    (): LiveEvent[] => theme?.live_events ?? [],
-    [theme?.live_events],
+    (): LiveEvent[] =>
+      filterLiveEventsToPublishedLocations(
+        theme?.live_events,
+        publishedLocationsFromTheme(theme?.locations, settings),
+      ),
+    [theme?.live_events, theme?.locations, settings],
   );
+
+  const eventPath = useMemo(
+    () => parsePublicEventPath(pathname),
+    [pathname],
+  );
+  const { data: pageEventResponse } = useEventDetail(
+    eventPath?.eventSlug ?? "",
+    tenantHost,
+  );
+  const pageBookingBrief = useMemo((): ChatEventBookingBrief | null => {
+    const event = pageEventResponse?.data;
+    if (!eventPath || !event) return null;
+    const live = liveEvents.find(
+      (item) =>
+        item.slug === eventPath.eventSlug &&
+        item.location_slug === eventPath.locationSlug,
+    );
+    return summarizeEventDetailForChat(event, {
+      href: `/${eventPath.locationSlug}/events/${eventPath.eventSlug}`,
+      locationCity: live?.location_city,
+      locationSlug: eventPath.locationSlug,
+      eventSlug: eventPath.eventSlug,
+      currencySymbol,
+    });
+  }, [eventPath, pageEventResponse?.data, liveEvents, currencySymbol]);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -519,6 +707,10 @@ export function ChatBot() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [supportFlow, setSupportFlow] =
     useState<SupportFlowState>(INITIAL_FLOW);
+  const [stripePaymentSession, setStripePaymentSession] =
+    useState<CheckoutStripePaymentSession | null>(null);
+  const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
+  const eventBookingBriefRef = useRef<ChatEventBookingBrief | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const motionSafe = !prefersReducedMotion;
@@ -526,6 +718,10 @@ export function ChatBot() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    eventBookingBriefRef.current = pageBookingBrief;
+  }, [pageBookingBrief]);
 
   // Personalise opening greeting once we know the signed-in user (customer / vendor / admin)
   useEffect(() => {
@@ -729,23 +925,156 @@ export function ChatBot() {
     ]);
   }
 
+  async function startChatPayment(
+    payMode: "full" | "deposit",
+    extraMessages: Array<{ role: string; content: string }> = [],
+  ) {
+    const brief = eventBookingBriefRef.current ?? pageBookingBrief;
+    const conversation = [
+      ...messages.map(({ role, content }) => ({ role, content })),
+      ...extraMessages,
+    ];
+    const choices = parseChatBookingChoices(conversation, brief);
+
+    if (!brief || !bookingChoicesReadyForPay(brief, choices)) {
+      setMessages((prev) => [
+        ...clearQuickActions(prev),
+        {
+          role: "assistant",
+          content:
+            "I still need the room, date, guest count and seating before I can take payment here.",
+        },
+      ]);
+      return;
+    }
+
+    if (!isLoggedInCustomer) {
+      const callback = pathname || "/";
+      saveAuthCallbackUrl(callback);
+      const loginHref = `/auth/login?callbackUrl=${encodeURIComponent(callback)}`;
+      setMessages((prev) => [
+        ...clearQuickActions(prev),
+        {
+          role: "assistant",
+          content:
+            "Please log in with a customer account so I can take payment here.",
+          quickActions: [
+            { id: "login", label: "Log in", href: loginHref },
+            {
+              id: "register",
+              label: "Create account",
+              href: `/auth/register/customer?callbackUrl=${encodeURIComponent(callback)}`,
+            },
+          ],
+        },
+      ]);
+      return;
+    }
+
+    setIsLoading(true);
+    setMessages((prev) => [
+      ...clearQuickActions(prev),
+      {
+        role: "assistant",
+        content:
+          payMode === "deposit"
+            ? "Opening payment so you can pay a table deposit…"
+            : "Opening payment so you can pay in full…",
+      },
+    ]);
+
+    const result = await runChatCheckout({ brief, choices, payMode });
+    setIsLoading(false);
+
+    if (!result.ok) {
+      const recovery =
+        result.reason === "capacity" || result.reason === "incomplete"
+          ? null
+          : brief
+            ? buildRecoveryQuickActions(brief, {
+                roomId: choices.roomId,
+                dates: choices.dates.map((date) => date.date.slice(0, 10)),
+              })
+            : null;
+      const loginActions =
+        result.reason === "login"
+          ? [
+              {
+                id: "login",
+                label: "Log in",
+                href: `/auth/login?callbackUrl=${encodeURIComponent(pathname || "/")}`,
+              },
+            ]
+          : [];
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: result.message,
+          quickActions:
+            loginActions.length > 0
+              ? loginActions
+              : recovery
+                ? toUiQuickActions(recovery)
+                : undefined,
+        },
+      ]);
+      return;
+    }
+
+    if (result.action.type === "stripe") {
+      setStripePaymentSession(result.action.session);
+      setIsStripePaymentOpen(true);
+      return;
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: "Opening your payment page now.",
+      },
+    ]);
+    window.location.assign(result.action.url);
+  }
+
   async function handleQuickAction(action: QuickAction) {
     if (isLoading || supportFlow.step === "submitting") return;
+
+    if (action.id === CHAT_PAY_FULL_ID || action.id === CHAT_PAY_DEPOSIT_ID) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: action.label },
+      ]);
+      await startChatPayment(
+        action.id === CHAT_PAY_DEPOSIT_ID ? "deposit" : "full",
+        [{ role: "user", content: action.label }],
+      );
+      return;
+    }
+
+    if (action.sendText) {
+      await handleSendMessage(action.sendText);
+      return;
+    }
 
     // Navigation actions (Register / Log in / Contact, etc.)
     if (action.href) {
       const href = action.href;
+      persistCheckoutHandoffFromHref(href);
+      const checkoutCopy = checkoutHandoffNavCopy(href, isLoggedInCustomer);
       setMessages((prev) => [
         ...clearQuickActions(prev),
         { role: "user", content: action.label },
         {
           role: "assistant",
           content:
-            action.id === "register"
+            checkoutCopy ??
+            (action.id === "register"
               ? "Taking you to registration now. Complete the form to create your account, then you can book events."
               : action.id === "login"
                 ? "Taking you to log in. Once you’re signed in, you can continue with your booking."
-                : "Taking you there now.",
+                : "Taking you there now."),
           supportCta: {
             href,
             label: action.label,
@@ -866,12 +1195,12 @@ export function ChatBot() {
     }
   }
 
-  async function handleSendMessage() {
-    if (!input.trim() || isLoading) return;
+  async function handleSendMessage(overrideText?: string) {
+    const userText = (overrideText ?? input).trim();
+    if (!userText || isLoading) return;
 
-    const userText = input.trim();
     const userMessage: Message = { role: "user", content: userText };
-    setInput("");
+    if (!overrideText) setInput("");
 
     // Active guided support flow — handle without calling the AI
     if (supportFlow.step !== "idle" && supportFlow.step !== "submitting") {
@@ -929,30 +1258,62 @@ Is there anything else I can help you with?`,
       return;
     }
 
-    // Public venue site: answer event booking asks from theme live_events (direct links)
+    // Public venue site: first-turn location picker only. Follow-ups and the
+    // open event page go to the concierge with real dates/rooms/drinks.
     if (
       isVendorStorefront &&
       !isLoggedInVendor &&
       isLiveEventBookingIntent(userText) &&
-      liveEvents.length > 0
+      !pageBookingBrief &&
+      !isBookingConciergeFollowUp(userText) &&
+      !messages.some((m) => m.role === "user")
     ) {
-      const matches = matchLiveEvents(userText, liveEvents);
-      const direct = buildLiveEventsDirectReply({
-        userText,
-        matches,
-        allLiveEvents: liveEvents,
-        siteName,
-        userName,
-      });
-      if (direct) {
+      const replyFromDirect = (content: string) => {
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: direct.content,
-            supportCta: direct.supportCta,
+            ...inChatChoiceMessage(content),
           },
         ]);
+      };
+
+      if (liveEvents.length === 0) {
+        replyFromDirect(
+          buildLiveEventsNoMatchReply({
+            allLiveEvents: liveEvents,
+            siteName,
+            userName,
+          }).content,
+        );
+        return;
+      }
+
+      const matches = matchLiveEvents(userText, liveEvents);
+      if (
+        matches.length > 0 &&
+        needsLiveEventLocationChoice(userText, matches, liveEvents)
+      ) {
+        const direct = buildLiveEventsDirectReply({
+          userText,
+          matches,
+          allLiveEvents: liveEvents,
+          siteName,
+          userName,
+        });
+        if (direct) {
+          replyFromDirect(direct.content);
+          return;
+        }
+      }
+      if (matches.length === 0) {
+        replyFromDirect(
+          buildLiveEventsNoMatchReply({
+            allLiveEvents: liveEvents,
+            siteName,
+            userName,
+          }).content,
+        );
         return;
       }
     }
@@ -1233,6 +1594,177 @@ Is there anything else I can help you with?`,
           }
         : null;
 
+      let eventBookingBrief: ChatEventBookingBrief | null = pageBookingBrief;
+      const locationPick = isLiveEventLocationChoiceText(userText, liveEvents);
+      let pickedLiveEvent: LiveEventChatMatch | undefined;
+      if (isVendorStorefront && !eventBookingBrief && tenantHost) {
+        const matches = matchLiveEventsFromConversation(
+          userText,
+          messages,
+          liveEvents,
+        );
+        const pick =
+          matches.length === 1
+            ? matches[0]
+            : matches.find((item) =>
+                [userText, ...messages.map((m) => m.content)]
+                  .join("\n")
+                  .toLowerCase()
+                  .includes(item.event.location_city.toLowerCase()),
+              ) ??
+              (needsLiveEventLocationChoice(userText, matches, liveEvents)
+                ? undefined
+                : matches[0]);
+        pickedLiveEvent = pick;
+        if (pick) {
+          try {
+            const detail = await eventsService.getEventDetail(
+              pick.event.slug,
+              tenantHost,
+              { suppressErrorToast: true },
+            );
+            if (detail?.data) {
+              eventBookingBrief = summarizeEventDetailForChat(detail.data, {
+                href: pick.href,
+                locationCity: pick.event.location_city,
+                locationSlug: pick.event.location_slug,
+                eventSlug: pick.event.slug,
+                currencySymbol,
+              });
+              eventBookingBriefRef.current = eventBookingBrief;
+            }
+          } catch (error) {
+            console.error("Chat event detail fetch failed:", error);
+          }
+        }
+      }
+
+      if (
+        isVendorStorefront &&
+        !isLoggedInVendor &&
+        locationPick &&
+        !eventBookingBrief
+      ) {
+        if (pickedLiveEvent) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: `I found **${pickedLiveEvent.event.title}** in **${pickedLiveEvent.event.location_city}**, but I couldn’t load the booking details just now. Please try again in a moment, or pick that city from the locations directory.`,
+            },
+          ]);
+          return;
+        }
+        const priorMatches = matchLiveEvents(
+          messages.map((m) => m.content).join("\n"),
+          liveEvents,
+        );
+        const direct =
+          priorMatches.length > 0
+            ? buildLiveEventsDirectReply({
+                userText,
+                matches: priorMatches,
+                allLiveEvents: liveEvents,
+                siteName,
+                userName,
+              })
+            : buildLiveEventsNoMatchReply({
+                allLiveEvents: liveEvents,
+                siteName,
+                userName,
+              });
+        if (direct) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              ...inChatChoiceMessage(direct.content),
+            },
+          ]);
+          return;
+        }
+      }
+
+      const isFirstUserTurn = !messages.some((m) => m.role === "user");
+      if (
+        isVendorStorefront &&
+        !isLoggedInVendor &&
+        eventBookingBrief &&
+        ((isFirstUserTurn && isLiveEventBookingIntent(userText)) ||
+          locationPick)
+      ) {
+        const conversation = [...messages, userMessage];
+        const kickoffTurn = buildHostBookingTurn({
+          brief: eventBookingBrief,
+          userText,
+          choices: parseChatBookingChoices(conversation, eventBookingBrief),
+          userName,
+        });
+        const kickoff =
+          kickoffTurn?.content ??
+          buildBookingKickoffCopy({
+            brief: eventBookingBrief,
+            userName,
+          });
+        const kickoffActions = publicBookingQuickActions({
+          content: kickoff,
+          brief: eventBookingBrief,
+          conversation,
+          hostActions: kickoffTurn?.actions,
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: kickoff,
+            quickActions:
+              kickoffActions.length > 0 ? kickoffActions : undefined,
+          },
+        ]);
+        return;
+      }
+
+      const conversationForHost = [...messages, userMessage];
+      if (isVendorStorefront && !isLoggedInVendor && eventBookingBrief) {
+        const hostChoices = parseChatBookingChoices(
+          conversationForHost,
+          eventBookingBrief,
+        );
+        const payMode = parseChatPayMode(userText);
+        if (
+          payMode &&
+          bookingChoicesReadyForPay(eventBookingBrief, hostChoices)
+        ) {
+          await startChatPayment(payMode, [userMessage]);
+          return;
+        }
+        if (isHostBookingUserText(userText, eventBookingBrief)) {
+          const hostTurn = buildHostBookingTurn({
+            brief: eventBookingBrief,
+            userText,
+            choices: hostChoices,
+            userName,
+          });
+          if (hostTurn) {
+            const hostActions = publicBookingQuickActions({
+              content: hostTurn.content,
+              brief: eventBookingBrief,
+              conversation: conversationForHost,
+              hostActions: hostTurn.actions,
+            });
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: hostTurn.content,
+                quickActions: hostActions.length > 0 ? hostActions : undefined,
+              },
+            ]);
+            return;
+          }
+        }
+      }
+
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1242,8 +1774,8 @@ Is there anything else I can help you with?`,
             .map(({ role, content }) => ({
               role,
               content:
-                typeof content === "string" && content.length > 4000
-                  ? `${content.slice(0, 4000)}…`
+                typeof content === "string" && content.length > 1200
+                  ? `${content.slice(0, 1200)}…`
                   : content,
             })),
           context: {
@@ -1258,51 +1790,165 @@ Is there anything else I can help you with?`,
             contactEmail,
             contactAddress,
             vendorLiveStats: isLoggedInVendor ? slimStats : null,
-            liveEvents: isVendorStorefront ? liveEvents : null,
+            liveEvents: isVendorStorefront
+              ? eventBookingBrief
+                ? liveEvents.slice(0, 8)
+                : liveEvents
+              : null,
+            eventBookingBrief: isVendorStorefront ? eventBookingBrief : null,
           },
         }),
       });
+
+      const briefForHandoff = eventBookingBrief ?? pageBookingBrief;
+      const conversation = [...messages, userMessage];
 
       if (!response.ok) {
         const errBody = (await response.json().catch(() => null)) as {
           retryAfter?: unknown;
           details?: unknown;
+          code?: unknown;
         } | null;
         const wait =
           typeof errBody?.retryAfter === "string" ? errBody.retryAfter : null;
         const details =
           typeof errBody?.details === "string" ? errBody.details : null;
+        const providerNoise =
+          errBody?.code === "context_too_long" ||
+          isUnsafeChatProviderError(details);
+        const recovery =
+          briefForHandoff && !wait
+            ? buildBookingRecoveryCopy({
+                brief: briefForHandoff,
+                userName,
+              })
+            : null;
+        const content = wait
+          ? `I'm a bit busy right now. Please try again in ${wait}.`
+          : recovery ||
+            (providerNoise
+              ? "Sorry, I couldn’t complete that in chat. Visit the event page to book, or try a shorter question."
+              : "Sorry, something went wrong. Please try again in a moment.");
+        const errorActions =
+          isVendorStorefront && !isLoggedInVendor && briefForHandoff
+            ? publicBookingQuickActions({
+                content,
+                brief: briefForHandoff,
+                conversation,
+                recovery: Boolean(recovery || providerNoise),
+              })
+            : [];
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: wait
-              ? `I'm a bit busy right now. Please try again in ${wait}.`
-              : details ||
-                "Sorry, something went wrong. Please try again in a moment.",
+            content,
             supportCta,
+            quickActions: errorActions.length > 0 ? errorActions : undefined,
           },
         ]);
         return;
       }
 
       const data = await response.json();
+      const rawReply =
+        typeof data.message === "string" ? data.message : "";
+      const choices = parseChatBookingChoices(
+        [...conversation, { role: "assistant", content: rawReply }],
+        briefForHandoff,
+      );
+      const hasDates = choices.dates.length > 0;
+      const shouldOfferRooms =
+        asksRoomDifference(userText) ||
+        asksToChangeOrPickRoom(userText) ||
+        isLiveEventBookingIntent(userText) ||
+        isBookingConciergeFollowUp(userText) ||
+        choices.guestCount != null ||
+        messages.some(
+          (m) =>
+            m.role === "user" &&
+            (isLiveEventBookingIntent(m.content) ||
+              isBookingConciergeFollowUp(m.content)),
+        ) ||
+        /\b(book|booking|guests?|tables?|tickets?|which room|choose.{0,12}room)\b/i.test(
+          userText,
+        );
+      const replyWithRooms =
+        isVendorStorefront && !isLoggedInVendor
+          ? withGuaranteedRoomChoiceCopy(rawReply, {
+              brief: briefForHandoff,
+              roomChosen: choices.roomId != null,
+              userText,
+              shouldOfferRooms,
+              guestCount: choices.guestCount,
+            })
+          : rawReply;
+      const reply =
+        isVendorStorefront && !isLoggedInVendor
+          ? withGuaranteedDateChoiceCopy(replyWithRooms, {
+              brief: briefForHandoff,
+              roomId: choices.roomId,
+              roomChosen: choices.roomId != null,
+              hasDates,
+            })
+          : replyWithRooms;
+      const quickActions =
+        isVendorStorefront && !isLoggedInVendor
+          ? publicBookingQuickActions({
+              content: reply,
+              brief: briefForHandoff,
+              conversation: [
+                ...conversation,
+                { role: "assistant", content: reply },
+              ],
+            })
+          : extractBookingQuickActions(reply)
+              .filter((action) => Boolean(action.sendText) && !action.href)
+              .map((action) => ({
+                id: action.id,
+                label: action.label,
+                sendText: action.sendText,
+              }));
+      const eventPageCta = isBareEventPageHref(
+        supportCta?.href,
+        briefForHandoff,
+      );
+      const replySupportCta = eventPageCta ? undefined : supportCta;
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: data.message,
-          supportCta,
+          content: stripInChatChoiceMarkdown(reply),
+          supportCta: replySupportCta,
+          quickActions: quickActions.length > 0 ? quickActions : undefined,
         },
       ]);
     } catch (error) {
       console.error("Error sending message:", error);
+      const briefForHandoff = pageBookingBrief;
+      const recovery =
+        isVendorStorefront && !isLoggedInVendor && briefForHandoff
+          ? buildBookingRecoveryCopy({
+              brief: briefForHandoff,
+              userName,
+            })
+          : "Sorry, something went wrong. Please try again in a moment.";
+      const errorActions =
+        isVendorStorefront && !isLoggedInVendor && briefForHandoff
+          ? publicBookingQuickActions({
+              content: recovery,
+              brief: briefForHandoff,
+              conversation: [...messages, userMessage],
+              recovery: true,
+            })
+          : [];
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, something went wrong. Please try again in a moment.",
+          content: recovery,
           supportCta,
+          quickActions: errorActions.length > 0 ? errorActions : undefined,
         },
       ]);
     } finally {
@@ -1725,6 +2371,15 @@ Is there anything else I can help you with?`,
           </motion.div>
         )}
       </AnimatePresence>
+
+      <CheckoutStripePaymentModal
+        open={isStripePaymentOpen}
+        onOpenChange={(open) => {
+          setIsStripePaymentOpen(open);
+          if (!open) setStripePaymentSession(null);
+        }}
+        session={stripePaymentSession}
+      />
 
       <style
         dangerouslySetInnerHTML={{

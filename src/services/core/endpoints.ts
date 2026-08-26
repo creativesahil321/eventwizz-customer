@@ -73,10 +73,7 @@ export const API_ENDPOINTS = {
       GET_ALL_STEPS: "/vendor/onboarding/steps/{location_id}/{is_rooms}",
       PAYMENT_GATEWAYS: "/vendor/onboarding/payment-gateway-connect",
       PAYMENT_RETURN: "/vendor/onboarding/return",
-      // Multi-room ("event spaces") endpoints. Same vendor onboarding surface, room-scoped.
-      ROOMS: "/vendor/onboarding/rooms",
-      ROOM_BY_ID: "/vendor/onboarding/rooms/{room_id}",
-      ROOMS_TOGGLE: "/vendor/onboarding/rooms/multi-space",
+      // Per-room step store. Room CRUD lives on VENDOR.ROOMS / ROOMS_STORE / ROOM_BY_ID.
       ROOM_STEP_STORE: "/vendor/onboarding/rooms/{room_id}/store",
     },
     PAYMENT_GATEWAYS: {
@@ -139,11 +136,17 @@ export const API_ENDPOINTS = {
     },
     NEWSLETTER: {
       GET_ALL: "/vendor/newsletters",
+      COUNTS: "/vendor/newsletters/counts",
       SHOW: "/vendor/newsletters/show/{id}",
       CREATE: "/vendor/newsletters/store",
       UPDATE: "/vendor/newsletters/update/{id}",
       DELETE: "/vendor/newsletters/delete/{id}",
+      /** Suppress by id (preferred). Does not hard-delete. */
+      UNSUBSCRIBE_BY_ID: "/vendor/newsletters/{id}/unsubscribe",
+      /** Suppress by email (staff). */
       UNSUBSCRIBE: "/vendor/newsletters/unsubscribe/{email}",
+      /** CSV file; pass ?status=subscribed|unsubscribed. Optional scope=new. */
+      EXPORT: "/vendor/newsletters/export",
     },
     DISCOUNTS: {
       GET_ALL: "/vendor/discounts",
@@ -266,6 +269,10 @@ export const API_ENDPOINTS = {
     DASHBOARD: {
       STATISTICS: "/customer/dashboard",
       NEARBY_EVENTS: "/customer/events/nearby",
+    },
+    NEWSLETTER: {
+      SUBSCRIBE: "/customer/newsletter/subscribe",
+      UNSUBSCRIBE: "/customer/newsletter/unsubscribe",
     },
     BOOKINGS: {
       BOOKINGS: "/customer/bookings",
@@ -677,6 +684,13 @@ export const API_ENDPOINTS = {
   // Public Endpoints
   PUBLIC: {
     FAQS: "",
+    /** Newsletter opt-in on a vendor site (tenant via X-Domain header). */
     SUBSCRIBE: "/subscribe",
+    /** Confirm a guest opt-in via hashed token. Body: { token }. No OTP. */
+    SUBSCRIBE_VERIFY: "/subscribe/verify",
+    /** Resend confirmation email. Same body as subscribe. Never reveals whether the email exists. */
+    SUBSCRIBE_RESEND: "/newsletters/resend",
+    /** Token-based unsubscribe from an email link. GET preview, POST confirm. */
+    NEWSLETTER_UNSUBSCRIBE: "/newsletter/unsubscribe",
   },
 };

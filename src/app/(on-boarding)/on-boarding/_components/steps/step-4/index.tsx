@@ -765,7 +765,7 @@ const StepFour = () => {
             <OnboardingTitle>
               {isMultiRoom
                 ? `Configure timeline & package for ${rooms[currentRoomIndex]?.name || "this room"}`
-                : "Multiple event spaces?"}
+                : "Timeline & package"}
             </OnboardingTitle>
           </CardHeader>
 

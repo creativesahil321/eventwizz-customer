@@ -52,10 +52,16 @@ import {
   LOGO_SUPPORTED_FORMATS_LABEL,
   LOGO_UPLOAD_HINT,
 } from "@/lib/logo/supported-formats";
+import {
+  FOOTER_BRAND_DESCRIPTION_MAX_CHARS,
+  FOOTER_BRAND_DESCRIPTION_MAX_WORDS,
+  clipFooterBrandDescription,
+} from "@/lib/footer-brand-description";
 
 const resolveStepTwoErrorIndex = (keys: string[]) => {
   if (keys.some((k) => k === "__extra_validation__")) return 0;
-  if (keys.some((k) => k === "logo" || k === "cover_image")) return 0;
+  if (keys.some((k) => k === "logo" || k === "cover_image" || k === "footer_brand_description"))
+    return 0;
   if (keys.some((k) => k === "banner_heading" || k === "banner_sub_heading"))
     return 1;
   return 2;
@@ -93,6 +99,9 @@ export default function StepTwo() {
       about_title: globalForm.getValues("stepTwo.about_title") || "",
       about_description:
         globalForm.getValues("stepTwo.about_description") || "",
+      footer_brand_description: clipFooterBrandDescription(
+        globalForm.getValues("stepTwo.footer_brand_description") || "",
+      ),
       logo: globalForm.getValues("stepTwo.logo") || undefined,
       cover_image: globalForm.getValues("stepTwo.cover_image") || undefined,
     },
@@ -106,6 +115,15 @@ export default function StepTwo() {
     };
   }, [setActiveField]);
 
+  const globalLogo = useWatch({
+    control: globalForm.control,
+    name: "stepTwo.logo",
+  });
+  const globalCover = useWatch({
+    control: globalForm.control,
+    name: "stepTwo.cover_image",
+  });
+
   // Initialize file state from global form values
   const [logoFiles, setLogoFiles] = React.useState<File[]>([]);
   const [coverFiles, setCoverFiles] = React.useState<File[]>([]);
@@ -114,28 +132,45 @@ export default function StepTwo() {
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
   const [coverUrl, setCoverUrl] = React.useState<string | null>(null);
 
-  // Initialize URL values from global form on mount
+  // AI apply stores a File; GET hydrate stores a URL. The dropzone only
+  // rendered URLs, so the logo was blank until refresh.
   useEffect(() => {
-    const logo = globalForm.getValues("stepTwo.logo");
-    const cover = globalForm.getValues("stepTwo.cover_image");
-
-    // Check if values are string URLs
-    if (typeof logo === "string" && logo) {
-      setLogoUrl(logo);
+    if (typeof globalLogo === "string" && globalLogo.trim()) {
+      setLogoUrl(globalLogo);
+      setLogoFiles([]);
+      form.setValue("logo", globalLogo);
+      return;
     }
-
-    if (typeof cover === "string" && cover) {
-      setCoverUrl(cover);
+    if (globalLogo instanceof File) {
+      const withPreview = ensureFilePreview(globalLogo);
+      setLogoFiles([withPreview]);
+      setLogoUrl(null);
+      form.setValue("logo", withPreview);
     }
-  }, [globalForm]);
+  }, [form, globalLogo]);
+
+  useEffect(() => {
+    if (typeof globalCover === "string" && globalCover.trim()) {
+      setCoverUrl(globalCover);
+      setCoverFiles([]);
+      form.setValue("cover_image", globalCover);
+      return;
+    }
+    if (globalCover instanceof File) {
+      const withPreview = ensureFilePreview(globalCover);
+      setCoverFiles([withPreview]);
+      setCoverUrl(null);
+      form.setValue("cover_image", withPreview);
+    }
+  }, [form, globalCover]);
 
   const sectionConfigs = useMemo((): GuidedSectionConfig<StepTwoType>[] => {
     return [
       {
         id: "branding",
         label: "Branding",
-        description: "Logo and landing page cover image.",
-        fields: [],
+        description: "Logo, footer line, and landing page cover image.",
+        fields: ["logo", "cover_image", "footer_brand_description"],
         validate: async () => {
           const lg = form.getValues("logo");
           const cv = form.getValues("cover_image");
@@ -529,6 +564,59 @@ export default function StepTwo() {
                   />
                   <FormField
                     control={form.control}
+                    name="footer_brand_description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <OnboardingFieldGroupTitle>
+                          Footer brand description
+                        </OnboardingFieldGroupTitle>
+                        <p className="mb-2 text-xs text-muted-foreground">
+                          Short line under your logo in the footer. Optional —
+                          About copy is used if this is empty.
+                        </p>
+                        <FormControl>
+                          <div
+                            onClick={() =>
+                              handleFieldFocus("footer_brand_description")
+                            }
+                          >
+                            <TiptapEditor
+                              value={field.value || ""}
+                              onChange={(value) => {
+                                field.onChange(value);
+                                globalForm.setValue(
+                                  "stepTwo.footer_brand_description",
+                                  value,
+                                  { shouldDirty: true, shouldValidate: false },
+                                );
+                              }}
+                              placeholder="A short line about your venue, shown under the logo in the footer…"
+                              maxLength={FOOTER_BRAND_DESCRIPTION_MAX_CHARS}
+                              maxWords={FOOTER_BRAND_DESCRIPTION_MAX_WORDS}
+                              className="min-h-[100px] w-full overflow-hidden max-w-[300px]"
+                              showAIButton={true}
+                              wrapText={true}
+                              aiContext={{
+                                title:
+                                  globalForm.getValues("stepOne.name") ||
+                                  undefined,
+                                city:
+                                  globalForm.getValues("stepOne.city") ||
+                                  undefined,
+                                description:
+                                  form.getValues("about_description") ||
+                                  undefined,
+                                contentType: "footer",
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="cover_image"
                     render={({ field }) => (
                       <FormItem>
@@ -676,7 +764,7 @@ export default function StepTwo() {
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
-                              placeholder="e.g. Experience more Stock Brook Events"
+                              placeholder="e.g. Unforgettable nights at your venue"
                               {...field}
                               maxLength={maxLength}
                               onFocus={() =>
@@ -757,7 +845,7 @@ export default function StepTwo() {
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
-                              placeholder="e.g. Experience more Stock Brook Events or Stock Brook Events"
+                              placeholder="e.g. About your venue"
                               {...field}
                               maxLength={maxLength}
                               onFocus={() => handleFieldFocus("about_title")}
@@ -836,6 +924,7 @@ export default function StepTwo() {
               <GuidedMultiSectionBottomActions
                 onApproveAll={guided.handleApproveAllSections}
                 allSectionsApproved={guided.allSectionsApproved}
+                hasInput={guided.currentSectionHasInput}
                 loading={loading}
                 onContinue={() => void handleContinue()}
               />

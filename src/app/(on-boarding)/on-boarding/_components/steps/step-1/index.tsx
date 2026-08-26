@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import {
   Form,
@@ -14,13 +13,19 @@ import { Input } from "@/components/ui/input";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFormContext } from "../../form-provider";
-import { shouldShowStepOneLocationGate } from "../../form-provider/hydrate-onboarding-from-api";
+import {
+  isOnboardingLocationChoiceLocked,
+  shouldShowStepOneLocationGate,
+} from "../../form-provider/hydrate-onboarding-from-api";
 import { stepOneSchema, StepOneType } from "../../form-provider/schema";
 import GoogleBusinessSearch from "./google-business";
-import AddressAutocomplete from "../step-7/address-autocomplete";
+import AddressAutocomplete, {
+  cityFromFormattedAddress,
+} from "../step-7/address-autocomplete";
 import { env } from "@/env";
 import { fetchPlaceDetails } from "./_lib/actions";
 import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { OnboardingCard } from "@/components/ui/card";
 import {
   OnboardingTitle,
@@ -39,22 +44,67 @@ import { guidedSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 import { cn } from "@/lib/utils";
 import { useBrandNameAvailability } from "@/hooks/use-brand-name-availability";
+import { AIChoicePair } from "../../ai-onboarding/ai-choice-pair";
+import { toast } from "sonner";
 
 const RESOLVE_STEP_ONE_ERROR_INDEX = (keys: string[]) =>
   keys.some((k) => k === "name" || k === "has_multiple_locations") ? 0 : 1;
 
 export default function StepOne() {
   const [loading, setLoading] = useState(false);
+  /** Lets the vendor return to Yes/No after a mistaken tap, even if the flag is still set. */
+  const [locationGateReopened, setLocationGateReopened] = useState(false);
   const {
     form: globalForm,
     save,
     setActiveStep,
+    lastCompletedStep,
     persistedProgressHydrated,
   } = useFormContext();
 
   const stepOnePersistedApproved = useWatch({
     control: globalForm.control,
     name: "stepOne.isApproved",
+  });
+  const lastCompletedFromForm = useWatch({
+    control: globalForm.control,
+    name: "last_completed_step",
+  });
+  const stepTwoBanner = useWatch({
+    control: globalForm.control,
+    name: "stepTwo.banner_heading",
+  });
+  const stepThreeEventName = useWatch({
+    control: globalForm.control,
+    name: "stepThree.event_name",
+  });
+  const stepSixMenus = useWatch({
+    control: globalForm.control,
+    name: "stepSix.menus",
+  });
+
+  const locationChoiceLocked = isOnboardingLocationChoiceLocked({
+    ...globalForm.getValues(),
+    last_completed_step: Math.max(
+      lastCompletedStep,
+      Number(lastCompletedFromForm ?? 0) || 0,
+    ),
+    stepOne: {
+      ...globalForm.getValues("stepOne"),
+      isApproved: stepOnePersistedApproved === true,
+    },
+    stepTwo: {
+      ...globalForm.getValues("stepTwo"),
+      banner_heading: stepTwoBanner,
+    },
+    stepThree: {
+      ...globalForm.getValues("stepThree"),
+      event_name: stepThreeEventName,
+    },
+    stepSix: {
+      ...globalForm.getValues("stepSix"),
+      menus: stepSixMenus,
+    },
   });
   const { update } = useSession();
 
@@ -108,6 +158,23 @@ export default function StepOne() {
     });
   }, [globalHasMultiple, globalForm, form]);
 
+  const addressValue = useWatch({
+    control: form.control,
+    name: "address",
+  });
+  const cityValue = useWatch({
+    control: form.control,
+    name: "city",
+  });
+
+  useEffect(() => {
+    if (cityValue?.trim() || !addressValue?.trim()) return;
+    const parsed = cityFromFormattedAddress(addressValue);
+    if (parsed) {
+      form.setValue("city", parsed, { shouldValidate: true });
+    }
+  }, [addressValue, cityValue, form]);
+
   const isBrandMode = hasMultipleLocations === true;
 
   const nameValue = useWatch({
@@ -135,6 +202,19 @@ export default function StepOne() {
           ? "Enter your brand name (any name — not limited to Google listings)."
           : "Pick your venue from Google Places.",
         fields: ["name"],
+        // Never approve a name that is still being checked or already taken —
+        // the taken case shows an inline red message, so only toast the "still checking" case.
+        validate: async () => {
+          if (brandNameChecking) {
+            toast.error(
+              isBrandMode
+                ? "Hold on — we're still checking that brand name."
+                : "Hold on — we're still checking that venue name.",
+            );
+            return false;
+          }
+          return !brandNameTaken;
+        },
       },
       {
         id: "contact-details",
@@ -143,7 +223,7 @@ export default function StepOne() {
         fields: ["contact_number", "email", "address", "city"],
       },
     ],
-    [isBrandMode],
+    [isBrandMode, brandNameChecking, brandNameTaken],
   );
 
   const guided = useGuidedOnboardingSections({
@@ -155,12 +235,38 @@ export default function StepOne() {
   });
 
   const persistLocationChoice = (value: boolean) => {
-    form.setValue("has_multiple_locations", value, { shouldValidate: true });
+    setLocationGateReopened(false);
+    form.clearErrors();
+    form.setValue("has_multiple_locations", value, { shouldValidate: false });
     const prev = globalForm.getValues("stepOne");
     globalForm.setValue("stepOne", {
       ...prev,
       has_multiple_locations: value,
     });
+  };
+
+  const goBackToLocationQuestion = () => {
+    if (locationChoiceLocked) return;
+    setLocationGateReopened(true);
+    const email = form.getValues("email");
+    const cleared = {
+      step: 1 as const,
+      has_multiple_locations: undefined,
+      name: "",
+      contact_number: "",
+      email,
+      address: "",
+      city: "",
+      domain: "",
+      description: "",
+    };
+    form.reset(cleared);
+    const prev = globalForm.getValues("stepOne");
+    globalForm.setValue("stepOne", {
+      ...prev,
+      ...cleared,
+    });
+    guided.resetSectionProgress();
   };
 
   const persistStepOne = async (data: StepOneType) => {
@@ -171,87 +277,116 @@ export default function StepOne() {
         isApproved: true,
       });
 
-      if (response.status) {
-        globalForm.setValue("stepOne", { ...data, isApproved: true });
-        if (response.data?.vendor_location_id) {
-          const vendorLocationId = response.data.vendor_location_id;
-          await update({
-            vendor_location_id: vendorLocationId,
-            on_boarding_step: response.data.on_boarding_step,
-          });
-        }
-
-        setActiveStep(2);
-
-        Promise.all([
-          response.data?.on_boarding_step
-            ? update({ on_boarding_step: response.data.on_boarding_step })
-            : update({ on_boarding_step: 2 }),
-          save(),
-        ]).catch((error) => {
-          console.error("Background save error:", error);
-        });
+      if (!response.status) {
+        toast.error(
+          response.message?.trim() || "Could not save. Please try again.",
+        );
+        return;
       }
+
+      globalForm.setValue("stepOne", { ...data, isApproved: true });
+      const nextStep = Number(response.data?.on_boarding_step) || 2;
+      // Do not await NextAuth `update()` — it can hang and freeze Save & continue.
+      void setActiveStep(nextStep, { skipSessionSync: true });
+      void update({
+        ...(response.data?.vendor_location_id
+          ? { vendor_location_id: response.data.vendor_location_id }
+          : {}),
+        on_boarding_step: nextStep,
+      });
+      void save();
     } catch (error) {
       console.error("Error submitting step 1:", error);
+      toast.error("Could not save. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleContinue = async () => {
-    if (brandNameTaken || brandNameChecking) return;
+    if (brandNameTaken) {
+      toast.error(
+        isBrandMode
+          ? "This brand name is already in use."
+          : "This venue name is already in use.",
+      );
+      return;
+    }
+    if (brandNameChecking) {
+      toast.error(
+        isBrandMode
+          ? "Hold on — we're still checking that brand name."
+          : "Hold on — we're still checking that venue name.",
+      );
+      return;
+    }
+    if (hasMultipleLocations === undefined) {
+      toast.error("Please choose whether you have multiple locations.");
+      setLocationGateReopened(true);
+      return;
+    }
     if (!guided.allSectionsApproved) {
       const ok = await guided.handleApproveAllSections();
       if (!ok) return;
     }
-    await form.handleSubmit(persistStepOne)();
+    const valid = await form.trigger();
+    if (!valid) {
+      toast.error("Please check the highlighted fields.");
+      return;
+    }
+    await persistStepOne(form.getValues());
   };
 
-  const showLocationGate = shouldShowStepOneLocationGate(
-    hasMultipleLocations,
-    stepOnePersistedApproved,
-  );
+  // Always ask when the choice is missing — even if a later-step placeholder
+  // (empty menus) incorrectly looks like a draft. Lock only blocks going *back*
+  // after a real Yes/No is already stored.
+  const showLocationGate =
+    shouldShowStepOneLocationGate(hasMultipleLocations) ||
+    (locationGateReopened && !locationChoiceLocked);
 
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-screen py-8 px-4">
+    <div className="flex w-full flex-col items-center py-6 px-4">
       <OnboardingCard className="w-full max-w-2xl">
         <CardHeader className="pb-2 pt-4">
           <OnboardingTitle>Tell us about your business</OnboardingTitle>
+          {showLocationGate ? (
+            <p className="mt-2 text-sm font-normal text-slate-400">
+              First, tell us if you run more than one venue under the same
+              brand.
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent>
           {showLocationGate ? (
             <div className="space-y-6">
-              <OnboardingFieldGroupTitle className="text-base">
+              <h2 className="text-lg font-semibold text-white text-center">
                 Do you have multiple locations?
-              </OnboardingFieldGroupTitle>
-              <p className="text-sm text-muted-foreground">
-                If you operate several venues under one brand, we&apos;ll label
-                this step for your brand and send the right details to our
-                systems. If you have a single venue, nothing changes in your
-                flow.
+              </h2>
+              <p className="text-slate-400 text-sm text-center max-w-md mx-auto">
+                Choose Yes if several venues share one brand. We&apos;ll ask for
+                a brand name instead of a single venue listing.
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <Button
-                  type="button"
-                  variant="event-primary"
-                  className="min-w-[140px]"
-                  onClick={() => persistLocationChoice(true)}
-                >
-                  Yes, multiple locations
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-w-[140px] border-white/20 bg-white/5 hover:bg-white/10"
-                  onClick={() => persistLocationChoice(false)}
-                >
-                  No, single location
-                </Button>
-              </div>
+              <AIChoicePair
+                value={undefined}
+                onChange={persistLocationChoice}
+                options={[
+                  { value: true, label: "Yes, multiple locations" },
+                  { value: false, label: "No, single location" },
+                ]}
+              />
             </div>
           ) : (
             <>
+              {!locationChoiceLocked ? (
+                <button
+                  type="button"
+                  onClick={goBackToLocationQuestion}
+                  className="mb-4 flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to location question
+                </button>
+              ) : null}
               <section className="w-full mb-4">
                 <OnboardingFieldGroupTitle className="text-base">
                   {isBrandMode ? "Brand information" : "Venue information"}
@@ -440,8 +575,11 @@ export default function StepOne() {
                                   onChange={field.onChange}
                                   onResolved={({ address, city }) => {
                                     field.onChange(address);
-                                    if (city) {
-                                      form.setValue("city", city, {
+                                    const nextCity =
+                                      city ||
+                                      cityFromFormattedAddress(address);
+                                    if (nextCity) {
+                                      form.setValue("city", nextCity, {
                                         shouldValidate: true,
                                         shouldDirty: true,
                                       });
@@ -496,23 +634,16 @@ export default function StepOne() {
                               </FormLabel>
                               <FormControl>
                                 <Input
-                                  placeholder={
-                                    isBrandMode
-                                      ? "e.g. London"
-                                      : "Select a venue to auto-fill"
-                                  }
-                                  className={cn(
-                                    "bg-white/5",
-                                    !isBrandMode && "cursor-not-allowed",
-                                  )}
-                                  readOnly={!isBrandMode}
+                                  placeholder="Filled from your Google listing"
+                                  className="cursor-not-allowed bg-white/5 opacity-80"
+                                  readOnly
+                                  autoComplete="off"
                                   {...field}
                                 />
                               </FormControl>
                               <p className="text-xs text-muted-foreground mt-1">
-                                {isBrandMode
-                                  ? "Enter the city for your head office or main site (or your primary trading city)."
-                                  : "Auto-filled from Google Places when you select a venue"}
+                                Filled from your Google listing. Edit the
+                                address to update it.
                               </p>
                               <FormMessage />
                             </FormItem>
@@ -530,9 +661,10 @@ export default function StepOne() {
                   <GuidedMultiSectionBottomActions
                     onApproveAll={guided.handleApproveAllSections}
                     allSectionsApproved={guided.allSectionsApproved}
+                    hasInput={guided.currentSectionHasInput}
                     loading={loading}
                     onContinue={handleContinue}
-                    continueDisabled={brandNameTaken || brandNameChecking}
+                    continueDisabled={brandNameTaken}
                   />
                 </form>
               </Form>

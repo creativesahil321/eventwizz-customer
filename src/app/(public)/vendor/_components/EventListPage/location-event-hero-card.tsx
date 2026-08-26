@@ -9,6 +9,7 @@ import {
   usePreviewEventSelect,
 } from "@/contexts/preview-context";
 import type { LocationEventCardModel } from "./location-event-card";
+import { formatEventCardFromPrice } from "./event-card-utils";
 import { SiteHeading } from "@/components/public/site-heading";
 
 type LocationEventHeroCardProps = {
@@ -34,6 +35,7 @@ export function LocationEventHeroCard({
   const onPreviewEventSelect = usePreviewEventSelect();
   const isInteractivePreview = isPreview && Boolean(onPreviewEventSelect);
   const href = `/${locationSlug}/events/${event.slug}`;
+  const fromPrice = formatEventCardFromPrice(event.price);
 
   // Visual hover is decoupled from click interactivity so the Site Essentials
   // preview matches the live site. Only the loading state blocks pointer events.
@@ -67,9 +69,9 @@ export function LocationEventHeroCard({
         aria-hidden
       />
 
-      {event.price ? (
+      {fromPrice ? (
         <div className="absolute right-3 top-3 z-[1] rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold tabular-nums leading-none text-[var(--color-primary-foreground)] shadow-md md:right-4 md:top-4 md:px-3.5 md:py-2 md:text-sm">
-          {event.price}
+          {fromPrice}
         </div>
       ) : null}
 

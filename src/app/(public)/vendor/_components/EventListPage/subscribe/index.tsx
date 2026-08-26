@@ -1,12 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { CheckCircle2, Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SiteHeading } from "@/components/public/site-heading";
+import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { cn } from "@/lib/utils";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { useAuthStore } from "@/store/auth.store";
+import { useLocationStore } from "@/store/location.store";
+import {
+  useCustomerNewsletterToggle,
+  usePublicSubscribe,
+  useResendNewsletterConfirmation,
+  useThemeNewsletterSubscription,
+  type SubscribePayload,
+} from "@/services/common/newsletter";
 
 interface SubscribeSectionProps {
   /**
@@ -16,33 +29,52 @@ interface SubscribeSectionProps {
   emphasis?: HeadingEmphasis;
 }
 
-export default function SubscribeSection({ emphasis }: SubscribeSectionProps = {}) {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-  });
-  const narrowPreview = usePreviewNarrowLayout();
+export default function SubscribeSection({
+  emphasis,
+}: SubscribeSectionProps = {}) {
+  const isPreviewMode = useIsPreviewMode();
+  const isSessionChecked = useAuthStore((s) => s.isSessionChecked);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const accountType = useAuthStore((s) => s.account_type);
+  const { isLoggedInCustomer } = useThemeNewsletterSubscription();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  const authPending = !isPreviewMode && !isSessionChecked;
+  const awaitingCustomerTheme =
+    !isPreviewMode &&
+    isSessionChecked &&
+    isAuthenticated &&
+    accountType === "customer" &&
+    !isLoggedInCustomer;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-    });
-  };
+  return (
+    <SubscribeShell
+      emphasis={emphasis}
+      subtitle={
+        isLoggedInCustomer
+          ? "Get drops for new dates and venues — we'll use your account email, no spam."
+          : "Get drops for new dates and venues — one short form, no spam."
+      }
+    >
+      {authPending || awaitingCustomerTheme ? (
+        <SubscribeCardSkeleton />
+      ) : isLoggedInCustomer ? (
+        <CustomerSubscribeCard />
+      ) : (
+        <GuestSubscribeForm />
+      )}
+    </SubscribeShell>
+  );
+}
 
-  const fieldClass =
-    "h-[42px] rounded-xl border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-background)]/90 text-[var(--color-text)] placeholder:text-[var(--color-text-dimmed)] focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]";
-
+function SubscribeShell({
+  emphasis,
+  subtitle,
+  children,
+}: {
+  emphasis?: HeadingEmphasis;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="relative overflow-hidden bg-[var(--color-surface)] py-16 md:py-20">
       <div
@@ -62,70 +94,317 @@ export default function SubscribeSection({ emphasis }: SubscribeSectionProps = {
           className="mb-4 !text-3xl !font-semibold tracking-tight !text-[var(--color-on-surface)] md:!text-4xl"
         />
         <p className="mx-auto mb-8 max-w-xl text-base text-[var(--color-text-dimmed)] md:mb-9 md:text-lg">
-          Get drops for new dates and venues — one short form, no spam.
+          {subtitle}
         </p>
-
-        <form
-          onSubmit={handleSubmit}
-          className={cn(
-            "mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.28)]",
-            !narrowPreview && "md:flex-row md:flex-wrap md:items-center md:p-6",
-          )}
-        >
-          <Input
-            type="text"
-            name="name"
-            placeholder="Your Name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            className={cn(
-              fieldClass,
-              "w-full",
-              !narrowPreview && "md:min-w-[160px] md:flex-1",
-            )}
-          />
-
-          <Input
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className={cn(
-              fieldClass,
-              "w-full",
-              !narrowPreview && "md:min-w-[200px] md:flex-1",
-            )}
-          />
-
-          <Input
-            type="tel"
-            name="phone"
-            placeholder="Mobile Number"
-            value={formData.phone}
-            onChange={handleChange}
-            className={cn(
-              fieldClass,
-              "w-full",
-              !narrowPreview && "md:min-w-[160px] md:flex-1",
-            )}
-          />
-
-          <Button
-            type="submit"
-            variant="event-primary"
-            className="h-[42px] rounded-xl px-6 font-semibold"
-          >
-            Subscribe
-          </Button>
-        </form>
-
-        <p className="mx-auto mt-4 max-w-md text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:mt-5 sm:text-[13px]">
-          No spam. Only event updates. Unsubscribe anytime.
-        </p>
+        {children}
       </div>
     </section>
+  );
+}
+
+function subscribeCardClass(narrowPreview: boolean) {
+  return cn(
+    "mx-auto flex max-w-4xl flex-col items-stretch justify-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.28)]",
+    !narrowPreview && "md:flex-row md:flex-wrap md:items-center md:p-6",
+  );
+}
+
+function SubscribeCardSkeleton() {
+  const narrowPreview = usePreviewNarrowLayout();
+  return (
+    <div className={subscribeCardClass(narrowPreview)}>
+      <Skeleton className="h-[42px] w-full rounded-xl md:min-w-[160px] md:flex-1" />
+      <Skeleton className="h-[42px] w-full rounded-xl md:min-w-[200px] md:flex-1" />
+      <Skeleton className="h-[42px] w-full rounded-xl md:min-w-[160px] md:flex-1" />
+      <Skeleton className="h-[42px] w-full rounded-xl md:w-32" />
+    </div>
+  );
+}
+
+function CustomerSubscribeCard() {
+  const narrowPreview = usePreviewNarrowLayout();
+  const { settings } = useDomain();
+  const locationId = useLocationStore((s) => s.getLocationId());
+  const email = useAuthStore((s) => s.user?.email) ?? null;
+  const { isSubscribed } = useThemeNewsletterSubscription();
+  const toggle = useCustomerNewsletterToggle();
+
+  const brandName = settings?.name ?? "this venue";
+
+  return (
+    <>
+      <div className={subscribeCardClass(narrowPreview)}>
+        <p className="min-w-0 flex-1 text-left text-sm leading-relaxed text-[var(--color-text-dimmed)] md:text-[15px]">
+          {isSubscribed ? (
+            <>
+              You&apos;re receiving event updates from {brandName}
+              {email ? (
+                <>
+                  {" "}
+                  as{" "}
+                  <span className="font-medium text-[var(--color-on-surface)]">
+                    {email}
+                  </span>
+                </>
+              ) : null}
+              .
+            </>
+          ) : (
+            <>
+              Subscribe with your account
+              {email ? (
+                <>
+                  {" "}
+                  (
+                  <span className="font-medium text-[var(--color-on-surface)]">
+                    {email}
+                  </span>
+                  )
+                </>
+              ) : null}
+              . No confirmation email needed.
+            </>
+          )}
+        </p>
+        {isSubscribed ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-[42px] shrink-0 rounded-xl px-6 font-semibold"
+            disabled={toggle.isPending}
+            onClick={() => toggle.mutate("unsubscribe")}
+          >
+            {toggle.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Unsubscribing...
+              </>
+            ) : (
+              "Unsubscribe"
+            )}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="event-primary"
+            className="h-[42px] shrink-0 rounded-xl px-6 font-semibold"
+            disabled={toggle.isPending}
+            onClick={() =>
+              toggle.mutate({
+                action: "subscribe",
+                ...(locationId ? { location_id: locationId } : {}),
+              })
+            }
+          >
+            {toggle.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Subscribing...
+              </>
+            ) : (
+              "Subscribe"
+            )}
+          </Button>
+        )}
+      </div>
+      <p className="mx-auto mt-4 max-w-md text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:mt-5 sm:text-[13px]">
+        No spam. Only event updates. Unsubscribe anytime.
+      </p>
+    </>
+  );
+}
+
+function GuestSubscribeForm() {
+  const isPreviewMode = useIsPreviewMode();
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  });
+  const [result, setResult] = useState<{
+    state: "pending" | "subscribed";
+    message: string;
+  } | null>(null);
+  const [lastPayload, setLastPayload] = useState<SubscribePayload | null>(null);
+  const narrowPreview = usePreviewNarrowLayout();
+  const locationId = useLocationStore((s) => s.getLocationId());
+  const subscribeMutation = usePublicSubscribe();
+  const resendMutation = useResendNewsletterConfirmation();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isPreviewMode || subscribeMutation.isPending) return;
+    const payload: SubscribePayload = {
+      email: formData.email.trim(),
+      name: formData.name.trim() || undefined,
+      phone: formData.phone.trim() || undefined,
+      source: "landing",
+      ...(locationId ? { location_id: locationId } : {}),
+    };
+    subscribeMutation.mutate(payload, {
+      onSuccess: (data) => {
+        setLastPayload(payload);
+        setResult({ state: data.state, message: data.message });
+        setFormData({ name: "", email: "", phone: "" });
+      },
+    });
+  };
+
+  const fieldClass =
+    "h-[42px] rounded-xl border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-background)]/90 text-[var(--color-text)] placeholder:text-[var(--color-text-dimmed)] focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]";
+
+  if (result) {
+    return (
+      <SubscribeSuccess
+        state={result.state}
+        message={result.message}
+        resendPending={resendMutation.isPending}
+        resendMessage={resendMutation.data?.message}
+        onResend={
+          lastPayload ? () => resendMutation.mutate(lastPayload) : undefined
+        }
+        onReset={() => {
+          setResult(null);
+          resendMutation.reset();
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <form
+        onSubmit={handleSubmit}
+        className={subscribeCardClass(narrowPreview)}
+      >
+        <Input
+          type="text"
+          name="name"
+          placeholder="Your Name"
+          value={formData.name}
+          onChange={handleChange}
+          disabled={subscribeMutation.isPending}
+          className={cn(
+            fieldClass,
+            "w-full",
+            !narrowPreview && "md:min-w-[160px] md:flex-1",
+          )}
+        />
+
+        <Input
+          type="email"
+          name="email"
+          placeholder="Email Address"
+          value={formData.email}
+          onChange={handleChange}
+          required
+          disabled={subscribeMutation.isPending}
+          className={cn(
+            fieldClass,
+            "w-full",
+            !narrowPreview && "md:min-w-[200px] md:flex-1",
+          )}
+        />
+
+        <Input
+          type="tel"
+          name="phone"
+          placeholder="Mobile Number"
+          value={formData.phone}
+          onChange={handleChange}
+          disabled={subscribeMutation.isPending}
+          className={cn(
+            fieldClass,
+            "w-full",
+            !narrowPreview && "md:min-w-[160px] md:flex-1",
+          )}
+        />
+
+        <Button
+          type="submit"
+          variant="event-primary"
+          disabled={isPreviewMode || subscribeMutation.isPending}
+          title={isPreviewMode ? "Preview only — subscribe is disabled" : undefined}
+          className="h-[42px] rounded-xl px-6 font-semibold"
+        >
+          {subscribeMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            "Subscribe"
+          )}
+        </Button>
+      </form>
+
+      <p className="mx-auto mt-4 max-w-md text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:mt-5 sm:text-[13px]">
+        No spam. Only event updates. Unsubscribe anytime.
+      </p>
+    </>
+  );
+}
+
+function SubscribeSuccess({
+  state,
+  message,
+  resendPending,
+  resendMessage,
+  onResend,
+  onReset,
+}: {
+  state: "pending" | "subscribed";
+  message: string;
+  resendPending: boolean;
+  resendMessage?: string;
+  onResend?: () => void;
+  onReset: () => void;
+}) {
+  const isPending = state === "pending";
+  return (
+    <div className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-8 text-center shadow-[0_16px_40px_-28px_rgba(0,0,0,0.28)]">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+        {isPending ? (
+          <Mail className="h-7 w-7" />
+        ) : (
+          <CheckCircle2 className="h-7 w-7" />
+        )}
+      </div>
+      <h3 className="text-xl font-semibold text-[var(--color-on-surface)]">
+        {isPending ? "Check your email" : "You're subscribed"}
+      </h3>
+      <p className="max-w-md text-sm leading-relaxed text-[var(--color-text-dimmed)]">
+        {resendMessage ?? message}
+      </p>
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+        {isPending && onResend ? (
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            disabled={resendPending}
+            onClick={onResend}
+          >
+            {resendPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              "Resend email"
+            )}
+          </Button>
+        ) : null}
+        <Button variant="outline" className="rounded-xl" onClick={onReset}>
+          Add another email
+        </Button>
+      </div>
+    </div>
   );
 }

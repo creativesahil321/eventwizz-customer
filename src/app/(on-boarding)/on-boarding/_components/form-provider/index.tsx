@@ -13,6 +13,7 @@ import { useForm, UseFormReturn, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { OnboardingFormData, onboardingSchema } from "./schema";
 import { patchOnboardingPayloadFromApi } from "./hydrate-onboarding-from-api";
+import { isAIBulkApplyInProgress } from "../../_lib/ai-bulk-apply-session-flag";
 import { defaultValues } from "./defaultValues";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
@@ -35,6 +36,13 @@ interface FormContextType {
   previewTheme: ThemeSchema;
   activeField: string | null;
   setActiveField: (fieldName: string | null) => void;
+  /**
+   * Preview → form bridge: a click on a preview "Edit …" hit asks the left form
+   * panel to open (if collapsed) and scroll/focus the matching field. The token
+   * bumps on every request so repeating the same field still re-triggers.
+   */
+  formFieldFocusRequest: { field: string; token: number } | null;
+  requestFormFieldFocus: (field: string) => void;
   setActiveStep: (
     step: number,
     options?: { skipSessionSync?: boolean },
@@ -109,8 +117,20 @@ export function FormProvider({
   const [persistedProgressHydrated, setPersistedProgressHydrated] =
     useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
+  const [formFieldFocusRequest, setFormFieldFocusRequest] = useState<{
+    field: string;
+    token: number;
+  } | null>(null);
   /** Step save/next only; initial shell is gated by the parent onboarding query, not another artificial delay. */
   const [isLoading, setIsLoading] = useState(false);
+
+  const requestFormFieldFocus = useCallback((field: string) => {
+    if (!field) return;
+    setFormFieldFocusRequest((prev) => ({
+      field,
+      token: (prev?.token ?? 0) + 1,
+    }));
+  }, []);
 
   const maxSteps = 11;
   const dataLoadAttempted = useRef(false);
@@ -151,6 +171,8 @@ export function FormProvider({
 
   // Reset form when server data changes - this is important for preserving state
   useEffect(() => {
+    if (isAIBulkApplyInProgress()) return;
+
     if (serverData) {
       const formData = serverData.data || serverData;
 
@@ -374,6 +396,8 @@ export function FormProvider({
       previewTheme,
       activeField,
       setActiveField,
+      formFieldFocusRequest,
+      requestFormFieldFocus,
       setActiveStep: updateActiveStep,
       save,
       next,
@@ -388,6 +412,8 @@ export function FormProvider({
       previewTheme,
       activeField,
       setActiveField,
+      formFieldFocusRequest,
+      requestFormFieldFocus,
       isLoading,
       updateActiveStep,
       save,

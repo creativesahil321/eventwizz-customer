@@ -11,6 +11,7 @@ export type OnboardingPreviewEventData = SiteEssentials & {
     logo?: string | null;
     favicon?: string | null;
     copyright?: string | null;
+    footer_brand_description?: string | null;
     address?: string;
     phone?: string;
     email?: string | null;

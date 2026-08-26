@@ -1,3 +1,5 @@
+"use client";
+
 import { usePathname } from "next/navigation";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { appConfig } from "@/config/app";
@@ -65,7 +67,11 @@ function AuthPanel({
   );
 }
 
-export function AuthContent() {
+export function AuthContent({
+  callbackUrl,
+}: {
+  callbackUrl?: string | null;
+}) {
   const pathname = usePathname();
   const { settings } = useDomain();
   const siteName = settings?.name || appConfig.name;
@@ -76,6 +82,8 @@ export function AuthContent() {
   const isCustomer = segments.includes("customer");
   const isVendor = segments.includes("vendor");
   const isLogin = segments.includes("login");
+  const isVendorOnboarding =
+    (callbackUrl ?? "").includes("/on-boarding");
 
   if (isRegister && isCustomer) {
     return (
@@ -108,6 +116,20 @@ export function AuthContent() {
   }
 
   if (isLogin) {
+    if (isVendorOnboarding) {
+      return (
+        <AuthPanel
+          title={`Welcome back to ${siteName}`}
+          description="Sign in to continue setting up your venue website. We’ll pick up your onboarding where you left off."
+          stats={[
+            { value: "11", label: "Setup steps" },
+            { value: "~5 min", label: "AI draft" },
+            { value: "24/7", label: "Support" },
+          ]}
+          trust="For event organisers setting up their EventWizz site"
+        />
+      );
+    }
     return (
       <AuthPanel
         title={`Welcome Back to ${siteName}`}

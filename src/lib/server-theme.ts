@@ -105,6 +105,7 @@ export async function fetchServerTheme(
         Accept: "application/json",
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
+        "X-Domain": cleanDomain,
         Origin: env.NEXT_PUBLIC_APP_URL || "",
         Host: cleanDomain,
       },

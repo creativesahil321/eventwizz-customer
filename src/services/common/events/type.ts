@@ -76,6 +76,8 @@ export interface LocationData {
   about_title: string | null;
   about_cta_link: string | null;
   about_description: string | null;
+  /** Global footer blurb; location GET should still echo it (same as copyright). */
+  footer_brand_description?: string | null;
   about_link_title: string | null;
   event_title_1: string | null;
   latest_events: Event[];

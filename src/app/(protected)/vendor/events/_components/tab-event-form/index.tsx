@@ -36,6 +36,7 @@ const FaqsTab = lazy(() => import("./tabs/faqs-tab"));
 const PublishTab = lazy(() => import("./tabs/publish-tab"));
 import { EventPreview } from "../event-preview";
 import { PreviewProvider } from "@/contexts/preview-context";
+import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { useEventData } from "../../_lib/hooks/useEventData";
 import { useEventPreviewNavigation } from "../../_lib/use-event-preview-navigation";
 import { useParams } from "next/navigation";
@@ -272,6 +273,7 @@ export default function TabEventForm() {
     setActiveStep,
   } = useEventFormContext();
   const { openEventPreview, canPreview } = useEventPreviewNavigation();
+  const previewSiteEssentials = useEventPreviewSiteEssentials();
 
   const [activeTab, setActiveTab] = useState("event-name");
   const [vendorRooms, setVendorRooms] = useState<VendorRoomOption[]>([]);
@@ -979,6 +981,7 @@ export default function TabEventForm() {
                     <PreviewProvider isPreviewMode>
                       <EventPreview
                         data={(eventData as { data?: object })?.data || {}}
+                        siteEssentials={previewSiteEssentials}
                         embedInShell
                       />
                     </PreviewProvider>

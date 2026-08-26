@@ -17,6 +17,25 @@ export function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** Laravel `Content-Disposition: attachment; filename="subscribers.csv"`. */
+export function filenameFromContentDisposition(
+  header: string | undefined,
+  fallback: string,
+): string {
+  if (!header) return fallback;
+  const star = header.match(/filename\*=(?:UTF-8'')?([^;]+)/i);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/['"]/g, ""));
+    } catch {
+      return star[1].trim().replace(/['"]/g, "");
+    }
+  }
+  const match = header.match(/filename="?([^";]+)"?/i);
+  const name = match?.[1]?.trim();
+  return name || fallback;
+}
+
 export function exportTableToCSV<TData>(
   /**
    * The table to export.

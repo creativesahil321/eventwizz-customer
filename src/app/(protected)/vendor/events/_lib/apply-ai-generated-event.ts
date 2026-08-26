@@ -30,8 +30,15 @@ import {
   cleanVendorStepThreeDatesForForm,
   formatVendorStepThreeDateForApi,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
-import type { VendorStepFourRoomEntry } from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
-import { ensureEventMenuCategoriesForRoom } from "@/lib/event-menu-categories";
+import {
+  normalizeVendorStepFourMenus,
+  type VendorStepFourRoomEntry,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
+import {
+  ensureEventMenuCategoriesForRoom,
+  isValidMenuCategoryId,
+  toPositiveId,
+} from "@/lib/event-menu-categories";
 import type { StepFiveSavePayload } from "@/services/vendor/events/events.service";
 import { persistAiEventDraftId } from "./ai-event-draft-storage";
 import type { StepThreeType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
@@ -475,7 +482,9 @@ async function applyAIGeneratedEventToBackendInner(params: {
         ? 1
         : 0;
   const hasCatering = cateringOption === 1;
-  const menus = hasCatering ? (s.stepFour.menus ?? []) : [];
+  const menus = hasCatering
+    ? normalizeVendorStepFourMenus(s.stepFour.menus)
+    : [];
 
   let primaryMenuCategoryId: number | undefined;
   const menuCategoryIdByRoomId = new Map<number, number>();
@@ -513,9 +522,19 @@ async function applyAIGeneratedEventToBackendInner(params: {
   }
 
   const defaultMenuCategoryId =
-    primaryMenuCategoryId ??
-    menuCategoryIdByRoomId.values().next().value ??
+    toPositiveId(primaryMenuCategoryId) ??
+    toPositiveId(menuCategoryIdByRoomId.values().next().value) ??
     0;
+
+  // Catering can only be persisted with a real menu category. If creation
+  // failed, degrade to "off" instead of saving menus with category id 0.
+  const cateringPersistable =
+    hasCatering && isValidMenuCategoryId(defaultMenuCategoryId);
+  if (hasCatering && !cateringPersistable) {
+    console.warn(
+      "[AI event] Skipping catering: no menu category could be created for the generated menus.",
+    );
+  }
 
   const menuBgUrl = hasCatering
     ? (dummyImages as { menu_background?: string }).menu_background
@@ -536,16 +555,25 @@ async function applyAIGeneratedEventToBackendInner(params: {
       },
       s.stepFour.rooms,
     );
-    const roomMenus = hasCatering ? (resolved.menus ?? menus) : [];
-    const roomCatering = resolved.catering_option === 1 ? 1 : 0;
+    const roomMenus = hasCatering
+      ? normalizeVendorStepFourMenus(resolved.menus ?? menus)
+      : [];
+    const roomCategoryId =
+      menuCategoryIdByRoomId.get(roomId) ?? defaultMenuCategoryId;
+    // Only enable this room's catering when it has a real category AND menus.
+    const roomCatering =
+      resolved.catering_option === 1 &&
+      roomMenus.length > 0 &&
+      isValidMenuCategoryId(roomCategoryId)
+        ? 1
+        : 0;
     return {
       room_id: roomId,
       catering_option: roomCatering as 0 | 1,
       menu_title: roomCatering === 1 ? resolved.menu_title : "",
       menu_description: roomCatering === 1 ? resolved.menu_description : "",
-      event_menu_category_id:
-        menuCategoryIdByRoomId.get(roomId) ?? defaultMenuCategoryId,
-      menus: roomMenus,
+      event_menu_category_id: roomCatering === 1 ? roomCategoryId : 0,
+      menus: roomCatering === 1 ? roomMenus : [],
       menu_background_image: menuBgFile ?? null,
     };
   };
@@ -572,11 +600,15 @@ async function applyAIGeneratedEventToBackendInner(params: {
       step: 4 as const,
       event_id: eventId,
       is_rooms: 0,
-      catering_option: cateringOption,
-      menu_title: hasCatering ? s.stepFour.menu_title : undefined,
-      menu_description: hasCatering ? s.stepFour.menu_description : undefined,
-      event_menu_category_id: hasCatering ? defaultMenuCategoryId : undefined,
-      menus: hasCatering ? menus : undefined,
+      catering_option: cateringPersistable ? 1 : 0,
+      menu_title: cateringPersistable ? s.stepFour.menu_title : undefined,
+      menu_description: cateringPersistable
+        ? s.stepFour.menu_description
+        : undefined,
+      event_menu_category_id: cateringPersistable
+        ? defaultMenuCategoryId
+        : undefined,
+      menus: cateringPersistable ? menus : undefined,
       menu_background_image: menuBgFile ?? undefined,
     });
   }

@@ -3,6 +3,8 @@ import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
 } from "@/lib/word-count";
+import { FOOTER_BRAND_DESCRIPTION_MAX_CHARS } from "@/lib/footer-brand-description";
+import { plainTextCharCount } from "@/lib/plain-text-length";
 
 /** Hero subline; was 80 — too short for full sentences (often cut mid-word in CMS). */
 export const BANNER_SUB_HEADING_MAX_CHARS = 220;
@@ -257,6 +259,15 @@ export const siteEssentialsFormSchema = z.object({
     .max(
       COPYRIGHT_MAX_CHARS,
       `Copyright text must not exceed ${COPYRIGHT_MAX_CHARS} characters`,
+    ),
+  footer_brand_description: z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (s) =>
+        plainTextCharCount(s ?? "") <= FOOTER_BRAND_DESCRIPTION_MAX_CHARS,
+      `Footer brand description must not exceed ${FOOTER_BRAND_DESCRIPTION_MAX_CHARS} characters`,
     ),
   logo: z.any().optional(),
   favicon: z.any().optional(),

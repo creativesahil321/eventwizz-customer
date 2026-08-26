@@ -1,4 +1,4 @@
-import type { LiveEvent } from "@/types/theme.types";
+import type { LiveEvent, LocationData } from "@/types/theme.types";
 
 const STOP_WORDS = new Set([
   "a",
@@ -92,6 +92,46 @@ export function buildLiveEventHref(event: LiveEvent): string {
   return `/${locationSlug}/events/${eventSlug}`;
 }
 
+function normalizeSlug(slug: string): string {
+  return slug.replace(/^\/+|\/+$/g, "").toLowerCase();
+}
+
+/**
+ * Chat must only offer events whose location exists on this storefront.
+ * Theme `live_events` can include stale venue names (404s like
+ * /walton-summit-centre/events/…) that are not in `theme.locations`.
+ */
+export function filterLiveEventsToPublishedLocations(
+  liveEvents: LiveEvent[] | null | undefined,
+  locations: LocationData[] | null | undefined,
+): LiveEvent[] {
+  const events = liveEvents ?? [];
+  const published = (locations ?? []).filter(
+    (location) => typeof location.slug === "string" && location.slug.trim(),
+  );
+  if (published.length === 0) return events;
+
+  const slugs = new Set(
+    published.map((location) => normalizeSlug(location.slug)),
+  );
+  const cityBySlug = new Map(
+    published.map((location) => [
+      normalizeSlug(location.slug),
+      (location.city ?? "").trim(),
+    ]),
+  );
+
+  return events
+    .filter((event) => slugs.has(normalizeSlug(event.location_slug)))
+    .map((event) => {
+      const catalogCity = cityBySlug.get(normalizeSlug(event.location_slug));
+      if (catalogCity) {
+        return { ...event, location_city: catalogCity };
+      }
+      return event;
+    });
+}
+
 function normalize(text: string): string {
   return text
     .toLowerCase()
@@ -154,14 +194,47 @@ function extractMentionedCity(
   events: LiveEvent[],
 ): string | null {
   const q = normalize(query);
-  const cities = [
-    ...new Set(events.map((e) => normalize(e.location_city)).filter(Boolean)),
-  ].sort((a, b) => b.length - a.length);
+  if (!q) return null;
 
-  for (const city of cities) {
-    if (city && q.includes(city)) return city;
+  const candidates = events.flatMap((event) => {
+    const city = normalize(event.location_city);
+    const slugCity = normalize(event.location_slug.replace(/-/g, " "));
+    return [
+      { key: city, city },
+      { key: slugCity, city },
+    ].filter((item) => item.key);
+  });
+
+  const unique = [
+    ...new Map(candidates.map((item) => [item.key, item])).values(),
+  ].sort((a, b) => b.key.length - a.key.length);
+
+  for (const item of unique) {
+    if (q.includes(item.key)) return item.city;
   }
   return null;
+}
+
+/** City the guest just named (including “Book in Bristol”). */
+export function mentionedLiveEventCity(
+  query: string,
+  events: LiveEvent[],
+): string | null {
+  return extractMentionedCity(query, events);
+}
+
+/** True when the message is a location tap / “Book in {city}”, not a later booking step. */
+export function isLiveEventLocationChoiceText(
+  text: string,
+  events: LiveEvent[],
+): boolean {
+  const city = extractMentionedCity(text, events);
+  if (!city) return false;
+  const n = normalize(text);
+  if (n === city) return true;
+  if (n.startsWith("book in ") && n.includes(city)) return true;
+  if (/\bbook\b/.test(n) && n.includes(" in ") && n.includes(city)) return true;
+  return false;
 }
 
 export type LiveEventChatMatch = {
@@ -210,12 +283,124 @@ export function matchLiveEvents(
   return scored.filter((m) => m.score >= Math.max(18, top - 25));
 }
 
+/**
+ * Keep the same event across follow-ups like “50” or “tables only”.
+ * Uses the current message, earlier chat text, and any /location/events/slug links.
+ */
+export function matchLiveEventsFromConversation(
+  userText: string,
+  messages: Array<{ role: string; content: string }>,
+  liveEvents: LiveEvent[] | null | undefined,
+): LiveEventChatMatch[] {
+  if (!liveEvents?.length) return [];
+
+  const mentionedCity = extractMentionedCity(userText, liveEvents);
+  const priorCorpus = messages.map((m) => m.content).join("\n");
+  const priorMatches = priorCorpus.trim()
+    ? matchLiveEvents(priorCorpus, liveEvents)
+    : [];
+
+  if (mentionedCity) {
+    const atCity = (list: LiveEventChatMatch[]) =>
+      list.filter((m) => normalize(m.event.location_city) === mentionedCity);
+
+    if (priorMatches.length > 0) {
+      const cityHits = atCity(priorMatches);
+      if (cityHits.length > 0) return cityHits;
+      return [];
+    } else {
+      const cityEvents = liveEvents.filter(
+        (event) => normalize(event.location_city) === mentionedCity,
+      );
+      if (cityEvents.length > 0) {
+        const fromQuery = matchLiveEvents(
+          `${priorCorpus}\n${userText}`.trim(),
+          cityEvents,
+        );
+        if (fromQuery.length > 0) return fromQuery;
+      }
+    }
+  }
+
+  const fromCurrent = matchLiveEvents(userText, liveEvents);
+  if (fromCurrent.length > 0) return fromCurrent;
+
+  const corpus = [userText, ...messages.map((m) => m.content)].join("\n");
+  const hrefHits: LiveEventChatMatch[] = [];
+  const seen = new Set<string>();
+  const hrefRe = /\/([A-Za-z0-9-]+)\/events\/([A-Za-z0-9-]+)/g;
+  let hrefMatch: RegExpExecArray | null;
+  while ((hrefMatch = hrefRe.exec(corpus)) !== null) {
+    const locationSlug = hrefMatch[1];
+    const eventSlug = hrefMatch[2];
+    const event = liveEvents.find(
+      (item) =>
+        item.slug === eventSlug && item.location_slug === locationSlug,
+    );
+    if (!event) continue;
+    const key = `${locationSlug}/${eventSlug}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    hrefHits.push({
+      event,
+      href: buildLiveEventHref(event),
+      score: 95,
+    });
+  }
+  if (hrefHits.length > 0) return hrefHits;
+
+  const userCorpus = [
+    userText,
+    ...messages.filter((m) => m.role === "user").map((m) => m.content),
+  ].join("\n");
+  const fromUsers = matchLiveEvents(userCorpus, liveEvents);
+  if (fromUsers.length > 0) return fromUsers;
+
+  return matchLiveEvents(corpus, liveEvents);
+}
+
+/** True when chat should ask city / list events — not load one event’s rooms yet. */
+export function needsLiveEventLocationChoice(
+  userText: string,
+  matches: LiveEventChatMatch[],
+  allLiveEvents: LiveEvent[],
+): boolean {
+  if (!matches.length) return false;
+  if (
+    matches.every((m) => m.score <= 1) ||
+    /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|list\s+(of\s+)?events?)\b/i.test(
+      userText,
+    )
+  ) {
+    return true;
+  }
+
+  const byTitle = new Map<string, LiveEventChatMatch[]>();
+  for (const m of matches) {
+    const key = normalize(m.event.title);
+    const list = byTitle.get(key) ?? [];
+    list.push(m);
+    byTitle.set(key, list);
+  }
+  const primaryGroup = byTitle.get([...byTitle.keys()][0]) ?? matches;
+  const cities = [
+    ...new Set(primaryGroup.map((m) => normalize(m.event.location_city))),
+  ];
+  const mentionedCity = extractMentionedCity(userText, allLiveEvents);
+  if (mentionedCity && !cities.includes(mentionedCity)) return true;
+  return primaryGroup.length > 1;
+}
+
 function titleCaseCity(city: string): string {
   if (!city) return city;
   return city
     .split(/\s+/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+function chatChoiceMarkdown(label: string, sendText: string): string {
+  return `[${label}](chat:${sendText})`;
 }
 
 /**
@@ -264,14 +449,10 @@ export function buildLiveEventsDirectReply(options: {
   ) {
     const lines = matches.map((m) => {
       const city = titleCaseCity(m.event.location_city);
-      return `- **${m.event.title}** in **${city}** — [Book now](${m.href})`;
+      return `- **${m.event.title}** in **${city}** — ${chatChoiceMarkdown(`Book now`, `Book ${m.event.title} in ${city}`)}`;
     });
     return {
-      content: `Here’s what’s currently available to book at **${brand}**${nameBit}:\n\n${lines.join("\n")}\n\nTap a link to open the event and choose your date.`,
-      supportCta: {
-        href: primary.href,
-        label: `Book ${primary.event.title}`,
-      },
+      content: `Here’s what’s currently available to book at **${brand}**${nameBit}:\n\n${lines.join("\n")}\n\nWhich would you like? I’ll book it here in chat.`,
     };
   }
 
@@ -284,14 +465,13 @@ export function buildLiveEventsDirectReply(options: {
     const asked = titleCaseCity(mentionedCity);
     const linkLines = primaryGroup.map((m) => {
       const city = titleCaseCity(m.event.location_city);
-      return `[Book ${displayTitle} in ${city}](${m.href})`;
+      return chatChoiceMarkdown(
+        `Book ${displayTitle} in ${city}`,
+        `Book in ${city}`,
+      );
     });
     return {
       content: `**${displayTitle}** is currently available in **${available}**, but not in **${asked}**.\n\n${linkLines.join(" · ")}\n\nWould you like help with anything else?`,
-      supportCta: {
-        href: primary.href,
-        label: `Book ${displayTitle}`,
-      },
     };
   }
 
@@ -299,29 +479,63 @@ export function buildLiveEventsDirectReply(options: {
   if (primaryGroup.length === 1) {
     const city = titleCaseCity(primary.event.location_city);
     return {
-      content: `Yes${nameBit} — **${displayTitle}** is currently available in **${city}**.\n\n[Click here to book ${displayTitle}](${primary.href})\n\nYou’ll be taken to the event page to choose your date and places.`,
-      supportCta: {
-        href: primary.href,
-        label: `Book ${displayTitle}`,
-      },
+      content: `Yes${nameBit} — **${displayTitle}** is available in **${city}**. I’ll help you book it here.\n\nHow many guests are you booking for? ${chatChoiceMarkdown("10 guests", "10 guests")} ${chatChoiceMarkdown("20 guests", "20 guests")} ${chatChoiceMarkdown("40 guests", "40 guests")} ${chatChoiceMarkdown("I’ll type a number", "I'll type the guest number")}`,
     };
   }
 
-  // Multiple locations
+  // Multiple locations — stay in chat; never navigate to /{slug}/events/…
   const linkLines = primaryGroup.map((m) => {
     const city = titleCaseCity(m.event.location_city);
-    return `[Book in ${city}](${m.href})`;
+    return chatChoiceMarkdown(`Book in ${city}`, `Book in ${city}`);
   });
   return {
-    content: `**${displayTitle}** is currently available in **${cities.join(" and ")}**.\n\n${linkLines.join(" · ")}\n\nChoose the location that suits you and complete your booking there.`,
-    supportCta: {
-      href: primary.href,
-      label: `Book ${displayTitle}`,
-    },
+    content: `**${displayTitle}** is currently available in **${cities.join(" and ")}**.\n\n${linkLines.join(" · ")}\n\nWhich location would you like? I’ll then check dates, rooms, tables and drinks with you.`,
   };
 }
 
-/** Compact block for the AI prompt when a direct reply isn’t used. */
+/** Guest asked for an event that is not on any published location. */
+export function buildLiveEventsNoMatchReply(options: {
+  allLiveEvents: LiveEvent[];
+  siteName?: string | null;
+  userName?: string | null;
+}): { content: string } {
+  const { allLiveEvents, siteName, userName } = options;
+  const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
+  const brand = siteName?.trim() || "our venue";
+  if (!allLiveEvents.length) {
+    return {
+      content: `I don’t have any events listed to book on **${brand}** right now${nameBit}. Please choose a location from the directory, or tell me which city you have in mind.`,
+    };
+  }
+  const lines = allLiveEvents.slice(0, 8).map((event) => {
+    const city = titleCaseCity(event.location_city);
+    return `- **${event.title}** in **${city}** — ${chatChoiceMarkdown(`Book now`, `Book ${event.title} in ${city}`)}`;
+  });
+  return {
+    content: `I couldn’t find that event among our current locations${nameBit}. Here’s what’s available to book at **${brand}**:\n\n${lines.join("\n")}\n\nWhich would you like?`,
+  };
+}
+
+/** Compact block when EVENT BOOKING DATA is already loaded — avoid blowing the context window. */
+export function buildCompactLiveEventsPromptBlock(
+  liveEvents: LiveEvent[] | null | undefined,
+): string {
+  if (!liveEvents?.length) {
+    return `
+LIVE EVENTS (names + cities only):
+- No other live events listed.
+`;
+  }
+  const lines = liveEvents.slice(0, 10).map((event) => {
+    const city = event.location_city?.trim() || event.location_slug;
+    return `- ${event.title} (${city})`;
+  });
+  return `
+LIVE EVENTS (names + cities only — current booking is EVENT BOOKING DATA):
+${lines.join("\n")}
+If they ask about a different event, use this list. Do not dump this list unless they ask.
+`;
+}
 export function buildLiveEventsPromptBlock(
   liveEvents: LiveEvent[] | null | undefined,
 ): string {
@@ -334,17 +548,20 @@ LIVE EVENTS (theme):
   }
 
   const lines = liveEvents.map((e) => {
-    const href = buildLiveEventHref(e);
-    return `- ${e.title} | ${e.location_city} | markdown: [Book ${e.title}](${href})`;
+    const city = e.location_city?.trim() || e.location_slug;
+    return `- ${e.title} | ${city} | in-chat: [Book in ${city}](chat:Book in ${city})`;
   });
 
   return `
-LIVE EVENTS (authoritative — use these for booking redirects):
+LIVE EVENTS (authoritative — only these cities exist on this site):
 When the guest asks about an event by name (e.g. Christmas, Diwali, New Year):
-1. Answer from this list only — never invent events or URLs.
-2. Say which location(s) have it.
-3. Always include the markdown booking link(s) below.
-4. If they ask for a city that is not listed for that event, say it is not available there and offer the cities that are.
+1. Answer from this list only — never invent events, cities, or URLs.
+2. Say which location(s) have it. Location buttons stay in chat: [Book in City](chat:Book in City)
+3. NEVER write /chat: or /chat — the prefix is chat: with no slash. Dates: [Thu 27 Aug](chat:Thu 27 Aug 2026)
+4. NEVER send [Book in City](/location-slug/events/event-slug) — that leaves chat.
+5. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (room → dates → guests → seating → drinks → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
+6. If they ask for a city that is not listed for that event, say it is not available there and offer the cities that are.
+7. Never skip the room when rooms are listed. Quote prices. Coupon last. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
 
 ${lines.join("\n")}
 `;

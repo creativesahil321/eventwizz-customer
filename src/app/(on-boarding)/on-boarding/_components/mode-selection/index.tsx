@@ -115,12 +115,43 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
             <span style={accent.gradient}>build your site?</span>
           </h1>
           <p className="text-slate-400 text-lg max-w-xl mx-auto">
-            Choose your preferred setup experience. You can always customise
-            everything later.
+            AI writes a first draft in about 5 minutes. You then review every
+            section before publishing. You can always switch to full manual
+            control.
           </p>
 
-          {/* How it works — expandable so vendor knows what AI vs Manual creates */}
-          <div className="mt-8 max-w-2xl mx-auto">
+          <div className="mt-8 mx-auto grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-3">
+            {[
+              { n: "1", label: "Choose setup" },
+              { n: "2", label: "Tell us about your venue" },
+              { n: "3", label: "Review the draft" },
+            ].map((step, index) => {
+              const isCurrent = index === 0;
+              return (
+                <div
+                  key={step.n}
+                  className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm ${
+                    isCurrent
+                      ? "border-white/20 bg-white/[0.07] text-white"
+                      : "border-white/10 bg-white/[0.03] text-slate-500"
+                  }`}
+                >
+                  <span
+                    className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${
+                      isCurrent ? "text-white" : "border border-white/15 text-slate-500"
+                    }`}
+                    style={isCurrent ? accent.badge : undefined}
+                  >
+                    {step.n}
+                  </span>
+                  {step.label}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* How it works — expandable extra detail */}
+          <div className="mt-5 max-w-2xl mx-auto">
             <button
               type="button"
               onClick={() => setShowHowItWorks((v) => !v)}
@@ -158,8 +189,8 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
                         FAQs, and placeholder images. You review and edit
                         anything you like, then set your domain and connect
                         payment (Stripe/PayPal etc.). Best if you want a
-                        professional site
-                        in about 5 minutes.
+                        professional site in about 5 minutes. You’ll then review
+                        every section before publishing.
                       </p>
                     </div>
                     <div>
@@ -222,9 +253,9 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
                 AI-Powered Setup
               </h2>
               <p className="text-slate-400 mb-6 text-sm leading-relaxed">
-                Let our AI create your entire event website in seconds.
-                Professional content, smart defaults, and stunning placeholder
-                images — all customizable.
+                AI writes a first draft in about 5 minutes. Professional copy,
+                smart defaults, and placeholder images — then you review every
+                section before publishing.
               </p>
 
               <div className="space-y-3 mb-8">

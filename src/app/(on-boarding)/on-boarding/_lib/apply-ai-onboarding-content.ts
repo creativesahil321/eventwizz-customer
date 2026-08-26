@@ -19,9 +19,16 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { roomService } from "@/services/vendor/onboarding/room.service";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { withSuppressedSuccessToasts } from "@/services/core/api-client";
-import { ensureEventMenuCategoriesForRoom } from "@/lib/event-menu-categories";
 import {
-  AI_ONBOARDING_MAX_ROOMS,
+  ensureEventMenuCategoriesForRoom,
+  isValidMenuCategoryId,
+  toPositiveId,
+} from "@/lib/event-menu-categories";
+import { ensureFilePreview } from "@/lib/file-preview";
+import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
+import { getSession } from "next-auth/react";
+import {
+  coerceAiDateList,
   coerceAiStepFiveRooms,
   ensureOnboardingDates,
   fillOnboardingContentDefaults,
@@ -34,16 +41,105 @@ import {
   resolveEventSchedulerItems,
 } from "@/lib/event-form-limits";
 
+function firstPositiveEventId(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    const id = Number(value);
+    if (Number.isFinite(id) && id > 0) return id;
+  }
+  return undefined;
+}
+
 /** Remove stale vendor rooms so AI apply always starts from the names the user entered. */
+function resolveVendorRoomId(
+  room: { id?: unknown; room_id?: unknown } | null | undefined,
+): number {
+  const id = Number(room?.id ?? room?.room_id);
+  return Number.isFinite(id) && id > 0 ? id : NaN;
+}
+
 async function resetVendorRoomsBeforeAiApply(): Promise<void> {
   const listed = await roomService.listVendorRooms();
   const existing = listed?.data ?? [];
   await Promise.allSettled(
     existing
-      .map((room) => Number(room.id))
+      .map((room) => resolveVendorRoomId(room))
       .filter((id) => Number.isFinite(id) && id > 0)
       .map((id) => roomService.remove(id)),
   );
+}
+
+/**
+ * Reuse rooms that already match the vendor's names (delete+recreate hits
+ * Laravel max-room and leaves empty leftover spaces). Create only missing ones.
+ */
+async function syncVendorRoomsForAiApply(
+  names: string[],
+): Promise<Array<{ id: number; name: string }>> {
+  const listed = await roomService.listVendorRooms();
+  const existing = listed?.data ?? [];
+  const wanted = new Set(names.map((name) => name.trim().toLowerCase()));
+
+  await Promise.allSettled(
+    existing
+      .filter(
+        (room) => !wanted.has(String(room.name ?? "").trim().toLowerCase()),
+      )
+      .map((room) => {
+        const id = resolveVendorRoomId(room);
+        return Number.isFinite(id) ? roomService.remove(id) : Promise.resolve();
+      }),
+  );
+
+  const remaining = (await roomService.listVendorRooms())?.data ?? [];
+  const byName = new Map(
+    remaining.map((room) => [
+      String(room.name ?? "").trim().toLowerCase(),
+      room,
+    ]),
+  );
+
+  const createdRooms: Array<{ id: number; name: string }> = [];
+  for (const name of names) {
+    const match = byName.get(name.trim().toLowerCase());
+    const existingId = resolveVendorRoomId(match);
+    if (Number.isFinite(existingId) && existingId > 0) {
+      createdRooms.push({ id: existingId, name: match?.name || name });
+      continue;
+    }
+    const created = await roomService.create({ name });
+    const id = resolveVendorRoomId(created?.data);
+    if (!created?.status || !Number.isFinite(id) || id <= 0) {
+      throw new Error("Failed to create rooms for AI room system");
+    }
+    createdRooms.push({ id, name: created.data?.name || name });
+  }
+  if (createdRooms.length < 2) {
+    throw new Error("AI room system requires at least 2 created rooms");
+  }
+  return createdRooms;
+}
+
+function minPriceStartFrom(
+  dates: Array<{
+    tickets?: Array<{ price?: unknown }>;
+    tables?: Array<{ price?: unknown }>;
+  }>,
+  fallback: string,
+): string {
+  const prices: number[] = [];
+  for (const date of dates) {
+    for (const ticket of date.tickets ?? []) {
+      const n = Number(String(ticket.price ?? "").replace(/[^0-9.]/g, ""));
+      if (Number.isFinite(n) && n > 0) prices.push(n);
+    }
+    for (const table of date.tables ?? []) {
+      const n = Number(String(table.price ?? "").replace(/[^0-9.]/g, ""));
+      if (Number.isFinite(n) && n > 0) prices.push(n);
+    }
+  }
+  if (prices.length > 0) return String(Math.min(...prices));
+  const fb = Number(String(fallback).replace(/[^0-9.]/g, ""));
+  return Number.isFinite(fb) && fb > 0 ? String(fb) : "50";
 }
 
 export const AI_ONBOARDING_APPLY_STEPS = [
@@ -79,6 +175,7 @@ function normalizeAIGeneratedContent(
       banner_sub_heading: "",
       about_title: "",
       about_description: "",
+      footer_brand_description: "",
       ...c.stepTwo,
     },
     stepThree: {
@@ -104,8 +201,13 @@ function normalizeAIGeneratedContent(
         : [],
     },
     stepFive: {
-      dates: Array.isArray(c.stepFive?.dates) ? c.stepFive.dates : [],
-      rooms: Array.isArray(c.stepFive?.rooms) ? c.stepFive.rooms : undefined,
+      dates: Array.isArray(c.stepFive?.dates)
+        ? c.stepFive.dates
+        : coerceAiDateList(c.stepFive?.dates),
+      rooms: (() => {
+        const rooms = coerceAiStepFiveRooms(c.stepFive?.rooms);
+        return rooms.length > 0 ? rooms : undefined;
+      })(),
     },
     stepSix: {
       menu_title: "",
@@ -241,6 +343,20 @@ async function applyAIGeneratedOnboardingContentInner({
     onApplyStepChange?.(i);
   };
 
+  const formEventId = firstPositiveEventId(
+    globalForm.getValues("stepThree.event_id"),
+    globalForm.getValues("stepFour.event_id"),
+    globalForm.getValues("stepFive.event_id"),
+    globalForm.getValues("stepSix.event_id"),
+    globalForm.getValues("stepSeven.event_id"),
+    globalForm.getValues("stepEight.event_id"),
+    globalForm.getValues("stepNine.event_id"),
+  );
+
+  const staleFaqIds = (globalForm.getValues("stepNine.faqs") ?? [])
+    .map((faq) => Number((faq as { id?: number }).id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+
   // --- Step 1: Basic Venue Info ---
   setStep(0);
   const stepOneData = {
@@ -253,6 +369,7 @@ async function applyAIGeneratedOnboardingContentInner({
     city: venueInput.city,
     domain: "",
     description: venueInput.description || "",
+    isApproved: true,
   };
 
   globalForm.setValue("stepOne", stepOneData);
@@ -276,7 +393,10 @@ async function applyAIGeneratedOnboardingContentInner({
     (await urlToImageFile(images.cover, "cover-image")) ??
     (await createPlaceholderPackageImage(venueInput.venueName));
 
-  const logoFile = await createPlaceholderLogo(venueInput.venueName);
+  const logoFile = ensureFilePreview(
+    await createPlaceholderLogo(venueInput.venueName),
+  );
+  const coverWithPreview = ensureFilePreview(coverFile);
 
   const stepTwoData = {
     step: 2 as const,
@@ -284,8 +404,13 @@ async function applyAIGeneratedOnboardingContentInner({
     banner_sub_heading: editedContent.stepTwo.banner_sub_heading,
     about_title: editedContent.stepTwo.about_title,
     about_description: editedContent.stepTwo.about_description,
+    footer_brand_description:
+      clipFooterBrandDescription(
+        editedContent.stepTwo.footer_brand_description || "",
+      ),
     logo: logoFile,
-    cover_image: coverFile,
+    cover_image: coverWithPreview,
+    isApproved: true,
   };
 
   globalForm.setValue("stepTwo", stepTwoData);
@@ -293,7 +418,45 @@ async function applyAIGeneratedOnboardingContentInner({
   if (!step2Response.status) {
     throw new Error(step2Response.message || "Failed to save landing page");
   }
+  const savedStepTwo = step2Response.data as
+    | { logo?: unknown; cover_image?: unknown; stepTwo?: { logo?: unknown; cover_image?: unknown } }
+    | undefined;
+  const savedLogo =
+    (typeof savedStepTwo?.logo === "string" && savedStepTwo.logo) ||
+    (typeof savedStepTwo?.stepTwo?.logo === "string" &&
+      savedStepTwo.stepTwo.logo) ||
+    null;
+  const savedCover =
+    (typeof savedStepTwo?.cover_image === "string" &&
+      savedStepTwo.cover_image) ||
+    (typeof savedStepTwo?.stepTwo?.cover_image === "string" &&
+      savedStepTwo.stepTwo.cover_image) ||
+    null;
+  if (savedLogo || savedCover) {
+    globalForm.setValue("stepTwo", {
+      ...stepTwoData,
+      ...(savedLogo ? { logo: savedLogo } : {}),
+      ...(savedCover ? { cover_image: savedCover } : {}),
+    });
+  }
   await updateSession({ on_boarding_step: 3 });
+
+  const session = await getSession();
+  const locationIdForPeek = firstPositiveEventId(
+    vendorLocationId,
+    session?.user?.vendor_location_id,
+  );
+  const persistedEventId = locationIdForPeek
+    ? await onboardingService.readPersistedOnboardingEventId(locationIdForPeek)
+    : undefined;
+  // GET is bound to one onboarding event per location. Saving to a newly
+  // created event_id returns success, then GET still echoes the old event
+  // with empty room dates. Always update that persisted id when it exists.
+  const existingEventId = firstPositiveEventId(
+    persistedEventId,
+    formEventId,
+    session?.user?.event_id,
+  );
 
   // --- Step 3: Event Details ---
   setStep(2);
@@ -313,18 +476,33 @@ async function applyAIGeneratedOnboardingContentInner({
     about_event_heading: editedContent.stepThree.about_event_heading,
     about_event_sub_heading: editedContent.stepThree.about_event_sub_heading,
     about_event_description: editedContent.stepThree.about_event_description,
+    isApproved: true,
+    ...(existingEventId ? { event_id: existingEventId } : {}),
   };
 
   globalForm.setValue("stepThree", stepThreeData);
   const step3Response =
     await onboardingService.storeStepThreeData(stepThreeData);
 
-  const eventId =
-    step3Response.data?.event_id || step3Response.data?.id || 0;
+  const createdEventId = firstPositiveEventId(
+    step3Response.data?.event_id,
+    step3Response.data?.id,
+  );
+  const eventId = existingEventId || createdEventId || 0;
   if (!step3Response.status || !eventId) {
     throw new Error(step3Response.message || "Failed to save event details");
   }
-  await updateSession({ on_boarding_step: 4 });
+  if (
+    existingEventId &&
+    createdEventId &&
+    createdEventId !== existingEventId
+  ) {
+    await onboardingService.storeStepThreeData({
+      ...stepThreeData,
+      event_id: existingEventId,
+    });
+  }
+  await updateSession({ on_boarding_step: 4, event_id: eventId });
 
   // --- Step 4: Packages ---
   setStep(3);
@@ -356,11 +534,17 @@ async function applyAIGeneratedOnboardingContentInner({
       editedContent.stepFour.event_schedular,
     ),
     gallery: galleryFiles.slice(0, EVENT_GALLERY_MAX_IMAGES),
+    isApproved: true,
   };
 
   const normalizedRoomNames = normalizeAiRoomNames(venueInput.room_names);
   const useRoomSystem =
     venueInput.has_room_system === true && normalizedRoomNames.length >= 2;
+  if (!useRoomSystem) {
+    // Previous generates may have left is_rooms=1 with empty rooms; wipe them
+    // so later steps save onto the event instead of a dead room payload.
+    await resetVendorRoomsBeforeAiApply();
+  }
   if (typeof window !== "undefined") {
     sessionStorage.setItem(
       "onboarding_is_rooms",
@@ -383,19 +567,7 @@ async function applyAIGeneratedOnboardingContentInner({
     };
   }> = [];
   if (useRoomSystem) {
-    await resetVendorRoomsBeforeAiApply();
-
-    const createdRooms: Array<{ id: number; name: string }> = [];
-    for (const name of normalizedRoomNames) {
-      const created = await roomService.create({ name });
-      if (!created?.status || !created.data?.id) {
-        throw new Error("Failed to create rooms for AI room system");
-      }
-      createdRooms.push({ id: created.data.id, name: created.data.name || name });
-    }
-    if (createdRooms.length < 2) {
-      throw new Error("AI room system requires at least 2 created rooms");
-    }
+    const createdRooms = await syncVendorRoomsForAiApply(normalizedRoomNames);
 
     roomPayloadsForSubmit = createdRooms.map((r) => ({
       id: r.id,
@@ -469,6 +641,7 @@ async function applyAIGeneratedOnboardingContentInner({
     step: 5,
     event_id: eventId,
     dates: formattedDates as StepFiveType["dates"],
+    isApproved: true,
   };
 
   globalForm.setValue("stepFive", stepFiveData);
@@ -488,18 +661,29 @@ async function applyAIGeneratedOnboardingContentInner({
           .trim()
           .toLowerCase();
         const roomSpecificDates = roomStepFiveByName.get(roomNameKey);
+        const dates =
+          Array.isArray(roomSpecificDates) && roomSpecificDates.length > 0
+            ? roomSpecificDates
+            : stepFiveData.dates;
         return {
           ...room,
+          id: resolveVendorRoomId(room),
+          isApprovedDates: true,
           dates: {
-            dates:
-              Array.isArray(roomSpecificDates) && roomSpecificDates.length > 0
-                ? roomSpecificDates
-                : stepFiveData.dates,
+            dates,
           },
         };
       }) as any)
     : [];
   if (useRoomSystem) {
+    const incomplete = step5RoomsPayload.filter((room: { id?: number; dates?: { dates?: unknown[] } }) => {
+      const id = resolveVendorRoomId(room);
+      const dates = Array.isArray(room.dates?.dates) ? room.dates.dates : [];
+      return !Number.isFinite(id) || dates.length === 0;
+    });
+    if (incomplete.length > 0) {
+      throw new Error("Failed to build dates for every event space");
+    }
     globalForm.setValue("multiSpace.rooms", step5RoomsPayload as any);
   }
   const step5Response = useRoomSystem
@@ -518,7 +702,6 @@ async function applyAIGeneratedOnboardingContentInner({
   setStep(5);
   const hasMenus =
     !vendorHints.omitCatering && (editedContent.stepSix?.menus?.length ?? 0) > 0;
-  const menuRemoved = removedSections.has("menu") || vendorHints.omitCatering;
 
   const roomsForMenuCategories = useRoomSystem
     ? (globalForm.getValues("multiSpace")?.rooms ?? [])
@@ -536,30 +719,45 @@ async function applyAIGeneratedOnboardingContentInner({
   const menuCategoryIdByRoomId = new Map<number, number>();
   if (hasMenus && eventId && useRoomSystem) {
     for (const room of roomsForMenuCategories) {
-      const roomId = Number((room as { id?: number }).id);
-      if (!Number.isFinite(roomId) || roomId <= 0) continue;
+      const roomId = toPositiveId((room as { id?: number }).id);
+      if (roomId == null) continue;
       const categoryId = await ensureEventMenuCategoriesForRoom(
         eventId,
         roomId,
         editedContent.stepSix.menus,
       );
-      if (categoryId != null) {
-        menuCategoryIdByRoomId.set(roomId, categoryId);
+      const linkedId = toPositiveId(categoryId);
+      if (linkedId != null) {
+        menuCategoryIdByRoomId.set(roomId, linkedId);
       }
     }
+  }
+
+  // A category MUST exist before menus can be persisted. If category creation
+  // failed (network/backend), do NOT save orphaned menus — degrade catering to
+  // "off" so we never write the broken state the schema now rejects.
+  const primaryCategoryId =
+    toPositiveId(primaryMenuCategoryId) ??
+    toPositiveId(menuCategoryIdByRoomId.values().next().value) ??
+    0;
+  const cateringPersistable = hasMenus && isValidMenuCategoryId(primaryCategoryId);
+  if (hasMenus && !cateringPersistable) {
+    console.warn(
+      "[AI onboarding] Skipping catering: no menu category could be created for the generated menus.",
+    );
   }
 
   const stepSixData = {
     step: 6 as const,
     event_id: eventId,
-    catering_option: (hasMenus ? 1 : 0) as 0 | 1,
-    menu_title: hasMenus ? editedContent.stepSix.menu_title : "",
-    menu_description: hasMenus ? editedContent.stepSix.menu_description : "",
-    event_menu_category_id:
-      primaryMenuCategoryId ??
-      menuCategoryIdByRoomId.values().next().value ??
-      0,
-    menus: hasMenus ? editedContent.stepSix.menus : [],
+    catering_option: (cateringPersistable ? 1 : 0) as 0 | 1,
+    menu_title: cateringPersistable ? editedContent.stepSix.menu_title : "",
+    menu_description: cateringPersistable
+      ? editedContent.stepSix.menu_description
+      : "",
+    event_menu_category_id: cateringPersistable ? primaryCategoryId : 0,
+    menus: cateringPersistable ? editedContent.stepSix.menus : [],
+    isApproved: true,
   };
   globalForm.setValue("stepSix", stepSixData);
   const roomStepSixByName = useRoomSystem
@@ -586,9 +784,8 @@ async function applyAIGeneratedOnboardingContentInner({
             menu_description:
               room.menu_description ?? stepSixData.menu_description,
             event_menu_category_id:
-              typeof room.event_menu_category_id === "number"
-                ? room.event_menu_category_id
-                : stepSixData.event_menu_category_id,
+              toPositiveId(room.event_menu_category_id) ??
+              stepSixData.event_menu_category_id,
             menus: Array.isArray(room.menus) ? room.menus : stepSixData.menus,
           },
         ]) ?? [],
@@ -603,57 +800,75 @@ async function applyAIGeneratedOnboardingContentInner({
           menus: StepSixType["menus"];
         }
       >();
-  if (!menuRemoved && hasMenus) {
-    const step6RoomsPayload = useRoomSystem
-      ? ((globalForm.getValues("multiSpace")?.rooms ?? []).map((room) => {
-          const roomNameKey = String((room as { name?: string }).name ?? "")
-            .trim()
-            .toLowerCase();
-          const roomSpecific = roomStepSixByName.get(roomNameKey);
-          const roomId = Number((room as { id?: number }).id);
-          const roomMenuCategoryId =
-            Number.isFinite(roomId) && roomId > 0
-              ? menuCategoryIdByRoomId.get(roomId)
-              : undefined;
-          const cateringBase = roomSpecific ?? {
-            catering_option: stepSixData.catering_option,
-            menu_title: stepSixData.menu_title,
-            menu_description: stepSixData.menu_description,
-            event_menu_category_id: stepSixData.event_menu_category_id,
-            menus: stepSixData.menus,
-          };
-          return {
-            ...room,
-            catering: {
-              ...cateringBase,
-              event_menu_category_id:
-                roomMenuCategoryId ?? cateringBase.event_menu_category_id,
-            },
-          };
-        }) as any)
-      : [];
-    if (useRoomSystem) {
-      globalForm.setValue("multiSpace.rooms", step6RoomsPayload as any);
-    }
-    const step6Response = useRoomSystem
-      ? await onboardingService.storeStepSixRoomsData({
-          event_id: eventId,
-          rooms: step6RoomsPayload,
-          isApproved: true,
-        })
-      : await onboardingService.storeStepSixData(stepSixData);
-    if (!step6Response.status) {
-      throw new Error(step6Response.message || "Failed to save catering & menu");
-    }
-    await updateSession({ on_boarding_step: 7 });
-  } else {
-    await updateSession({ on_boarding_step: 7 });
+  const step6RoomsPayload = useRoomSystem
+    ? ((globalForm.getValues("multiSpace")?.rooms ?? []).map((room) => {
+        const roomNameKey = String((room as { name?: string }).name ?? "")
+          .trim()
+          .toLowerCase();
+        const roomSpecific = roomStepSixByName.get(roomNameKey);
+        const roomId = toPositiveId((room as { id?: number }).id);
+        const roomMenuCategoryId =
+          roomId != null ? menuCategoryIdByRoomId.get(roomId) : undefined;
+        const cateringBase = roomSpecific ?? {
+          catering_option: stepSixData.catering_option,
+          menu_title: stepSixData.menu_title,
+          menu_description: stepSixData.menu_description,
+          event_menu_category_id: stepSixData.event_menu_category_id,
+          menus: stepSixData.menus,
+        };
+        const roomCategoryId = toPositiveId(
+          roomMenuCategoryId ?? cateringBase.event_menu_category_id,
+        );
+        // Same rule per room: only keep catering when this room has a real
+        // category. Otherwise store it as "off" so no orphaned menus are saved.
+        const roomCateringPersistable =
+          cateringBase.catering_option === 1 &&
+          Array.isArray(cateringBase.menus) &&
+          cateringBase.menus.length > 0 &&
+          isValidMenuCategoryId(roomCategoryId);
+        return {
+          ...room,
+          catering: {
+            ...cateringBase,
+            catering_option: (roomCateringPersistable ? 1 : 0) as 0 | 1,
+            menu_title: roomCateringPersistable ? cateringBase.menu_title : "",
+            menu_description: roomCateringPersistable
+              ? cateringBase.menu_description
+              : "",
+            event_menu_category_id: roomCateringPersistable ? roomCategoryId : 0,
+            menus: roomCateringPersistable ? cateringBase.menus : [],
+          },
+        };
+      }) as any)
+    : [];
+  if (useRoomSystem) {
+    globalForm.setValue("multiSpace.rooms", step6RoomsPayload as any);
   }
+  const step6Response = useRoomSystem
+    ? await onboardingService.storeStepSixRoomsData({
+        event_id: eventId,
+        rooms: step6RoomsPayload,
+        isApproved: true,
+      })
+    : await onboardingService.storeStepSixData(stepSixData);
+  if (!step6Response.status) {
+    throw new Error(step6Response.message || "Failed to save catering & menu");
+  }
+  await updateSession({ on_boarding_step: 7 });
 
   // --- Step 7: Brochure, location & pricing ---
   setStep(6);
-  const brochureEventAddress = brochureSource.event_address ?? venueInput.address;
-  const brochurePriceStartFrom = brochureSource.price_start_from ?? "";
+  const brochureEventAddress =
+    String(brochureSource.event_address ?? "").trim() ||
+    venueInput.address ||
+    venueInput.city;
+  const brochurePriceStartFrom = minPriceStartFrom(
+    formattedDates as Array<{
+      tickets?: Array<{ price?: unknown }>;
+      tables?: Array<{ price?: unknown }>;
+    }>,
+    brochureSource.price_start_from ?? "",
+  );
   const brochureLatitude =
     typeof brochureSource.latitude === "number"
       ? brochureSource.latitude
@@ -682,6 +897,7 @@ async function applyAIGeneratedOnboardingContentInner({
     faq_pdf: null,
     downloads: [],
     more_info: [],
+    isApproved: true,
   };
   globalForm.setValue("stepSeven", stepSevenData);
 
@@ -749,18 +965,16 @@ async function applyAIGeneratedOnboardingContentInner({
             available_quantity: 100,
           },
         ];
-  const hasDrinkPackages = resolvedDrinkPackages.length > 0;
-  const drinksRemoved = removedSections.has("drinks") || vendorHints.omitDrinks;
   const stepEightData = {
     step: 8 as const,
     event_id: eventId,
     drink_title: drinksSource.drink_title ?? "",
     drink_description: drinksSource.drink_description ?? "",
     packages: resolvedDrinkPackages,
+    isApproved: true,
   };
   globalForm.setValue("stepEight", stepEightData);
-  if (!drinksRemoved && hasDrinkPackages) {
-    const roomDrinksByName = useRoomSystem
+  const roomDrinksByName = useRoomSystem
       ? new Map(
           (drinksSource.rooms ?? []).map((room) => [
             String(room.room_name ?? "").trim().toLowerCase(),
@@ -804,9 +1018,7 @@ async function applyAIGeneratedOnboardingContentInner({
       useRoomSystem &&
       Array.isArray(step8RoomsPayload) &&
       step8RoomsPayload.some(
-        (room) =>
-          Number.isFinite(Number((room as { id?: number }).id)) &&
-          Number((room as { id?: number }).id) > 0,
+        (room) => Number.isFinite(resolveVendorRoomId(room)),
       );
     if (useRoomSystem) {
       globalForm.setValue("multiSpace.rooms", step8RoomsPayload as any);
@@ -822,9 +1034,6 @@ async function applyAIGeneratedOnboardingContentInner({
       throw new Error(step8Response.message || "Failed to save drink packages");
     }
     await updateSession({ on_boarding_step: 9 });
-  } else {
-    await updateSession({ on_boarding_step: 9 });
-  }
 
   // --- Step 9: FAQs ---
   setStep(8);
@@ -832,6 +1041,8 @@ async function applyAIGeneratedOnboardingContentInner({
     step: 9,
     event_id: eventId,
     faqs: (editedContent.stepNine?.faqs ?? []).slice(0, STEP_NINE_MAX_FAQS),
+    isApproved: true,
+    ...(staleFaqIds.length > 0 ? { deleted_faq_ids: staleFaqIds } : {}),
   };
 
   globalForm.setValue("stepNine", stepNineData);

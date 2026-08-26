@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { UseFormReturn } from "react-hook-form";
 import { StepOneType } from "../../../form-provider/schema";
-import { cityFromGoogleAddressComponents } from "../../step-7/address-autocomplete";
+import { cityFromGooglePlace } from "../../step-7/address-autocomplete";
 
 export const fetchPlaceDetails = (
   form: UseFormReturn<StepOneType>,
@@ -54,8 +54,10 @@ export const fetchPlaceDetails = (
         shouldValidate: true,
       });
 
-      // Extract city from address components if available
-      const city = cityFromGoogleAddressComponents(place.address_components);
+      const city = cityFromGooglePlace({
+        address_components: place.address_components,
+        formatted_address: place.formatted_address,
+      });
       if (city) {
         form.setValue("city", city, {
           shouldValidate: true,

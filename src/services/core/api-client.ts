@@ -191,6 +191,8 @@ export interface ApiResponse<T = unknown> {
 
 export interface RequestOptions extends AxiosRequestConfig {
   returnFullResponse?: boolean;
+  /** Return the AxiosResponse (blob downloads need Content-Disposition). */
+  returnAxiosResponse?: boolean;
   /** Skip global error toasts — caller shows inline validation instead. */
   suppressErrorToast?: boolean;
   /** Skip global success toasts — used for silent checkout cart saves on Pay. */
@@ -718,6 +720,15 @@ apiClient.interceptors.response.use(
 export const request = async <T>(config: RequestOptions): Promise<T> => {
   try {
     const response = await apiClient.request<ApiResponse<T> | T>(config);
+
+    if (config.returnAxiosResponse) {
+      return response as unknown as T;
+    }
+
+    // Blob downloads are raw files, not `{ status, data }` envelopes
+    if (config.responseType === "blob") {
+      return response.data as T;
+    }
 
     // Return full response or just data based on options
     if (config.returnFullResponse) {

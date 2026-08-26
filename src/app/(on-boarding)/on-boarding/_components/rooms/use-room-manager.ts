@@ -103,6 +103,10 @@ export const isRoomSectionComplete = (
     if (!catering) return false;
     const option = Number(catering.catering_option ?? 0);
     if (option === 0) return true;
+    // A menu category must exist before menus count as complete — menus without
+    // a created category cannot be saved (see stepSixSchema enforcement).
+    const categoryId = Number(catering.event_menu_category_id ?? 0);
+    if (!Number.isFinite(categoryId) || categoryId < 1) return false;
     return Array.isArray(catering.menus) && catering.menus.length > 0;
   }
 

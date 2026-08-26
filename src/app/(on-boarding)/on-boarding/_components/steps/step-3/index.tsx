@@ -209,7 +209,12 @@ export default function StepThree() {
         id: "event-hero",
         label: "Banner",
         description: "Cover image or video and banner headings.",
-        fields: ["event_banner_heading", "event_banner_sub_heading"],
+        fields: [
+          "event_banner_heading",
+          "event_banner_sub_heading",
+          "event_banner_image",
+          "event_banner_video",
+        ],
         validate: async () => {
           const img = form.getValues("event_banner_image");
           const vid = form.getValues("event_banner_video");
@@ -436,9 +441,7 @@ export default function StepThree() {
         : 0;
 
       if (storedEventId) {
-        // Add event_id to data if available
-        (data as StepThreeType & { event_id?: number }).event_id =
-          storedEventId;
+        data.event_id = storedEventId;
       }
 
       // Validate header banner with user-friendly error
@@ -1284,6 +1287,7 @@ export default function StepThree() {
               <GuidedMultiSectionBottomActions
                 onApproveAll={guided.handleApproveAllSections}
                 allSectionsApproved={guided.allSectionsApproved}
+                hasInput={guided.currentSectionHasInput}
                 loading={loading}
                 onContinue={() => void handleContinue()}
                 className="order-4"

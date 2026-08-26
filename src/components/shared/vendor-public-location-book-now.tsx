@@ -271,14 +271,12 @@ export function VendorPublicLocationBookNow({
   }
 
   /**
-   * Only gate the label behind the `@md/preview` container query when a device
-   * frame actually provides that container. Full-page `/preview/site` has no
-   * `@container/preview`, so the query never matches and the label would stay
-   * hidden (icon-only) — diverging from the live site, which shows "Locations".
+   * Preview frames: show the "Locations" label only when the panel is as wide
+   * as viewport `xl` (`@7xl/preview` = 1280px). `@md/preview` is only 448px.
    */
   const locationsLabelClass =
     isPreviewMode && deviceFramesEnabled
-      ? "hidden @md/preview:inline"
+      ? "hidden @7xl/preview:inline"
       : "inline";
 
   const bookNowPillClass = cn(

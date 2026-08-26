@@ -10,6 +10,7 @@ import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 interface AIOnboardingFlowProps {
   onComplete: () => void;
   onSwitchToManual: () => void;
+  onBackToMode: () => void;
   /** From GET persistence: `null` = never set → show location gate; `true`/`false` = skip gate. */
   persistedHasMultipleLocations: boolean | null;
   /** From GET persistence: `null` = unknown; otherwise pre-lock room-system choice. */
@@ -21,6 +22,7 @@ interface AIOnboardingFlowProps {
 export default function AIOnboardingFlow({
   onComplete,
   onSwitchToManual,
+  onBackToMode,
   persistedHasMultipleLocations,
   persistedHasRoomSystem,
   persistedRoomNames,
@@ -86,6 +88,7 @@ export default function AIOnboardingFlow({
             <AICollectInfo
               onSubmit={handleCollectComplete}
               onSwitchToManual={onSwitchToManual}
+              onBackToMode={onBackToMode}
               isLoading={isGenerating}
               initialData={venueInput}
               persistedHasMultipleLocations={persistedHasMultipleLocations}

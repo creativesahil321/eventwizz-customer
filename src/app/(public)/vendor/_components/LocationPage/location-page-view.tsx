@@ -18,7 +18,9 @@ import {
   resolvePublicPageContact,
   type VenueContactOverride,
 } from "@/lib/resolve-venue-contact";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { ServerContext } from "@/lib/server-context";
+import { useIsPreviewMode } from "@/contexts/preview-context";
 import CommonHeader from "@/components/shared/common-header";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import HeroBanner from "../EventListPage/hero-banner";
@@ -45,6 +47,7 @@ type LocationPageViewProps = {
     | "banner_heading_align"
     | "banner_heading_valign"
     | "typography"
+    | "footer_brand_description"
   > | null;
   headerVariant?: "default" | "preview";
   /** Override logo (Site Essentials / onboarding draft). */
@@ -93,6 +96,8 @@ export function LocationPageView({
   footerBrandDescription,
 }: LocationPageViewProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
+  const isPreviewMode = useIsPreviewMode();
+  const liveTheme = theme as ThemeSchema | null;
   const latestEvents = locationData.latest_events || [];
   const upcomingEvents = locationData.upcoming_events || [];
   const heroContact = useMemo(
@@ -222,6 +227,7 @@ export function LocationPageView({
             eyebrow={locationData.city || cityLabel || null}
             heroContact={{
               address: heroContact.address,
+              email: heroContact.email,
               phone: heroContact.phone,
             }}
             heroFooter={searchBar}
@@ -263,7 +269,12 @@ export function LocationPageView({
         contactTheme={footerContactTheme}
         socialLinksOverride={footerSocialLinksOverride}
         brandDescription={
-          footerBrandDescription ?? locationData.about_description
+          firstFooterBrandDescription(
+            footerBrandDescription,
+            settings?.footer_brand_description,
+            locationData.footer_brand_description,
+            isPreviewMode ? null : liveTheme?.footer_brand_description,
+          )
         }
       />
     </>

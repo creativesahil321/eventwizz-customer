@@ -7,6 +7,7 @@ import { normalizeSlug } from "@/lib/utils";
 import {
   consumePendingBooking,
   peekPendingBooking,
+  pendingBookingDates,
 } from "@/lib/booking/pending-booking";
 
 /**
@@ -36,16 +37,19 @@ export function useResumePendingBooking(enabled: boolean) {
 
     void (async () => {
       try {
-        await cartService.storeEventBooking({
-          slug: normalizeSlug(pending.event_slug),
-          event_date: pending.event_date,
-          ...(pending.room_id != null && pending.room_id > 0
-            ? { room_id: pending.room_id }
-            : {}),
-          drink_package: [],
-          tables: [],
-          tickets: [],
-        });
+        const dates = pendingBookingDates(pending);
+        for (const eventDate of dates) {
+          await cartService.storeEventBooking({
+            slug: normalizeSlug(pending.event_slug),
+            event_date: eventDate,
+            ...(pending.room_id != null && pending.room_id > 0
+              ? { room_id: pending.room_id }
+              : {}),
+            drink_package: [],
+            tables: [],
+            tickets: [],
+          });
+        }
         consumePendingBooking();
         await queryClient.invalidateQueries({ queryKey: ["cart-data"] });
       } catch (error) {

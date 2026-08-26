@@ -92,6 +92,13 @@ export async function applyImportedWebsite(
     bump(setIfPresent(form, "banner_sub_heading", content.banner_sub_heading));
     bump(setIfPresent(form, "about_title", content.about_title));
     bump(setIfPresent(form, "about_description", content.about_description));
+    bump(
+      setIfPresent(
+        form,
+        "footer_brand_description",
+        content.footer_brand_description,
+      ),
+    );
     bump(setIfPresent(form, "event_title_1", content.event_title_1));
     bump(setIfPresent(form, "event_title_2", content.event_title_2));
     bump(setIfPresent(form, "event_gallery_title", content.event_gallery_title));

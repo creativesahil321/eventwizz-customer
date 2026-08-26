@@ -26,7 +26,7 @@ export default function AboutEventSec({
   aboutHeadingAccentHint,
 }: AboutEventSecProps) {
   const defaultDescription =
-    "<p>If you are looking for a great ladies fun night out, with all the entertainment, Cosmopolitan reception drink, prosecco, three-course dinner and dancing till 1am, then you need look no further! Stock Brook Country Club has the perfect answer for a great night out with the girls.</p><p>Check out the latest dates to be released, but get in quick as these dates will soon go!!</p>";
+    "<p>Tell guests what makes this event special — the atmosphere, what’s included, and why they should book.</p><p>Add the latest dates, then keep this section short so people can scan it quickly.</p>";
 
   return (
     <section className="w-full bg-[color:var(--color-background)] py-20 md:py-28">

@@ -37,7 +37,9 @@ export function useCheckoutAuth() {
 
     if (!isAuthenticated) {
       const currentUrl = window.location.href;
-      saveAuthCallbackUrl("/vendor/checkout");
+      saveAuthCallbackUrl(
+        `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      );
       router.push(`/auth/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
       return;
     }

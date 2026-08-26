@@ -8,10 +8,7 @@ import { CalendarDays, Loader2, MapPin, SearchX } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ServerContext } from "@/lib/server-context";
-import {
-  formatMoneyCompact,
-  resolveCurrencySymbol,
-} from "@/lib/currency-format";
+import { resolveCurrencySymbol } from "@/lib/currency-format";
 import { cn } from "@/lib/utils";
 import { savePendingBooking } from "@/lib/booking/pending-booking";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
@@ -27,6 +24,7 @@ import type {
 import type { LocationSearchFilters } from "./_lib/search-filters";
 import { LocationEventCard } from "../EventListPage/location-event-card";
 import {
+  formatEventListingPrice,
   getEventCardDateLabel,
   getEventCardTimeLabel,
 } from "../EventListPage/event-card-utils";
@@ -267,10 +265,7 @@ export function PublicSearchResults({
                 slot.date,
                 slot.room?.room_id ?? "na",
               ].join(":");
-              const price =
-                slot.price != null && !Number.isNaN(Number(slot.price))
-                  ? formatMoneyCompact(Number(slot.price), currencySym)
-                  : null;
+              const price = formatEventListingPrice(slot.price, currencySym);
               const isBusy = pendingKey === key;
 
               return (
@@ -331,11 +326,10 @@ export function PublicSearchResults({
           <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 md:gap-5 xl:grid-cols-4">
             {eventResults.map((item) => {
               const event = item.event;
-              const price =
-                event.lowest_price != null &&
-                !Number.isNaN(Number(event.lowest_price))
-                  ? formatMoneyCompact(Number(event.lowest_price), currencySym)
-                  : null;
+              const price = formatEventListingPrice(
+                event.lowest_price,
+                currencySym,
+              );
               const dateLabel = getEventCardDateLabel(event);
               const cardKey = `${item.location.slug}:${event.slug}`;
 

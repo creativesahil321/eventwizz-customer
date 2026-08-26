@@ -27,15 +27,53 @@ export function cityFromGoogleAddressComponents(
   );
 }
 
+/** Fallback when Places omits locality (common on UK street addresses). */
+const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/gi;
+const US_ZIP = /\b\d{5}(?:-\d{4})?\b/g;
+
+export function cityFromFormattedAddress(
+  address: string | null | undefined,
+): string | null {
+  if (!address?.trim()) return null;
+  const parts = address
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+
+  const withoutCountry = parts.slice(0, -1);
+  for (let i = withoutCountry.length - 1; i >= 0; i--) {
+    const city = withoutCountry[i]
+      .replace(UK_POSTCODE, "")
+      .replace(US_ZIP, "")
+      .trim()
+      .replace(/^[-,]+|[-,]+$/g, "")
+      .trim();
+    if (city.length >= 2 && !/^\d+$/.test(city)) return city;
+  }
+  return null;
+}
+
+export function cityFromGooglePlace(place: {
+  address_components?: google.maps.GeocoderAddressComponent[];
+  formatted_address?: string | null;
+}): string | null {
+  return (
+    cityFromGoogleAddressComponents(place.address_components) ||
+    cityFromFormattedAddress(place.formatted_address)
+  );
+}
+
 interface AddressAutocompleteProps {
   value: string;
   onChange: (address: string) => void;
   onSelect?: (placeId: string, address: string) => void;
-  /** Extra place bits (city) after Google details resolve. */
+  /** Extra place bits after Google details resolve. Phone is only set for business listings. */
   onResolved?: (details: {
     placeId: string;
     address: string;
     city: string | null;
+    phone: string | null;
   }) => void;
   onFocus?: () => void;
   placeholder?: string;
@@ -49,6 +87,11 @@ interface AddressAutocompleteProps {
   variant?: "default" | "dark";
   noResultsMessage?: string;
   unavailableMessage?: string;
+  /**
+   * Include businesses in suggestions (not only street addresses).
+   * Needed to pick up a phone number from Google Place Details.
+   */
+  includeEstablishments?: boolean;
 }
 
 const AddressAutocomplete = forwardRef<
@@ -69,6 +112,7 @@ const AddressAutocomplete = forwardRef<
     variant = "default",
     noResultsMessage,
     unavailableMessage,
+    includeEstablishments = false,
   },
   ref,
 ) {
@@ -205,7 +249,7 @@ const AddressAutocomplete = forwardRef<
         autocompleteService.current.getPlacePredictions(
           {
             input: inputValue,
-            types: ["geocode"],
+            ...(includeEstablishments ? {} : { types: ["geocode"] }),
             componentRestrictions: { country: ["gb"] },
           },
           (predictions, status) => {
@@ -251,12 +295,17 @@ const AddressAutocomplete = forwardRef<
     setIsSelected(true);
 
     if (onSelect || onResolved) {
-      const finish = (address: string, city: string | null) => {
+      const finish = (
+        address: string,
+        city: string | null,
+        phone: string | null = null,
+      ) => {
         onSelect?.(suggestion.place_id, address);
         onResolved?.({
           placeId: suggestion.place_id,
           address,
           city,
+          phone,
         });
       };
 
@@ -264,16 +313,30 @@ const AddressAutocomplete = forwardRef<
         placesService.current.getDetails(
           {
             placeId: suggestion.place_id,
-            fields: ["formatted_address", "geometry", "address_components"],
+            fields: [
+              "formatted_address",
+              "geometry",
+              "address_components",
+              "formatted_phone_number",
+              "international_phone_number",
+            ],
           },
           (place, status) => {
             if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+              const phone =
+                place.international_phone_number?.trim() ||
+                place.formatted_phone_number?.trim() ||
+                null;
               finish(
                 place.formatted_address || suggestion.description,
-                cityFromGoogleAddressComponents(place.address_components),
+                cityFromGooglePlace({
+                  address_components: place.address_components,
+                  formatted_address: place.formatted_address,
+                }),
+                phone,
               );
             } else {
-              finish(suggestion.description, null);
+              finish(suggestion.description, null, null);
             }
           },
         );
@@ -300,7 +363,7 @@ const AddressAutocomplete = forwardRef<
         autocompleteService.current.getPlacePredictions(
           {
             input: value,
-            types: ["geocode"],
+            ...(includeEstablishments ? {} : { types: ["geocode"] }),
             componentRestrictions: { country: ["gb"] },
           },
           (predictions, status) => {

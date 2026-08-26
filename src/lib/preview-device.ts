@@ -49,5 +49,5 @@ export const PREVIEW_DEVICE_ORDER: PreviewDeviceId[] = [
 
 export const DEFAULT_PREVIEW_DEVICE: PreviewDeviceId = "desktop";
 
-/** Named CSS container — pair with `@lg/preview:` / `@container/header` in chrome. */
+/** Named CSS container — pair with `@5xl/preview:` (1024px) / `@7xl/preview:` (1280px). */
 export const PREVIEW_CONTAINER_CLASS = "@container/preview";

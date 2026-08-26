@@ -155,6 +155,17 @@ function resolveStepFiveEventDate(
   return String(raw ?? "").trim();
 }
 
+function readRoomStepFiveDates(
+  room: RoomType,
+): StepFiveType["dates"] {
+  const nested = room.dates?.dates;
+  if (Array.isArray(nested)) return nested as StepFiveType["dates"];
+  if (Array.isArray(room.dates)) {
+    return room.dates as unknown as StepFiveType["dates"];
+  }
+  return [];
+}
+
 function normalizeStepFiveDatePayload(
   date: StepFiveType["dates"][number],
 ): Record<string, unknown> {
@@ -248,6 +259,64 @@ export const onboardingService = {
     }
 
     return 1;
+  },
+
+  /**
+   * Event id the persistence GET is bound to for this location.
+   * Step saves to a different event_id succeed but GET still returns this one
+   * (empty room dates) — AI apply must write to this id.
+   */
+  readPersistedOnboardingEventId: async (
+    locationId: number,
+  ): Promise<number | undefined> => {
+    if (!Number.isFinite(locationId) || locationId <= 0) return undefined;
+
+    const headers = {
+      "X-Venue-Location-Id": String(locationId),
+    };
+
+    const fetchOnce = async (isRooms: boolean) => {
+      const response = await request<ApiResponse>({
+        url: API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
+          "{location_id}",
+          String(locationId),
+        ).replace("{is_rooms}", isRooms ? "true" : "false"),
+        method: "GET",
+        headers,
+        returnFullResponse: true,
+      });
+      if (!response?.status) return null;
+      return response.data ?? null;
+    };
+
+    const payload =
+      (await fetchOnce(true).catch(() => null)) ||
+      (await fetchOnce(false).catch(() => null));
+    if (!payload || typeof payload !== "object") return undefined;
+
+    const root = payload as Record<string, unknown>;
+    const nested =
+      root.data && typeof root.data === "object"
+        ? (root.data as Record<string, unknown>)
+        : root;
+
+    for (const key of [
+      "stepThree",
+      "stepFour",
+      "stepFive",
+      "stepSix",
+      "stepSeven",
+      "stepEight",
+      "stepNine",
+      "stepTen",
+      "stepEleven",
+    ]) {
+      const step = nested[key];
+      if (!step || typeof step !== "object") continue;
+      const id = Number((step as { event_id?: unknown }).event_id);
+      if (Number.isFinite(id) && id > 0) return id;
+    }
+    return undefined;
   },
 
   saveStep: async (
@@ -369,6 +438,10 @@ export const onboardingService = {
     formData.append("banner_sub_heading", data.banner_sub_heading);
     formData.append("about_title", data.about_title);
     formData.append("about_description", data.about_description);
+    formData.append(
+      "footer_brand_description",
+      data.footer_brand_description ?? "",
+    );
 
     // Add logo and cover_image if they exist
     // Check for both File and Blob (cropped images might be Blob)
@@ -439,6 +512,10 @@ export const onboardingService = {
     // Add only the necessary fields as specified
     formData.append("step", "3");
     formData.append("vendor_location_id", vendorLocationId);
+    const existingEventId = Number(data.event_id);
+    if (Number.isFinite(existingEventId) && existingEventId > 0) {
+      formData.append("event_id", String(existingEventId));
+    }
     formData.append("event_category_id", data.event_category_id.toString());
     formData.append("event_name", data.event_name || "");
 
@@ -620,6 +697,10 @@ export const onboardingService = {
         formData.append(`rooms[${key}][package_description]`, "");
       }
       formData.append(
+        `rooms[${key}][package_button_name]`,
+        p.package_button_name ?? "",
+      );
+      formData.append(
         `rooms[${key}][event_schedular_title]`,
         p.event_schedular_title ?? "",
       );
@@ -757,6 +838,7 @@ export const onboardingService = {
       {
         step: data.step,
         event_id: data.event_id,
+        is_rooms: 0,
         dates: formattedDates,
       },
       data.isApproved,
@@ -790,13 +872,19 @@ export const onboardingService = {
     isApproved?: boolean;
   }): Promise<ApiResponse> => {
     const roomBlocks = payload.rooms
-      .filter((room) => Number.isFinite(Number(room.id)) && Number(room.id) > 0)
-      .map((room) => ({
-        room_id: Number(room.id),
-        dates: ((room.dates?.dates ?? []) as StepFiveType["dates"])
-          .filter((date) => resolveStepFiveEventDate(date).length > 0)
-          .map(normalizeStepFiveDatePayload),
-      }));
+      .map((room) => {
+        const roomId = Number(
+          room.id ?? (room as { room_id?: unknown }).room_id,
+        );
+        if (!Number.isFinite(roomId) || roomId <= 0) return null;
+        return {
+          room_id: roomId,
+          dates: readRoomStepFiveDates(room)
+            .filter((date) => resolveStepFiveEventDate(date).length > 0)
+            .map(normalizeStepFiveDatePayload),
+        };
+      })
+      .filter((block): block is NonNullable<typeof block> => block !== null);
 
     const firstDate = roomBlocks[0]?.dates?.[0] as
       | { booking_type?: "tickets" | "tables" | "both" }
@@ -853,7 +941,7 @@ export const onboardingService = {
       data.menus?.forEach((menu, menuIndex) => {
         formData.append(`menus[${menuIndex}][name]`, menu.name);
 
-        menu.items.forEach((item, itemIndex) => {
+        (menu.items ?? []).forEach((item, itemIndex) => {
           formData.append(
             `menus[${menuIndex}][items][${itemIndex}][title]`,
             item.title
@@ -1118,12 +1206,10 @@ export const onboardingService = {
         );
       }
 
-      if (brochure.price_start_from) {
-        formData.append(
-          `rooms[${roomIndex}][price_start_from]`,
-          String(brochure.price_start_from),
-        );
-      }
+      formData.append(
+        `rooms[${roomIndex}][price_start_from]`,
+        String(brochure.price_start_from ?? ""),
+      );
 
       if (brochure.remove_brochure_pdf) {
         formData.append(`rooms[${roomIndex}][remove_brochure_pdf]`, "true");
@@ -1583,9 +1669,13 @@ export const onboardingService = {
    * `useOnboardingData` listening for `onboarding-data-changed`).
    */
   notifyDataChanged: async (): Promise<void> => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("onboarding-data-changed"));
-    }
+    if (typeof window === "undefined") return;
+    const { isAIBulkApplyInProgress } = await import(
+      "@/app/(on-boarding)/on-boarding/_lib/ai-bulk-apply-session-flag"
+    );
+    // Mid-apply GET resets the form to leftover event data (e.g. a previous venue).
+    if (isAIBulkApplyInProgress()) return;
+    window.dispatchEvent(new CustomEvent("onboarding-data-changed"));
   },
 
   /**

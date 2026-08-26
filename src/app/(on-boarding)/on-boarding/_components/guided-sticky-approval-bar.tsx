@@ -10,6 +10,7 @@ export type GuidedActionsSlice = {
   currentSectionIndex: number;
   sectionFlow: readonly { id: string }[];
   approvedSections: Set<string>;
+  currentSectionHasInput: boolean;
   handleApproveSection: () => void | Promise<void>;
   handleChipClick: (index: number) => void;
 };
@@ -154,10 +155,14 @@ export function GuidedWholeStepApproveButton({
   guided,
   sectionId,
 }: {
-  guided: Pick<GuidedActionsSlice, "approvedSections" | "handleApproveSection">;
+  guided: Pick<
+    GuidedActionsSlice,
+    "approvedSections" | "handleApproveSection" | "currentSectionHasInput"
+  >;
   sectionId: string;
 }) {
   if (guided.approvedSections.has(sectionId)) return null;
+  if (!guided.currentSectionHasInput) return null;
   return (
     <Button
       type="button"
@@ -181,6 +186,8 @@ export function GuidedSectionCoreActions({ guided }: CoreActionsProps) {
   const approved =
     !!guided.currentSection &&
     guided.approvedSections.has(guided.currentSection.id);
+
+  if (!approved && !guided.currentSectionHasInput) return null;
 
   return (
     <div className="inline-flex max-w-full flex-none flex-row flex-nowrap items-center gap-3">

@@ -234,7 +234,7 @@ function SiteEssentialsFormInner() {
     const errorsByTab: Record<string, boolean> = {};
 
     // Check for errors in Branding tab fields
-    if (errors.logo || errors.favicon || errors.copyright) {
+    if (errors.logo || errors.favicon || errors.copyright || errors.footer_brand_description) {
       errorsByTab.branding = true;
     }
 
@@ -596,6 +596,16 @@ function SiteEssentialsFormInner() {
                     typeof siteEssentials?.main_landing_cover_image ===
                     "string"
                       ? siteEssentials.main_landing_cover_image
+                      : undefined
+                  }
+                  serverLogo={
+                    typeof siteEssentials?.logo === "string"
+                      ? siteEssentials.logo
+                      : undefined
+                  }
+                  serverFavicon={
+                    typeof siteEssentials?.favicon === "string"
+                      ? siteEssentials.favicon
                       : undefined
                   }
                 />

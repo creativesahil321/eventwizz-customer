@@ -30,6 +30,7 @@ import { handleUrlErrorParams } from "@/lib/auth/url-utils";
 import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
 import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link";
 import { AuthLegalNotice } from "@/app/(auth)/_components/auth-legal-notice";
+import { clearOnboardingBrowserState } from "@/lib/clear-vendor-browser-session";
 
 export default function LoginForm() {
   const [loading, setLoading] = React.useState(false);
@@ -77,6 +78,8 @@ export default function LoginForm() {
       }
 
       if (response.data.token) {
+        clearOnboardingBrowserState();
+
         // Store auth data in Zustand
         const store = useAuthStore.getState();
         const account_type = (response.data.account_type ||

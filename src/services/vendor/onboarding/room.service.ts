@@ -17,17 +17,20 @@ function fillRoomId(url: string, roomId: number | string): string {
  * The single-room onboarding service in `onboarding.service.ts` is left untouched. When the
  * vendor opts into multiple event spaces on Step 4, the wizard switches to the methods below:
  *
- *  - {@link roomService.setMultiSpaceEnabled} — flips the vendor-level flag.
  *  - {@link roomService.create} / {@link roomService.update} / {@link roomService.remove} —
  *    manage the rooms list (max 3 enforced client-side; backend should enforce too).
  *  - `storeRoom*Data` — mirrors `storeStepFour…SevenData` but routes to a room-scoped endpoint
  *    so the same form payload is persisted against `room_id`.
  *
+ * Multi-space on/off is not a dedicated route. The backend infers it from room
+ * records plus `is_rooms` on GET `/vendor/onboarding/steps/{location_id}/{is_rooms}`
+ * and on each step store payload.
+ *
  * Backend contract expected (mirrors existing onboarding store):
- *   POST /vendor/onboarding/rooms                 { name }                  -> { id, name }
- *   PATCH /vendor/onboarding/rooms/{room_id}      { name }
- *   DELETE /vendor/onboarding/rooms/{room_id}
- *   POST /vendor/onboarding/rooms/multi-space     { enabled: boolean }
+ *   GET  /vendor/rooms
+ *   POST /vendor/rooms/store                      { name }                  -> { id, name }
+ *   PUT  /vendor/rooms/{room_id}                  { name }
+ *   DELETE /vendor/rooms/{room_id}
  *   POST /vendor/onboarding/rooms/{room_id}/store FormData (step + room data)
  */
 
@@ -89,14 +92,6 @@ export const roomService = {
     return api.get<VendorRoomsListResponse>(API_ENDPOINTS.VENDOR.ROOMS, {
       returnFullResponse: true,
     });
-  },
-
-  setMultiSpaceEnabled: async (enabled: boolean): Promise<ApiResponse> => {
-    return api.post<ApiResponse>(
-      API_ENDPOINTS.VENDOR.ONBOARDING.ROOMS_TOGGLE,
-      { enabled },
-      { returnFullResponse: true },
-    );
   },
 
   create: async (

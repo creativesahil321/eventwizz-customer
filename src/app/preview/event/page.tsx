@@ -27,9 +27,8 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/open-event-preview-tab";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
-import { useSitePreviewStore } from "@/store/site-preview.store";
 import { PreviewProvider } from "@/contexts/preview-context";
-import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
+import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -147,19 +146,7 @@ function EventPreviewPageContent() {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // Get site essentials from Zustand store (populated after save or preview click)
-  const { previewData: storeSiteEssentials } = useSitePreviewStore();
-
-  // Fetch from API as a fallback for vendors who haven't interacted with the
-  // site essentials form in the current session (store would be empty)
-  const { data: apiSiteEssentials } = useSiteEssentialsQuery();
-
-  // Prefer the store (reflects unsaved in-progress edits); fall back to the
-  // API response so that already-saved colors always show in the preview
-  const siteEssentials: SiteEssentialsFormValues | null =
-    storeSiteEssentials ??
-    (apiSiteEssentials as SiteEssentialsFormValues | null) ??
-    null;
+  const siteEssentials = useEventPreviewSiteEssentials();
 
   const handleGoBack = () => {
     if (eventId && /^\d+$/.test(eventId)) {

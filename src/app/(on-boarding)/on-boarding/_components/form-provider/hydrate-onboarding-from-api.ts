@@ -6,15 +6,123 @@ import {
   normalizeStepOneFromApi,
   readHasMultipleLocationsField,
 } from "./schema";
+import { toPositiveId } from "@/lib/event-menu-categories";
 
 /**
- * Step 1 gate: only when the GET truly has no flag yet step 1 is already saved (bad payload).
+ * Ask Yes/No whenever persistence has no `has_multiple_locations` yet.
+ * Do not hide this behind `stepOne.isApproved` — GET can mark step 1 saved
+ * without the flag, which is exactly when the vendor still needs to answer.
  */
 export function shouldShowStepOneLocationGate(
   hasMultipleLocations: boolean | undefined,
-  stepOneIsApproved: boolean | undefined,
 ): boolean {
-  return hasMultipleLocations === undefined && stepOneIsApproved !== true;
+  return hasMultipleLocations === undefined;
+}
+
+function hasNonEmptyText(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasPersistedUpload(value: unknown): boolean {
+  if (typeof File !== "undefined" && value instanceof File) {
+    return value.size > 0 || value.name.trim().length > 0;
+  }
+  if (typeof Blob !== "undefined" && value instanceof Blob) {
+    return value.size > 0;
+  }
+  return hasNonEmptyText(value);
+}
+
+/** Real catering copy — ignore the empty placeholder row in `defaultValues`. */
+function hasPersistedCateringMenus(menus: unknown): boolean {
+  if (!Array.isArray(menus)) return false;
+  return menus.some((menu) => {
+    if (!menu || typeof menu !== "object") return false;
+    const row = menu as { name?: unknown; items?: unknown };
+    if (hasNonEmptyText(row.name)) return true;
+    if (!Array.isArray(row.items)) return false;
+    return row.items.some((item) => {
+      if (!item || typeof item !== "object") return false;
+      const it = item as {
+        title?: unknown;
+        name?: unknown;
+        description?: unknown;
+      };
+      return (
+        hasNonEmptyText(it.title) ||
+        hasNonEmptyText(it.name) ||
+        hasNonEmptyText(it.description)
+      );
+    });
+  });
+}
+
+/**
+ * After AI apply (or any later-step work), flipping "multiple locations" rebuilds
+ * the venue/brand model and wipes the generated draft. Lock the Yes/No *back*
+ * control once anything past step 1 exists — do not rely on `stepOne.isApproved`
+ * alone (GET often omits it).
+ *
+ * Empty default rows (one blank menu, one blank FAQ) must not lock a fresh
+ * manual start — that skipped the question and made Save fail.
+ */
+export function isOnboardingLocationChoiceLocked(
+  values: {
+    last_completed_step?: number;
+    stepOne?: { isApproved?: boolean };
+    stepTwo?: {
+      logo?: unknown;
+      cover_image?: unknown;
+      banner_heading?: unknown;
+      about_description?: unknown;
+      footer_brand_description?: unknown;
+    };
+    stepThree?: {
+      event_name?: unknown;
+      event_banner_heading?: unknown;
+      about_event_heading?: unknown;
+    };
+    stepSix?: { menus?: unknown[] };
+    stepNine?: { faqs?: Array<{ question?: unknown; answer?: unknown }> };
+  } | null | undefined,
+): boolean {
+  if (!values) return false;
+  if (values.stepOne?.isApproved === true) return true;
+  const last = Number(values.last_completed_step ?? 0);
+  if (Number.isFinite(last) && last >= 2) return true;
+
+  const two = values.stepTwo;
+  if (
+    hasPersistedUpload(two?.logo) ||
+    hasPersistedUpload(two?.cover_image) ||
+    hasNonEmptyText(two?.banner_heading) ||
+    hasNonEmptyText(two?.about_description) ||
+    hasNonEmptyText(two?.footer_brand_description)
+  ) {
+    return true;
+  }
+
+  const three = values.stepThree;
+  if (
+    hasNonEmptyText(three?.event_name) ||
+    hasNonEmptyText(three?.event_banner_heading) ||
+    hasNonEmptyText(three?.about_event_heading)
+  ) {
+    return true;
+  }
+
+  if (hasPersistedCateringMenus(values.stepSix?.menus)) return true;
+
+  const faqs = values.stepNine?.faqs ?? [];
+  if (
+    faqs.some(
+      (faq) => hasNonEmptyText(faq.question) || hasNonEmptyText(faq.answer),
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -76,6 +184,13 @@ export function patchOnboardingPayloadFromApi(
       ...(hasMultiple !== undefined
         ? { has_multiple_locations: hasMultiple }
         : {}),
+    };
+  }
+
+  if (dataAny.stepTwo && typeof dataAny.stepTwo === "object") {
+    dataAny.stepTwo = {
+      ...defaultValues.stepTwo,
+      ...(dataAny.stepTwo as object),
     };
   }
 
@@ -166,10 +281,24 @@ export function patchOnboardingPayloadFromApi(
             ? activeCatering.menu_description
             : "",
         menus: Array.isArray(activeCatering.menus) ? activeCatering.menus : [],
-        ...(typeof activeCatering.event_menu_category_id === "number"
-          ? { event_menu_category_id: activeCatering.event_menu_category_id }
+        ...(toPositiveId(activeCatering.event_menu_category_id) != null
+          ? {
+              event_menu_category_id: toPositiveId(
+                activeCatering.event_menu_category_id,
+              ),
+            }
           : {}),
       };
+    }
+  }
+
+  if (dataAny.stepSix && typeof dataAny.stepSix === "object") {
+    const stepSix = dataAny.stepSix as Record<string, unknown>;
+    const categoryId = toPositiveId(stepSix.event_menu_category_id);
+    if (categoryId != null) {
+      stepSix.event_menu_category_id = categoryId;
+    } else {
+      delete stepSix.event_menu_category_id;
     }
   }
 
@@ -215,7 +344,7 @@ function normalizeStepElevenFromApi(
 ): Record<string, unknown> {
   const suffix =
     typeof stepEleven.domain_suffix === "string" &&
-    stepEleven.domain_suffix.trim().length > 0
+      stepEleven.domain_suffix.trim().length > 0
       ? stepEleven.domain_suffix.trim().toLowerCase()
       : "eventwizz.com";
 
@@ -343,7 +472,7 @@ function hydrateMultiSpaceFromApi(
     )
     .slice(0, MAX_ROOMS)
     .map((r, i) => ({
-      id: typeof r.id === "number" ? r.id : undefined,
+      id: toPositiveId(r.id) ?? toPositiveId(r.room_id),
       name:
         typeof r.name === "string" && r.name.trim()
           ? r.name.trim()
@@ -359,7 +488,16 @@ function hydrateMultiSpaceFromApi(
       isApprovedDrinks: Boolean(r.isApprovedDrinks ?? r.is_approved_drinks),
       package: (r.package as Record<string, unknown>) ?? {},
       dates: (r.dates as Record<string, unknown>) ?? { dates: [] },
-      catering: (r.catering as Record<string, unknown>) ?? {},
+      catering: (() => {
+        const catering = (r.catering as Record<string, unknown>) ?? {};
+        const categoryId = toPositiveId(catering.event_menu_category_id);
+        return {
+          ...catering,
+          ...(categoryId != null
+            ? { event_menu_category_id: categoryId }
+            : {}),
+        };
+      })(),
       brochure: (r.brochure as Record<string, unknown>) ?? {},
       drinks: (r.drinks as Record<string, unknown>) ?? {},
     }));
@@ -373,7 +511,7 @@ function hydrateMultiSpaceFromApi(
     const key = name.trim();
     if (!key) return;
     const existing = roomMap.get(key);
-    roomMap.set(key, {
+    const merged = {
       id: existing?.id,
       name: key,
       isApprovedPackage: Boolean(existing?.isApprovedPackage),
@@ -388,19 +526,26 @@ function hydrateMultiSpaceFromApi(
       drinks: (existing?.drinks as Record<string, unknown>) ?? {},
       ...existing,
       ...patch,
-    });
+    };
+    const id = toPositiveId(merged.id) ?? toPositiveId(existing?.id);
+    if (id != null) merged.id = id;
+    else delete merged.id;
+    roomMap.set(
+      key,
+      merged as Record<string, unknown> & { id?: number; name: string },
+    );
   };
 
   if (stepFourRooms) {
     Object.entries(stepFourRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : typeof roomVal.id === "number"
-              ? roomVal.id
-              : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedPackage: Boolean(
           (payload.stepFour as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -467,10 +612,12 @@ function hydrateMultiSpaceFromApi(
       if (!isRecord(roomVal)) return;
       const hydratedDates = Array.isArray(roomVal.dates) ? roomVal.dates : [];
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedDates: Boolean(
           (payload.stepFive as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -488,10 +635,12 @@ function hydrateMultiSpaceFromApi(
     Object.entries(stepSixRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedCatering: Boolean(
           (payload.stepSix as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -529,10 +678,9 @@ function hydrateMultiSpaceFromApi(
             typeof roomVal.menu_description === "string"
               ? roomVal.menu_description
               : "",
-          event_menu_category_id:
-            typeof roomVal.event_menu_category_id === "number"
-              ? roomVal.event_menu_category_id
-              : undefined,
+          event_menu_category_id: toPositiveId(
+            roomVal.event_menu_category_id,
+          ),
           menus: Array.isArray(roomVal.menus) ? roomVal.menus : [],
         },
       });
@@ -543,10 +691,12 @@ function hydrateMultiSpaceFromApi(
     Object.entries(stepSevenRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedBrochure: Boolean(
           (payload.stepSeven as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -583,12 +733,12 @@ function hydrateMultiSpaceFromApi(
     Object.entries(stepEightRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : typeof roomVal.id === "number"
-              ? roomVal.id
-              : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedDrinks: Boolean(
           (payload.stepEight as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -626,10 +776,10 @@ function hydrateMultiSpaceFromApi(
       enabled ||
       Boolean(
         stepFourRooms ||
-          stepFiveRooms ||
-          stepSixRooms ||
-          stepSevenRooms ||
-          stepEightRooms,
+        stepFiveRooms ||
+        stepSixRooms ||
+        stepSevenRooms ||
+        stepEightRooms,
       ),
     currentRoomIndex: Math.min(
       Number(direct?.currentRoomIndex ?? direct?.current_room_index ?? 0) || 0,

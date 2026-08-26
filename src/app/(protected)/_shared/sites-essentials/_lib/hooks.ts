@@ -167,6 +167,7 @@ export const useSiteEssentials = () => {
       },
       name: "",
       copyright: "",
+      footer_brand_description: "",
       logo: null,
       favicon: null,
       banner_heading: "",

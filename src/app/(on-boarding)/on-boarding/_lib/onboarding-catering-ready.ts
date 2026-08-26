@@ -9,8 +9,9 @@ export function normalizeOnboardingCateringOption(value: unknown): 0 | 1 {
 
 /**
  * Matches onboarding `stepSixSchema`: when catering is enabled, title, description,
- * and at least one menu category with a filled item are required. Menu category
- * dropdown (`event_menu_category_id`) is optional when custom menus exist.
+ * a created menu category (`event_menu_category_id`), and at least one menu with a
+ * filled item are all required. The category must exist on the backend before any
+ * menu items can be saved.
  */
 export function isOnboardingCateringRoomReady(
   data:
@@ -28,6 +29,9 @@ export function isOnboardingCateringRoomReady(
   if (normalizeOnboardingCateringOption(data.catering_option) !== 1) return true;
   if (!String(data.menu_title ?? "").trim()) return false;
   if (!String(data.menu_description ?? "").trim()) return false;
+
+  const categoryId = Number(data.event_menu_category_id);
+  if (!Number.isFinite(categoryId) || categoryId < 1) return false;
 
   const menus = data.menus ?? [];
   if (menus.length === 0) return false;

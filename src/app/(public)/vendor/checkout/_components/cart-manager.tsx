@@ -74,6 +74,8 @@ import { hasRemainingDatesToAdd } from "../_lib/remaining-dates";
 import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
+import { useCheckoutChatHandoff } from "../_lib/hooks/use-checkout-chat-handoff";
+import { readChatEventReturnHref } from "@/lib/checkout-chat-handoff";
 
 type CartManagerProps = Record<string, never>;
 
@@ -412,6 +414,8 @@ export default function CartManager({}: CartManagerProps) {
     return getAvailableDates(currentEventApiData);
   }, [currentEventApiData, roomMode]);
 
+  useCheckoutChatHandoff(currentEventSlug, allBookingDateKeys);
+
   const bookingDiscountableForPromo = useMemo(() => {
     if (!currentEventSlug) return 0;
     return allBookingDateKeys.reduce((sum, dateKey) => {
@@ -617,31 +621,42 @@ export default function CartManager({}: CartManagerProps) {
   // Empty cart — require no API rooms either (room carts can briefly have
   // availableDates=[] while activeRoomId is reconciled after an event switch).
   if (isCartEmpty) {
+    const chatEventHref =
+      typeof window !== "undefined" ? readChatEventReturnHref() : null;
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
         <div className="w-16 h-16 mx-auto bg-gray-50 rounded-2xl flex items-center justify-center mb-5">
           <ShoppingCart className="h-7 w-7 text-gray-300" />
         </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-1.5">
-          Your cart is empty
+          Nothing in your cart yet
         </h3>
-        <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
-          Browse events to find tickets, tables, and packages to add to your cart.
+        <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+          {chatEventHref
+            ? "Tap the dates you want on the event page — that adds them here. Then you can choose tables and pay."
+            : "Browse events to find tickets, tables, and packages to add to your cart."}
         </p>
-        <Button
-          onClick={() => {
-            // Prefer going back when there's history; otherwise fall back to the
-            // tenant home so a direct visit to /checkout never dead-ends.
-            if (typeof window !== "undefined" && window.history.length > 1) {
-              window.history.back();
-            } else {
-              window.location.href = "/";
-            }
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
-        >
-          Browse Events
-        </Button>
+        {chatEventHref ? (
+          <Button
+            asChild
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
+          >
+            <Link href={chatEventHref}>Choose dates</Link>
+          </Button>
+        ) : (
+          <Button
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                window.history.back();
+              } else {
+                window.location.href = "/";
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
+          >
+            Browse Events
+          </Button>
+        )}
       </div>
     );
   }

@@ -3,6 +3,8 @@ export type PendingBookingIntent = {
   event_name: string;
   event_image: string;
   event_date: string;
+  /** Extra dates to add after `event_date` (same event / room). */
+  extra_dates?: string[];
   room_id?: number;
 };
 
@@ -10,6 +12,21 @@ const STORAGE_KEY = "ew_pending_booking_intent";
 
 function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof sessionStorage !== "undefined";
+}
+
+export function pendingBookingDates(intent: PendingBookingIntent): string[] {
+  const first = intent.event_date?.trim();
+  const extra = (intent.extra_dates ?? [])
+    .map((d) => d.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const dates: string[] = [];
+  for (const date of first ? [first, ...extra] : extra) {
+    if (seen.has(date)) continue;
+    seen.add(date);
+    dates.push(date);
+  }
+  return dates;
 }
 
 export function savePendingBooking(intent: PendingBookingIntent): void {

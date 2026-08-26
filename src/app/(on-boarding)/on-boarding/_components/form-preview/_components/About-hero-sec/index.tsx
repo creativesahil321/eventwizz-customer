@@ -49,7 +49,7 @@ function AboutHeroSection({
             className="text-2xl md:text-3xl font-bold text-center break-words"
             style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
           >
-            {title || "e.g. Experience more Stock Brook Events"}
+            {title || "e.g. About your venue"}
           </h2>
         </div>
         <div className="w-full min-w-0 flex flex-col gap-6">

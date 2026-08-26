@@ -248,8 +248,8 @@ export function LocationSearchBar({
 
   const fieldBtnClass = cn(
     "flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2.5 py-2 text-left text-sm transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-text)_4%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:min-w-[9rem] sm:gap-2 sm:px-3 sm:py-2",
-    "@max-sm/preview:!min-w-0",
-    isPreviewMobile && "!min-w-0",
+    "@max-sm/preview:!min-w-0 @max-sm/preview:!px-2",
+    isPreviewMobile && "!min-w-0 !px-2",
   );
 
   /** Location pages: hide locked city on small screens — already on that city. */
@@ -268,17 +268,17 @@ export function LocationSearchBar({
         className={cn(
           "rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-1.5 shadow-[0_10px_32px_-20px_rgba(0,0,0,0.28)] sm:rounded-full sm:p-1",
           previewSearchFormUntilSm,
-          isPreviewMobile && "!rounded-2xl !p-1.5",
+          isPreviewMobile && "!rounded-xl !p-1",
         )}
       >
         <div
           className={cn(
-            "flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-0",
+            "flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-0",
             previewSearchStackUntilSm,
-            isPreviewMobile && "!flex-col !items-stretch !gap-1.5",
+            isPreviewMobile && "!flex-col !items-stretch !gap-1",
           )}
         >
-          <label className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-2.5 sm:px-3.5 sm:py-2">
+          <label className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-2 sm:px-3.5 sm:py-2 @max-sm/preview:!py-2">
             <Search
               className="h-4 w-4 shrink-0 text-[var(--color-primary)]"
               aria-hidden
@@ -321,15 +321,17 @@ export function LocationSearchBar({
           */}
           <div
             className={cn(
-              "gap-1.5 sm:contents",
-              hideCity ? "grid grid-cols-[1fr_auto]" : "grid grid-cols-2",
+              "gap-1 sm:contents",
+              hideCity
+                ? "grid grid-cols-[minmax(0,1fr)_auto]"
+                : "grid grid-cols-2",
               previewSearchFieldsUntilSm,
               hideCity
                 ? previewSearchFieldsLocationUntilSm
                 : previewSearchFieldsMultiUntilSm,
               isPreviewMobile &&
                 (hideCity
-                  ? "!grid !grid-cols-[1fr_auto]"
+                  ? "!grid !grid-cols-[minmax(0,1fr)_auto]"
                   : "!grid !grid-cols-2"),
             )}
           >
@@ -528,17 +530,35 @@ export function LocationSearchBar({
 
             <button
               type="submit"
+              aria-label="Search events"
               className={cn(
-                "inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--color-footer)] px-4 text-sm font-semibold text-[var(--color-on-footer)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:h-9 sm:px-5",
+                "inline-flex h-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[var(--color-footer)] px-3 text-sm font-semibold text-[var(--color-on-footer)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:h-9 sm:px-5",
                 !hideCity && "col-span-2 sm:col-span-1",
                 hideCity
                   ? previewSearchSubmitUntilSm
                   : previewSearchSubmitFullUntilSm,
-                isPreviewMobile && "!h-11",
+                isPreviewMobile && "!h-10",
                 isPreviewMobile && !hideCity && "!col-span-2",
               )}
             >
-              Search events
+              <span
+                className={cn(
+                  "sm:hidden",
+                  isPreviewMobile && "!inline",
+                  "@max-sm/preview:!inline",
+                )}
+              >
+                Search
+              </span>
+              <span
+                className={cn(
+                  "hidden sm:inline",
+                  isPreviewMobile && "!hidden",
+                  "@max-sm/preview:!hidden",
+                )}
+              >
+                Search events
+              </span>
               <ArrowRight className="h-4 w-4" aria-hidden />
             </button>
           </div>

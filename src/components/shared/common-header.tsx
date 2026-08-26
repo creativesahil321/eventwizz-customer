@@ -21,6 +21,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  useRef,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -47,8 +48,18 @@ import {
   usePreviewDeviceFramesEnabled,
   usePreviewNarrowLayout,
 } from "@/hooks/use-preview-narrow-layout";
+import { getNearestScrollContainer } from "@/components/public/event-section-nav";
 import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
 import { resolvePublicPageContact } from "@/lib/resolve-venue-contact";
+import {
+  previewBrowseIconVisibility,
+  previewDesktopActionLabel,
+  previewDesktopActionsRowClass,
+  previewDesktopHeaderFlex,
+  previewDesktopHeaderHidden,
+  previewDesktopIconAction,
+  previewLogoSizeClass,
+} from "@/lib/preview-container-layout";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -263,10 +274,15 @@ export default function CommonHeader({
   const isAuthenticated = status === "authenticated";
   /** Guest auth CTAs in preview even when the editor session is signed in. */
   const showGuestAuthLinks = isPreviewChrome || !isAuthenticated;
+  const headerRootRef = useRef<HTMLElement>(null);
 
   // Handle scroll effect (window or embedded preview scroll container)
   useEffect(() => {
-    const scrollRoot = scrollContainerRef?.current;
+    const preferred = scrollContainerRef?.current;
+    const scrollRoot =
+      preferred && preferred.scrollHeight > preferred.clientHeight + 1
+        ? preferred
+        : getNearestScrollContainer(headerRootRef.current ?? preferred);
 
     const handleScroll = () => {
       const scrollTop = scrollRoot ? scrollRoot.scrollTop : window.scrollY;
@@ -590,49 +606,52 @@ export default function CommonHeader({
     (usesEmbeddedScrollPanel &&
       (variant === "preview" || variant === "onboarding"));
 
+  /**
+   * Full header from viewport `xl` (1280px) / container `@7xl` (1280px).
+   * Below that: hamburger — tablet, mobile, and small desktop / onboarding
+   * side panels. (`@lg/preview` is only 512px and caused logo overlap.)
+   */
   const desktopHeaderVisibility = isPreviewNarrow
     ? "hidden"
     : usePreviewContainerQueries
-      ? "hidden @lg/preview:flex"
-      : "hidden lg:flex";
+      ? previewDesktopHeaderFlex
+      : "hidden xl:flex";
   const mobileHeaderVisibility = isPreviewNarrow
     ? "grid"
     : usePreviewContainerQueries
-      ? "@lg/preview:hidden"
-      : "lg:hidden";
+      ? previewDesktopHeaderHidden
+      : "xl:hidden";
 
-  /** Icon-first until the *frame* (preview) or viewport (live) is wide enough. */
+  /** Icon-first until there is room for labels beside a wordmark logo. */
   const desktopActionLabelClass = usePreviewContainerQueries
-    ? "hidden @xl/preview:inline"
-    : "hidden xl:inline";
+    ? previewDesktopActionLabel
+    : "hidden 2xl:inline";
   /**
-   * Phone numbers are the longest header label. In framed preview (onboarding side
-   * panel) always show the icon only — container queries often disagree with the
-   * visible panel width and leave icon + full number stacked/overlapping.
+   * Phone numbers are the longest header label. In framed preview always icon
+   * only. Live: icon until 2xl.
    */
   const desktopPhoneLabelClass = usePreviewContainerQueries
     ? "sr-only"
     : "hidden 2xl:inline";
   const desktopIconActionClass = usePreviewContainerQueries
-    ? "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 @xl/preview:h-auto @xl/preview:w-auto @xl/preview:gap-1.5 @xl/preview:!px-3"
-    : "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 xl:h-auto xl:w-auto xl:gap-1.5 xl:!px-3";
+    ? previewDesktopIconAction
+    : "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 2xl:h-auto 2xl:w-auto 2xl:gap-1.5 2xl:!px-3";
   const desktopPhoneIconActionClass = usePreviewContainerQueries
     ? "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 box-border"
     : "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 box-border 2xl:h-auto 2xl:w-auto 2xl:gap-1.5 2xl:!px-3";
   const browseIconVisibilityClass = usePreviewContainerQueries
-    ? "h-4 w-4 shrink-0 @xl/preview:hidden"
-    : "h-4 w-4 shrink-0 xl:hidden";
-  // Mobile ~44px tall / ~10rem wide keeps long wordmarks readable without crowding nav icons.
+    ? previewBrowseIconVisibility
+    : "h-4 w-4 shrink-0 2xl:hidden";
   const logoSizeClass = usePreviewContainerQueries
-    ? "max-h-11 max-w-[min(100%,10rem)] w-auto object-contain @xl/preview:max-h-12 @xl/preview:max-w-[min(100%,12rem)]"
-    : "max-h-11 max-w-[min(100%,10rem)] w-auto object-contain xl:max-h-12 xl:max-w-[min(100%,12rem)]";
-  // Keep actions above the logo column so a wide mark cannot cover/clip the phone pill.
+    ? previewLogoSizeClass
+    : "max-h-11 max-w-[min(100%,9.5rem)] w-auto object-contain xl:max-h-12 xl:max-w-[min(100%,11rem)]";
   const desktopActionsRowClass = usePreviewContainerQueries
-    ? "relative z-10 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 text-xs @xl/preview:gap-2 @xl/preview:text-sm"
-    : "relative z-10 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 text-xs xl:gap-2 xl:text-sm";
+    ? previewDesktopActionsRowClass
+    : "relative z-0 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 overflow-hidden text-xs xl:gap-1.5 xl:text-sm";
 
   return (
     <section
+      ref={headerRootRef}
       className={cn(
         usesStickyHeader
           ? "sticky top-0 z-50 w-full transition-all duration-300"
@@ -703,7 +722,7 @@ export default function CommonHeader({
                 </Link>
               ))}
           </div>
-          <div className="relative z-0 w-1/3 min-w-0 overflow-hidden px-2 text-center">
+          <div className="relative z-0 w-1/3 min-w-0 overflow-hidden px-1 text-center sm:px-2">
             {disableLogoHomeLink ? (
               <div className="flex h-14 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (

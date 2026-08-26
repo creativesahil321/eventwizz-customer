@@ -5,6 +5,7 @@
 
 import { resetAllStores } from "@/lib/utils";
 import { setLogoutInProgress } from "@/services/core/api-client";
+import { clearVendorBrowserSession } from "@/lib/clear-vendor-browser-session";
 
 /**
  * Performs a complete logout with proper cleanup of all application state
@@ -55,6 +56,7 @@ export async function logout({
 
       // Clear storage
       if (typeof window !== "undefined") {
+        clearVendorBrowserSession();
         localStorage.clear();
         sessionStorage.clear();
 

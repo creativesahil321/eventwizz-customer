@@ -88,7 +88,7 @@ export default function AuthLayout({
       <div className="flex min-h-screen flex-col overflow-x-hidden bg-[var(--color-background)] pt-[60px] font-body md:flex-row">
         <aside className="hidden flex-col border-r border-[var(--color-text)]/8 bg-[color-mix(in_srgb,var(--color-primary)_7%,var(--color-background))] md:flex md:w-[34%] lg:w-[32%]">
           <div className="flex flex-1 flex-col justify-center px-8 py-12 lg:px-12">
-            <AuthContent />
+            <AuthContent callbackUrl={callbackUrl} />
           </div>
         </aside>
 

@@ -75,6 +75,12 @@ function normalizeMenus(raw: unknown): VendorStepFourMenuCategory[] {
     .filter((menu) => menu.name.length > 0 || menu.items.length > 0);
 }
 
+export function normalizeVendorStepFourMenus(
+  raw: unknown,
+): VendorStepFourMenuCategory[] {
+  return normalizeMenus(raw);
+}
+
 function mapPayloadToRoomEntry(
   payload: Record<string, unknown>,
 ): VendorStepFourRoomEntry | null {
@@ -197,7 +203,7 @@ export function stepFourFieldsToRoomEntry(
     menu_title: String(data.menu_title ?? "").trim(),
     menu_description: String(data.menu_description ?? "").trim(),
     event_menu_category_id: Number(data.event_menu_category_id) || 0,
-    menus: Array.isArray(data.menus) ? data.menus : [],
+    menus: normalizeMenus(data.menus),
     menu_background_image: data.menu_background_image ?? null,
   };
 }
@@ -210,13 +216,7 @@ export function cloneVendorStepFourRoomMenu(
     menu_title: source.menu_title ?? "",
     menu_description: source.menu_description ?? "",
     event_menu_category_id: source.event_menu_category_id ?? 0,
-    menus: (source.menus ?? []).map((menu) => ({
-      name: menu.name,
-      items: menu.items.map((item) => ({
-        title: item.title,
-        description: item.description,
-      })),
-    })),
+    menus: normalizeMenus(source.menus),
     menu_background_image: source.menu_background_image ?? null,
   };
 }
@@ -229,7 +229,8 @@ export function isVendorRoomMenuStepComplete(
   if (entry.catering_option !== 1) return true;
   if (!hasNonEmpty(entry.menu_title)) return false;
   if (!hasNonEmpty(entry.menu_description)) return false;
-  if (!Number(entry.event_menu_category_id) || entry.event_menu_category_id < 1) {
+  const menuCategoryId = Number(entry.event_menu_category_id);
+  if (!Number.isFinite(menuCategoryId) || menuCategoryId < 1) {
     return false;
   }
   const menus = entry.menus ?? [];
@@ -237,7 +238,7 @@ export function isVendorRoomMenuStepComplete(
   return menus.some(
     (menu) =>
       hasNonEmpty(menu.name) &&
-      menu.items.some(
+      (menu.items ?? []).some(
         (item) => hasNonEmpty(item.title) && hasNonEmpty(item.description),
       ),
   );
@@ -272,12 +273,15 @@ export function appendVendorStepFourRoomToFormData(
     );
   }
 
-  (room.menus ?? []).forEach((menu, menuIndex) => {
-    formData.append(`rooms[${roomIndex}][menus][${menuIndex}][name]`, menu.name);
-    menu.items.forEach((item, itemIndex) => {
+  normalizeMenus(room.menus).forEach((menu, menuIndex) => {
+    formData.append(
+      `rooms[${roomIndex}][menus][${menuIndex}][name]`,
+      menu.name,
+    );
+    (menu.items ?? []).forEach((item, itemIndex) => {
       formData.append(
         `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][title]`,
-        item.title,
+        item.title ?? "",
       );
       formData.append(
         `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][description]`,

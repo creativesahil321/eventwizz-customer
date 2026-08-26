@@ -3,6 +3,7 @@ import type {
   AIRoomDates,
   AIRoomDrinks,
 } from "@/app/api/ai/generate-onboarding/route";
+import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
 
 export const AI_ONBOARDING_MIN_ROOMS = 2;
 export const AI_ONBOARDING_MAX_ROOMS = 3;
@@ -179,12 +180,30 @@ export function hasUsableOnboardingDates(
   );
 }
 
+/** Accepts AI `dates[]` or Laravel/room `{ dates: [] }` so truncated payloads still hydrate. */
+export function coerceAiDateList(dates: unknown): AIDate[] {
+  if (Array.isArray(dates)) {
+    return dates.filter(
+      (date): date is AIDate => Boolean(date) && typeof date === "object",
+    );
+  }
+  if (dates && typeof dates === "object") {
+    const nested = (dates as { dates?: unknown }).dates;
+    if (Array.isArray(nested)) {
+      return nested.filter(
+        (date): date is AIDate => Boolean(date) && typeof date === "object",
+      );
+    }
+  }
+  return [];
+}
+
 export function coerceAiStepFiveRooms(rooms: unknown): AIRoomDates[] {
   if (Array.isArray(rooms)) {
     return rooms
       .map((room) => ({
         room_name: String(room?.room_name ?? "").trim(),
-        dates: Array.isArray(room?.dates) ? room.dates : [],
+        dates: coerceAiDateList(room?.dates),
       }))
       .filter((room) => room.room_name.length > 0);
   }
@@ -193,11 +212,11 @@ export function coerceAiStepFiveRooms(rooms: unknown): AIRoomDates[] {
       .map(([key, value]) => {
         const parsed = (value ?? {}) as {
           room_name?: string;
-          dates?: AIDate[];
+          dates?: unknown;
         };
         return {
           room_name: String(parsed.room_name ?? key).trim(),
-          dates: Array.isArray(parsed.dates) ? parsed.dates : [],
+          dates: coerceAiDateList(parsed.dates),
         };
       })
       .filter((room) => room.room_name.length > 0);
@@ -697,7 +716,7 @@ export function ensureStepSevenRooms(
 export function buildAiOnboardingJsonSchemaBlock(stepNineMaxFaqs: number): string {
   return `Return this JSON shape (compact keys, no extra commentary):
 {
-  "stepTwo": {"banner_heading":"≤30 words","banner_sub_heading":"≤80 chars","about_title":"≤40 chars","about_description":"≤340 chars, no HTML"},
+  "stepTwo": {"banner_heading":"≤30 words","banner_sub_heading":"≤80 chars","about_title":"≤40 chars","about_description":"≤340 chars, no HTML","footer_brand_description":"≤180 chars, no HTML, footer blurb under logo"},
   "stepThree": {"event_name":"≤40 chars","event_banner_heading":"≤30 words","event_banner_sub_heading":"≤80 chars","about_event_heading":"≤50 chars","about_event_sub_heading":"≤80 chars","about_event_description":"≤340 chars, no HTML"},
   "stepFour": {"package_title":"≤40","package_description":"≤160","package_button_name":"≤18","package_details":[{"title":"≤40"},{"title":"≤40"},{"title":"≤40"},{"title":"≤40"},{"title":"≤40"}],"event_schedular_title":"≤40","event_schedule_subtitle":"≤160 optional","event_schedular":[{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"}]},
   "stepFive": {
@@ -732,13 +751,13 @@ CRITICAL RULES:
 10. ROOM SYSTEM (when enabled):
    - Use EXACT room names provided (spelling/casing as given)
    - Minimum ${AI_ONBOARDING_MIN_ROOMS}, maximum ${AI_ONBOARDING_MAX_ROOMS} rooms — never invent extra rooms
-   - stepFive.rooms: one entry per room_name with its own dates array
+   - stepFive.rooms: one entry per room_name with its own dates array — NEVER omit dates, tickets, or prices for a room
    - If vendor says same dates/data for all rooms, use IDENTICAL dates arrays for every room
    - If vendor assigns different dates/tickets per room, respect that per room_name
    - stepFour content is shared style; rooms differ mainly in stepFive dates (and optional per-room notes in copy)
    - Drinks (stepSeven) and menu (stepSix) can be shared across rooms unless vendor specifies per-room differences
    - When vendor asks per-room drinks, fill stepSeven.rooms with room-specific drinks
-11. stepSix menus: [] if no catering; stepSeven packages: [] if no drinks
+11. stepSix menus: [] if no catering; stepSeven packages: [] if no drinks. Every menu MUST have a non-empty "name" (the category, e.g. Starters, Mains) with at least one item — never output a menu block without a category name.
 12. stepFive.dates: when room system is Yes, still provide template dates in stepFive.dates AND full stepFive.rooms
 13. VENDOR FACTS OVERRIDE DEFAULTS. If Additional Info lists dates, ticket prices, table counts, per-person prices, or a deposit %, use those exact values in stepFive. One date object per listed event date. Never invent different dates or prices when the vendor already specified them.`;
 }
@@ -1041,14 +1060,28 @@ export function ensureOnboardingDates(
 
 /**
  * Truncated AI JSON often drops later steps. Fill professional defaults so
- * apply always has dates, timeline, packages, menus, and FAQs.
+ * apply always has event copy, dates, timeline, packages, menus, and FAQs.
  */
+function firstNonEmpty(...values: Array<string | undefined | null>): string {
+  for (const value of values) {
+    const trimmed = String(value ?? "").trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+
+function clipText(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return value.slice(0, max).trim();
+}
+
 export function fillOnboardingContentDefaults(
   content: import("@/app/api/ai/generate-onboarding/route").AIGeneratedContent,
   input: {
     venueName: string;
     venueType: string;
     city?: string;
+    address?: string;
     has_room_system?: boolean;
     room_names?: string[];
     description?: string;
@@ -1057,11 +1090,86 @@ export function fillOnboardingContentDefaults(
 ): import("@/app/api/ai/generate-onboarding/route").AIGeneratedContent {
   const venue = input.venueName.trim() || "the venue";
   const kind = input.venueType.trim() || "events";
+  const city = firstNonEmpty(input.city);
+  const address = firstNonEmpty(input.address, city);
   const next = { ...content };
   const omitHints = parseVendorDescriptionHints(
     input.description,
     input.room_names,
   );
+
+  // Truncated AI JSON often keeps stepTwo and drops event/brochure copy.
+  // Empty strings must not reach apply — Laravel leaves the previous event in place.
+  next.stepTwo = {
+    banner_heading: firstNonEmpty(
+      next.stepTwo?.banner_heading,
+      clipText(`Discover ${venue}`, 80),
+    ),
+    banner_sub_heading: firstNonEmpty(
+      next.stepTwo?.banner_sub_heading,
+      clipText(
+        city
+          ? `Unforgettable ${kind} in ${city}.`
+          : `Unforgettable ${kind} at ${venue}.`,
+        80,
+      ),
+    ),
+    about_title: firstNonEmpty(
+      next.stepTwo?.about_title,
+      clipText(`About ${venue}`, 40),
+    ),
+    about_description: firstNonEmpty(
+      next.stepTwo?.about_description,
+      clipText(
+        `${venue} is a ${kind} venue${city ? ` in ${city}` : ""}. Tell guests what to expect, what’s included, and why they should book.`,
+        340,
+      ),
+    ),
+    footer_brand_description: clipFooterBrandDescription(
+      firstNonEmpty(
+        next.stepTwo?.footer_brand_description,
+        city
+          ? `${venue} is a ${kind} venue in the heart of ${city}.`
+          : `${venue} is a ${kind} venue for unforgettable celebrations.`,
+      ),
+    ),
+  };
+
+  next.stepThree = {
+    event_name: firstNonEmpty(
+      next.stepThree?.event_name,
+      clipText(venue, 40),
+    ),
+    event_banner_heading: firstNonEmpty(
+      next.stepThree?.event_banner_heading,
+      clipText(`Welcome to ${venue}`, 80),
+    ),
+    event_banner_sub_heading: firstNonEmpty(
+      next.stepThree?.event_banner_sub_heading,
+      clipText(
+        city
+          ? `Join us for ${kind} in ${city}.`
+          : `Join us for ${kind} at ${venue}.`,
+        80,
+      ),
+    ),
+    about_event_heading: firstNonEmpty(
+      next.stepThree?.about_event_heading,
+      "What to expect",
+    ),
+    about_event_sub_heading: firstNonEmpty(
+      next.stepThree?.about_event_sub_heading,
+      clipText(`Discover ${kind} at ${venue}`, 80),
+    ),
+    about_event_description: firstNonEmpty(
+      next.stepThree?.about_event_description,
+      clipText(
+        firstNonEmpty(omitHints.sanitizedDescription) ||
+          `An event at ${venue}${city ? ` in ${city}` : ""}. Book your tickets or tables and enjoy a night designed around ${kind}.`,
+        340,
+      ),
+    ),
+  };
 
   next.stepFour = {
     package_title: next.stepFour?.package_title || "What's included",
@@ -1167,6 +1275,45 @@ export function fillOnboardingContentDefaults(
     };
   }
 
+  const brochureAddress = firstNonEmpty(
+    sevenIsBrochure && typeof sevenRaw?.event_address === "string"
+      ? sevenRaw.event_address
+      : "",
+    next.stepEight?.event_address,
+    address,
+  );
+  const brochurePrice = firstNonEmpty(
+    sevenIsBrochure && typeof sevenRaw?.price_start_from === "string"
+      ? sevenRaw.price_start_from
+      : "",
+    next.stepEight?.price_start_from,
+    "50",
+  );
+  if (sevenIsBrochure) {
+    next.stepSeven = {
+      ...next.stepSeven,
+      event_address: brochureAddress,
+      price_start_from: brochurePrice,
+    } as typeof next.stepSeven;
+  } else {
+    next.stepEight = {
+      event_address: brochureAddress,
+      price_start_from: brochurePrice,
+      price_start_from_button_text: firstNonEmpty(
+        next.stepEight?.price_start_from_button_text,
+        "Book Now",
+      ),
+      location: {
+        title: firstNonEmpty(next.stepEight?.location?.title, "Venue location"),
+        description: firstNonEmpty(
+          next.stepEight?.location?.description,
+          brochureAddress ||
+            `${venue}${city ? `, ${city}` : ""}`,
+        ),
+      },
+    };
+  }
+
   const hasMenus =
     !omitHints.omitCatering &&
     Array.isArray(next.stepSix?.menus) &&
@@ -1223,6 +1370,35 @@ export function fillOnboardingContentDefaults(
           },
         ],
   };
+
+  if (useRooms && !omitHints.omitCatering) {
+    next.stepSix = {
+      ...next.stepSix,
+      rooms: roomNames.map((name) => ({
+        room_name: name,
+        catering_option: 1 as const,
+        menu_title: next.stepSix.menu_title,
+        menu_description: next.stepSix.menu_description,
+        menus: next.stepSix.menus,
+      })),
+    };
+  }
+
+  if (useRooms && !sevenIsBrochure && !omitHints.omitDrinks) {
+    next.stepSeven = {
+      ...next.stepSeven,
+      rooms: ensureStepSevenRooms(
+        next.stepSeven?.rooms,
+        roomNames,
+        {
+          drink_title: next.stepSeven.drink_title,
+          drink_description: next.stepSeven.drink_description,
+          packages: next.stepSeven.packages,
+        },
+        omitHints,
+      ),
+    };
+  }
 
   const faqs = Array.isArray(next.stepNine?.faqs)
     ? next.stepNine.faqs.filter((f) => f.question?.trim() && f.answer?.trim())

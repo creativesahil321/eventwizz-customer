@@ -9,6 +9,10 @@ import {
   COPYRIGHT_MAX_TEXT_CHARS,
 } from "../../_lib/schema";
 import {
+  FOOTER_BRAND_DESCRIPTION_MAX_CHARS,
+  FOOTER_BRAND_DESCRIPTION_MAX_WORDS,
+} from "@/lib/footer-brand-description";
+import {
   FormField,
   FormItem,
   FormLabel,
@@ -67,6 +71,36 @@ interface BrandingTabProps {
   serverCoverImage?: string;
   serverCoverVideo?: string;
   serverMainLandingCoverImage?: string;
+  serverLogo?: string;
+  serverFavicon?: string;
+}
+
+function resolveFooterAiCity(
+  locations: SiteEssentialsFormValues["locations"],
+  slug: string | undefined,
+): string | undefined {
+  const list = locations ?? [];
+  const trimmedSlug = slug?.trim();
+  const match = trimmedSlug
+    ? list.find((loc) => loc.slug === trimmedSlug)
+    : undefined;
+  const city = match?.city?.trim() || list[0]?.city?.trim();
+  return city || undefined;
+}
+
+function coerceMediaUrl(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value instanceof File) return "";
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["url", "src", "path", "original"]) {
+      const candidate = record[key];
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  }
+  return "";
 }
 
 type BrandingScopeTab =
@@ -101,6 +135,8 @@ export function BrandingTab({
   serverCoverImage,
   serverCoverVideo,
   serverMainLandingCoverImage,
+  serverLogo,
+  serverFavicon,
 }: BrandingTabProps) {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { setPreviewScope } = useSitePreviewStore();
@@ -119,6 +155,20 @@ export function BrandingTab({
     return hasMultipleLocations ? "main-home" : "site-identity";
   });
   const form = useFormContext<SiteEssentialsFormValues>();
+  const footerAiTitle = useWatch({ control: form.control, name: "name" });
+  const footerAiLocations = useWatch({
+    control: form.control,
+    name: "locations",
+  });
+  const footerAiSlug = useWatch({ control: form.control, name: "slug" });
+  const footerAiAbout = useWatch({
+    control: form.control,
+    name: "about_description",
+  });
+  const footerAiCity: string | undefined = resolveFooterAiCity(
+    footerAiLocations,
+    footerAiSlug,
+  );
   // The admin/main marketing site edits a fixed set of home sections (no
   // per-location vendor fields), so we swap in a dedicated editor.
   const isAdmin = form.watch("website_role") === "admin";
@@ -259,22 +309,29 @@ export function BrandingTab({
     if (watchedLogo instanceof File) {
       setLogoFiles([ensureFilePreview(watchedLogo)]);
       setLogoUrl("");
-    } else if (typeof watchedLogo === "string" && watchedLogo) {
-      setLogoFiles([]);
-      setLogoUrl(watchedLogo);
-    } else if (watchedLogo !== undefined) {
+    } else if (watchedLogo === null) {
       setLogoFiles([]);
       setLogoUrl("");
+    } else {
+      const nextLogoUrl =
+        coerceMediaUrl(watchedLogo) || coerceMediaUrl(serverLogo);
+      setLogoFiles([]);
+      setLogoUrl(nextLogoUrl);
     }
-    if (typeof watchedFavicon === "string" && watchedFavicon) {
+    if (watchedFavicon instanceof File) {
+      setFaviconFiles([ensureFilePreview(watchedFavicon)]);
+      setFaviconUrl("");
+    } else if (typeof watchedFavicon === "string" && watchedFavicon) {
       setFaviconFiles([]);
       setFaviconUrl(watchedFavicon);
     } else if (
       watchedFavicon !== undefined &&
       !(watchedFavicon instanceof File)
     ) {
+      const nextFaviconUrl =
+        coerceMediaUrl(watchedFavicon) || coerceMediaUrl(serverFavicon);
       setFaviconFiles([]);
-      setFaviconUrl("");
+      setFaviconUrl(nextFaviconUrl);
     }
     if (watchedCoverImage instanceof File) {
       setLandingPageImageFiles([watchedCoverImage]);
@@ -308,7 +365,16 @@ export function BrandingTab({
       setLandingPageVideoFiles([]);
       setLandingPageVideoUrl("");
     }
-  }, [watchedLogo, watchedFavicon, watchedCoverImage, watchedCoverVideo]);
+  }, [
+    watchedLogo,
+    watchedFavicon,
+    watchedCoverImage,
+    watchedCoverVideo,
+    serverLogo,
+    serverFavicon,
+    form.formState.dirtyFields.logo,
+    form.formState.dirtyFields.favicon,
+  ]);
 
   const handleLogoFileChange = async (files: File[]) => {
     if (!files.length) return;
@@ -438,13 +504,13 @@ export function BrandingTab({
     revokeFilePreview(logoFiles[0]);
     setLogoFiles([]);
     setLogoUrl("");
-    form.setValue("logo", null);
+    form.setValue("logo", null, { shouldDirty: true, shouldTouch: true });
   };
 
   const handleRemoveFavicon = () => {
     setFaviconFiles([]);
     setFaviconUrl("");
-    form.setValue("favicon", null);
+    form.setValue("favicon", null, { shouldDirty: true, shouldTouch: true });
   };
 
   const handleRemoveLandingPageImage = () => {
@@ -487,7 +553,7 @@ export function BrandingTab({
           {isAdmin ? (
             <>
               Edit your marketing site here. <strong>Site identity</strong>{" "}
-              (logo, favicon, copyright) applies everywhere;{" "}
+              (logo, favicon, copyright, footer description) applies everywhere;{" "}
               <strong>Home page</strong> controls each section of your public
               home.
             </>
@@ -503,7 +569,7 @@ export function BrandingTab({
             <>
               You have a single location — your public home page is edited under{" "}
               <strong>Home page</strong>. <strong>Site identity</strong> (logo,
-              favicon, copyright) applies everywhere.
+              favicon, copyright, footer description) applies everywhere.
             </>
           )}
         </AlertDescription>
@@ -550,7 +616,7 @@ export function BrandingTab({
         <div className="space-y-2">
           <SectionTitle
             title="Logo & site identity"
-            description="Logo, favicon, and copyright — shared across all locations and pages."
+            description="Logo, favicon, copyright, and the short footer line under your logo — shared across all locations and pages."
           />
         </div>
 
@@ -607,7 +673,44 @@ export function BrandingTab({
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 md:gap-6">
+        <FormField
+          control={form.control}
+          name="footer_brand_description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Footer brand description</FormLabel>
+              <FormControl>
+                <TiptapEditor
+                  value={field.value || ""}
+                  onChange={(html) => {
+                    field.onChange(html);
+                    void form.trigger("footer_brand_description");
+                  }}
+                  placeholder="A short line about your venue, shown under the logo in the footer…"
+                  maxLength={FOOTER_BRAND_DESCRIPTION_MAX_CHARS}
+                  maxWords={FOOTER_BRAND_DESCRIPTION_MAX_WORDS}
+                  className="min-h-[100px]"
+                  readOnly={readOnly}
+                  showAIButton={!readOnly}
+                  aiContext={{
+                    title: footerAiTitle || undefined,
+                    city: footerAiCity,
+                    description: footerAiAbout || undefined,
+                    contentType: "footer",
+                  }}
+                />
+              </FormControl>
+              <FormDescription>
+                Appears under your logo in the site footer on every page. Keep
+                it to one or two sentences. If you leave this empty, the About
+                section description is used instead.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
           <FormField
             control={form.control}
             name="logo"

@@ -334,14 +334,14 @@ export default function CateringTab() {
     if (!menus?.length) return;
     const next = menus.map((m) => ({
       ...m,
-      items: m.items.map((it) => ({
+      items: (m.items ?? []).map((it) => ({
         ...it,
         title: (it.title || "").slice(0, MENU_ITEM_TITLE_MAX),
         description: (it.description || "").slice(0, MENU_DESCRIPTION_MAX),
       })),
     }));
     const changed = menus.some((m, mi) =>
-      m.items.some(
+      (m.items ?? []).some(
         (it, ii) =>
           it.title !== next[mi].items[ii].title ||
           it.description !== next[mi].items[ii].description,

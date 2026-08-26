@@ -471,6 +471,24 @@ export default function StepEleven() {
                               </strong>
                             </p>
 
+                            {showDuplicateEventOptions && (
+                              <p className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs leading-relaxed text-sky-200">
+                                This is your <strong>one brand domain</strong>.
+                                Each location gets its own page underneath it
+                                (e.g.{" "}
+                                <span className="font-medium break-all">
+                                  {subdomainPublicPreviewLabel(
+                                    selectedDomain,
+                                    venueName,
+                                    domainSuffix,
+                                  )}
+                                  .{domainSuffix}/your-location
+                                </span>
+                                ) — use your brand name here, not a single
+                                location&apos;s name.
+                              </p>
+                            )}
+
                             <div className="space-y-3">
                               <div className="space-y-2">
                                 <label className="text-sm font-medium text-slate-300">

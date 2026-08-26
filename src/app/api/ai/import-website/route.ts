@@ -7,6 +7,7 @@ import {
   truncateToMaxWords,
 } from "@/lib/word-count";
 import { BANNER_SUB_HEADING_MAX_CHARS } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
 import {
   SITE_ESSENTIALS_GOOGLE_FONT_NAMES,
   siteEssentialsGoogleFontStack,
@@ -230,6 +231,7 @@ Return ONLY a valid JSON object (no markdown, no commentary) with EXACTLY this s
   "banner_sub_heading": "string (hero tagline, max ${BANNER_SUB_HEADING_MAX_CHARS} chars)",
   "about_title": "string (about section title, max 40 chars)",
   "about_description": "string (plain text, no HTML, max 340 chars)",
+  "footer_brand_description": "string (plain text, no HTML, max 180 chars, short footer blurb under the logo)",
   "event_title_1": "string (a section title e.g. 'Weddings', max 40 chars)",
   "event_title_2": "string (a second section title e.g. 'Corporate Events', max 40 chars)",
   "event_gallery_title": "string (gallery section title, max 40 chars)",
@@ -267,6 +269,9 @@ function sanitizeContent(raw: Partial<WebsiteImportContent>): WebsiteImportConte
     banner_sub_heading: truncate(raw.banner_sub_heading, BANNER_SUB_HEADING_MAX_CHARS),
     about_title: truncate(raw.about_title, 40),
     about_description: truncate(raw.about_description, 340),
+    footer_brand_description: clipFooterBrandDescription(
+      raw.footer_brand_description ?? "",
+    ),
     event_title_1: truncate(raw.event_title_1, 40),
     event_title_2: truncate(raw.event_title_2, 40),
     event_gallery_title: truncate(raw.event_gallery_title, 40),

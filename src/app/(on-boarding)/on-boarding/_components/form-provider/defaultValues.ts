@@ -33,6 +33,7 @@ export const defaultValues: OnboardingFormData = {
     banner_sub_heading: "",
     about_title: "",
     about_description: "",
+    footer_brand_description: "",
   },
   stepThree: {
     isApproved: false,

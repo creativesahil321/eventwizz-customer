@@ -10,6 +10,7 @@ import {
   buildSiteEssentialsContactTheme,
   resolveSiteEssentialsPreviewContact,
 } from "../_lib/preview-contact";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import type { LocationData } from "@/types/theme.types";
 
 interface MainLandingSitePreviewProps {
@@ -107,7 +108,11 @@ export function MainLandingSitePreview({
       contactTheme={buildSiteEssentialsContactTheme(formValues)}
       socialLinksOverride={formValues.socialLinks}
       brandDescription={
-        formValues.about_description || formValues.seo?.description || ""
+        firstFooterBrandDescription(
+          formValues.footer_brand_description,
+          formValues.about_description,
+          formValues.seo?.description,
+        )
       }
       exploreCitiesSectionId="explore-cities-preview"
     />

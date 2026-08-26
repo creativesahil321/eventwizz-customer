@@ -7,10 +7,11 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CHECKOUT_CONSTANTS } from "@/app/(public)/vendor/checkout/_lib/constants";
 // Professional API-only approach - no cart store needed
@@ -45,6 +46,14 @@ import {
 import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
 import { savePendingBooking } from "@/lib/booking/pending-booking";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
+import {
+  CHECKOUT_HANDOFF_COUPON,
+  CHECKOUT_HANDOFF_DATES,
+  CHECKOUT_HANDOFF_PAY,
+  buildCheckoutHandoffHref,
+  mergeCheckoutHandoffPending,
+  parseCheckoutHandoffPay,
+} from "@/lib/checkout-chat-handoff";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 // Define proper user interface for session
@@ -65,6 +74,20 @@ export type DatesSectionType = {
   /** Raw domain-event API field. */
   discount?: PublicEventDateDiscount | null;
 }[];
+
+function isoDateKey(raw: string | null | undefined): string {
+  const trimmed = raw?.trim() ?? "";
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : "";
+}
+
+function parseChatHandoffDates(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((part) => isoDateKey(part.trim()))
+    .filter(Boolean);
+}
 
 type DatesSectionProps = {
   dates?: DatesSectionType;
@@ -337,6 +360,8 @@ export default function DatesSection({
 }: DatesSectionProps) {
   const currencySymbol = useCurrencySymbol();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const chatDateHandoffRan = useRef(false);
   const { data: session, status } = useSession();
   const { isOnboarding } = useOnboarding();
   const isPreviewMode = useIsPreviewMode();
@@ -653,6 +678,94 @@ export default function DatesSection({
       );
     }
   };
+
+  useEffect(() => {
+    if (isPreviewMode || isOnboarding || chatDateHandoffRan.current) return;
+    const requested = parseChatHandoffDates(
+      searchParams.get(CHECKOUT_HANDOFF_DATES),
+    );
+    if (requested.length === 0) return;
+
+    const available = dates ?? [];
+    const toAdd = requested
+      .map((iso) =>
+        available.find(
+          (item) => isoDateKey(item.event_date) === iso && item.sold_out !== true,
+        ),
+      )
+      .filter((item): item is DatesSectionType[0] => Boolean(item));
+    if (toAdd.length === 0) return;
+
+    chatDateHandoffRan.current = true;
+
+    const pay = parseCheckoutHandoffPay(searchParams.get(CHECKOUT_HANDOFF_PAY));
+    const coupon = searchParams.get(CHECKOUT_HANDOFF_COUPON)?.trim() || null;
+    mergeCheckoutHandoffPending({ pay, coupon });
+    const checkoutHref = buildCheckoutHandoffHref({ pay, coupon });
+
+    const actualEventSlug = eventSlug || CHECKOUT_CONSTANTS.DEFAULT_EVENT_SLUG;
+    const actualEventName = eventName || "Festive & Fabulous";
+    const actualEventImage =
+      eventImage ||
+      "http://192.168.1.100:8000/storage/uploads/vendor/events/event_banner_image68bab4bb983bd.jpg";
+
+    const user = session?.user as SessionUser | undefined;
+    const isCustomer =
+      status === "authenticated" &&
+      user?.account_type === "customer" &&
+      user?.active_role === "customer" &&
+      Boolean(user?.token);
+
+    if (!isCustomer) {
+      savePendingBooking({
+        event_slug: actualEventSlug,
+        event_name: actualEventName,
+        event_image: actualEventImage,
+        event_date: toAdd[0].event_date,
+        extra_dates: toAdd.slice(1).map((item) => item.event_date),
+        ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
+      });
+      saveAuthCallbackUrl(checkoutHref);
+      router.push(
+        `/auth/login?callbackUrl=${encodeURIComponent(checkoutHref)}`,
+      );
+      return;
+    }
+
+    void (async () => {
+      try {
+        for (const item of toAdd) {
+          await storeEventBooking({
+            data: {
+              slug: normalizeSlug(actualEventSlug),
+              event_date: item.event_date,
+              ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
+              drink_package: [],
+              tables: [],
+              tickets: [],
+            },
+          });
+        }
+        router.push(checkoutHref);
+      } catch (error) {
+        console.error("Chat date handoff failed:", error);
+        chatDateHandoffRan.current = false;
+      }
+    })();
+  }, [
+    dates,
+    eventImage,
+    eventName,
+    eventSlug,
+    isOnboarding,
+    isPreviewMode,
+    roomId,
+    router,
+    searchParams,
+    session?.user,
+    status,
+    storeEventBooking,
+  ]);
 
   // Professional API-only approach - no conflict resolution needed
 

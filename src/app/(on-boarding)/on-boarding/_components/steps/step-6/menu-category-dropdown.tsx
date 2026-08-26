@@ -14,6 +14,10 @@ import { Loader2 } from "lucide-react";
 import { EventMenuCategory } from "@/services/vendor/events/type";
 import { eventsService } from "@/services/vendor/events/events.service";
 import {
+  extractCreatedMenuCategory,
+  toPositiveId,
+} from "@/lib/event-menu-categories";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -68,8 +72,9 @@ export default function MenuCategoryDropdown({
   eventId,
   roomId,
 }: MenuCategoryDropdownProps) {
+  const selectedId = toPositiveId(initialValue);
   const [selectedValue, setSelectedValue] = useState<string | undefined>(
-    initialValue ? String(initialValue) : undefined,
+    selectedId != null ? String(selectedId) : undefined,
   );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,11 +90,8 @@ export default function MenuCategoryDropdown({
 
   // Update selected value when initialValue changes
   useEffect(() => {
-    setSelectedValue(
-      initialValue !== undefined && initialValue !== null
-        ? String(initialValue)
-        : undefined,
-    );
+    const nextId = toPositiveId(initialValue);
+    setSelectedValue(nextId != null ? String(nextId) : undefined);
   }, [initialValue]);
 
   const handleSelectChange = (value: string) => {
@@ -124,49 +126,14 @@ export default function MenuCategoryDropdown({
       };
 
       const response = await eventsService.createEventMenuCategory(payload);
-
-      // Extract category data from response (handle both formats)
-      let categoryData: { id: number; name: string } | null = null;
-
-      // Format 1: Standard API response with status and data
-      if (
-        response &&
-        typeof response === "object" &&
-        "status" in response &&
-        response.status &&
-        response.data
-      ) {
-        categoryData = response.data;
-      }
-      // Format 2: Direct object with id and name
-      else if (
-        response &&
-        typeof response === "object" &&
-        "id" in response &&
-        "name" in response
-      ) {
-        categoryData = {
-          id: response.id as number,
-          name: response.name as string,
-        };
-      }
-
-      // Check if we successfully extracted category data
-      if (categoryData) {
-        // Reset form and close dialog
+      const created = extractCreatedMenuCategory(response);
+      if (created) {
         form.reset();
         setIsDialogOpen(false);
 
-        // Notify parent component to refresh categories
         if (onCategoryCreated) {
-          onCategoryCreated(categoryData);
-
-          // Wait a moment for the categories to refresh
-          setTimeout(() => {
-            // Select the newly created category
-            const newCategoryId = String(categoryData.id);
-            setSelectedValue(newCategoryId);
-          }, 100);
+          onCategoryCreated({ id: created.id, name: created.name });
+          setSelectedValue(String(created.id));
         }
       } else {
         // Error toast is handled by axios interceptor
@@ -209,11 +176,26 @@ export default function MenuCategoryDropdown({
                   <SelectItem value="placeholder" disabled>
                     Select an option
                   </SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={String(category.id)}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {categories.map((category) => {
+                    const id = toPositiveId(category.id);
+                    if (id == null) return null;
+                    return (
+                      <SelectItem key={id} value={String(id)}>
+                        {category.name}
+                      </SelectItem>
+                    );
+                  })}
+                  {selectedValue &&
+                    toPositiveId(selectedValue) != null &&
+                    !categories.some(
+                      (category) =>
+                        String(toPositiveId(category.id) ?? "") ===
+                        selectedValue,
+                    ) && (
+                      <SelectItem value={selectedValue}>
+                        Selected category
+                      </SelectItem>
+                    )}
                 </>
               )}
             </SelectContent>

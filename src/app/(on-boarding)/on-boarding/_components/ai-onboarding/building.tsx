@@ -8,6 +8,7 @@ import type {
   AIOnboardingInput,
 } from "@/app/api/ai/generate-onboarding/route";
 import { useFormContext } from "../form-provider";
+import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import {
   AI_ONBOARDING_APPLY_STEPS,
   applyAIGeneratedOnboardingContent,
@@ -73,9 +74,11 @@ export default function AIOnboardingBuilding({
       setGenProgress((prev) => {
         if (prev >= BUILDING_GENERATE_HOLD_PCT) return BUILDING_GENERATE_HOLD_PCT;
         const remaining = BUILDING_GENERATE_HOLD_PCT - prev;
-        return prev + Math.max(0.12, remaining * 0.018);
+        const step =
+          prev < 18 ? 1.25 : prev < 34 ? 0.55 : Math.max(0.07, remaining * 0.012);
+        return Math.min(BUILDING_GENERATE_HOLD_PCT, prev + step);
       });
-    }, 90);
+    }, 100);
     return () => window.clearInterval(id);
   }, [phase]);
 
@@ -114,6 +117,7 @@ export default function AIOnboardingBuilding({
       } finally {
         setApplyStep(-1);
         clearAIBulkApplyStarted();
+        void onboardingService.notifyDataChanged();
       }
     };
 
@@ -136,6 +140,7 @@ export default function AIOnboardingBuilding({
       hasMultipleLocations={hasMultipleLocations}
       activeIndex={activeIndex}
       progress={progress}
+      isWriting={phase === "generating"}
     />
   );
 }

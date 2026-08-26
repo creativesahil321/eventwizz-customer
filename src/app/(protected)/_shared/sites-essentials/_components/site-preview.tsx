@@ -11,6 +11,7 @@ import {
   buildSiteEssentialsContactTheme,
   resolveSiteEssentialsPreviewContact,
 } from "../_lib/preview-contact";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 
 interface SitePreviewProps {
   formValues: SiteEssentialsFormValues;
@@ -102,6 +103,7 @@ export function SitePreview({
     about_title: formValues.about_title ?? null,
     about_cta_link: null,
     about_description: formValues.about_description ?? null,
+    footer_brand_description: formValues.footer_brand_description ?? null,
     about_link_title: null,
     event_title_1: formValues.event_title_1 ?? "Popular Events",
     latest_events: latestEvents,
@@ -140,6 +142,7 @@ export function SitePreview({
           banner_heading_align: formValues.banner_heading_align,
           banner_heading_valign: formValues.banner_heading_valign,
           typography: formValues.typography,
+          footer_brand_description: formValues.footer_brand_description,
         }}
         headerVariant="preview"
         headerLogo={logoUrl}
@@ -153,7 +156,11 @@ export function SitePreview({
         footerContactTheme={contactTheme}
         footerSocialLinksOverride={formValues.socialLinks}
         footerBrandDescription={
-          formValues.about_description || formValues.seo?.description || ""
+          firstFooterBrandDescription(
+            formValues.footer_brand_description,
+            formValues.about_description,
+            formValues.seo?.description,
+          )
         }
       />
     </div>

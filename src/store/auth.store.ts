@@ -356,6 +356,17 @@ export const useAuthStore = create<AuthState>()(
           state.tokenExpiry = null;
         });
 
+        // Persist middleware rewrites auth-storage after set() — wipe again so
+        // the next account does not inherit onboarding_mode / rooms / location.
+        try {
+          const { clearVendorBrowserSession } = await import(
+            "@/lib/clear-vendor-browser-session"
+          );
+          clearVendorBrowserSession();
+        } catch (error) {
+          console.error("[Auth Store] Error clearing browser session:", error);
+        }
+
         // For security violations, hard redirect to login
         if (securityViolation && typeof window !== "undefined") {
           window.location.href = "/auth/login?error=security_violation";

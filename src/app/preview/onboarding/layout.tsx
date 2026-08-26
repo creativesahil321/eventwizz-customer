@@ -43,7 +43,7 @@ export default async function OnboardingPreviewLayout({
         subdomain,
       }}
     >
-      <div className="onboarding-preview-shell min-h-screen w-full">
+      <div className="onboarding-preview-shell h-[100dvh] max-h-[100dvh] w-full overflow-hidden">
         {children}
       </div>
     </ServerContextProvider>

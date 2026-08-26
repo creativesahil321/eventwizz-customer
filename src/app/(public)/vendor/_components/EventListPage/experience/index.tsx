@@ -44,7 +44,7 @@ export default function ExperienceSection({
         <div
           className={cn(
             "grid grid-cols-1 items-start gap-8 text-[var(--color-text)]",
-            !narrowPreview && "md:grid-cols-2 md:gap-16",
+            !narrowPreview && "lg:grid-cols-2 lg:gap-16",
           )}
         >
           <div className="w-full min-w-0">
@@ -54,7 +54,7 @@ export default function ExperienceSection({
               variant="onSurface"
               className={cn(
                 "!mt-2 !leading-tight break-words !text-3xl !font-black tracking-tight",
-                !narrowPreview && "md:!text-5xl",
+                !narrowPreview && "lg:!text-5xl",
               )}
             />
           </div>
@@ -62,7 +62,7 @@ export default function ExperienceSection({
             <div
               className={cn(
                 "break-words text-base text-[var(--color-text-dimmed)]",
-                !narrowPreview && "md:text-lg",
+                !narrowPreview && "lg:text-lg",
               )}
               dangerouslySetInnerHTML={{ __html: descriptionHtml }}
             />

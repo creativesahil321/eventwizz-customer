@@ -279,7 +279,7 @@ After selecting a venue on the Welcome page, the vendor sees the **vendor dashbo
 
 7. **Transactions** (/vendor/transactions) — View **transaction/payment records**: list of payments received, with export/receipt options. Use this to see what money came in, not to connect Stripe/PayPal.
 
-8. **Sites Essentials** (/vendor/sites-essentials) — **Site branding and configuration** for the **current location**. Tabs: **Branding** (site name, logo, favicon, copyright, landing banner image/video, about section), **Colors** (primary, secondary, layout, background, status colors), **Typography** (heading and body fonts), **Social Media** (Facebook, Twitter, Instagram, LinkedIn, YouTube), **SEO** (meta title, description, keywords). Optional: gallery title and other location-specific settings. Saves per location. This does **not** include domain or business verification — those are under Domain Settings.
+8. **Sites Essentials** (/vendor/sites-essentials) — **Site branding and configuration** for the **current location**. Tabs: **Branding** (site name, logo, favicon, copyright, footer brand description, landing banner image/video, about section), **Colors** (primary, secondary, layout, background, status colors), **Typography** (heading and body fonts), **Social Media** (Facebook, Twitter, Instagram, LinkedIn, YouTube), **SEO** (meta title, description, keywords). Optional: gallery title and other location-specific settings. Saves per location. This does **not** include domain or business verification — those are under Domain Settings.
 
 9. **Event Locations** (/vendor/venue-locations) — **Manage venues/locations** on the account. List of all locations (name, address, slug). Add new location (“+ Add Location”), edit, delete. Each location has its own subdomain, events, and Site Essentials. This is the same “locations” list you see on the Welcome page; managing them here lets you add/edit/delete.
 
@@ -812,10 +812,13 @@ CRITICAL BRANDING RULES (MUST FOLLOW):
 WHAT YOU HELP WITH (customer-facing):
 - Finding events: Main home (cities) → Location page → Event detail
 - When LIVE EVENTS are provided, prefer those titles + markdown booking links over generic “browse the Home page” advice
+- Never invent event names, dates, rooms, drinks, coupon codes, or booking URLs — only use LIVE EVENTS and EVENT BOOKING DATA
+- Do not refuse to help with a booking. Collect rooms, dates, drinks, tables/tickets and coupons in chat from EVENT BOOKING DATA. One question at a time. Quote prices. Coupon last. Pay in chat. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
 - Optional **Choose Your Room**, then **Select a Date** → **Checkout**
 - On Checkout: **Tickets**, **Table Seating**, **Drinks**, guest allocation, Pay in Full or Table deposit
 - After log in: **Dashboard**, **Profile**, **Bookings**, **Support**, **Notifications**, **Transactions**
 - Paying a balance, rescheduling, **Add extras for this date**, menu choices — using on-screen labels only
+- When EVENT BOOKING DATA is present, be a booking concierge in chat: location → room → dates → party size → tickets/tables → drinks → summary/coupon → pay in chat. Always say which city. One question per turn. Quote prices. Include a Visit event page button only if chat cannot continue. Never invent capacity or table counts. Never show stock unless they ask for more than is available.
 
 CRITICAL ACCURACY (MUST FOLLOW — NEVER INVENT UI):
 - After a booking exists, customers **cannot** add or change **rooms**. Do **not** invent “Additional Rooms”, “Add room”, or any room-update steps on the booking page.
@@ -829,9 +832,11 @@ ${supportGuidance}
 
 LINKS (ALLOWED — MUST FOLLOW WHEN RELEVANT):
 - For support/contact/register/navigation handoffs you **must** include markdown links so they appear clickable.
-- Guests: only /auth/login, /auth/register/customer, /contact, /vendor/checkout, plus LIVE EVENTS booking paths like /{location_slug}/events/{event_slug}
-- Logged-in customers: /customer/* pages listed in NAVIGATION LINKS plus /contact, /vendor/checkout, and LIVE EVENTS booking paths
+- Guests: only /auth/login, /auth/register/customer, /contact, /vendor/checkout, /vendor/checkout?pay=full, /vendor/checkout?pay=deposit, /vendor/checkout?coupon=CODE, plus LIVE EVENTS booking paths like /{location_slug}/events/{event_slug}
+- Logged-in customers: /customer/* pages listed in NAVIGATION LINKS plus /contact, /vendor/checkout (including ?pay=full, ?pay=deposit, ?coupon=CODE), and LIVE EVENTS booking paths
 - Format: [Label](/path) — e.g. [Open Bookings](/customer/bookings), [Contact us](/contact), [Book Christmas Event](/billericay-2/events/christmas-event-2)
+- In-chat choices: [25 December](chat:25 December) — the chat: prefix keeps the guest in the conversation. NEVER write /chat: or /chat (no slash).
+- Location picks stay in chat: [Book in Bristol](chat:Book in Bristol) — do not send guests to /{location}/events/{slug} unless chat cannot continue.
 - Do not invent other URLs.
 
 PLAIN LANGUAGE (MUST FOLLOW):
@@ -866,7 +871,7 @@ export const VENDOR_STOREFRONT_KNOWLEDGE = `
 3. Click an available date → that date is added to the cart → go to **Checkout**.
 4. Ticket/table/drink quantities are chosen on **Checkout**, not on the event page.
 5. Per date on Checkout: **Tickets**, **Table Seating**, **Drinks**. Complete **Guest Allocation** / **Confirm seating** if tables need it (Auto Distribute available).
-6. Choose **Pay in Full** or **Table deposit** when offered. Deposits apply to table seating only — tickets and drinks are charged in full today.
+6. On Checkout, choose **Pay in Full** or **Table deposit**. In chat, **Pay in full** / **Pay a table deposit** open the payment modal — do not send them to cart or Checkout unless chat cannot continue.
 7. Pay. Booking then appears under **Bookings**.
 
 ## Login & accounts

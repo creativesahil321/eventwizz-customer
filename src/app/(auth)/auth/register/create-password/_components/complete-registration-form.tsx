@@ -21,6 +21,7 @@ import { usePermissionStore } from "@/store/permission.store";
 import { Loader2 } from "lucide-react";
 import { RegistrationResponse } from "@/types/api.types";
 import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
+import { clearOnboardingBrowserState } from "@/lib/clear-vendor-browser-session";
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
@@ -100,6 +101,8 @@ export function CompleteRegistrationForm() {
       })) as unknown as RegistrationResponse;
 
       if (response.status) {
+        clearOnboardingBrowserState();
+
         // Clear registration data
         const cookieKeys = [
           "verification_email",

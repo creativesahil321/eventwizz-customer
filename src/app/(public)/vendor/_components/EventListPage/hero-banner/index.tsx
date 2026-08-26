@@ -2,7 +2,7 @@
 
 import { useContext, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Phone } from "lucide-react";
+import { MapPin, Phone, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
@@ -16,10 +16,11 @@ import {
   heroBandHeightClass,
   heroBandMediaOverlayClass,
   heroBannerBodyClass,
-  heroBannerContactRowClass,
   heroBannerEyebrowClass,
   heroBannerHeadingTypeClass,
   heroBannerStackClass,
+  heroBannerVenueContactClass,
+  heroBannerVenueContactLinksClass,
   heroFooterDockClass,
   heroHeadingMeasureClass,
   normalizeBannerHeadingAlign,
@@ -27,6 +28,10 @@ import {
   type BannerHeadingAlign,
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
+import {
+  previewFlexFromMd,
+  previewFlexOnlyUntilMd,
+} from "@/lib/preview-container-layout";
 // Default fallback media
 // const FALLBACK_VIDEO_URL =
 //   "https://www.bestpartiesever.com/wp-content/uploads/2025/03/Website-video-combined-edit-online-video-cutter.com-1.mp4";
@@ -68,9 +73,10 @@ interface HeroBannerProps {
   heroFooter?: ReactNode;
   /** Small-caps line above the title (city / region). */
   eyebrow?: string | null;
-  /** Address + phone under the description (location covers). */
+  /** Address, email, and phone under the description (location covers). */
   heroContact?: {
     address?: string | null;
+    email?: string | null;
     phone?: string | null;
   } | null;
 }
@@ -157,6 +163,11 @@ export default function HeroBanner({
       : vendorTheme?.banner_heading_valign,
   );
   const stackClass = heroBannerStackClass(textAlign, { fromMd: true });
+  const hasContact = Boolean(
+    heroContact?.address?.trim() ||
+      heroContact?.email?.trim() ||
+      heroContact?.phone?.trim(),
+  );
 
   return (
     <section
@@ -202,6 +213,7 @@ export default function HeroBanner({
           heroBandCopyPlacementClass(heroValign),
           "max-w-7xl px-3 sm:px-4",
           heroHeadingMeasureClass,
+          "@max-sm/preview:!px-3",
           heroBandContentPadClass(heroValign, {
             withBottomChrome: Boolean(heroFooter),
           }),
@@ -243,15 +255,34 @@ export default function HeroBanner({
             </p>
           ) : null}
 
-          <HeroBannerContactMeta contact={heroContact} align={textAlign} />
+          {hasContact ? (
+            <div className={heroFooter ? previewFlexFromMd : undefined}>
+              <HeroBannerContactMeta contact={heroContact} align={textAlign} />
+            </div>
+          ) : null}
         </motion.div>
       </div>
 
       {/* Independent of heading align/valign — always bottom-centered */}
       {heroFooter ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
-          <div className="mx-auto w-full max-w-7xl px-3 pb-4 sm:px-4 sm:pb-5 md:pb-6">
-            <div className={heroFooterDockClass(textAlign)}>{heroFooter}</div>
+          <div className="mx-auto w-full max-w-7xl px-3 pb-3 sm:px-4 sm:pb-5 md:pb-6 @max-sm/preview:!px-2.5 @max-sm/preview:!pb-3">
+            <div
+              className={cn(
+                heroFooterDockClass(textAlign),
+                "flex flex-col gap-3 sm:gap-3.5",
+              )}
+            >
+              {hasContact ? (
+                <div className={previewFlexOnlyUntilMd}>
+                  <HeroBannerContactMeta
+                    contact={heroContact}
+                    align={textAlign}
+                  />
+                </div>
+              ) : null}
+              {heroFooter}
+            </div>
           </div>
         </div>
       ) : null}
@@ -267,31 +298,61 @@ function HeroBannerContactMeta({
   align: BannerHeadingAlign;
 }) {
   const address = contact?.address?.trim() || null;
+  const email = contact?.email?.trim() || null;
   const phone = contact?.phone?.trim() || null;
-  if (!address && !phone) return null;
+  if (!address && !email && !phone) return null;
 
   return (
-    <div className={heroBannerContactRowClass(align, { fromMd: true })}>
+    <div className={heroBannerVenueContactClass(align, { fromMd: true })}>
       {address ? (
-        <a
+        <HeroContactLine
           href={buildMapsDirectionsUrl(address)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex max-w-full items-start gap-2 transition-colors hover:text-white"
-        >
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <span className="min-w-0 break-words">{address}</span>
-        </a>
+          external
+          icon={MapPin}
+          label={address}
+          block
+        />
       ) : null}
-      {phone ? (
-        <a
-          href={`tel:${phone}`}
-          className="inline-flex items-center gap-2 transition-colors hover:text-white"
-        >
-          <Phone className="h-4 w-4 shrink-0" aria-hidden />
-          <span>{phone}</span>
-        </a>
+      {email || phone ? (
+        <div className={heroBannerVenueContactLinksClass(align, { fromMd: true })}>
+          {email ? (
+            <HeroContactLine href={`mailto:${email}`} icon={Mail} label={email} />
+          ) : null}
+          {phone ? (
+            <HeroContactLine href={`tel:${phone}`} icon={Phone} label={phone} />
+          ) : null}
+        </div>
       ) : null}
     </div>
+  );
+}
+
+function HeroContactLine({
+  href,
+  icon: Icon,
+  label,
+  external = false,
+  block = false,
+}: {
+  href: string;
+  icon: typeof MapPin;
+  label: string;
+  external?: boolean;
+  block?: boolean;
+}) {
+  return (
+    <a
+      href={href}
+      {...(external
+        ? { target: "_blank", rel: "noopener noreferrer" }
+        : {})}
+      className={cn(
+        "inline-flex min-w-0 items-center gap-2 text-[13px] leading-snug text-white/90 transition-colors hover:text-white sm:text-sm @max-md/preview:!text-[13px]",
+        block ? "max-w-[min(100%,28rem)] text-pretty" : "w-auto max-w-full shrink-0",
+      )}
+    >
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
+      <span className="min-w-0 text-pretty [overflow-wrap:anywhere]">{label}</span>
+    </a>
   );
 }

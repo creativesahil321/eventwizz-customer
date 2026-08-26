@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import {
   AI_PLAIN_TEXT,
+  looksLikeAiInstructionLeak,
   toUserFacingMarketingCopy,
 } from "../lib/extract-json";
 import {
@@ -9,8 +10,10 @@ import {
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
+import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
+import { toPlainText } from "@/lib/plain-text-length";
 
-type ContentType = "about" | "policy" | "contact" | "page";
+type ContentType = "about" | "policy" | "contact" | "page" | "footer";
 
 /**
  * Single source of truth for the HTML shape every CMS page produces. Keeping the
@@ -124,6 +127,112 @@ function buildContactPrompt({
   };
 }
 
+function guestFacingDraft(value?: string): string | undefined {
+  if (!value || value === "undefined") return undefined;
+  const plain = toPlainText(value);
+  if (!plain || looksLikeAiInstructionLeak(plain)) return undefined;
+  return plain;
+}
+
+function buildFooterPrompt({
+  venueName,
+  city,
+  venueSummary,
+  currentDescription,
+}: {
+  venueName: string;
+  city?: string;
+  venueSummary?: string;
+  currentDescription?: string;
+}): { system: string; user: string; maxTokens: number } {
+  const location = typeof city === "string" ? city.trim() : "";
+  let userPrompt = `Venue name: ${venueName}`;
+  if (location) {
+    userPrompt += `\nLocation: ${location}`;
+  }
+  const summary = guestFacingDraft(venueSummary);
+  if (summary) {
+    userPrompt += `\nVenue summary (facts only — do not copy or discuss):\n${summary}`;
+  }
+  const draft = guestFacingDraft(currentDescription);
+  if (draft) {
+    userPrompt += `\nCurrent footer line to improve (rewrite it, do not quote or analyse it):\n${draft}`;
+  }
+
+  userPrompt += `
+
+Write the one-line footer blurb shown under the logo for guests.
+- 1–2 warm sentences about this venue
+- At most 35 words and 180 characters
+- Plain text only
+- Do not mention writing tasks, drafts, UK vs India, or these rules
+- Reply with the blurb only`;
+
+  return {
+    system:
+      "You write short guest-facing venue footer lines. Reply with the finished blurb only — never planning, analysis, or restated instructions.",
+    user: userPrompt,
+    maxTokens: 120,
+  };
+}
+
+function finalisePlainCopy(raw: string, contentType: ContentType): string {
+  const summary = toUserFacingMarketingCopy(raw);
+  if (!summary || summary === "REGENERATE") return "";
+
+  if (contentType !== "about" && contentType !== "footer") {
+    return summary
+      .replace(/^```html\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+  }
+
+  const clean = summary
+    .replace(/^["']|["']$/g, "")
+    .replace(
+      /^(Here( is|'s)|This is|I suggest|Below is|Following is|We wrote|The following is|Let me give you|I have created)\s*.*?:?\s*/i,
+      "",
+    )
+    .replace(/^(Revised|Updated)?\s*description\s*:\s*/i, "")
+    .replace(/^As a\b.*?,\s*/i, "")
+    .replace(/\b(?:therefore|moreover|furthermore|consequently)\b/gi, "")
+    .trim();
+
+  const bannedPrefixes = [
+    "here is",
+    "here's",
+    "this is",
+    "i suggest",
+    "below is",
+    "following is",
+    "we wrote",
+    "let me give you",
+    "i have created",
+    "we need",
+  ];
+
+  if (
+    bannedPrefixes.some((prefix) => clean.toLowerCase().startsWith(prefix)) ||
+    looksLikeAiInstructionLeak(clean)
+  ) {
+    return "";
+  }
+
+  return clean;
+}
+
+function finaliseFooterBlurb(raw: string): string {
+  let clean = finalisePlainCopy(raw, "footer");
+  if (!clean) {
+    clean = toUserFacingMarketingCopy(raw);
+  }
+  if (!clean || looksLikeAiInstructionLeak(clean)) return "";
+  const clipped = clipFooterBrandDescription(clean);
+  if (!clipped || looksLikeAiInstructionLeak(clipped)) return "";
+  return clipped;
+}
+
 export async function POST(req: Request) {
   try {
     const {
@@ -132,6 +241,7 @@ export async function POST(req: Request) {
       ctaText,
       ctaUrl,
       description,
+      city,
       event_name,
       sub_title,
       event_category_name,
@@ -152,6 +262,7 @@ export async function POST(req: Request) {
     let systemContent: string;
     let userPrompt: string;
     let maxTokens = 300;
+    let temperature = 0.7;
 
     if (contentType === "policy") {
       const policy = buildPolicyPrompt({
@@ -182,6 +293,17 @@ export async function POST(req: Request) {
       systemContent = contact.system;
       userPrompt = contact.user;
       maxTokens = contact.maxTokens;
+    } else if (contentType === "footer") {
+      const footer = buildFooterPrompt({
+        venueName,
+        city: typeof city === "string" ? city : undefined,
+        venueSummary: typeof description === "string" ? description : undefined,
+        currentDescription,
+      });
+      systemContent = footer.system;
+      userPrompt = footer.user;
+      maxTokens = footer.maxTokens;
+      temperature = 0.35;
     } else {
       if (!title?.trim()) {
         return NextResponse.json(
@@ -238,7 +360,7 @@ export async function POST(req: Request) {
         "If you break any rule, respond with 'REGENERATE'.";
     }
 
-    const result: FallbackResult = await tryModelsWithFallback(
+    let result: FallbackResult = await tryModelsWithFallback(
       aiConfig,
       {
         messages: [
@@ -251,7 +373,7 @@ export async function POST(req: Request) {
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
+        temperature,
         max_tokens: maxTokens,
         ...AI_PLAIN_TEXT,
       }
@@ -278,11 +400,39 @@ export async function POST(req: Request) {
       );
     }
 
-    const summary = toUserFacingMarketingCopy(
-      result.data.choices?.[0]?.message?.content ?? "",
-    );
+    const rawContent = result.data.choices?.[0]?.message?.content ?? "";
+    let cleanSummary =
+      contentType === "footer"
+        ? finaliseFooterBlurb(rawContent)
+        : finalisePlainCopy(rawContent, contentType);
 
-    if (!summary || summary === "REGENERATE") {
+    // Footer blurbs are short and easy to over-run; one focused retry when the
+    // first pass leaked instructions or clipped to empty.
+    if (contentType === "footer" && !cleanSummary) {
+      const retryPrompt = buildFooterPrompt({
+        venueName,
+        city: typeof city === "string" ? city : undefined,
+        venueSummary: typeof description === "string" ? description : undefined,
+        currentDescription: undefined,
+      });
+      const retry = await tryModelsWithFallback(aiConfig, {
+        messages: [
+          { role: "system", content: retryPrompt.system },
+          { role: "user", content: retryPrompt.user },
+        ],
+        temperature: 0.2,
+        max_tokens: retryPrompt.maxTokens,
+        ...AI_PLAIN_TEXT,
+      });
+      if (retry.success && retry.data) {
+        result = retry;
+        cleanSummary = finaliseFooterBlurb(
+          retry.data.choices?.[0]?.message?.content ?? "",
+        );
+      }
+    }
+
+    if (!cleanSummary) {
       return NextResponse.json(
         {
           error:
@@ -290,63 +440,6 @@ export async function POST(req: Request) {
         },
         { status: 500 }
       );
-    }
-
-    const cleanSummary =
-      contentType === "about"
-        ? summary
-            .replace(/^["']|["']$/g, "")
-            .replace(
-              /^(Here( is|'s)|This is|I suggest|Below is|Following is|We wrote|The following is|Let me give you|I have created)\s*.*?:?\s*/i,
-              ""
-            )
-            .replace(/^(Revised|Updated)?\s*description\s*:\s*/i, "")
-            .replace(/^As a\b.*?,\s*/i, "")
-            .replace(/\b(?:therefore|moreover|furthermore|consequently)\b/gi, "")
-            .trim()
-        : summary
-            .replace(/^```html\s*/i, "")
-            .replace(/^```\s*/i, "")
-            .replace(/\s*```$/i, "")
-            .trim();
-
-    if (
-      /thinking process|\*\*role:\*\*|analyze the request|drafting\s*[-–]\s*attempt/i.test(
-        cleanSummary,
-      )
-    ) {
-      return NextResponse.json(
-        { error: "AI returned invalid meta content. Please try again." },
-        { status: 500 }
-      );
-    }
-
-    if (contentType === "about") {
-      const bannedPrefixes = [
-        "here is",
-        "here's",
-        "this is",
-        "i suggest",
-        "below is",
-        "following is",
-        "we wrote",
-        "let me give you",
-        "i have created",
-      ];
-
-      if (
-        bannedPrefixes.some((prefix) =>
-          cleanSummary.toLowerCase().startsWith(prefix)
-        ) ||
-        /thinking process|\*\*role:\*\*|analyze the request|drafting\s*[-–]\s*attempt/i.test(
-          cleanSummary,
-        )
-      ) {
-        return NextResponse.json(
-          { error: "AI returned invalid meta content. Please try again." },
-          { status: 500 }
-        );
-      }
     }
 
     return NextResponse.json({

@@ -832,11 +832,11 @@ export const eventsService = {
 
       if (data.menus) {
         data.menus.forEach((menu, menuIndex) => {
-          formData.append(`menus[${menuIndex}][name]`, menu.name);
-          menu.items.forEach((item, itemIndex) => {
+          formData.append(`menus[${menuIndex}][name]`, menu.name ?? "");
+          (menu.items ?? []).forEach((item, itemIndex) => {
             formData.append(
               `menus[${menuIndex}][items][${itemIndex}][title]`,
-              item.title,
+              item.title ?? "",
             );
             formData.append(
               `menus[${menuIndex}][items][${itemIndex}][description]`,

@@ -38,6 +38,13 @@ import {
 } from "./dialog";
 import { Input } from "./input";
 import { toast } from "sonner";
+import {
+  clipPlainTextToLimits,
+  toPlainText,
+  wrapPlainTextAsHtml,
+} from "@/lib/plain-text-length";
+import { countWords } from "@/lib/word-count";
+import { looksLikeAiInstructionLeak } from "@/app/api/ai/lib/extract-json";
 
 interface TiptapEditorProps {
   value: string;
@@ -50,6 +57,7 @@ interface TiptapEditorProps {
     title?: string;
     sub_title?: string;
     description?: string;
+    city?: string;
     ctaText?: string;
     ctaUrl?: string;
     event_name?: string;
@@ -63,7 +71,7 @@ interface TiptapEditorProps {
      * - "contact": short contact intro
      * - "page": full structured marketing page (About Us, How It Works)
      */
-    contentType?: "about" | "policy" | "contact" | "page";
+    contentType?: "about" | "policy" | "contact" | "page" | "footer";
     policySection?: string;
   };
   showAIButton?: boolean;
@@ -105,10 +113,12 @@ export function TiptapEditor({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const onUploadImageRef = useRef(onUploadImage);
+  const onChangeRef = useRef(onChange);
   const editorRef = useRef<ReturnType<typeof useEditor>>(null);
   const uploadingImageRef = useRef(false);
 
   onUploadImageRef.current = onUploadImage;
+  onChangeRef.current = onChange;
 
   const insertUploadedImage = React.useCallback(
     async (file: File, pos?: number) => {
@@ -198,9 +208,7 @@ export function TiptapEditor({
       Placeholder.configure({
         placeholder,
       }),
-      CharacterCount.configure({
-        limit: maxLength,
-      }),
+      CharacterCount,
       TextAlign.configure({
         types: enableRichBlocks ? ["paragraph", "heading"] : ["paragraph"],
         alignments: ["left", "center", "right"],
@@ -284,12 +292,34 @@ export function TiptapEditor({
 
   editorRef.current = editor;
 
-  // Update editor content when value prop changes
+  // Update editor content when value prop changes.
+  // CharacterCount.limit silently rejects setContent over the cap, so over-limit
+  // footer HTML from AI must be clipped before it is applied.
   React.useEffect(() => {
-    if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value);
+    if (!editor) return;
+
+    let nextHtml = value || "";
+    if (aiContext?.contentType === "footer") {
+      const plain = toPlainText(nextHtml);
+      if (
+        plain &&
+        (plain.length > maxLength || countWords(plain) > maxWords)
+      ) {
+        nextHtml = wrapPlainTextAsHtml(
+          clipPlainTextToLimits(plain, maxLength, maxWords),
+        );
+        if (nextHtml !== value) {
+          onChangeRef.current(nextHtml);
+        }
+      }
     }
-  }, [editor, value]);
+
+    const nextPlain = toPlainText(nextHtml);
+    const currentPlain = editor.getText().replace(/\s+/g, " ").trim();
+    if (nextPlain !== currentPlain) {
+      editor.commands.setContent(nextHtml);
+    }
+  }, [editor, value, maxLength, maxWords, aiContext?.contentType]);
 
   React.useEffect(() => {
     editor?.setEditable(!readOnly);
@@ -348,11 +378,16 @@ export function TiptapEditor({
         },
         body: JSON.stringify({
           title: aiContext?.title,
-          currentDescription: editor.getHTML(),
+          currentDescription: looksLikeAiInstructionLeak(
+            toPlainText(editor.getHTML()),
+          )
+            ? ""
+            : editor.getHTML(),
           sub_title: aiContext?.sub_title,
           ctaText: aiContext?.ctaText,
           ctaUrl: aiContext?.ctaUrl,
           description: aiContext?.description,
+          city: aiContext?.city,
           event_name: aiContext?.event_name,
           event_category_name: aiContext?.event_category_name,
           banner_heading: aiContext?.banner_heading,
@@ -370,8 +405,29 @@ export function TiptapEditor({
 
       const data = await response.json();
       if (data.summary) {
-        editor.commands.setContent(data.summary); // Update editor content
-        onChange(data.summary); // Explicitly call onChange to sync with parent
+        if (looksLikeAiInstructionLeak(String(data.summary))) {
+          toast.error("Generated copy was not usable. Please try again.");
+          return;
+        }
+        const isPlainCopy =
+          aiContext?.contentType === "footer" ||
+          aiContext?.contentType === "about" ||
+          !aiContext?.contentType;
+        const html = isPlainCopy
+          ? wrapPlainTextAsHtml(
+              clipPlainTextToLimits(
+                String(data.summary),
+                maxLength,
+                maxWords,
+              ),
+            )
+          : String(data.summary);
+        if (!html || looksLikeAiInstructionLeak(toPlainText(html))) {
+          toast.error("Generated copy was empty. Please try again.");
+          return;
+        }
+        editor.commands.setContent(html);
+        onChange(html);
         toast.success("Content generated successfully!");
       }
     } catch (error) {
@@ -383,8 +439,14 @@ export function TiptapEditor({
     }
   };
 
-  const characterCount = editor?.getText().length ?? 0;
-  const wordCount = editor?.getText().split(/\s+/).filter(Boolean).length ?? 0;
+  const characterCount =
+    aiContext?.contentType === "footer"
+      ? toPlainText(editor?.getHTML() ?? "").length
+      : (editor?.getText().length ?? 0);
+  const wordCount =
+    aiContext?.contentType === "footer"
+      ? countWords(toPlainText(editor?.getHTML() ?? ""))
+      : (editor?.getText().split(/\s+/).filter(Boolean).length ?? 0);
 
   if (!editor) {
     return null;
@@ -577,7 +639,10 @@ export function TiptapEditor({
               size="sm"
               variant="outline"
               onClick={handleAIGenerate}
-              disabled={isGenerating || !aiContext?.title}
+              disabled={
+                isGenerating ||
+                (!aiContext?.title && aiContext?.contentType !== "footer")
+              }
               className="gap-1"
             >
               <Sparkles className="h-4 w-4" />

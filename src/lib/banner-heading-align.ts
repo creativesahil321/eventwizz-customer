@@ -68,7 +68,8 @@ export function heroBannerStackClass(
   scope?: HeroAlignScope,
 ): string {
   return cn(
-    "flex w-full max-w-full flex-col gap-3 sm:gap-4",
+    "flex w-full max-w-full flex-col gap-2.5 sm:gap-4",
+    "@max-sm/preview:!gap-2.5",
     stackAlignClass(align, scope?.fromMd),
   );
 }
@@ -108,6 +109,7 @@ export function heroBannerBodyClass(
 ): string {
   return cn(
     "w-full max-w-xl overflow-visible break-words text-pretty text-sm leading-relaxed text-white/85 [overflow-wrap:anywhere] sm:max-w-2xl sm:text-base sm:leading-relaxed",
+    "@max-sm/preview:!max-w-full @max-sm/preview:!text-sm @max-sm/preview:!leading-snug",
     measureAlignClass(align, scope?.fromMd),
     !scope?.fromMd && align === "center" && "text-center",
     !scope?.fromMd && align === "left" && "text-left",
@@ -124,15 +126,63 @@ export function heroBannerContactRowClass(
   scope?: HeroAlignScope,
 ): string {
   return cn(
-    "flex max-w-2xl flex-wrap items-start gap-x-6 gap-y-2 text-sm text-white/90",
+    "flex w-fit max-w-full flex-row flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-white/90",
     measureAlignClass(align, scope?.fromMd),
-    !scope?.fromMd && align === "center" && "justify-center text-center",
-    !scope?.fromMd && align === "left" && "justify-start text-left",
-    !scope?.fromMd && align === "right" && "justify-end text-right",
-    scope?.fromMd && "justify-center text-center",
-    scope?.fromMd && align === "left" && "md:justify-start md:text-left",
-    scope?.fromMd && align === "center" && "md:justify-center md:text-center",
-    scope?.fromMd && align === "right" && "md:justify-end md:text-right",
+    !scope?.fromMd && align === "center" && "justify-center",
+    !scope?.fromMd && align === "left" && "justify-start",
+    !scope?.fromMd && align === "right" && "justify-end",
+    scope?.fromMd && "justify-center",
+    scope?.fromMd && align === "left" && "md:justify-start",
+    scope?.fromMd && align === "center" && "md:justify-center",
+    scope?.fromMd && align === "right" && "md:justify-end",
+  );
+}
+
+/**
+ * Venue address + email/phone. Shrink-wraps so centered rows share one axis
+ * (live location hero). Phone/tablet: address then email+phone. `md+`: one wrapping row.
+ */
+export function heroBannerVenueContactClass(
+  align: BannerHeadingAlign,
+  scope?: HeroAlignScope,
+): string {
+  return cn(
+    "flex w-fit max-w-full flex-col gap-2 text-sm text-white/90",
+    "md:flex-row md:flex-wrap md:items-center md:gap-x-6 md:gap-y-2",
+    "@max-md/preview:!flex-col @max-md/preview:!gap-2",
+    measureAlignClass(align, scope?.fromMd),
+    !scope?.fromMd && align === "center" && "items-center md:justify-center",
+    !scope?.fromMd && align === "left" && "items-start md:justify-start",
+    !scope?.fromMd && align === "right" && "items-end md:justify-end",
+    scope?.fromMd && "items-center md:justify-center",
+    scope?.fromMd && align === "left" && "md:items-center md:justify-start",
+    scope?.fromMd && align === "center" && "md:items-center md:justify-center",
+    scope?.fromMd && align === "right" && "md:items-center md:justify-end",
+    "@max-md/preview:!items-center",
+    scope?.fromMd &&
+      align === "left" &&
+      "@min-md/preview:!items-center @min-md/preview:!justify-start",
+    scope?.fromMd &&
+      align === "right" &&
+      "@min-md/preview:!items-center @min-md/preview:!justify-end",
+  );
+}
+
+export function heroBannerVenueContactLinksClass(
+  align: BannerHeadingAlign,
+  scope?: HeroAlignScope,
+): string {
+  return cn(
+    "flex max-w-full flex-wrap items-center gap-x-5 gap-y-1.5",
+    "md:contents",
+    "@max-md/preview:!flex @max-md/preview:!flex-wrap",
+    !scope?.fromMd && align === "center" && "justify-center",
+    !scope?.fromMd && align === "left" && "justify-start",
+    !scope?.fromMd && align === "right" && "justify-end",
+    scope?.fromMd && "justify-center",
+    "@max-md/preview:!justify-center",
+    scope?.fromMd && align === "left" && "@min-md/preview:!justify-start",
+    scope?.fromMd && align === "right" && "@min-md/preview:!justify-end",
   );
 }
 
@@ -227,7 +277,7 @@ export const heroHomeHeadingTypeClass = cn(
  * Use on any full-width marketing hero section.
  */
 export const heroBandHeightClass =
-  "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px]";
+  "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px] @max-sm/preview:!h-[32rem] @max-sm/preview:!min-h-[28rem] @max-sm/preview:!max-h-[34rem]";
 
 /**
  * Slightly shorter than the location hero — room for search without eating the fold.
@@ -329,16 +379,19 @@ export function heroBandContentPadClass(
   return cn(
     v === "top" &&
     (withBottomChrome
-      ? "pt-16 pb-24 sm:pt-24 sm:pb-32 md:pt-28 md:pb-36"
+      ? "pt-16 pb-36 sm:pt-24 sm:pb-40 md:pt-28 md:pb-44"
       : "pt-16 pb-8 sm:pt-24 sm:pb-12 md:pt-28 md:pb-14"),
     v === "center" &&
     (withBottomChrome
-      ? "pt-16 pb-24 sm:pt-24 sm:pb-32"
+      ? "pt-16 pb-40 sm:pt-24 sm:pb-36 md:pb-40"
       : "pt-16 pb-8 sm:pt-24 sm:pb-10"),
     v === "bottom" &&
     (withBottomChrome
-      ? "pt-16 pb-24 sm:pt-[4.5rem] sm:pb-36 md:pb-40"
+      ? "pt-16 pb-40 sm:pt-[4.5rem] sm:pb-44 md:pb-48"
       : "pt-16 pb-12 sm:pt-[4.5rem] sm:pb-20 md:pb-24"),
+    withBottomChrome &&
+      "@max-sm/preview:!pt-[4.25rem] @max-sm/preview:!pb-52",
+    !withBottomChrome && "@max-sm/preview:!pt-[4.25rem] @max-sm/preview:!pb-8",
   );
 }
 

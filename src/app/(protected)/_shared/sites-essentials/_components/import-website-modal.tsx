@@ -543,6 +543,10 @@ export function ImportWebsiteModal({
                     <PreviewField label="Banner sub-heading" value={content.banner_sub_heading} />
                     <PreviewField label="About title" value={content.about_title} />
                     <PreviewField label="About description" value={content.about_description} />
+                    <PreviewField
+                      label="Footer brand description"
+                      value={content.footer_brand_description}
+                    />
                     <div className="grid grid-cols-2 gap-3">
                       <PreviewField label="Section 1" value={content.event_title_1} />
                       <PreviewField label="Section 2" value={content.event_title_2} />

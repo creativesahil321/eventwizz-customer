@@ -96,6 +96,11 @@ function isFallbackWorthyGroqError(status: number, message: string | undefined, 
   if (msg.includes("tokens per minute")) return true;
   if (msg.includes("tokens per day") || msg.includes("tpd")) return true;
   if (msg.includes("request too large")) return true;
+  if (msg.includes("reduce the length of the messages")) return true;
+  if (msg.includes("reduce the length of the message")) return true;
+  if (msg.includes("context length") || msg.includes("maximum context")) {
+    return true;
+  }
   // Per-model completion caps (e.g. allam-2-7b = 4096 vs our 8192 request).
   if (
     msg.includes("max_completion_tokens") &&

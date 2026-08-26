@@ -74,6 +74,8 @@ export interface SiteEssentials {
   media_updated_at?: string | null;
   name: string;
   copyright: string;
+  /** Short blurb under the footer logo. Falls back to about_description when empty. */
+  footer_brand_description?: string | null;
   domain: string | null;
   website_role: string;
   banner_heading: string | null;

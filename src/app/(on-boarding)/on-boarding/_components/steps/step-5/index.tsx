@@ -1369,6 +1369,10 @@ export default function StepFive() {
                       <FormLabel className="text-md font-medium">
                         Is it a ticketed or seated event?
                       </FormLabel>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Defaults to Tickets — switch to Tables or Both if guests
+                        reserve seats.
+                      </p>
                       <FormControl>
                         <Select
                           value={field.value}

@@ -11,6 +11,7 @@ import {
   BANNER_HEADING_MAX_WORDS,
   truncateToMaxWords,
 } from "@/lib/word-count";
+import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
 import {
   DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
   DRINK_PACKAGE_PRICE_MAX,
@@ -27,6 +28,7 @@ import {
   buildAiOnboardingUserPrompt,
   buildAiOnboardingJsonSchemaBlock,
   coerceAiStepFiveRooms,
+  coerceAiDateList,
   ensureStepFiveRooms,
   ensureStepSevenRooms,
   normalizeAIDatePaymentFields,
@@ -104,6 +106,7 @@ export interface AIGeneratedContent {
     banner_sub_heading: string;
     about_title: string;
     about_description: string;
+    footer_brand_description: string;
   };
   stepThree: {
     event_name: string;
@@ -133,6 +136,16 @@ export interface AIGeneratedContent {
     menus: Array<{
       name: string;
       items: Array<{ title: string; description: string }>;
+    }>;
+    rooms?: Array<{
+      room_name: string;
+      catering_option?: 0 | 1;
+      menu_title?: string;
+      menu_description?: string;
+      menus?: Array<{
+        name: string;
+        items: Array<{ title: string; description: string }>;
+      }>;
     }>;
   };
   stepSeven: {
@@ -238,6 +251,9 @@ export async function POST(req: NextRequest) {
         content.stepTwo.banner_sub_heading = truncate(content.stepTwo.banner_sub_heading, 80);
         content.stepTwo.about_title = truncate(content.stepTwo.about_title, 40);
         content.stepTwo.about_description = truncate(content.stepTwo.about_description, 340);
+        content.stepTwo.footer_brand_description = clipFooterBrandDescription(
+          content.stepTwo.footer_brand_description ?? "",
+        );
       }
 
       if (content.stepThree) {
@@ -350,7 +366,7 @@ export async function POST(req: NextRequest) {
           }
 
           const tickets = (date.tickets || []).map((t) => ({
-            title: truncate(t.title || "General Admission", 25),
+            title: truncate(t.title || "Event ticket", 25),
             description: truncate(t.description || "Standard entry ticket", 160),
             total_capacity: String(
               Math.max(1, Math.min(100000, parseInt(t.total_capacity) || 100)),
@@ -376,7 +392,7 @@ export async function POST(req: NextRequest) {
                 : bookingType !== "tables"
                   ? [
                       {
-                        title: "General Admission",
+                        title: "Event ticket",
                         description: "Standard entry ticket",
                         total_capacity: "100",
                         price: "50",
@@ -425,6 +441,10 @@ export async function POST(req: NextRequest) {
       };
 
       // Enforce stepFive validation
+      content.stepFive = {
+        ...content.stepFive,
+        dates: coerceAiDateList(content.stepFive?.dates),
+      };
       if ((content.stepFive?.dates?.length ?? 0) > 0) {
         content.stepFive.dates = sanitizeAIDates(content.stepFive.dates, 2);
       } else {
@@ -439,7 +459,7 @@ export async function POST(req: NextRequest) {
               event_date: d1.toISOString().split("T")[0],
               booking_type: "both",
               tickets: [
-                { title: "General Admission", description: "Standard entry with full event access", total_capacity: "100", price: "50" },
+                { title: "Event ticket", description: "Standard entry with full event access", total_capacity: "100", price: "50" },
                 { title: "VIP Pass", description: "Premium access with exclusive perks", total_capacity: "30", price: "120" },
               ],
               tables: [
@@ -470,7 +490,10 @@ export async function POST(req: NextRequest) {
         const filteredRooms = coerceAiStepFiveRooms(content.stepFive?.rooms)
           .map((room, roomIdx) => ({
             room_name: truncate(String(room.room_name || "").trim(), 80),
-            dates: sanitizeAIDates(room.dates, 2 + roomIdx),
+            dates: sanitizeAIDates(
+              room.dates.length > 0 ? room.dates : content.stepFive?.dates,
+              2 + roomIdx,
+            ),
           }))
           .filter((room) => room.room_name.length > 0);
 
@@ -565,7 +588,7 @@ export async function POST(req: NextRequest) {
         }
       } else {
         content.stepSeven = {
-          drink_title: "Drinks & Packages",
+          drink_title: "",
           drink_description: "",
           packages: [],
         };

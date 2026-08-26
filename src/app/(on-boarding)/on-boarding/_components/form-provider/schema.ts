@@ -18,6 +18,7 @@ import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
 } from "@/lib/word-count";
+import { FOOTER_BRAND_DESCRIPTION_MAX_CHARS } from "@/lib/footer-brand-description";
 
 //#===step-1===#
 export const stepOneSchema = z
@@ -146,6 +147,10 @@ export const stepTwoSchema = z.object({
     .min(1, "Title is required")
     .max(40, "Title must not exceed 40 characters"),
   about_description: z.string().min(1, "Description is required"),
+  footer_brand_description: z.string().refine(
+    (s) => plainTextCharCount(s) <= FOOTER_BRAND_DESCRIPTION_MAX_CHARS,
+    `Footer brand description must not exceed ${FOOTER_BRAND_DESCRIPTION_MAX_CHARS} characters`,
+  ),
 });
 export type StepTwoType = z.infer<typeof stepTwoSchema>;
 
@@ -155,6 +160,7 @@ export const stepThreeSchema = z.object({
   isApproved: z.boolean().optional(),
   step: z.literal(3),
   vendor_location_id: z.number().optional(),
+  event_id: z.number().optional(),
   event_category_id: z.number().min(1, "Event Category is required"),
   event_name: z
     .string()
@@ -751,13 +757,15 @@ export const stepSixSchema = z
         });
       }
 
-      if (
-        (!data.event_menu_category_id || data.event_menu_category_id < 1) &&
-        (!data.menus || data.menus.length === 0)
-      ) {
+      // A menu category MUST exist before any menu items can be saved.
+      // Menu blocks can be populated from AI prefill / hydration without a
+      // backend category ever being created (categories API returns `data: []`),
+      // so this must be enforced whenever catering is Yes — not only when the
+      // menus array is empty.
+      if (!data.event_menu_category_id || data.event_menu_category_id < 1) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Menu category is required when catering option is Yes",
+          message: "Create or select a menu category before adding menu items",
           path: ["event_menu_category_id"],
         });
       }

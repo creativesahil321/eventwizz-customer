@@ -45,6 +45,17 @@ const MAIN_LANDING_KEYS = [
   "main_landing_locations_list_subtitle",
 ] as const;
 
+/**
+ * Global site-identity fields. A slug-scoped GET must still return them, but
+ * if it omits them (or sends ""), keep the editor/global snapshot.
+ */
+const GLOBAL_IDENTITY_KEYS = [
+  "copyright",
+  "logo",
+  "favicon",
+  "footer_brand_description",
+] as const;
+
 /** Filled from API only when the editor/preview snapshot has no value. */
 const READONLY_FROM_API_KEYS = new Set<
   (typeof LOCATION_SCOPED_KEYS)[number]
@@ -113,6 +124,20 @@ function preserveMainLandingFields(
   return result;
 }
 
+function preserveGlobalIdentityFields(
+  merged: SiteEssentialsFormValues,
+  global: SiteEssentialsFormValues,
+): SiteEssentialsFormValues {
+  const result = { ...merged };
+  for (const key of GLOBAL_IDENTITY_KEYS) {
+    const globalVal = global[key as keyof SiteEssentialsFormValues];
+    if (formFieldHasValue(globalVal)) {
+      (result as Record<string, unknown>)[key] = globalVal;
+    }
+  }
+  return result;
+}
+
 /**
  * Builds preview form values for a location page: global branding/theme from the
  * editor snapshot, location hero/about/events from the slug-specific API response.
@@ -164,7 +189,10 @@ export function mergeGlobalWithLocationSiteEssentials(
     perLocation,
   );
 
-  let result = preserveMainLandingFields(merged, global);
+  let result = preserveGlobalIdentityFields(
+    preserveMainLandingFields(merged, global),
+    global,
+  );
 
   const formSlug = global.slug?.trim() ?? "";
   const usePerLocationReadonlyFields =

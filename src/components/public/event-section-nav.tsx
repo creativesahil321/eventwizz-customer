@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { cn } from "@/lib/utils";
 
 export const EVENT_SECTION_NAV_HEIGHT = "3.5rem";
@@ -55,6 +55,37 @@ export function buildEventSectionNavItems(flags: {
   return items;
 }
 
+/** Nearest ancestor that actually scrolls on the Y axis (device frames, embed shells). */
+export function getNearestScrollContainer(
+  start: HTMLElement | null | undefined,
+): HTMLElement | null {
+  if (typeof window === "undefined") return null;
+  let node: HTMLElement | null = start ?? null;
+  while (node && node !== document.documentElement) {
+    const { overflowY } = window.getComputedStyle(node);
+    const canScrollY =
+      overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay";
+    if (canScrollY && node.scrollHeight > node.clientHeight + 1) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function resolveScrollContainer(
+  preferred: HTMLElement | null | undefined,
+  fallbackFrom: HTMLElement | null | undefined,
+): HTMLElement | null {
+  if (
+    preferred &&
+    preferred.scrollHeight > preferred.clientHeight + 1
+  ) {
+    return preferred;
+  }
+  return getNearestScrollContainer(fallbackFrom ?? preferred);
+}
+
 type EventSectionNavProps = {
   items: EventSectionNavItem[];
   stickyTop: string;
@@ -67,19 +98,17 @@ type EventSectionNavProps = {
 function scrollToSection(
   id: string,
   offsetPx: number,
-  container: HTMLElement | null,
+  preferredContainer: HTMLElement | null,
 ) {
   const el = document.getElementById(id);
   if (!el) return;
 
-  const useContainer =
-    !!container && container.scrollHeight > container.clientHeight + 1;
+  const container = resolveScrollContainer(preferredContainer, el);
 
-  if (useContainer && container) {
+  if (container) {
     const elRect = el.getBoundingClientRect();
     const cRect = container.getBoundingClientRect();
-    const top =
-      elRect.top - cRect.top + container.scrollTop - offsetPx;
+    const top = elRect.top - cRect.top + container.scrollTop - offsetPx;
     container.scrollTo({ top: Math.max(top, 0), behavior: "smooth" });
     return;
   }
@@ -98,13 +127,17 @@ export function EventSectionNav({
   scrollContainerRef,
   onItemClick,
 }: EventSectionNavProps) {
+  const navRef = useRef<HTMLElement>(null);
   const [activeId, setActiveId] = useState(items[0]?.id ?? "");
   const itemKey = useMemo(() => items.map((item) => item.id).join("|"), [items]);
 
   useEffect(() => {
     if (items.length === 0) return;
 
-    const root = scrollContainerRef?.current ?? null;
+    const root = resolveScrollContainer(
+      scrollContainerRef?.current,
+      navRef.current,
+    );
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -132,37 +165,46 @@ export function EventSectionNav({
 
   return (
     <nav
+      ref={navRef}
       aria-label="Event sections"
-      className="sticky z-40 border-y border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.45)] backdrop-blur-md"
+      className="sticky z-40 isolate border-y border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.45)] backdrop-blur-md"
       style={{ top: stickyTop, minHeight: EVENT_SECTION_NAV_HEIGHT }}
     >
-      <div className="mx-auto flex min-h-[3.5rem] max-w-5xl items-center justify-center gap-5 overflow-x-auto px-4 py-2.5 sm:gap-7 sm:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((item) => {
-          const isActive = item.id === activeId;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                scrollToSection(
-                  item.id,
-                  headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX,
-                  scrollContainerRef?.current ?? null,
-                );
-                onItemClick?.(item.id);
-              }}
-              className={cn(
-                "shrink-0 border-b-2 pb-1 text-[13px] font-medium tracking-wide transition-colors sm:text-sm",
-                isActive
-                  ? "border-[color:var(--color-primary)] text-[var(--color-text)]"
-                  : "border-transparent text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]",
-              )}
-              aria-current={isActive ? "true" : undefined}
-            >
-              {item.label}
-            </button>
-          );
-        })}
+      {/*
+        Do not put justify-center on the overflow scroller — it clips the first
+        tabs (About) on a 390px mobile frame. Inner w-max min-w-full centers
+        when the row fits and starts at About when it overflows.
+      */}
+      <div className="overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mx-auto flex w-max min-w-full min-h-[3.5rem] flex-nowrap items-center justify-center gap-5 px-4 py-2.5 sm:gap-7 sm:px-6">
+          {items.map((item) => {
+            const isActive = item.id === activeId;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  scrollToSection(
+                    item.id,
+                    headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX,
+                    scrollContainerRef?.current ??
+                      getNearestScrollContainer(navRef.current),
+                  );
+                  onItemClick?.(item.id);
+                }}
+                className={cn(
+                  "shrink-0 border-b-2 pb-1 text-[13px] font-medium tracking-wide transition-colors sm:text-sm",
+                  isActive
+                    ? "border-[color:var(--color-primary)] text-[var(--color-text)]"
+                    : "border-transparent text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]",
+                )}
+                aria-current={isActive ? "true" : undefined}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

@@ -358,6 +358,15 @@ export async function resetAllStores(): Promise<void> {
         // Silent
       }
 
+      try {
+        const { clearOnboardingBrowserState } = await import(
+          "@/lib/clear-vendor-browser-session"
+        );
+        clearOnboardingBrowserState();
+      } catch {
+        // ignore
+      }
+
       // Clear additional legacy storage items
       const legacyKeys = [
         "onboarding_data",
@@ -365,6 +374,10 @@ export async function resetAllStores(): Promise<void> {
         "vendor_location_id",
         "event_id",
         "permissions-backup",
+        "onboarding_mode",
+        "onboarding_is_rooms",
+        "ew_ai_bulk_apply_active",
+        "vendor_ai_event_draft_id",
       ];
 
       legacyKeys.forEach((key) => {
