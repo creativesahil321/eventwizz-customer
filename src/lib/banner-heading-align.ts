@@ -69,7 +69,7 @@ export function heroBannerStackClass(
 ): string {
   return cn(
     "flex w-full max-w-full flex-col gap-2.5 sm:gap-4",
-    "@max-sm/preview:!gap-2.5",
+    "@max-md/preview:!gap-2.5",
     stackAlignClass(align, scope?.fromMd),
   );
 }
@@ -109,7 +109,7 @@ export function heroBannerBodyClass(
 ): string {
   return cn(
     "w-full max-w-xl overflow-visible break-words text-pretty text-sm leading-relaxed text-white/85 [overflow-wrap:anywhere] sm:max-w-2xl sm:text-base sm:leading-relaxed",
-    "@max-sm/preview:!max-w-full @max-sm/preview:!text-sm @max-sm/preview:!leading-snug",
+    "@max-md/preview:!max-w-full @max-md/preview:!text-sm @max-md/preview:!leading-snug",
     measureAlignClass(align, scope?.fromMd),
     !scope?.fromMd && align === "center" && "text-center",
     !scope?.fromMd && align === "left" && "text-left",
@@ -273,11 +273,22 @@ export const heroHomeHeadingTypeClass = cn(
 /* ---- Hero band height (location page + multi-location home) ---- */
 
 /**
- * Capped hero height — matches `HeroBanner` / location preview (not full viewport).
- * Use on any full-width marketing hero section.
+ * Compact height for the 390px Mobile device frame.
+ * Do not use `@max-sm/preview` here — that container is 384px, so 390px never matches.
  */
+export const previewMobileHeroHeightClass =
+  "!h-[32rem] !min-h-[30rem] !max-h-[36rem] @max-md/preview:!h-[32rem] @max-md/preview:!min-h-[30rem] @max-md/preview:!max-h-[36rem]";
+
+/**
+ * Header clearance + reserved dock (contact + stacked search) on Mobile preview.
+ * Viewport `sm:`/`md:` padding still wins inside a laptop window without `!`.
+ */
+export const previewMobileHeroPadClass =
+  "!pt-[4.25rem] !pb-[11.5rem] @max-md/preview:!pt-[4.25rem] @max-md/preview:!pb-[11.5rem]";
+
+/** Capped hero height — matches `HeroBanner` / location preview (not full viewport). */
 export const heroBandHeightClass =
-  "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px] @max-sm/preview:!h-[32rem] @max-sm/preview:!min-h-[28rem] @max-sm/preview:!max-h-[34rem]";
+  "h-[min(68dvh,720px)] min-h-[380px] max-h-[760px] @max-md/preview:!h-[32rem] @max-md/preview:!min-h-[30rem] @max-md/preview:!max-h-[36rem]";
 
 /**
  * Slightly shorter than the location hero — room for search without eating the fold.
@@ -390,8 +401,8 @@ export function heroBandContentPadClass(
       ? "pt-16 pb-40 sm:pt-[4.5rem] sm:pb-44 md:pb-48"
       : "pt-16 pb-12 sm:pt-[4.5rem] sm:pb-20 md:pb-24"),
     withBottomChrome &&
-      "@max-sm/preview:!pt-[4.25rem] @max-sm/preview:!pb-52",
-    !withBottomChrome && "@max-sm/preview:!pt-[4.25rem] @max-sm/preview:!pb-8",
+      "@max-md/preview:!pt-[4.25rem] @max-md/preview:!pb-[11.5rem]",
+    !withBottomChrome && "@max-md/preview:!pt-[4.25rem] @max-md/preview:!pb-8",
   );
 }
 

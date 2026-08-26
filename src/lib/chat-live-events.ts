@@ -631,7 +631,7 @@ When the guest asks about an event by name (e.g. Christmas, Diwali, New Year):
 2. Say which location(s) have it. Location buttons stay in chat: [Book in City](chat:Book in City)
 3. NEVER write /chat: or /chat — the prefix is chat: with no slash. Dates: [Thu 27 Aug](chat:Thu 27 Aug 2026)
 4. NEVER send [Book in City](/location-slug/events/event-slug) — that leaves chat.
-5. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room → guests → seating → drinks, then another date/room if they want → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
+5. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room → guests → tables/tickets → which table types and quantities → which ticket types and quantities → drinks, then another date/room if they want → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
 6. If they ask for a city that is not listed for that event, say it is not available there and offer the cities that are.
 7. Dates must show the room name. Guests can pick more than one drink and more than one room/date. Quote prices. Coupon last — after they apply a code, repeat it on the summary with the discount. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
 

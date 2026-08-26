@@ -4,6 +4,7 @@ import type { GuestBookableLink } from "@/lib/chat-live-events";
 import { isDisallowedChatSafetyIntent } from "@/lib/chat-safety";
 import { couponToStripProps } from "@/lib/coupon-strip-props";
 import { formatDateCardOfferBadge } from "@/components/public/date-card-offer";
+import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
 import { pickRoomHighlights } from "@/lib/event-room-chooser-item";
 import {
   isPublicEventRoomMode,
@@ -49,6 +50,14 @@ export type ChatBookingDate = {
   tickets: ChatBookingTicket[];
   roomId?: number;
   roomName?: string;
+  /** True after chat loaded table/ticket types from the cart for this date. */
+  inventoryLoaded?: boolean;
+};
+
+export type ChatDateInventory = {
+  tables: ChatBookingTable[];
+  tickets: ChatBookingTicket[];
+  loaded?: boolean;
 };
 
 export type ChatBookingDrink = {
@@ -78,6 +87,12 @@ export type ChatBookingScheduleItem = {
   title: string;
 };
 
+export type ChatBookingPdf = {
+  title: string;
+  href: string;
+  roomName?: string;
+};
+
 export type ChatBookingRoom = {
   name: string;
   roomId: number;
@@ -90,6 +105,7 @@ export type ChatBookingRoom = {
   fromPrice?: number;
   menus: ChatBookingMenu[];
   schedule: ChatBookingScheduleItem[];
+  brochures: ChatBookingPdf[];
 };
 
 export type ChatEventBookingBrief = {
@@ -108,6 +124,7 @@ export type ChatEventBookingBrief = {
   schedule: ChatBookingScheduleItem[];
   faqs: ChatBookingFaq[];
   packageDetails: string[];
+  brochures: ChatBookingPdf[];
   currencySymbol: string;
   coupon?: {
     code: string;
@@ -168,21 +185,31 @@ export function formatChatEventDate(raw: string): string {
   return format(parsed, "EEE d MMM yyyy");
 }
 
+function firstFinite(...values: unknown[]): number {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return NaN;
+}
+
 function mapTables(raw: unknown): ChatBookingTable[] {
   if (!Array.isArray(raw)) return [];
   const tables: ChatBookingTable[] = [];
   for (const row of raw) {
     const item = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
-    const minPersons = Number(item.min_persons);
-    const maxPersons = Number(item.max_persons);
-    const price = Number(item.price);
-    const total = Number(item.total_tables);
-    const sold = Number(item.sold_tables);
-    const id = Number(item.id);
+    const minPersons = firstFinite(item.min_persons, item.minPersons, item.min);
+    const maxPersons = firstFinite(item.max_persons, item.maxPersons, item.max);
+    const price = firstFinite(item.price);
+    const total = firstFinite(item.total_tables, item.totalTables, item.total);
+    const sold = firstFinite(item.sold_tables, item.soldTables, item.sold);
+    const id = firstFinite(item.id);
     const remaining =
       Number.isFinite(total) && Number.isFinite(sold)
         ? Math.max(0, total - sold)
-        : undefined;
+        : Number.isFinite(total)
+          ? total
+          : undefined;
     if (!Number.isFinite(minPersons) && !Number.isFinite(maxPersons)) {
       continue;
     }
@@ -203,16 +230,22 @@ function mapTickets(raw: unknown): ChatBookingTicket[] {
   const tickets: ChatBookingTicket[] = [];
   for (const row of raw) {
     const item = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
-    const title = String(item.title ?? "").trim();
+    const title = String(item.title ?? item.name ?? "").trim();
     if (!title) continue;
-    const price = Number(item.price);
-    const capacity = Number(item.total_capacity);
-    const sold = Number(item.sold_tickets);
-    const id = Number(item.id);
+    const price = firstFinite(item.price);
+    const capacity = firstFinite(
+      item.total_capacity,
+      item.totalCapacity,
+      item.capacity,
+    );
+    const sold = firstFinite(item.sold_tickets, item.soldTickets, item.sold);
+    const id = firstFinite(item.id);
     const remaining =
       Number.isFinite(capacity) && Number.isFinite(sold)
         ? Math.max(0, capacity - sold)
-        : undefined;
+        : Number.isFinite(capacity)
+          ? capacity
+          : undefined;
     tickets.push({
       id: Number.isFinite(id) && id > 0 ? id : undefined,
       title,
@@ -224,40 +257,38 @@ function mapTickets(raw: unknown): ChatBookingTicket[] {
   return tickets;
 }
 
-function mapDates(
-  dates:
-    | Array<{
-      event_date: string;
-      price?: number;
-      sold_out?: boolean;
-      offer?: Parameters<typeof formatDateCardOfferBadge>[0] | null;
-      booking_type?: string;
-      tables?: unknown;
-      tickets?: unknown;
-    }>
-    | undefined,
-): ChatBookingDate[] {
+function mapDates(dates: unknown): ChatBookingDate[] {
   if (!Array.isArray(dates)) return [];
   return dates.map((row) => {
-    const offerBadge = row.offer
-      ? formatDateCardOfferBadge(row.offer) || undefined
-      : undefined;
-    const price = Number(row.price);
-    const bookingType =
-      row.booking_type === "tickets" ||
-        row.booking_type === "tables" ||
-        row.booking_type === "both"
-        ? row.booking_type
+    const item =
+      row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+    const offerRaw = item.offer;
+    const offerBadge =
+      offerRaw && typeof offerRaw === "object"
+        ? formatDateCardOfferBadge(
+            offerRaw as Parameters<typeof formatDateCardOfferBadge>[0],
+          ) || undefined
         : undefined;
+    const price = firstFinite(item.price);
+    const bookingTypeRaw = String(
+      item.booking_type ?? item.bookingType ?? "",
+    ).trim();
+    const bookingType =
+      bookingTypeRaw === "tickets" ||
+      bookingTypeRaw === "tables" ||
+      bookingTypeRaw === "both"
+        ? bookingTypeRaw
+        : undefined;
+    const eventDate = String(item.event_date ?? item.eventDate ?? "").trim();
     return {
-      date: row.event_date,
-      label: formatChatEventDate(row.event_date),
-      soldOut: row.sold_out === true,
+      date: eventDate,
+      label: formatChatEventDate(eventDate),
+      soldOut: item.sold_out === true || item.soldOut === true,
       fromPrice: Number.isFinite(price) && price > 0 ? price : undefined,
       offer: offerBadge || undefined,
       bookingType,
-      tables: mapTables(row.tables),
-      tickets: mapTickets(row.tickets),
+      tables: mapTables(item.tables ?? item.table_types ?? item.tableTypes),
+      tickets: mapTickets(item.tickets ?? item.ticket_types ?? item.ticketTypes),
     };
   });
 }
@@ -329,9 +360,64 @@ function mapFaqs(
     .filter((item) => item.question && item.answer);
 }
 
+function mapChatPdfs(
+  source: {
+    brochure_pdf?: unknown;
+    brochure_pdf_2?: unknown;
+    faq_pdf?: unknown;
+  },
+  roomName?: string,
+): ChatBookingPdf[] {
+  return buildEventHeaderDownloadLinks(source).map((item) => ({
+    title: item.title,
+    href: item.href,
+    roomName,
+  }));
+}
+
+export function listChatBrochures(
+  brief: ChatEventBookingBrief | null | undefined,
+  roomId?: number | null,
+): ChatBookingPdf[] {
+  if (!brief) return [];
+  if (brief.hasRooms) {
+    if (roomId != null) {
+      const room = brief.rooms.find((item) => item.roomId === roomId);
+      if (room?.brochures.length) return room.brochures;
+    }
+    const seen = new Set<string>();
+    const fromRooms: ChatBookingPdf[] = [];
+    for (const room of brief.rooms) {
+      for (const pdf of room.brochures) {
+        if (seen.has(pdf.href)) continue;
+        seen.add(pdf.href);
+        fromRooms.push({
+          ...pdf,
+          roomName: pdf.roomName ?? room.name,
+        });
+      }
+    }
+    if (fromRooms.length > 0) return fromRooms;
+  }
+  return brief.brochures;
+}
+
+export function isBrochureQuestion(text: string): boolean {
+  return (
+    /\b(brochure|brochures|broucher|brocure|brousture|brosure|flyer|flier|flayer)\b/i.test(
+      text,
+    ) ||
+    /\b(event\s+)?pdfs?\b/i.test(text) ||
+    /\bdownloads? (the )?(brochure|flyer|pdf|pack)\b/i.test(text)
+  );
+}
+
 export function isEventInfoQuestion(text: string): boolean {
-  return /\b(menu|menus|food|starter|starters|mains?|dessert|faq|faqs|frequently asked|schedule|programme|program|about (the |this |our )?event|dress code|what('?s| is) included|what time|brochure|tell me about|included in)\b/i.test(
-    text,
+  return (
+    isBrochureQuestion(text) ||
+    /\b(menu|menus|food|starter|starters|mains?|dessert|faq|faqs|frequently asked|schedule|programme|program|about (the |this |our )?event|dress code|what('?s| is) included|what time|tell me about|included in)\b/i.test(
+      text,
+    )
   );
 }
 
@@ -386,6 +472,14 @@ export function formatChatDrinkLabel(
   return price ? `${drink.title} · ${price}` : drink.title;
 }
 
+export function formatChatTicketLabel(
+  ticket: ChatBookingTicket,
+  symbol?: string,
+): string {
+  const price = formatChatMoney(ticket.price, symbol);
+  return price ? `${ticket.title} · ${price}` : ticket.title;
+}
+
 export function summarizeEventDetailForChat(
   event: EventDetail,
   options: {
@@ -428,6 +522,14 @@ export function summarizeEventDetailForChat(
         fromPrice: lowestDateFromPrice(dates),
         menus: mapMenus(slices.menus),
         schedule: mapSchedule(slices.event_schedular),
+        brochures: mapChatPdfs(
+          {
+            brochure_pdf: slices.brochure_pdf,
+            brochure_pdf_2: slices.brochure_pdf_2,
+            faq_pdf: event.faq_pdf,
+          },
+          room.name,
+        ),
       };
     })
     : [];
@@ -478,6 +580,11 @@ export function summarizeEventDetailForChat(
       .map((detail) => String(detail.title ?? "").trim())
       .filter(Boolean)
       .slice(0, 8),
+    brochures: mapChatPdfs({
+      brochure_pdf: event.brochure_pdf ?? flat.brochure_pdf,
+      brochure_pdf_2: event.brochure_pdf_2 ?? flat.brochure_pdf_2,
+      faq_pdf: event.faq_pdf,
+    }),
     coupon: couponProps?.code
       ? {
         code: couponProps.code,
@@ -614,6 +721,100 @@ export function chatDateSlotKey(
   date: Pick<ChatBookingDate, "date" | "roomId">,
 ): string {
   return `${date.roomId ?? 0}:${date.date.slice(0, 10)}`;
+}
+
+export function chatInventoryFromCartBucket(
+  bucket: unknown,
+): ChatDateInventory {
+  const row =
+    bucket && typeof bucket === "object"
+      ? (bucket as Record<string, unknown>)
+      : null;
+  return {
+    tables: mapTables(row?.tables ?? row?.table_types ?? row?.tableTypes),
+    tickets: mapTickets(row?.tickets ?? row?.ticket_types ?? row?.ticketTypes),
+    loaded: true,
+  };
+}
+
+function inferChatBookingType(
+  tables: ChatBookingTable[],
+  tickets: ChatBookingTicket[],
+): ChatBookingDate["bookingType"] {
+  if (tables.length > 0 && tickets.length > 0) return "both";
+  if (tables.length > 0) return "tables";
+  if (tickets.length > 0) return "tickets";
+  return undefined;
+}
+
+function listAllChatDates(brief: ChatEventBookingBrief): ChatBookingDate[] {
+  return brief.hasRooms
+    ? brief.rooms.flatMap((room) => room.dates)
+    : brief.dates;
+}
+
+export function chatDateNeedsInventoryHydrate(date: ChatBookingDate): boolean {
+  if (date.inventoryLoaded) return false;
+  return date.tables.length === 0 && date.tickets.length === 0;
+}
+
+export function withChatDateInventory(
+  brief: ChatEventBookingBrief,
+  catalogs: Map<string, ChatDateInventory>,
+): ChatEventBookingBrief {
+  if (catalogs.size === 0) return brief;
+  const apply = (date: ChatBookingDate): ChatBookingDate => {
+    const catalog = catalogs.get(chatDateSlotKey(date));
+    if (!catalog) return date;
+    const tables =
+      catalog.tables.length > 0 || catalog.loaded
+        ? catalog.tables
+        : date.tables;
+    const tickets =
+      catalog.tickets.length > 0 || catalog.loaded
+        ? catalog.tickets
+        : date.tickets;
+    return {
+      ...date,
+      tables,
+      tickets,
+      inventoryLoaded:
+        catalog.loaded === true || date.inventoryLoaded === true,
+      bookingType: date.bookingType ?? inferChatBookingType(tables, tickets),
+    };
+  };
+  return {
+    ...brief,
+    dates: brief.dates.map(apply),
+    rooms: brief.rooms.map((room) => ({
+      ...room,
+      dates: room.dates.map(apply),
+    })),
+  };
+}
+
+export function mergeChatBriefInventory(
+  base: ChatEventBookingBrief,
+  previous: ChatEventBookingBrief | null | undefined,
+): ChatEventBookingBrief {
+  if (!previous || previous.eventSlug !== base.eventSlug) return base;
+  const catalogs = new Map<string, ChatDateInventory>();
+  for (const date of listAllChatDates(previous)) {
+    if (
+      !date.inventoryLoaded &&
+      date.tables.length === 0 &&
+      date.tickets.length === 0
+    ) {
+      continue;
+    }
+    catalogs.set(chatDateSlotKey(date), {
+      tables: date.tables,
+      tickets: date.tickets,
+      loaded: true,
+    });
+  }
+  if (catalogs.size === 0) return base;
+  return withChatDateInventory(base, catalogs);
 }
 
 export function formatChatDateChoiceSendText(date: ChatBookingDate): string {
@@ -1125,6 +1326,33 @@ function formatScheduleCopy(
   return `Here’s the schedule for **${brief.title}**:\n\n${lines}`;
 }
 
+function brochureWantsAllDownloads(text: string): boolean {
+  return /\b(pdf|pdfs|downloads?|flyer|flier|flayer)\b/i.test(text);
+}
+
+function formatBrochureCopy(
+  brief: ChatEventBookingBrief,
+  pdfs: ChatBookingPdf[],
+): string {
+  const venue = formatEventVenuePhrase(brief);
+  const lines = pdfs
+    .map((pdf) => {
+      const room = pdf.roomName ? ` · ${pdf.roomName}` : "";
+      return `- [${pdf.title}${room}](${pdf.href})`;
+    })
+    .join("\n");
+  return `Here’s the brochure for **${brief.title}**${venue}. Tap a file to open the PDF.\n\n${lines}`;
+}
+
+function brochureActions(pdfs: ChatBookingPdf[]): ChatQuickActionDraft[] {
+  return pdfs.map((pdf, index) => ({
+    id: `brochure-${index}`,
+    label: pdf.title,
+    hint: pdf.roomName,
+    href: pdf.href,
+  }));
+}
+
 export function buildEventInfoTurn(options: {
   brief: ChatEventBookingBrief;
   userText: string;
@@ -1132,6 +1360,23 @@ export function buildEventInfoTurn(options: {
 }): { content: string; actions: ChatQuickActionDraft[] } | null {
   const { brief, userText, roomId } = options;
   const t = userText.toLowerCase();
+  if (isBrochureQuestion(userText)) {
+    const all = listChatBrochures(brief, roomId);
+    const pdfs = brochureWantsAllDownloads(userText)
+      ? all
+      : all.filter((pdf) => !/faq/i.test(pdf.title));
+    const files = pdfs.length > 0 ? pdfs : all;
+    if (files.length > 0) {
+      return {
+        content: `${formatBrochureCopy(brief, files)}\n\nYou can keep booking here after you’ve had a look.`,
+        actions: brochureActions(files),
+      };
+    }
+    return {
+      content: `I don’t have a brochure file listed for **${brief.title}**. You can still open the event page to check.`,
+      actions: [buildVisitEventQuickAction(brief, { roomId })],
+    };
+  }
   let content: string | null = null;
   if (/\b(menu|menus|food|starter|starters|mains?|dessert|included in)\b/i.test(t)) {
     content = formatMenusCopy(brief, roomId);
@@ -1308,6 +1553,14 @@ ${
         .join("\n")
     : "    (no dish list)"
 }
+  Brochures:
+${
+  room.brochures.length
+    ? room.brochures
+        .map((pdf) => `    - [${pdf.title}](${pdf.href})`)
+        .join("\n")
+    : "    (none listed)"
+}
   Schedule:
 ${
   room.schedule.length
@@ -1367,7 +1620,18 @@ ${
         .join("\n")
     : "    (none listed)"
 }
-- If they ask about menus, FAQs, schedule, or about the event, answer from this block. NEVER say you do not have the details if they are listed.
+- Brochures / PDFs:
+${
+  listChatBrochures(brief).length
+    ? listChatBrochures(brief)
+        .map((pdf) => {
+          const room = pdf.roomName ? ` · ${pdf.roomName}` : "";
+          return `    - [${pdf.title}${room}](${pdf.href})`;
+        })
+        .join("\n")
+    : "    (none listed)"
+}
+- If they ask about menus, FAQs, schedule, about the event, or the brochure/PDF, answer from this block. NEVER say you do not have the brochure if a URL is listed — give the markdown link.
 - Greetings (hi, hello, thanks): greet back only — do not list dates, rooms, or Visit event page until they ask to book.
 - They may book in chat or open the event page: [Visit event page](${brief.href})`;
 
@@ -1413,15 +1677,16 @@ Ask ONE question at a time, in this order (skip any step they already answered).
 2. Room, if rooms are enabled. Offer every bookable room. If they ask the difference, short bullets with package, from-price, inclusions and drink prices — no stock counts, no date dump — then the room buttons again.
 3. Date(s) for the chosen room.
 4. Party size.
-5. Tables, tickets, or both.
-6. Drinks for that room, with prices. If they ask for more than available, say the stock figure then.
-7. Short summary with prices. Coupon LAST — which dates have a date offer, then Apply CODE.
-8. Pay in full / Pay a table deposit (deposit is tables only). Stay in chat.
+5. Tables, tickets, or both — only options listed for that date.
+6. If tables: which table type(s) and how many of each (min–max guests). If both, how many sit at tables first. If tickets: which ticket type(s) and how many of each. Do not skip to drinks until those are chosen.
+7. Drinks for that room, with prices. If they ask for more than available, say the stock figure then.
+8. Short summary with prices. Coupon LAST — which dates have a date offer, then Apply CODE.
+9. Pay in full / Pay a table deposit (deposit is tables only). Stay in chat.
 
 CHOICE BUTTONS:
 - In-chat only: [Label](chat:the exact reply)
 - They can book in chat or open the event page themselves: [Visit event page](/{location_slug}/events/{event_slug}) from EVENT BOOKING DATA.
-- Only show room/date buttons for the current booking question. Do not repeat the same buttons twice. Do not re-offer rooms when they asked about menus, FAQs, or the schedule.
+- Only show room/date buttons for the current booking question. Do not repeat the same buttons twice. Do not re-offer rooms when they asked about menus, FAQs, the brochure, or the schedule.
 - NEVER write /chat: or /chat — there is no slash before chat:
 - Do NOT invent table counts, dates, rooms, drinks, menus, FAQs, or coupon codes.
 

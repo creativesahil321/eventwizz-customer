@@ -5,6 +5,8 @@ import {
   extractEventsFromApiResponse,
   findApiCartEventBySlug,
   findEventBySlug,
+  getApiDateData,
+  isRoomBasedCart,
 } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { hasViableTablePlan } from "@/app/(public)/vendor/checkout/_lib/table-recommendations";
 import {
@@ -12,7 +14,14 @@ import {
   type ChatBookingChoices,
   type ChatBookingSlot,
 } from "@/lib/chat-booking-choices";
-import type { ChatEventBookingBrief } from "@/lib/chat-event-booking";
+import {
+  chatDateNeedsInventoryHydrate,
+  chatDateSlotKey,
+  chatInventoryFromCartBucket,
+  withChatDateInventory,
+  type ChatDateInventory,
+  type ChatEventBookingBrief,
+} from "@/lib/chat-event-booking";
 import { cartService } from "@/services/customer/cart/cart.service";
 import { checkoutService } from "@/services/customer/checkout/checkout.service";
 import {
@@ -81,23 +90,29 @@ function resolveCartCoupon(
 
 function checkoutSlots(choices: ChatBookingChoices): ChatBookingSlot[] {
   if (choices.slots.length > 0) return choices.slots;
-  return choices.dates.map((date) => ({
-    roomId: choices.roomId,
-    roomName: choices.roomName,
-    date,
-    guestCount: choices.guestCount,
-    seating: choices.seating,
-    drinkTitles: choices.drinkTitles,
-    drinkQuantities: choices.drinkQuantities,
-    drinksDone: true,
-    tableGuestCount:
-      choices.seating === "tickets" ? 0 : choices.guestCount,
-    ticketCount: choices.seating === "tickets" ? choices.guestCount : 0,
-    tableMix: {},
-    tablePlan: [],
-    tablePlanDone: true,
-    mixingTables: false,
-  }));
+  return choices.dates.map((date) => {
+    const slot = {
+      roomId: choices.roomId,
+      roomName: choices.roomName,
+      date,
+      guestCount: choices.guestCount,
+      seating: choices.seating,
+      drinkTitles: choices.drinkTitles,
+      drinkQuantities: choices.drinkQuantities,
+      drinksDone: true,
+      tableGuestCount:
+        choices.seating === "tickets" ? 0 : choices.guestCount,
+      ticketCount: choices.seating === "tickets" ? choices.guestCount : 0,
+      ticketTitles: [] as string[],
+      ticketQuantities: {} as Record<string, number>,
+      ticketsDone: true,
+      tableMix: {} as Record<string, number>,
+      tablePlan: [] as ChatBookingSlot["tablePlan"],
+      tablePlanDone: true,
+      mixingTables: false,
+    };
+    return slot;
+  });
 }
 
 export function bookingChoicesReadyForPay(
@@ -133,6 +148,107 @@ function findChatCartEvent(
     events.find((event) => normalizeSlug(event.event_slug) === want) ??
     null
   );
+}
+
+export function chatCartConflictsWithEvent(
+  apiCartData: unknown,
+  eventSlug: string,
+): boolean {
+  const want = normalizeSlug(eventSlug);
+  const events = extractEventsFromApiResponse(apiCartData);
+  if (events.length === 0) return false;
+  return events.some((event) => normalizeSlug(event.event_slug) !== want);
+}
+
+function cartBucketForChatSlot(
+  event: ApiEventCartData,
+  isoDate: string,
+  roomId: number | null | undefined,
+) {
+  const dateKey =
+    isRoomBasedCart(event) && roomId != null && roomId > 0
+      ? buildCartDateLookupKey(isoDate, roomId)
+      : isoDate;
+  return getApiDateData(event, dateKey);
+}
+
+/**
+ * Table/ticket types live on the cart date bucket, not the public event page.
+ * Seed that bucket (empty, like a date-card click) so chat can ask which types.
+ */
+export async function hydrateChatBriefCatalogs(
+  brief: ChatEventBookingBrief,
+  slots: ChatBookingSlot[],
+): Promise<ChatEventBookingBrief> {
+  const pending = slots.filter((slot) =>
+    chatDateNeedsInventoryHydrate(slot.date),
+  );
+  if (pending.length === 0) return brief;
+
+  const slug = normalizeSlug(brief.eventSlug);
+  const catalogs = new Map<string, ChatDateInventory>();
+  const markEmpty = (slot: ChatBookingSlot) => {
+    catalogs.set(chatDateSlotKey(slot.date), {
+      tables: [],
+      tickets: [],
+      loaded: true,
+    });
+  };
+
+  let cartResponse: unknown = null;
+  try {
+    cartResponse = await cartService.getCartData();
+  } catch {
+    for (const slot of pending) markEmpty(slot);
+    return withChatDateInventory(brief, catalogs);
+  }
+
+  if (chatCartConflictsWithEvent(cartResponse, brief.eventSlug)) {
+    for (const slot of pending) markEmpty(slot);
+    return withChatDateInventory(brief, catalogs);
+  }
+
+  let event = findChatCartEvent(cartResponse, slug);
+
+  for (const slot of pending) {
+    const isoDate = slot.date.date.slice(0, 10);
+    const key = chatDateSlotKey(slot.date);
+    let bucket = event ? cartBucketForChatSlot(event, isoDate, slot.roomId) : null;
+
+    if (!bucket) {
+      try {
+        await cartService.storeEventBooking(
+          {
+            slug,
+            event_date: isoDate,
+            ...(slot.roomId != null && slot.roomId > 0
+              ? { room_id: slot.roomId }
+              : {}),
+            drink_package: [],
+            tables: [],
+            tickets: [],
+          },
+          { suppressSuccessToast: true, suppressErrorToast: true },
+        );
+        cartResponse = await cartService.getCartData();
+        if (chatCartConflictsWithEvent(cartResponse, brief.eventSlug)) {
+          catalogs.set(key, { tables: [], tickets: [], loaded: true });
+          continue;
+        }
+        event = findChatCartEvent(cartResponse, slug);
+        bucket = event
+          ? cartBucketForChatSlot(event, isoDate, slot.roomId)
+          : null;
+      } catch {
+        catalogs.set(key, { tables: [], tickets: [], loaded: true });
+        continue;
+      }
+    }
+
+    catalogs.set(key, chatInventoryFromCartBucket(bucket));
+  }
+
+  return withChatDateInventory(brief, catalogs);
 }
 
 function cartRequestHasLineItems(cartData: {
@@ -396,24 +512,44 @@ export async function runChatCheckout(options: {
 
     if (ticketQty > 0) {
       const tickets = store.getDateData(storeSlug, dateKey)?.tickets ?? [];
-      const ticket = tickets[0];
-      const remaining = ticket?.maxQuantity;
-      if (!ticket) {
-        return {
-          ok: false,
-          reason: "incomplete",
-          message:
-            "This date doesn’t have tickets I can add. Choose another date, or visit the event page.",
-        };
+      if (slot.ticketTitles.length > 0) {
+        for (const title of slot.ticketTitles) {
+          const ticket = tickets.find(
+            (item) =>
+              item.title.trim().toLowerCase() === title.trim().toLowerCase(),
+          );
+          const qty = Math.max(0, slot.ticketQuantities[title] ?? 0);
+          if (!ticket || qty < 1) continue;
+          const remaining = ticket.maxQuantity;
+          if (remaining != null && qty > remaining) {
+            return {
+              ok: false,
+              reason: "capacity",
+              message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${qty}.`,
+            };
+          }
+          store.updateQuantity(storeSlug, dateKey, "ticket", ticket.id, qty);
+        }
+      } else {
+        const ticket = tickets[0];
+        const remaining = ticket?.maxQuantity;
+        if (!ticket) {
+          return {
+            ok: false,
+            reason: "incomplete",
+            message:
+              "This date doesn’t have tickets I can add. Choose another date, or visit the event page.",
+          };
+        }
+        if (remaining != null && ticketQty > remaining) {
+          return {
+            ok: false,
+            reason: "capacity",
+            message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${ticketQty}.`,
+          };
+        }
+        store.updateQuantity(storeSlug, dateKey, "ticket", ticket.id, ticketQty);
       }
-      if (remaining != null && ticketQty > remaining) {
-        return {
-          ok: false,
-          reason: "capacity",
-          message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${ticketQty}.`,
-        };
-      }
-      store.updateQuantity(storeSlug, dateKey, "ticket", ticket.id, ticketQty);
     }
 
     const drinkCatalog = store.getDateData(storeSlug, dateKey)?.drinks ?? [];

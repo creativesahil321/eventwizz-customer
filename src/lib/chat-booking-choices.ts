@@ -14,6 +14,7 @@ import {
   formatChatDateChoiceSendText,
   formatChatDrinkLabel,
   formatChatMoney,
+  formatChatTicketLabel,
   formatEventVenuePhrase,
   isBookingConciergeFollowUp,
   isCasualChatText,
@@ -26,6 +27,7 @@ import {
   type ChatBookingDate,
   type ChatBookingDrink,
   type ChatBookingTable,
+  type ChatBookingTicket,
   type ChatEventBookingBrief,
   type ChatQuickActionDraft,
 } from "@/lib/chat-event-booking";
@@ -39,6 +41,7 @@ import {
   planFromTablePicks,
   planSingleTableType,
   recommendedChatTablePlan,
+  chatSeatingPlanGuests,
   type ChatSeatingPlanItem,
 } from "@/lib/chat-table-plan";
 
@@ -55,6 +58,9 @@ export type ChatBookingSlot = {
   drinksDone: boolean;
   tableGuestCount: number | null;
   ticketCount: number | null;
+  ticketTitles: string[];
+  ticketQuantities: Record<string, number>;
+  ticketsDone: boolean;
   tableMix: Record<string, number>;
   tablePlan: ChatSeatingPlanItem[];
   tablePlanDone: boolean;
@@ -78,6 +84,7 @@ export type ChatBookingChoices = {
   wantsGuestChange: boolean;
   wantsSeatingChange: boolean;
   pendingDrinkQtyTitle: string | null;
+  pendingTicketQtyTitle: string | null;
   awaitingTableGuestCount: boolean;
 };
 
@@ -97,6 +104,7 @@ export const CHAT_MIX_TABLES_SEND = "mix table types";
 export const CHAT_TABLE_MIX_DONE_SEND = "that's the table mix";
 export const CHAT_ALL_AT_TABLES_SEND = "all guests at tables";
 export const CHAT_TYPE_TABLE_GUESTS_SEND = "I'll type how many sit at tables";
+export const CHAT_TICKETS_DONE_SEND = "that's all for tickets";
 
 function normalize(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -239,6 +247,13 @@ function dateOffersTickets(date: ChatBookingDate): boolean {
   return date.tickets.length > 0;
 }
 
+function slotPickedTicketQty(slot: ChatBookingSlot): number {
+  return slot.ticketTitles.reduce(
+    (sum, title) => sum + Math.max(0, slot.ticketQuantities[title] ?? 0),
+    0,
+  );
+}
+
 export function resolveSlotTableAndTicketCounts(slot: ChatBookingSlot): {
   tableGuests: number;
   ticketQty: number;
@@ -246,24 +261,36 @@ export function resolveSlotTableAndTicketCounts(slot: ChatBookingSlot): {
   const guests = slot.guestCount ?? 0;
   const offersTables = dateOffersTables(slot.date);
   const offersTickets = dateOffersTickets(slot.date);
+  const pickedTickets =
+    slot.ticketTitles.length > 0 ? slotPickedTicketQty(slot) : null;
 
-  if (!offersTables) {
+  if (slot.tablePlan.length > 0) {
+    const tableGuests = chatSeatingPlanGuests(slot.tablePlan);
     return {
-      tableGuests: 0,
-      ticketQty: slot.ticketCount ?? (offersTickets ? guests : 0),
+      tableGuests,
+      ticketQty:
+        pickedTickets ??
+        slot.ticketCount ??
+        Math.max(0, guests - tableGuests),
     };
   }
-  if (slot.seating === "tickets") {
-    return { tableGuests: 0, ticketQty: slot.ticketCount ?? guests };
+
+  if (!offersTables || slot.seating === "tickets") {
+    return {
+      tableGuests: 0,
+      ticketQty:
+        pickedTickets ?? slot.ticketCount ?? (offersTickets ? guests : 0),
+    };
   }
   if (slot.seating === "tables" || !offersTickets) {
     return {
       tableGuests: slot.tableGuestCount ?? guests,
-      ticketQty: 0,
+      ticketQty: pickedTickets ?? 0,
     };
   }
   const tableGuests = slot.tableGuestCount ?? guests;
   const ticketQty =
+    pickedTickets ??
     slot.ticketCount ??
     (slot.tableGuestCount != null ? Math.max(0, guests - tableGuests) : 0);
   return { tableGuests, ticketQty };
@@ -305,6 +332,70 @@ function isNoDrinksText(text: string): boolean {
     n === normalize(CHAT_NO_DRINKS_SEND) ||
     /\b(no drinks|skip drinks|without drinks|none for drinks)\b/.test(n)
   );
+}
+
+function isTicketsDoneText(text: string): boolean {
+  const n = normalize(text);
+  return (
+    n === normalize(CHAT_TICKETS_DONE_SEND) ||
+    /\b(that'?s all for tickets|no more tickets|done with tickets|tickets are fine)\b/.test(
+      n,
+    )
+  );
+}
+
+function typeTicketQtySend(title: string): string {
+  return `I'll type the ticket quantity for ${title}`;
+}
+
+function parseTypeTicketQtyTitle(
+  text: string,
+  tickets: ChatBookingTicket[],
+): string | null {
+  const n = normalize(text);
+  const prefix = normalize("I'll type the ticket quantity for");
+  if (!n.startsWith(prefix)) return null;
+  const rest = n.slice(prefix.length).trim();
+  const ticket = tickets.find((item) => normalize(item.title) === rest);
+  return ticket?.title ?? null;
+}
+
+function parseTicketQuantity(
+  text: string,
+  ticket: ChatBookingTicket,
+): number | null {
+  const n = normalize(text);
+  const title = normalize(ticket.title);
+  if (!title || !n.includes(title)) return null;
+  const after = n.match(
+    new RegExp(`${title.replace(/ /g, "\\s+")}\\s*(?:x|×)?\\s*(\\d{1,3})`),
+  );
+  if (after) {
+    const qty = Number(after[1]);
+    if (qty >= 1 && qty <= 500) return qty;
+  }
+  const before = n.match(
+    new RegExp(`(\\d{1,3})\\s*(?:x|×|of)?\\s*${title.replace(/ /g, "\\s+")}`),
+  );
+  if (before) {
+    const qty = Number(before[1]);
+    if (qty >= 1 && qty <= 500) return qty;
+  }
+  return 1;
+}
+
+function ticketsMentionedInText(
+  text: string,
+  tickets: ChatBookingTicket[],
+): ChatBookingTicket[] {
+  const n = normalize(text);
+  if (seatingFromText(n)) return [];
+  const hits = tickets.filter((ticket) => parseTicketQuantity(text, ticket) != null);
+  const titles = hits.map((ticket) => normalize(ticket.title));
+  return hits.filter((ticket) => {
+    const title = normalize(ticket.title);
+    return !titles.some((other) => other !== title && other.includes(title));
+  });
 }
 
 function isDatesDoneText(text: string): boolean {
@@ -401,6 +492,9 @@ function emptySlot(date: ChatBookingDate): ChatBookingSlot {
     drinksDone: false,
     tableGuestCount: null,
     ticketCount: null,
+    ticketTitles: [],
+    ticketQuantities: {},
+    ticketsDone: false,
     tableMix: {},
     tablePlan: [],
     tablePlanDone: false,
@@ -443,6 +537,7 @@ export function parseChatBookingChoices(
     wantsGuestChange: false,
     wantsSeatingChange: false,
     pendingDrinkQtyTitle: null,
+    pendingTicketQtyTitle: null,
     awaitingTableGuestCount: false,
   };
   if (!brief) return empty;
@@ -460,6 +555,7 @@ export function parseChatBookingChoices(
   let wantsGuestChange = false;
   let wantsSeatingChange = false;
   let pendingDrinkQtyTitle: string | null = null;
+  let pendingTicketQtyTitle: string | null = null;
   let awaitingTableGuestCount = false;
 
   const couponCode = brief.coupon?.code ? normalize(brief.coupon.code) : "";
@@ -515,6 +611,10 @@ export function parseChatBookingChoices(
       /which drinks|any other drinks|no drinks|that'?s all for drinks|how many .+ packages|change a quantity/i.test(
         assistant,
       );
+    const askingTickets =
+      /which ticket|ticket type|how many .+ tickets|that'?s all for tickets|tickets so far|tickets to choose/i.test(
+        assistant,
+      );
     const askingMoreDates =
       /another date|another (room|space)|add another/i.test(assistant);
     const askingTableSplit = /sit at tables|at tables\?|how many .+ tables/i.test(
@@ -555,6 +655,25 @@ export function parseChatBookingChoices(
     const active = activeKey ? slotsByKey.get(activeKey) : null;
     const tables = active?.date.tables ?? [];
     const drinkPool = listChatDrinks(brief, active?.roomId ?? pendingRoomId);
+    const ticketPool = active?.date.tickets ?? [];
+
+    const typedTicketTitle = parseTypeTicketQtyTitle(text, ticketPool);
+    if (typedTicketTitle) {
+      pendingTicketQtyTitle = typedTicketTitle;
+      continue;
+    }
+
+    if (pendingTicketQtyTitle && active) {
+      const qty = extractGuestCount(text);
+      if (qty != null) {
+        if (!active.ticketTitles.includes(pendingTicketQtyTitle)) {
+          active.ticketTitles.push(pendingTicketQtyTitle);
+        }
+        active.ticketQuantities[pendingTicketQtyTitle] = qty;
+        pendingTicketQtyTitle = null;
+        continue;
+      }
+    }
 
     const typedDrinkTitle = parseTypeDrinkQtyTitle(text, drinkPool);
     if (typedDrinkTitle) {
@@ -574,6 +693,11 @@ export function parseChatBookingChoices(
       }
     }
 
+    if (isTicketsDoneText(text) && active && (askingTickets || !askingDrinks)) {
+      active.ticketsDone = true;
+      continue;
+    }
+
     if (isChangeGuestsText(text) && active) {
       active.guestCount = null;
       if (active.seating == null && slotOrder.length >= 2) {
@@ -590,6 +714,9 @@ export function parseChatBookingChoices(
       active.tableMix = {};
       active.tableGuestCount = null;
       active.ticketCount = null;
+      active.ticketTitles = [];
+      active.ticketQuantities = {};
+      active.ticketsDone = false;
       if (active.guestCount == null && slotOrder.length >= 2) {
         const prev = slotsByKey.get(slotOrder[slotOrder.length - 2]);
         if (prev?.guestCount != null) active.guestCount = prev.guestCount;
@@ -626,6 +753,7 @@ export function parseChatBookingChoices(
     if (active && active.guestCount != null && n === normalize(CHAT_ALL_AT_TABLES_SEND)) {
       active.tableGuestCount = active.guestCount;
       active.ticketCount = 0;
+      active.ticketsDone = true;
       awaitingTableGuestCount = false;
       continue;
     }
@@ -720,7 +848,14 @@ export function parseChatBookingChoices(
     }
 
     const guest = extractGuestCount(text);
-    if (guest != null && !askingTableSplit && !askingSeatingPlan && !askingDrinks) {
+    if (
+      guest != null &&
+      !askingTableSplit &&
+      !askingSeatingPlan &&
+      !askingDrinks &&
+      !askingTickets &&
+      !pendingTicketQtyTitle
+    ) {
       if (active) active.guestCount = guest;
       else pendingGuest = guest;
       wantsGuestChange = false;
@@ -734,12 +869,53 @@ export function parseChatBookingChoices(
           active.tablePlanDone = true;
           active.tableGuestCount = 0;
           active.ticketCount = active.guestCount;
+          active.ticketsDone = false;
         } else if (seating === "tables" && active.guestCount != null) {
           active.tableGuestCount = active.guestCount;
           active.ticketCount = 0;
+          active.ticketsDone = true;
+          active.ticketTitles = [];
+          active.ticketQuantities = {};
+          active.tablePlanDone = false;
+        } else if (seating === "both") {
+          active.tablePlanDone = false;
+          active.ticketsDone = false;
+          active.tableGuestCount = null;
+          active.ticketCount = null;
         }
       } else pendingSeating = seating;
       wantsSeatingChange = false;
+      continue;
+    }
+
+    const mentionedTickets = ticketsMentionedInText(text, ticketPool);
+    if (mentionedTickets.length > 0 && active) {
+      const party = resolveSlotTableAndTicketCounts(active);
+      const remainingTickets = Math.max(
+        0,
+        party.ticketQty - slotPickedTicketQty(active),
+      );
+      const needed = Math.max(
+        1,
+        remainingTickets ||
+          party.ticketQty ||
+          (active.guestCount ?? 1),
+      );
+      for (const ticket of mentionedTickets) {
+        const qty = parseTicketQuantity(text, ticket);
+        const nextQty =
+          qty != null && qty > 1
+            ? qty
+            : n === normalize(ticket.title)
+              ? needed
+              : (qty ?? needed);
+        if (!active.ticketTitles.includes(ticket.title)) {
+          active.ticketTitles.push(ticket.title);
+        }
+        active.ticketQuantities[ticket.title] = nextQty;
+        pendingTicketQtyTitle = ticket.title;
+      }
+      continue;
     }
 
     const mentioned = drinksMentionedInText(text, drinkPool);
@@ -782,6 +958,7 @@ export function parseChatBookingChoices(
     wantsGuestChange,
     wantsSeatingChange,
     pendingDrinkQtyTitle,
+    pendingTicketQtyTitle,
     awaitingTableGuestCount,
   };
 }
@@ -817,6 +994,7 @@ export function isHostBookingUserText(
     isEventInfoQuestion(text) ||
     isDrinksDoneText(text) ||
     isNoDrinksText(text) ||
+    isTicketsDoneText(text) ||
     isDatesDoneText(text) ||
     isSameAsLastText(text) ||
     isChangeGuestsText(text) ||
@@ -826,7 +1004,9 @@ export function isHostBookingUserText(
     n === normalize(CHAT_TABLE_MIX_DONE_SEND) ||
     n === normalize(CHAT_ALL_AT_TABLES_SEND) ||
     n === normalize(CHAT_TYPE_TABLE_GUESTS_SEND) ||
-    n.startsWith(normalize("I'll type the quantity for"))
+    n.startsWith(normalize("I'll type the quantity for")) ||
+    n.startsWith(normalize("I'll type the ticket quantity for")) ||
+    n === normalize(CHAT_TICKETS_DONE_SEND)
   ) {
     return true;
   }
@@ -849,6 +1029,13 @@ export function isHostBookingUserText(
   }
   if (
     listChatDrinks(brief).some((drink) => n.includes(normalize(drink.title)))
+  ) {
+    return true;
+  }
+  if (
+    listChatDatesForRoom(brief).some((date) =>
+      date.tickets.some((ticket) => n.includes(normalize(ticket.title))),
+    )
   ) {
     return true;
   }
@@ -910,6 +1097,13 @@ function seatingActions(
 ): { prose: string; actions: ChatQuickActionDraft[] } {
   const offersTables = dateOffersTables(date);
   const offersTickets = dateOffersTickets(date);
+  if (!offersTables && !offersTickets) {
+    return {
+      prose:
+        "I don’t have table or ticket types listed for this date in chat. Open the event page to pick them, or tell me another date.",
+      actions: [],
+    };
+  }
   if (offersTables && !offersTickets) {
     return {
       prose: "This date is booked by table.",
@@ -1028,22 +1222,20 @@ function estimateLineTotal(
   const slots =
     choices.slots.length > 0
       ? choices.slots
-      : choices.dates.map((date) => ({
-          roomId: choices.roomId,
-          roomName: choices.roomName,
-          date,
-          guestCount: choices.guestCount,
-          seating: choices.seating,
-          drinkTitles: choices.drinkTitles,
-          drinkQuantities: choices.drinkQuantities,
-          drinksDone: choices.drinksDone,
-          tableGuestCount: choices.guestCount,
-          ticketCount: choices.seating === "tickets" ? choices.guestCount : 0,
-          tableMix: {},
-          tablePlan: [],
-          tablePlanDone: true,
-          mixingTables: false,
-        }));
+      : choices.dates.map((date) => {
+          const slot = emptySlot(date);
+          slot.guestCount = choices.guestCount;
+          slot.seating = choices.seating;
+          slot.drinkTitles = choices.drinkTitles;
+          slot.drinkQuantities = choices.drinkQuantities;
+          slot.drinksDone = choices.drinksDone;
+          slot.tableGuestCount = choices.guestCount;
+          slot.ticketCount =
+            choices.seating === "tickets" ? choices.guestCount : 0;
+          slot.ticketsDone = true;
+          slot.tablePlanDone = true;
+          return slot;
+        });
 
   for (const slot of slots) {
     const date = slot.date;
@@ -1081,17 +1273,32 @@ function estimateLineTotal(
     }
 
     if (date && ticketQty > 0 && slot.seating !== "tables") {
-      const ticket = date.tickets[0];
-      if (ticket?.price != null) {
-        ticketTotal += ticket.price * ticketQty;
-        lines.push(
-          `- ${prefix}Tickets: ${ticketQty} × ${ticket.title} · ${formatChatMoney(ticket.price, symbol)}`,
-        );
-      } else if (date.fromPrice != null && slot.seating === "tickets") {
-        ticketTotal += date.fromPrice * ticketQty;
-        lines.push(
-          `- ${prefix}Tickets from ${formatChatMoney(date.fromPrice, symbol)} × ${ticketQty}`,
-        );
+      if (slot.ticketTitles.length > 0) {
+        for (const title of slot.ticketTitles) {
+          const ticket = date.tickets.find(
+            (item) => normalize(item.title) === normalize(title),
+          );
+          const qty = slot.ticketQuantities[title] ?? 0;
+          if (!ticket || qty < 1) continue;
+          if (ticket.price != null) ticketTotal += ticket.price * qty;
+          const price = formatChatMoney(ticket.price, symbol);
+          lines.push(
+            `- ${prefix}Tickets: ${qty} × ${ticket.title}${price ? ` · ${price}` : ""}`,
+          );
+        }
+      } else {
+        const ticket = date.tickets[0];
+        if (ticket?.price != null) {
+          ticketTotal += ticket.price * ticketQty;
+          lines.push(
+            `- ${prefix}Tickets: ${ticketQty} × ${ticket.title} · ${formatChatMoney(ticket.price, symbol)}`,
+          );
+        } else if (date.fromPrice != null && slot.seating === "tickets") {
+          ticketTotal += date.fromPrice * ticketQty;
+          lines.push(
+            `- ${prefix}Tickets from ${formatChatMoney(date.fromPrice, symbol)} × ${ticketQty}`,
+          );
+        }
       }
     }
 
@@ -1224,14 +1431,78 @@ function drinkQuantityActions(
   return [...actions.slice(0, 5), ...(typeAction ? [typeAction] : [])];
 }
 
+function ticketChoiceActions(
+  tickets: ChatBookingTicket[],
+  symbol: string | undefined,
+  selected: string[],
+): ChatQuickActionDraft[] {
+  const remaining = tickets.filter(
+    (ticket) =>
+      !selected.some((title) => normalize(title) === normalize(ticket.title)),
+  );
+  return remaining.slice(0, 6).map((ticket) => ({
+    id: `ticket-${ticket.id || ticket.title}`,
+    label: formatChatTicketLabel(ticket, symbol),
+    sendText: ticket.title,
+  }));
+}
+
+function ticketQuantityActions(
+  slot: ChatBookingSlot,
+  tickets: ChatBookingTicket[],
+  pendingTitle: string | null,
+): ChatQuickActionDraft[] {
+  const actions: ChatQuickActionDraft[] = [];
+  const seen = new Set<string>();
+  for (const title of slot.ticketTitles) {
+    const ticket = tickets.find((item) => normalize(item.title) === normalize(title));
+    const current = slot.ticketQuantities[title] ?? 1;
+    const stock = ticket?.remaining ?? ticket?.capacity;
+    const candidates = [2, 5, 10, current + 5].filter(
+      (qty) => qty !== current && qty >= 1 && (stock == null || qty <= stock),
+    );
+    for (const qty of [...new Set(candidates)].slice(0, 2)) {
+      const sendText = `${qty} × ${title}`;
+      if (seen.has(sendText)) continue;
+      seen.add(sendText);
+      actions.push({
+        id: `ticket-qty-${title}-${qty}`,
+        label: `${qty} × ${title}`,
+        sendText,
+      });
+    }
+  }
+  const typeFor = pendingTitle || slot.ticketTitles[slot.ticketTitles.length - 1];
+  const typeAction = typeFor
+    ? {
+        id: "ticket-qty-type",
+        label: "I’ll type a quantity",
+        sendText: typeTicketQtySend(typeFor),
+      }
+    : null;
+  return [...actions.slice(0, 5), ...(typeAction ? [typeAction] : [])];
+}
+
 function slotNeedsSeatingPlan(slot: ChatBookingSlot): boolean {
   if (slot.tablePlanDone) return false;
   if (slot.seating === "tickets") return false;
   if (slot.seating !== "tables" && slot.seating !== "both") return false;
-  if (slot.date.tables.length === 0) return false;
+  if (!dateOffersTables(slot.date)) return false;
   if (slot.seating === "both" && slot.tableGuestCount == null) return true;
   const tableGuests = slot.tableGuestCount ?? slot.guestCount ?? 0;
   return tableGuests > 0;
+}
+
+function slotNeedsTicketPick(slot: ChatBookingSlot): boolean {
+  if (slot.seating === "tables") return false;
+  if (slot.seating !== "tickets" && slot.seating !== "both") return false;
+  if (!dateOffersTickets(slot.date)) return false;
+  if (slot.seating === "both" && slot.tableGuestCount == null) return false;
+  if (slotNeedsSeatingPlan(slot)) return false;
+  const { ticketQty } = resolveSlotTableAndTicketCounts(slot);
+  const picked = slotPickedTicketQty(slot);
+  if (slot.ticketsDone && (picked > 0 || ticketQty <= 0)) return false;
+  return ticketQty > 0 || picked > 0;
 }
 
 function buildSummaryTurn(options: {
@@ -1259,22 +1530,20 @@ function buildSummaryTurn(options: {
   const slots =
     choices.slots.length > 0
       ? choices.slots
-      : choices.dates.map((date) => ({
-          roomId: choices.roomId,
-          roomName: choices.roomName,
-          date,
-          guestCount: choices.guestCount,
-          seating: choices.seating,
-          drinkTitles: choices.drinkTitles,
-          drinkQuantities: choices.drinkQuantities,
-          drinksDone: true,
-          tableGuestCount: choices.guestCount,
-          ticketCount: choices.seating === "tickets" ? choices.guestCount : 0,
-          tableMix: {},
-          tablePlan: [],
-          tablePlanDone: true,
-          mixingTables: false,
-        }));
+      : choices.dates.map((date) => {
+          const slot = emptySlot(date);
+          slot.guestCount = choices.guestCount;
+          slot.seating = choices.seating;
+          slot.drinkTitles = choices.drinkTitles;
+          slot.drinkQuantities = choices.drinkQuantities;
+          slot.drinksDone = true;
+          slot.tableGuestCount = choices.guestCount;
+          slot.ticketCount =
+            choices.seating === "tickets" ? choices.guestCount : 0;
+          slot.ticketsDone = true;
+          slot.tablePlanDone = true;
+          return slot;
+        });
 
   const slotLines = slots.map((slot) => {
     const drinks =
@@ -1286,7 +1555,29 @@ function buildSummaryTurn(options: {
             })
             .join(", ")
         : "none";
-    return `- **${slotHeading(slot)}** — ${slot.guestCount ?? "?"} guests (${seatingLabel(slot.seating)}), drinks: ${drinks}`;
+    const tables =
+      slot.tablePlan.length > 0
+        ? slot.tablePlan
+            .map((item) => `${item.quantity} × ${chatTableLabel(item)}`)
+            .join(", ")
+        : null;
+    const tickets =
+      slot.ticketTitles.length > 0
+        ? slot.ticketTitles
+            .map((title) => {
+              const qty = slot.ticketQuantities[title] ?? 1;
+              return `${qty} × ${title}`;
+            })
+            .join(", ")
+        : null;
+    const extras = [
+      tables ? `tables: ${tables}` : null,
+      tickets ? `tickets: ${tickets}` : null,
+      `drinks: ${drinks}`,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    return `- **${slotHeading(slot)}** — ${slot.guestCount ?? "?"} guests (${seatingLabel(slot.seating)}); ${extras}`;
   });
 
   const offerCopy = dateOfferLines(
@@ -1350,6 +1641,7 @@ function slotsReadyForSummary(
   const complete = choices.slots.every((slot) => {
     if (slot.guestCount == null || !slot.seating) return false;
     if (slotNeedsSeatingPlan(slot)) return false;
+    if (slotNeedsTicketPick(slot)) return false;
     const drinks = listChatDrinks(brief, slot.roomId);
     return drinks.length === 0 || slot.drinksDone;
   });
@@ -1522,7 +1814,53 @@ export function buildHostBookingTurn(options: {
     const seating = seatingActions(active.date);
     return {
       content: `Noted${nameBit} — **${active.guestCount} guests** for **${brief.title}**${venue} on **${slotHeading(active)}**.\n\n${seating.prose}`,
-      actions: seating.actions,
+      actions:
+        seating.actions.length > 0
+          ? seating.actions
+          : [buildVisitEventQuickAction(brief)],
+    };
+  }
+
+  if (
+    (active.seating === "tables" || active.seating === "both") &&
+    !dateOffersTables(active.date)
+  ) {
+    if (dateOffersTickets(active.date)) {
+      return {
+        content: `This date doesn’t list table types I can book in chat${nameBit}. I can book **tickets** for your **${active.guestCount} guests**, or you can pick tables on the event page.`,
+        actions: [
+          {
+            id: "seating-tickets",
+            label: "Tickets only",
+            sendText: "tickets only",
+          },
+          buildVisitEventQuickAction(brief),
+        ],
+      };
+    }
+    return {
+      content: `I don’t have table types listed for this date in chat${nameBit}. Open the event page to pick tables.`,
+      actions: [buildVisitEventQuickAction(brief)],
+    };
+  }
+
+  if (active.seating === "tickets" && !dateOffersTickets(active.date)) {
+    if (dateOffersTables(active.date)) {
+      return {
+        content: `This date doesn’t list ticket types I can book in chat${nameBit}. I can book **tables** for your **${active.guestCount} guests**, or you can pick tickets on the event page.`,
+        actions: [
+          {
+            id: "seating-tables",
+            label: "Tables only",
+            sendText: "tables only",
+          },
+          buildVisitEventQuickAction(brief),
+        ],
+      };
+    }
+    return {
+      content: `I don’t have ticket types listed for this date in chat${nameBit}. Open the event page to pick tickets.`,
+      actions: [buildVisitEventQuickAction(brief)],
     };
   }
 
@@ -1662,21 +2000,83 @@ export function buildHostBookingTurn(options: {
   }
 
   const party = resolveSlotTableAndTicketCounts(active);
-  if (party.ticketQty > 0) {
-    const ticket = active.date.tickets[0];
-    const remaining = ticket?.remaining ?? ticket?.capacity ?? null;
-    if (ticket && remaining != null && party.ticketQty > remaining) {
+
+  if (
+    /i'?ll type the ticket quantity for /i.test(last) &&
+    choices.pendingTicketQtyTitle
+  ) {
+    return {
+      content: `Type how many **${choices.pendingTicketQtyTitle}** tickets you want.`,
+      actions: [],
+    };
+  }
+
+  if (slotNeedsTicketPick(active)) {
+    const tickets = active.date.tickets;
+    const needed =
+      party.ticketQty > 0
+        ? party.ticketQty
+        : Math.max(1, (active.guestCount ?? 0) - (active.tableGuestCount ?? 0));
+    const selected = active.ticketTitles;
+    const remainingTypes = ticketChoiceActions(
+      tickets,
+      brief.currencySymbol,
+      selected,
+    );
+    const qtyActions = ticketQuantityActions(
+      active,
+      tickets,
+      choices.pendingTicketQtyTitle,
+    );
+    if (selected.length === 0) {
       return {
-        content: `This date has **${remaining}** ${ticket.title} left — I can’t book **${party.ticketQty}** on tickets. Choose a smaller party, or another date.`,
-        actions: [
-          ...guestChoiceActions(),
-          ...remainingDateActions(
-            brief,
-            choices.slots,
-            choices.pendingRoomId ?? active.roomId,
-          ).slice(0, 6),
-        ],
+        content: `Thanks${nameBit} — **${needed} tickets** for **${slotHeading(active)}**.\n\nWhich ticket type would you like? You can add more than one, then set the quantity.`,
+        actions: remainingTypes,
       };
+    }
+    const picked = selected
+      .map((title) => {
+        const qty = active.ticketQuantities[title] ?? 1;
+        return `${qty} × ${title}`;
+      })
+      .join(", ");
+    const have = slotPickedTicketQty(active);
+    const stillNeed = Math.max(0, needed - have);
+    const needLine =
+      stillNeed > 0
+        ? ` You still need **${stillNeed}** more to cover the party.`
+        : "";
+    return {
+      content: `Tickets so far for **${slotHeading(active)}**: **${picked}**${nameBit}.${needLine}\n\nChange a quantity, add another ticket, or continue.`,
+      actions: [
+        ...qtyActions,
+        ...remainingTypes,
+        {
+          id: "tickets-done",
+          label: "That's all for tickets",
+          sendText: CHAT_TICKETS_DONE_SEND,
+        },
+      ],
+    };
+  }
+
+  if (party.ticketQty > 0) {
+    for (const title of active.ticketTitles) {
+      const ticket = active.date.tickets.find(
+        (item) => normalize(item.title) === normalize(title),
+      );
+      const qty = active.ticketQuantities[title] ?? 0;
+      const remaining = ticket?.remaining ?? ticket?.capacity ?? null;
+      if (ticket && remaining != null && qty > remaining) {
+        return {
+          content: `This date has **${remaining}** ${ticket.title} left — I can’t book **${qty}**. Choose a smaller quantity.`,
+          actions: ticketQuantityActions(
+            active,
+            active.date.tickets,
+            ticket.title,
+          ),
+        };
+      }
     }
   }
 
@@ -1769,6 +2169,8 @@ export function toChatQuickActions(
     if (action.id === "visit-event") return true;
     if (action.sendText) return true;
     if (action.href?.startsWith("/auth/")) return true;
+    if (action.id.startsWith("brochure-")) return true;
+    if (action.href && /^https?:\/\//i.test(action.href)) return true;
     return false;
   });
 }

@@ -145,6 +145,13 @@ export function LocationPageView({
   });
 
   const cityLabel = locationData.city || settings?.name || "";
+  const brandName = settings?.name?.trim() || "";
+  const cityEyebrow = locationData.city?.trim() || "";
+  const headingEyebrow =
+    cityEyebrow &&
+    (!brandName || cityEyebrow.toLowerCase() !== brandName.toLowerCase())
+      ? cityEyebrow
+      : null;
   const headingEmphasis =
     settings?.typography?.headingEmphasis != null
       ? normalizeHeadingEmphasis(settings.typography.headingEmphasis)
@@ -224,7 +231,7 @@ export function LocationPageView({
               locationData.banner_heading_valign ??
                 settings?.banner_heading_valign,
             )}
-            eyebrow={locationData.city || cityLabel || null}
+            eyebrow={headingEyebrow}
             heroContact={{
               address: heroContact.address,
               email: heroContact.email,

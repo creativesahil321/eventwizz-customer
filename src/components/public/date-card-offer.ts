@@ -82,14 +82,12 @@ export function mapApiDiscountToDateCardOffer(
 }
 
 /** Attach `offer` from API `discount` (keeps an existing `offer` if already set). */
-export function withDateCardOffersFromApi(
-  dates: DateWithOptionalOffer[] | null | undefined,
-): DateWithOptionalOffer[] | undefined {
+export function withDateCardOffersFromApi<T extends DateWithOptionalOffer>(
+  dates: T[] | null | undefined,
+): T[] | undefined {
   if (!dates) return undefined;
   return dates.map((date) => ({
-    event_date: date.event_date,
-    price: date.price,
-    sold_out: date.sold_out,
+    ...date,
     offer: date.offer ?? mapApiDiscountToDateCardOffer(date.discount),
   }));
 }

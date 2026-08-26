@@ -26,6 +26,8 @@ import {
   heroHeadingMeasureClass,
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
+  previewMobileHeroHeightClass,
+  previewMobileHeroPadClass,
   type BannerHeadingAlign,
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
@@ -72,7 +74,7 @@ interface HeroBannerProps {
    * alignment never moves it.
    */
   heroFooter?: ReactNode;
-  /** Small-caps line above the title (city / region). */
+  /** Small-caps city / region above the title — never the brand/site name. */
   eyebrow?: string | null;
   /** Address, email, and phone under the description (location covers). */
   heroContact?: {
@@ -163,7 +165,6 @@ export default function HeroBanner({
       ? bannerHeadingValignProp
       : vendorTheme?.banner_heading_valign,
   );
-  const stackClass = heroBannerStackClass(textAlign, { fromMd: true });
   const hasContact = Boolean(
     heroContact?.address?.trim() ||
       heroContact?.email?.trim() ||
@@ -174,10 +175,20 @@ export default function HeroBanner({
    * `md:` + `@max-md/preview`. On a wide monitor the viewport is still `md+`,
    * so both copies can show in the 390px Mobile frame and stack on the same
    * pixels. Skip the heading copy in that frame.
+   *
+   * The 390px frame is also wider than `@sm` (384px), so `@max-sm/preview`
+   * compact height/padding never apply. Laptop `sm:`/`md:` padding then
+   * vertically centers the subtitle on top of the docked contact + search.
    */
   const isPreviewMobile = usePreviewMobileLayout();
   const showHeadingContact = hasContact && !isPreviewMobile;
   const showDockContact = hasContact && Boolean(heroFooter);
+  const previewAlign: BannerHeadingAlign = isPreviewMobile
+    ? "center"
+    : textAlign;
+  const previewAlignScope = { fromMd: !isPreviewMobile };
+  const copyValign =
+    isPreviewMobile && heroFooter ? "top" : heroValign;
 
   return (
     <section
@@ -185,6 +196,7 @@ export default function HeroBanner({
       className={cn(
         "relative mx-auto w-full overflow-hidden",
         heroBandHeightClass,
+        isPreviewMobile && previewMobileHeroHeightClass,
       )}
     >
       {/* Video background if video URL exists and should be used */}
@@ -220,24 +232,28 @@ export default function HeroBanner({
 
       <div
         className={cn(
-          heroBandCopyPlacementClass(heroValign),
+          heroBandCopyPlacementClass(copyValign),
           "max-w-7xl px-3 sm:px-4",
           heroHeadingMeasureClass,
-          "@max-sm/preview:!px-3",
-          heroBandContentPadClass(heroValign, {
+          "@max-md/preview:!px-3",
+          heroBandContentPadClass(copyValign, {
             withBottomChrome: Boolean(heroFooter),
           }),
+          isPreviewMobile && heroFooter && previewMobileHeroPadClass,
         )}
       >
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className={cn(stackClass, "min-h-0 max-h-full")}
+          className={cn(
+            heroBannerStackClass(previewAlign, previewAlignScope),
+            "min-h-0 max-h-full",
+          )}
         >
           {eyebrow?.trim() &&
           eyebrow.trim().toLowerCase() !== bannerHeading.trim().toLowerCase() ? (
-            <p className={heroBannerEyebrowClass(textAlign, { fromMd: true })}>
+            <p className={heroBannerEyebrowClass(previewAlign, previewAlignScope)}>
               {eyebrow.trim()}
             </p>
           ) : null}
@@ -248,26 +264,29 @@ export default function HeroBanner({
             accentHint={bannerAccentHint}
             emphasis={headingEmphasis}
             variant="onDark"
-            align={textAlign}
-            alignFromMd
+            align={previewAlign}
+            alignFromMd={!isPreviewMobile}
             className={cn(
               "font-black tracking-tight",
               heroBannerHeadingTypeClass,
-              textAlign === "left"
+              previewAlign === "left"
                 ? "max-w-4xl md:max-w-3xl"
                 : "max-w-4xl",
             )}
           />
 
           {bannerSubheading ? (
-            <p className={heroBannerBodyClass(textAlign, { fromMd: true })}>
+            <p className={heroBannerBodyClass(previewAlign, previewAlignScope)}>
               {bannerSubheading}
             </p>
           ) : null}
 
           {showHeadingContact ? (
             <div className={heroFooter ? previewFlexFromMd : undefined}>
-              <HeroBannerContactMeta contact={heroContact} align={textAlign} />
+              <HeroBannerContactMeta
+                contact={heroContact}
+                align={previewAlign}
+              />
             </div>
           ) : null}
         </motion.div>
@@ -276,11 +295,18 @@ export default function HeroBanner({
       {/* Independent of heading align/valign — always bottom-centered */}
       {heroFooter ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
-          <div className="mx-auto w-full max-w-7xl px-3 pb-3 sm:px-4 sm:pb-5 md:pb-6 @max-sm/preview:!px-2.5 @max-sm/preview:!pb-3">
+          <div
+            className={cn(
+              "mx-auto w-full max-w-7xl px-3 pb-3 sm:px-4 sm:pb-5 md:pb-6",
+              "@max-md/preview:!px-2.5 @max-md/preview:!pb-3",
+              isPreviewMobile && "!px-2.5 !pb-3",
+            )}
+          >
             <div
               className={cn(
-                heroFooterDockClass(textAlign),
+                heroFooterDockClass(previewAlign),
                 "flex flex-col gap-3 sm:gap-3.5",
+                isPreviewMobile && "!gap-2.5",
               )}
             >
               {showDockContact ? (
@@ -291,7 +317,7 @@ export default function HeroBanner({
                 >
                   <HeroBannerContactMeta
                     contact={heroContact}
-                    align={textAlign}
+                    align={previewAlign}
                     stacked={isPreviewMobile}
                   />
                 </div>

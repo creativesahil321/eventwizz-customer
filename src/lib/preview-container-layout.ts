@@ -5,6 +5,10 @@
  *
  * Thresholds match live breakpoints: `md` = 768px, `sm` = 640px.
  * Live pages have no named `preview` container — these utilities are no-ops there.
+ *
+ * The Mobile device frame is 390px. Tailwind `@sm` containers are 24rem (384px),
+ * so `@max-sm/preview` never matches that frame — use `@max-md/preview` or
+ * `usePreviewMobileLayout()` class overrides instead.
  */
 export const previewStackUntilMd =
   "@max-md/preview:!flex-col @max-md/preview:!items-stretch";

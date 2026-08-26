@@ -1397,7 +1397,7 @@ export default function FormPreview() {
         </div>
         <PreviewDeviceFrame
           ref={previewContainerRef}
-          stageClassName="bg-slate-950 px-2 pb-2 pt-1 sm:px-3"
+          stageClassName="bg-slate-950 py-1 pl-8 pr-2 pt-1 sm:pl-8 sm:pr-3"
           frameClassName="bg-[color:var(--color-background,#fff)]"
         >
           {/* Avoid transform / overflow-x-hidden here — both break sticky header + room bar. */}

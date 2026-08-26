@@ -67,6 +67,7 @@ import {
   buildExistingCartBookingGateCopy,
   buildGuestBookingGateActions,
   buildGuestBookingGateCopy,
+  buildEventInfoTurn,
   buildRecoveryQuickActions,
   buildRoomDifferenceCopy,
   CHAT_PAY_DEPOSIT_ID,
@@ -81,6 +82,7 @@ import {
   isUnsafeChatProviderError,
   shouldOfferChatBookingUi,
   stripUnsolicitedBookingOfferCopy,
+  mergeChatBriefInventory,
   parseMarkdownLinkTarget,
   parsePublicEventPath,
   stripInChatChoiceMarkdown,
@@ -104,6 +106,8 @@ import {
 } from "@/lib/chat-booking-choices";
 import {
   bookingChoicesReadyForPay,
+  chatCartConflictsWithEvent,
+  hydrateChatBriefCatalogs,
   runChatCheckout,
 } from "@/lib/chat-checkout";
 import {
@@ -153,7 +157,8 @@ function isChatGridAction(action: QuickAction): boolean {
   return (
     action.id.startsWith("date-") ||
     action.id.startsWith("table-") ||
-    action.id.startsWith("drink-qty-")
+    action.id.startsWith("drink-qty-") ||
+    action.id.startsWith("ticket-qty-")
   );
 }
 
@@ -319,6 +324,7 @@ function publicBookingQuickActions(options: {
       if (action.id === CHAT_PAY_FULL_ID || action.id === CHAT_PAY_DEPOSIT_ID) {
         return true;
       }
+      if (action.href && /^https?:\/\//i.test(action.href)) return true;
       if (!action.sendText || action.href) return false;
       if (action.label.replace(/\s+/g, " ").toLowerCase().startsWith("visit ")) {
         return false;
@@ -790,7 +796,11 @@ export function ChatBot() {
   }, [messages, isLoading]);
 
   useEffect(() => {
-    eventBookingBriefRef.current = pageBookingBrief;
+    if (!pageBookingBrief) return;
+    eventBookingBriefRef.current = mergeChatBriefInventory(
+      pageBookingBrief,
+      eventBookingBriefRef.current,
+    );
   }, [pageBookingBrief]);
 
   // Personalise opening greeting once we know the signed-in user (customer / vendor / admin)
@@ -1018,6 +1028,17 @@ export function ChatBot() {
     }
   }
 
+  async function briefWithHydratedCatalogs(
+    brief: ChatEventBookingBrief,
+    conversation: Array<{ role: string; content: string }>,
+  ): Promise<ChatEventBookingBrief> {
+    const choices = parseChatBookingChoices(conversation, brief);
+    if (choices.slots.length === 0) return brief;
+    const next = await hydrateChatBriefCatalogs(brief, choices.slots);
+    eventBookingBriefRef.current = next;
+    return next;
+  }
+
   function sendExistingCartBookingGate() {
     const href = CHECKOUT_PATH;
     setMessages((prev) => [
@@ -1080,9 +1101,14 @@ export function ChatBot() {
       return;
     }
 
-    if (await customerCartHasDates()) {
-      sendExistingCartBookingGate();
-      return;
+    try {
+      const result = await refetchCustomerCart();
+      if (chatCartConflictsWithEvent(result.data, brief.eventSlug)) {
+        sendExistingCartBookingGate();
+        return;
+      }
+    } catch {
+      // Checkout still tries to prepare the cart.
     }
 
     setIsLoading(true);
@@ -1210,6 +1236,14 @@ export function ChatBot() {
     // Navigation actions (Register / Log in / Contact, etc.)
     if (action.href) {
       const href = action.href;
+      if (
+        action.id.startsWith("brochure-") ||
+        /^https?:\/\//i.test(href) ||
+        /\.pdf(\?|#|$)/i.test(href)
+      ) {
+        window.open(href, "_blank", "noopener,noreferrer");
+        return;
+      }
       persistCheckoutHandoffFromHref(href);
       const checkoutCopy = checkoutHandoffNavCopy(href, isLoggedInCustomer);
       setMessages((prev) => [
@@ -1516,12 +1550,18 @@ Is there anything else I can help you with?`,
         eventBookingBriefRef.current ?? pageBookingBrief,
       )
     ) {
-      setIsLoading(true);
-      const hasCartDates = await customerCartHasDates();
-      setIsLoading(false);
-      if (hasCartDates) {
-        sendExistingCartBookingGate();
-        return;
+      const brief = eventBookingBriefRef.current ?? pageBookingBrief;
+      const bookingInProgress = Boolean(
+        brief && parseChatBookingChoices(messages, brief).slots.length > 0,
+      );
+      if (!bookingInProgress) {
+        setIsLoading(true);
+        const hasCartDates = await customerCartHasDates();
+        setIsLoading(false);
+        if (hasCartDates) {
+          sendExistingCartBookingGate();
+          return;
+        }
       }
     }
 
@@ -1906,13 +1946,16 @@ Is there anything else I can help you with?`,
               { suppressErrorToast: true },
             );
             if (detail?.data) {
-              eventBookingBrief = summarizeEventDetailForChat(detail.data, {
-                href: pick.href,
-                locationCity: pick.event.location_city,
-                locationSlug: pick.event.location_slug,
-                eventSlug: pick.event.slug,
-                currencySymbol,
-              });
+              eventBookingBrief = mergeChatBriefInventory(
+                summarizeEventDetailForChat(detail.data, {
+                  href: pick.href,
+                  locationCity: pick.event.location_city,
+                  locationSlug: pick.event.location_slug,
+                  eventSlug: pick.event.slug,
+                  currencySymbol,
+                }),
+                eventBookingBriefRef.current,
+              );
               eventBookingBriefRef.current = eventBookingBrief;
             }
           } catch (error) {
@@ -2016,6 +2059,10 @@ Is there anything else I can help you with?`,
         (isLiveEventBookingIntent(userText) || locationPick)
       ) {
         const conversation = [...messages, userMessage];
+        eventBookingBrief = await briefWithHydratedCatalogs(
+          eventBookingBrief,
+          conversation,
+        );
         const kickoffTurn = buildHostBookingTurn({
           brief: eventBookingBrief,
           userText,
@@ -2048,6 +2095,10 @@ Is there anything else I can help you with?`,
 
       const conversationForHost = [...messages, userMessage];
       if (isVendorStorefront && isLoggedInCustomer && eventBookingBrief) {
+        eventBookingBrief = await briefWithHydratedCatalogs(
+          eventBookingBrief,
+          conversationForHost,
+        );
         const hostChoices = parseChatBookingChoices(
           conversationForHost,
           eventBookingBrief,
@@ -2107,6 +2158,41 @@ Is there anything else I can help you with?`,
           },
         ]);
         return;
+      }
+
+      if (
+        isVendorStorefront &&
+        eventBookingBrief &&
+        isEventInfoQuestion(userText) &&
+        !asksRoomDifference(userText)
+      ) {
+        const infoChoices = parseChatBookingChoices(
+          conversationForHost,
+          eventBookingBrief,
+        );
+        const infoTurn = buildEventInfoTurn({
+          brief: eventBookingBrief,
+          userText,
+          roomId: infoChoices.pendingRoomId ?? infoChoices.roomId,
+        });
+        if (infoTurn) {
+          const infoActions = publicBookingQuickActions({
+            content: infoTurn.content,
+            brief: eventBookingBrief,
+            conversation: conversationForHost,
+            hostActions: infoTurn.actions,
+          });
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: infoTurn.content,
+              quickActions:
+                infoActions.length > 0 ? infoActions : undefined,
+            },
+          ]);
+          return;
+        }
       }
 
       const response = await fetch("/api/ai/chat", {
