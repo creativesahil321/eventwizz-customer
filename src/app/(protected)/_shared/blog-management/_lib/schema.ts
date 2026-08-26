@@ -32,6 +32,22 @@ export function isValidBlogIsoDate(value: string): boolean {
   );
 }
 
+/** Local calendar date as `YYYY-MM-DD` (matches `<input type="date">`). */
+export function localIsoDate(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/** Publication picker bounds: last 5 years through today (no future dates). */
+export function blogPublicationDateBounds() {
+  const max = localIsoDate();
+  const oldest = new Date();
+  oldest.setFullYear(oldest.getFullYear() - 5);
+  return { min: localIsoDate(oldest), max };
+}
+
 function isAllowedBlogImageType(mime: string): boolean {
   return (BLOG_FEATURED_IMAGE_TYPES as readonly string[]).includes(
     mime.toLowerCase(),
@@ -88,6 +104,16 @@ export const blogFormSchema = z
         path: ["published_at"],
         message: "Use a valid publication date",
       });
+    } else if (values.published_at) {
+      const { min, max } = blogPublicationDateBounds();
+      if (values.published_at < min || values.published_at > max) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["published_at"],
+          message:
+            "Publication date must be within the last 5 years and cannot be in the future",
+        });
+      }
     }
 
     if (!values.cover_image.trim()) {

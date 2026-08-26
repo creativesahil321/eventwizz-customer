@@ -8,8 +8,11 @@ export type SearchParams = {
   per_page?: string;
   search?: string;
   status?: string;
+  booking_date?: string;
   from_date?: string;
   to_date?: string;
+  sort_by?: string;
+  sort_dir?: string;
   [key: string]: string | string[] | undefined;
 };
 

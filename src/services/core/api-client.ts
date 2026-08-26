@@ -632,7 +632,11 @@ apiClient.interceptors.response.use(
           }
           break;
         }
-        case 422:
+        case 422: {
+          const suppressValidationToast = (
+            error.config as RequestOptions | undefined
+          )?.suppressErrorToast;
+          if (suppressValidationToast) break;
           // Handle validation errors
           const errorData = error.response.data as ApiErrorResponse;
           if (
@@ -652,6 +656,7 @@ apiClient.interceptors.response.use(
             }
           }
           break;
+        }
         case 409: {
           const conflictData = error.response.data as ApiErrorResponse;
           if (

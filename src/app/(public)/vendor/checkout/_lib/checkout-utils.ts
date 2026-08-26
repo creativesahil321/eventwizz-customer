@@ -14,6 +14,7 @@ import { EditableDateData } from "@/store/cart-edit.store";
 import type { ApiEventCartData } from "@/lib/types/cart.types";
 import {
   extractEventsFromApiResponse,
+  findApiCartEventBySlug,
   findEventBySlug,
   getAllRoomDateKeys,
   getApiDateData,
@@ -24,7 +25,21 @@ import {
   parseRoomDateKey,
 } from "./cart-calculations";
 import { formatMoney, resolveCurrencySymbol } from "@/lib/currency-format";
+import { normalizeSlug } from "@/lib/utils";
 import { useDomainStore } from "@/store/domain.store";
+
+function editingDataForEventSlug(
+  editingData: Record<string, Record<string, EditableDateData>>,
+  eventSlug: string,
+): Record<string, Record<string, EditableDateData>> | null {
+  if (editingData[eventSlug]) return editingData;
+  const want = normalizeSlug(eventSlug);
+  const match = Object.keys(editingData).find(
+    (key) => normalizeSlug(key) === want,
+  );
+  if (!match) return null;
+  return { ...editingData, [eventSlug]: editingData[match] };
+}
 
 interface DatePaymentTotals {
   dateTotal: number;
@@ -521,14 +536,15 @@ export function transformCartToCheckout(
     discountAmount?: number | null;
   },
 ): CheckoutRequest | null {
-  const eventData = editingData[eventSlug];
-  if (!eventData) {
+  const resolvedEditing = editingDataForEventSlug(editingData, eventSlug);
+  if (!resolvedEditing?.[eventSlug]) {
     console.error("No event data found for slug:", eventSlug);
     return null;
   }
 
-  const eventsArray = extractEventsFromApiResponse(apiCartData);
-  const apiEventData = findEventBySlug(eventsArray, eventSlug);
+  const apiEventData =
+    findApiCartEventBySlug(apiCartData, eventSlug) ??
+    findEventBySlug(extractEventsFromApiResponse(apiCartData), eventSlug);
   const vendorEventId = apiEventData?.vendor_event_id;
 
   if (!vendorEventId) {
@@ -551,14 +567,22 @@ export function transformCartToCheckout(
   let checkoutRooms: CheckoutRoomData[] | undefined;
 
   if (roomMode) {
-    const collected = collectCheckoutRooms(eventSlug, editingData, apiEventData);
+    const collected = collectCheckoutRooms(
+      eventSlug,
+      resolvedEditing,
+      apiEventData,
+    );
     subTotal = collected.subTotal;
     payToday = collected.payToday;
     payLater = collected.payLater;
     depositToday = collected.depositToday;
     checkoutRooms = collected.rooms;
   } else {
-    const collected = collectCheckoutDates(eventSlug, editingData, apiEventData);
+    const collected = collectCheckoutDates(
+      eventSlug,
+      resolvedEditing,
+      apiEventData,
+    );
     subTotal = collected.subTotal;
     payToday = collected.payToday;
     payLater = collected.payLater;

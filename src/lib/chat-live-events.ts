@@ -1,4 +1,5 @@
 import type { LiveEvent, LocationData } from "@/types/theme.types";
+import { isDisallowedChatSafetyIntent } from "@/lib/chat-safety";
 
 const STOP_WORDS = new Set([
   "a",
@@ -51,10 +52,25 @@ const STOP_WORDS = new Set([
   "help",
 ]);
 
+/** Fix glued words / typos so “bookchristmas” and “nwat to book” still match. */
+export function normalizeChatBookingQuery(text: string): string {
+  return text
+    .replace(/\bnwat\b/gi, "want")
+    .replace(/\bwana\b/gi, "want to")
+    .replace(
+      /\bbook(christmas|xmas|diwali|halloween|nye|event|events|party)\b/gi,
+      "book $1",
+    )
+    .replace(/\b(christmas|xmas)event\b/gi, "$1 event")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Customer wants to find / book a live event on the public venue site. */
 export function isLiveEventBookingIntent(text: string): boolean {
-  const t = text.trim();
+  const t = normalizeChatBookingQuery(text);
   if (!t) return false;
+  if (isDisallowedChatSafetyIntent(t)) return false;
 
   if (
     /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?)\b/i.test(
@@ -90,6 +106,40 @@ export function buildLiveEventHref(event: LiveEvent): string {
   const locationSlug = event.location_slug.replace(/^\/+|\/+$/g, "");
   const eventSlug = event.slug.replace(/^\/+|\/+$/g, "");
   return `/${locationSlug}/events/${eventSlug}`;
+}
+
+export type GuestBookableLink = {
+  title: string;
+  href: string;
+  locationCity?: string;
+  locationHref?: string;
+};
+
+export function buildLocationPageHref(locationSlug: string): string {
+  const slug = locationSlug.replace(/^\/+|\/+$/g, "");
+  return slug ? `/${slug}` : "";
+}
+
+/** Event + location URLs for a logged-out guest who wants to book. */
+export function listGuestBookableLinks(
+  events: LiveEvent[] | null | undefined,
+): GuestBookableLink[] {
+  const seen = new Set<string>();
+  const out: GuestBookableLink[] = [];
+  for (const event of events ?? []) {
+    const href = buildLiveEventHref(event);
+    if (seen.has(href)) continue;
+    seen.add(href);
+    const locationHref = buildLocationPageHref(event.location_slug);
+    out.push({
+      title: event.title,
+      href,
+      locationCity: event.location_city?.trim() || undefined,
+      locationHref: locationHref || undefined,
+    });
+    if (out.length >= 8) break;
+  }
+  return out;
 }
 
 function normalizeSlug(slug: string): string {
@@ -252,12 +302,13 @@ export function matchLiveEvents(
   liveEvents: LiveEvent[] | null | undefined,
 ): LiveEventChatMatch[] {
   if (!liveEvents?.length) return [];
+  const query = normalizeChatBookingQuery(userText);
 
   const scored = liveEvents
     .map((event) => ({
       event,
       href: buildLiveEventHref(event),
-      score: scoreEvent(userText, event),
+      score: scoreEvent(query, event),
     }))
     .filter((m) => m.score >= 18)
     .sort((a, b) => b.score - a.score);
@@ -265,9 +316,10 @@ export function matchLiveEvents(
   // Listing intent with no specific name → return all
   if (
     scored.length === 0 &&
-    /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?)\b/i.test(
-      userText,
-    )
+    (/\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?)\b/i.test(
+      query,
+    ) ||
+      /\b(book|booking|reserve)\b/i.test(query))
   ) {
     return liveEvents.map((event) => ({
       event,
@@ -323,7 +375,27 @@ export function matchLiveEventsFromConversation(
   }
 
   const fromCurrent = matchLiveEvents(userText, liveEvents);
-  if (fromCurrent.length > 0) return fromCurrent;
+  if (fromCurrent.length > 0) {
+    if (priorMatches.length > 0) {
+      const pinned = new Set(
+        priorMatches.map(
+          (item) => `${item.event.location_slug}/${item.event.slug}`,
+        ),
+      );
+      const overlap = fromCurrent.filter((item) =>
+        pinned.has(`${item.event.location_slug}/${item.event.slug}`),
+      );
+      if (overlap.length > 0) return overlap;
+      const q = normalize(userText);
+      const namedOther = fromCurrent.filter((item) => {
+        const title = normalize(item.event.title);
+        return title.length >= 4 && q.includes(title);
+      });
+      if (namedOther.length === 0) return priorMatches;
+      return namedOther;
+    }
+    return fromCurrent;
+  }
 
   const corpus = [userText, ...messages.map((m) => m.content)].join("\n");
   const hrefHits: LiveEventChatMatch[] = [];
@@ -559,9 +631,9 @@ When the guest asks about an event by name (e.g. Christmas, Diwali, New Year):
 2. Say which location(s) have it. Location buttons stay in chat: [Book in City](chat:Book in City)
 3. NEVER write /chat: or /chat — the prefix is chat: with no slash. Dates: [Thu 27 Aug](chat:Thu 27 Aug 2026)
 4. NEVER send [Book in City](/location-slug/events/event-slug) — that leaves chat.
-5. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (room → dates → guests → seating → drinks → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
+5. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room → guests → seating → drinks, then another date/room if they want → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
 6. If they ask for a city that is not listed for that event, say it is not available there and offer the cities that are.
-7. Never skip the room when rooms are listed. Quote prices. Coupon last. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
+7. Dates must show the room name. Guests can pick more than one drink and more than one room/date. Quote prices. Coupon last — after they apply a code, repeat it on the summary with the discount. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
 
 ${lines.join("\n")}
 `;

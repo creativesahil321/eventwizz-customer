@@ -4,11 +4,10 @@ import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   flexRender,
   type SortingState,
   type PaginationState,
+  type Updater,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -21,6 +20,10 @@ import {
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import type { SearchParams, Transaction } from "../_lib/types";
 import { getTransactionColumns } from "./columns";
+import {
+  formatAdminTransactionEarnings,
+  isAdminTransactionSortField,
+} from "../_lib/filters";
 import { cn } from "@/lib/utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import {
@@ -42,23 +45,21 @@ export function AdminTransactionsDataTable({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: Number(search.per_page) || 30,
+    pageSize: 30,
   });
 
   const downloadReceiptMutation = useDownloadAdminReceipt();
 
   const handleDownloadReceipt = useCallback(
-    (paymentId: number) => {
+    (paymentId: number | string) => {
       downloadReceiptMutation.mutate(paymentId);
     },
     [downloadReceiptMutation],
   );
 
-  const downloadingPaymentId =
-    downloadReceiptMutation.isPending &&
-    downloadReceiptMutation.variables != null
-      ? Number(downloadReceiptMutation.variables)
-      : null;
+  const downloadingPaymentId = downloadReceiptMutation.isPending
+    ? downloadReceiptMutation.variables
+    : null;
 
   const columns = useMemo(
     () =>
@@ -70,32 +71,77 @@ export function AdminTransactionsDataTable({
     [downloadingPaymentId, formatMoneyLocale, handleDownloadReceipt],
   );
 
+  const sortColumn = sorting[0]?.id;
+  const sortBy = isAdminTransactionSortField(sortColumn)
+    ? sortColumn
+    : undefined;
+  const sortDir = sortBy ? (sorting[0]?.desc ? "desc" : "asc") : undefined;
+
+  const filterKey = [
+    search.search ?? "",
+    search.status ?? "",
+    search.booking_date ?? "",
+    search.from_date ?? "",
+    search.to_date ?? "",
+    sortBy ?? "",
+    sortDir ?? "",
+  ].join("|");
+  const prevFilterKeyRef = React.useRef(filterKey);
+  const filterChanged = prevFilterKeyRef.current !== filterKey;
+  if (filterChanged) {
+    prevFilterKeyRef.current = filterKey;
+  }
+  const pageIndex = filterChanged ? 0 : pagination.pageIndex;
+
+  if (filterChanged && pagination.pageIndex !== 0) {
+    setPagination((current) => ({ ...current, pageIndex: 0 }));
+  }
+
   const { data, isLoading, isError, isFetching } = useAdminTransactions({
     search: search.search,
     status: search.status,
+    booking_date: search.booking_date,
     from_date: search.from_date,
     to_date: search.to_date,
-    page: Number(search.page) || pagination.pageIndex + 1,
-    per_page: Number(search.per_page) || pagination.pageSize,
+    page: pageIndex + 1,
+    per_page: pagination.pageSize,
+    sort_by: sortBy,
+    sort_dir: sortDir,
   });
 
   useEffect(() => {
-    if (data?.earnings != null && onEarningsUpdate) {
-      onEarningsUpdate(data.earnings);
-    }
+    if (!data || !onEarningsUpdate) return;
+    onEarningsUpdate(
+      formatAdminTransactionEarnings(data.earnings_formatted, data.earnings),
+    );
   }, [data, onEarningsUpdate]);
 
   const transactions: Transaction[] = data?.data ?? [];
+  const pageCount = Math.max(1, data?.meta?.last_page ?? 1);
+
+  const handlePaginationChange = useCallback(
+    (updater: Updater<PaginationState>) => {
+      setPagination((current) => {
+        const next = typeof updater === "function" ? updater(current) : updater;
+        if (next.pageSize !== current.pageSize) {
+          return { ...next, pageIndex: 0 };
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   const table = useReactTable({
     data: transactions,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    manualPagination: true,
+    manualSorting: true,
+    pageCount,
     onSortingChange: setSorting,
-    onPaginationChange: setPagination,
-    state: { sorting, pagination },
+    onPaginationChange: handlePaginationChange,
+    state: { sorting, pagination: { ...pagination, pageIndex } },
   });
 
   if (isLoading) {

@@ -9,6 +9,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Send,
   Loader2,
@@ -52,6 +53,7 @@ import {
   buildLiveEventsDirectReply,
   buildLiveEventsNoMatchReply,
   filterLiveEventsToPublishedLocations,
+  listGuestBookableLinks,
   type LiveEventChatMatch,
 } from "@/lib/chat-live-events";
 import type { LiveEvent, LocationData } from "@/types/theme.types";
@@ -61,12 +63,24 @@ import {
   asksToChangeOrPickRoom,
   buildBookingKickoffCopy,
   buildBookingRecoveryCopy,
+  buildExistingCartBookingGateActions,
+  buildExistingCartBookingGateCopy,
+  buildGuestBookingGateActions,
+  buildGuestBookingGateCopy,
   buildRecoveryQuickActions,
+  buildRoomDifferenceCopy,
   CHAT_PAY_DEPOSIT_ID,
   CHAT_PAY_FULL_ID,
+  dedupeChatQuickActions,
   isBareEventPageHref,
   isBookingConciergeFollowUp,
+  isCasualChatText,
+  isChatEmailAddress,
+  isChatEmailUpdatesText,
+  isEventInfoQuestion,
   isUnsafeChatProviderError,
+  shouldOfferChatBookingUi,
+  stripUnsolicitedBookingOfferCopy,
   parseMarkdownLinkTarget,
   parsePublicEventPath,
   stripInChatChoiceMarkdown,
@@ -75,11 +89,14 @@ import {
   withGuaranteedDateChoiceCopy,
   withGuaranteedRoomChoiceCopy,
   withRoomChoiceQuickActions,
+  withVisitEventQuickAction,
   type ChatEventBookingBrief,
   type ChatQuickActionDraft,
 } from "@/lib/chat-event-booking";
 import {
   buildHostBookingTurn,
+  isChatExistingCartBookingIntent,
+  isGuestBookingConciergeText,
   isHostBookingUserText,
   parseChatBookingChoices,
   parseChatPayMode,
@@ -89,14 +106,26 @@ import {
   bookingChoicesReadyForPay,
   runChatCheckout,
 } from "@/lib/chat-checkout";
+import {
+  buildChatSafetyReply,
+  classifyChatSafetyIntent,
+} from "@/lib/chat-safety";
 import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
 import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useLocationStore } from "@/store/location.store";
 import {
+  newsletterApiMessage,
+  usePublicSubscribe,
+} from "@/services/common/newsletter";
+import {
+  CHECKOUT_PATH,
   checkoutHandoffNavCopy,
   persistCheckoutHandoffFromHref,
 } from "@/lib/checkout-chat-handoff";
+import { apiCartHasAnyDates } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import { useGetCartData } from "@/services/customer/cart/query";
 import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
 import { eventsService } from "@/services/common/events/events.service";
 import {
@@ -113,11 +142,20 @@ import { useQuery } from "@tanstack/react-query";
 type QuickAction = {
   id: string;
   label: string;
+  hint?: string;
   /** If set, tapping navigates here (e.g. Register / Log in) */
   href?: string;
   /** If set, tapping sends this as the next user message (in-chat choice). */
   sendText?: string;
 };
+
+function isChatGridAction(action: QuickAction): boolean {
+  return (
+    action.id.startsWith("date-") ||
+    action.id.startsWith("table-") ||
+    action.id.startsWith("drink-qty-")
+  );
+}
 
 type Message = {
   role: "user" | "assistant";
@@ -172,19 +210,6 @@ const CATEGORY_ACTIONS: QuickAction[] = [
 ];
 
 /** Guest auth options — register / login from chat */
-const GUEST_AUTH_ACTIONS: QuickAction[] = [
-  {
-    id: "register",
-    label: "Create account",
-    href: "/auth/register/customer",
-  },
-  {
-    id: "login",
-    label: "Log in",
-    href: "/auth/login",
-  },
-];
-
 const SUPPORT_INTENT_RE =
   /\b(support|help desk|customer service|enquiry|inquiry|ticket|contact (us|team|support)|speak to|talk to|get in touch|connect with|raise (a |an )?(query|issue|ticket|enquiry|inquiry)|not able to book|can'?t book|cannot book|booking (issue|problem|error)|technical issue|fix (my |the )?issue|having (a |an )?(issue|problem))\b/i;
 
@@ -250,6 +275,7 @@ function toUiQuickActions(actions: ChatQuickActionDraft[]): QuickAction[] {
   return actions.map((action) => ({
     id: action.id,
     label: action.label,
+    hint: action.hint,
     href: action.href,
     sendText: action.sendText,
   }));
@@ -261,6 +287,7 @@ function publicBookingQuickActions(options: {
   conversation: Array<{ role: string; content: string }>;
   hostActions?: ChatQuickActionDraft[];
   recovery?: boolean;
+  offerBookingUi?: boolean;
 }): QuickAction[] {
   const brief = options.brief;
   if (options.recovery && brief) {
@@ -273,7 +300,19 @@ function publicBookingQuickActions(options: {
     );
   }
   if (options.hostActions && options.hostActions.length > 0) {
-    return toUiQuickActions(toChatQuickActions(options.hostActions));
+    const choices = brief
+      ? parseChatBookingChoices(options.conversation, brief)
+      : null;
+    return toUiQuickActions(
+      toChatQuickActions(
+        dedupeChatQuickActions(
+          withVisitEventQuickAction(options.hostActions, brief, {
+            roomId: choices?.roomId,
+            dates: choices?.dates.map((date) => date.date.slice(0, 10)),
+          }),
+        ),
+      ),
+    );
   }
   const extracted = extractBookingQuickActions(options.content).filter(
     (action) => {
@@ -287,27 +326,52 @@ function publicBookingQuickActions(options: {
       return true;
     },
   );
-  if (!brief) return toUiQuickActions(extracted);
+  if (!brief) return toUiQuickActions(dedupeChatQuickActions(extracted));
   const choices = parseChatBookingChoices(options.conversation, brief);
   const lastUser =
     [...options.conversation].reverse().find((m) => m.role === "user")
       ?.content ?? "";
+  const offerBookingUi =
+    options.offerBookingUi ?? shouldOfferChatBookingUi(lastUser, choices);
+  if (!offerBookingUi) {
+    return toUiQuickActions(
+      dedupeChatQuickActions(
+        extracted.filter(
+          (action) =>
+            action.id !== "visit-event" &&
+            !action.id.startsWith("date-") &&
+            !action.id.startsWith("room-"),
+        ),
+      ),
+    );
+  }
+  const infoQuestion =
+    isEventInfoQuestion(lastUser) && !asksRoomDifference(lastUser);
+  const merged = infoQuestion
+    ? extracted
+    : withDateChoiceQuickActions(
+        withRoomChoiceQuickActions(extracted, {
+          brief,
+          roomChosen: choices.roomId != null,
+          hasDates: choices.dates.length > 0,
+          userText: lastUser,
+          reply: options.content,
+          isBookingTurn: true,
+        }),
+        {
+          brief,
+          roomId: choices.roomId,
+          roomChosen: choices.roomId != null,
+          hasDates: choices.dates.length > 0,
+          isBookingTurn: true,
+        },
+      );
   return toUiQuickActions(
-    withDateChoiceQuickActions(
-      withRoomChoiceQuickActions(extracted, {
-        brief,
-        roomChosen: choices.roomId != null,
-        hasDates: choices.dates.length > 0,
-        userText: lastUser,
-        reply: options.content,
-        isBookingTurn: true,
-      }),
-      {
-        brief,
+    dedupeChatQuickActions(
+      withVisitEventQuickAction(merged, brief, {
         roomId: choices.roomId,
-        roomChosen: choices.roomId != null,
-        hasDates: choices.dates.length > 0,
-      },
+        dates: choices.dates.map((date) => date.date.slice(0, 10)),
+      }),
     ),
   );
 }
@@ -596,6 +660,8 @@ export function ChatBot() {
   const tenantHost = typeof domain === "string" ? domain : "";
   const createTicket = useCreateCustomerSupportTicket();
   const currencySymbol = useCurrencySymbol();
+  const subscribeNewsletter = usePublicSubscribe();
+  const chatLocationId = useLocationStore((s) => s.getLocationId());
 
   const websiteRole =
     domainWebsiteRole ||
@@ -625,6 +691,9 @@ export function ChatBot() {
   const isVendorStorefront = websiteRole === "vendor";
   const isLoggedInVendor =
     sessionStatus === "authenticated" && accountType === "vendor";
+  const { refetch: refetchCustomerCart } = useGetCartData(
+    isVendorStorefront && isLoggedInCustomer,
+  );
 
   const todayYmd = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
   const chatDashboardRange = useMemo(
@@ -701,6 +770,7 @@ export function ChatBot() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [awaitingGuestEmail, setAwaitingGuestEmail] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   /** Session-only hide; remounts on refresh so the launcher returns. */
   const [isDismissed, setIsDismissed] = useState(false);
@@ -789,14 +859,27 @@ export function ChatBot() {
   }
 
   /** Guest: offer Create account / Log in buttons (no account creation inside chat). */
+  function guestAuthHrefs() {
+    const callback = pathname || "/";
+    saveAuthCallbackUrl(callback);
+    return {
+      registerHref: `/auth/register/customer?callbackUrl=${encodeURIComponent(callback)}`,
+      loginHref: `/auth/login?callbackUrl=${encodeURIComponent(callback)}`,
+    };
+  }
+
   function offerGuestAuthOptions() {
+    const hrefs = guestAuthHrefs();
     setMessages((prev) => [
       ...clearQuickActions(prev),
       {
         role: "assistant",
         content:
-          "To book an event, you’ll need a customer account. Please choose an option below — it only takes a moment:",
-        quickActions: GUEST_AUTH_ACTIONS,
+          "You’re not signed in, so I can’t take a booking in chat yet. Create an account or log in — it only takes a moment.",
+        quickActions: [
+          { id: "register", label: "Create account", href: hrefs.registerHref },
+          { id: "login", label: "Log in", href: hrefs.loginHref },
+        ],
       },
     ]);
   }
@@ -925,6 +1008,32 @@ export function ChatBot() {
     ]);
   }
 
+  async function customerCartHasDates(): Promise<boolean> {
+    if (!isLoggedInCustomer) return false;
+    try {
+      const result = await refetchCustomerCart();
+      return apiCartHasAnyDates(result.data);
+    } catch {
+      return false;
+    }
+  }
+
+  function sendExistingCartBookingGate() {
+    const href = CHECKOUT_PATH;
+    setMessages((prev) => [
+      ...clearQuickActions(prev),
+      {
+        role: "assistant",
+        content: buildExistingCartBookingGateCopy({ userName }),
+        quickActions: toUiQuickActions(buildExistingCartBookingGateActions()),
+        supportCta: { href, label: "Go to checkout" },
+      },
+    ]);
+    if (pathname !== CHECKOUT_PATH) {
+      router.push(href);
+    }
+  }
+
   async function startChatPayment(
     payMode: "full" | "deposit",
     extraMessages: Array<{ role: string; content: string }> = [],
@@ -971,6 +1080,11 @@ export function ChatBot() {
       return;
     }
 
+    if (await customerCartHasDates()) {
+      sendExistingCartBookingGate();
+      return;
+    }
+
     setIsLoading(true);
     setMessages((prev) => [
       ...clearQuickActions(prev),
@@ -983,7 +1097,17 @@ export function ChatBot() {
       },
     ]);
 
-    const result = await runChatCheckout({ brief, choices, payMode });
+    let result: Awaited<ReturnType<typeof runChatCheckout>>;
+    try {
+      result = await runChatCheckout({ brief, choices, payMode });
+    } catch {
+      result = {
+        ok: false,
+        reason: "unknown",
+        message:
+          "Payment couldn’t be started. Visit the event page to finish.",
+      };
+    }
     setIsLoading(false);
 
     if (!result.ok) {
@@ -1006,11 +1130,14 @@ export function ChatBot() {
               },
             ]
           : [];
+      const content =
+        result.message.trim() ||
+        "Payment couldn’t be started. Visit the event page to finish.";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: result.message,
+          content,
           quickActions:
             loginActions.length > 0
               ? loginActions
@@ -1023,8 +1150,30 @@ export function ChatBot() {
     }
 
     if (result.action.type === "stripe") {
+      if (!result.action.session) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "Payment couldn’t be started. Visit the event page to finish.",
+          },
+        ]);
+        return;
+      }
       setStripePaymentSession(result.action.session);
       setIsStripePaymentOpen(true);
+      const couponBit =
+        choices.couponApplied && brief.coupon?.code
+          ? ` Coupon **${brief.coupon.code}** is applied to tables and tickets.`
+          : "";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `The payment form is open — enter your card details to finish.${couponBit}`,
+        },
+      ]);
       return;
     }
 
@@ -1213,6 +1362,107 @@ export function ChatBot() {
 
     setMessages((prev) => [...clearQuickActions(prev), userMessage]);
 
+    const safetyKind = classifyChatSafetyIntent(userText, {
+      allowFinancial: isLoggedInVendor,
+    });
+    if (safetyKind) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: buildChatSafetyReply(safetyKind, { userName }),
+        },
+      ]);
+      return;
+    }
+
+    const isGuestCustomer =
+      isVendorStorefront && !isLoggedInVendor && !isLoggedInCustomer;
+
+    if (isGuestCustomer && isChatEmailUpdatesText(userText)) {
+      setAwaitingGuestEmail(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Type the email address you’d like us to use. We’ll send a confirmation — event updates only, no spam.",
+        },
+      ]);
+      return;
+    }
+
+    if (isGuestCustomer && awaitingGuestEmail) {
+      if (isDeclineIntent(userText)) {
+        setAwaitingGuestEmail(false);
+        offerGuestAuthOptions();
+        return;
+      }
+      if (isChatEmailAddress(userText)) {
+        setIsLoading(true);
+        try {
+          const result = await subscribeNewsletter.mutateAsync({
+            email: userText.trim(),
+            name: userName ?? undefined,
+            source: "landing",
+            ...(chatLocationId ? { location_id: chatLocationId } : {}),
+          });
+          setAwaitingGuestEmail(false);
+          const hrefs = guestAuthHrefs();
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: `${result.message}\n\nWhen you’re ready to book, create an account or log in.`,
+              quickActions: [
+                {
+                  id: "register",
+                  label: "Create account",
+                  href: hrefs.registerHref,
+                },
+                { id: "login", label: "Log in", href: hrefs.loginHref },
+              ],
+            },
+          ]);
+        } catch (error) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: newsletterApiMessage(
+                error,
+                "We couldn’t add that email just now. Please check it and try again.",
+              ),
+            },
+          ]);
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+      if (!isGuestBookingConciergeText(userText, eventBookingBriefRef.current)) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "Please type an email address, or tap **Create account** to book.",
+            quickActions: toUiQuickActions(
+              buildGuestBookingGateActions(
+                eventBookingBriefRef.current ?? pageBookingBrief,
+                {
+                  ...guestAuthHrefs(),
+                  events: listGuestBookableLinks(liveEvents),
+                },
+              ),
+            ),
+          },
+        ]);
+        return;
+      }
+      setAwaitingGuestEmail(false);
+    }
+
     // Logged-in customer on vendor site: start professional enquiry wizard
     if (
       isVendorStorefront &&
@@ -1256,6 +1506,23 @@ Is there anything else I can help you with?`,
         },
       ]);
       return;
+    }
+
+    if (
+      isVendorStorefront &&
+      isLoggedInCustomer &&
+      isChatExistingCartBookingIntent(
+        userText,
+        eventBookingBriefRef.current ?? pageBookingBrief,
+      )
+    ) {
+      setIsLoading(true);
+      const hasCartDates = await customerCartHasDates();
+      setIsLoading(false);
+      if (hasCartDates) {
+        sendExistingCartBookingGate();
+        return;
+      }
     }
 
     // Public venue site: first-turn location picker only. Follow-ups and the
@@ -1595,6 +1862,21 @@ Is there anything else I can help you with?`,
         : null;
 
       let eventBookingBrief: ChatEventBookingBrief | null = pageBookingBrief;
+      const pinnedBrief = eventBookingBriefRef.current;
+      const namedOtherEvent = matchLiveEvents(userText, liveEvents).some(
+        (item) => {
+          const title = item.event.title.trim().toLowerCase();
+          return (
+            Boolean(pinnedBrief) &&
+            title.length >= 4 &&
+            userText.toLowerCase().includes(title) &&
+            item.event.slug !== pinnedBrief?.eventSlug
+          );
+        },
+      );
+      if (!eventBookingBrief && pinnedBrief && !namedOtherEvent) {
+        eventBookingBrief = pinnedBrief;
+      }
       const locationPick = isLiveEventLocationChoiceText(userText, liveEvents);
       let pickedLiveEvent: LiveEventChatMatch | undefined;
       if (isVendorStorefront && !eventBookingBrief && tenantHost) {
@@ -1685,13 +1967,53 @@ Is there anything else I can help you with?`,
         }
       }
 
-      const isFirstUserTurn = !messages.some((m) => m.role === "user");
+      if (
+        isGuestCustomer &&
+        isGuestBookingConciergeText(userText, eventBookingBrief)
+      ) {
+        const hrefs = guestAuthHrefs();
+        const compare =
+          asksRoomDifference(userText) && eventBookingBrief
+            ? `${buildRoomDifferenceCopy(eventBookingBrief)}\n\n`
+            : "";
+        const matches = matchLiveEvents(userText, liveEvents);
+        const guestEvents = eventBookingBrief
+          ? undefined
+          : listGuestBookableLinks(
+              matches.length > 0
+                ? matches.map((item) => item.event)
+                : liveEvents,
+            );
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              compare +
+              buildGuestBookingGateCopy({
+                brief: eventBookingBrief,
+                events: guestEvents,
+                userName,
+                includeEventLead: !compare,
+                registerHref: hrefs.registerHref,
+                loginHref: hrefs.loginHref,
+              }),
+            quickActions: toUiQuickActions(
+              buildGuestBookingGateActions(eventBookingBrief, {
+                ...hrefs,
+                events: guestEvents,
+              }),
+            ),
+          },
+        ]);
+        return;
+      }
+
       if (
         isVendorStorefront &&
-        !isLoggedInVendor &&
+        isLoggedInCustomer &&
         eventBookingBrief &&
-        ((isFirstUserTurn && isLiveEventBookingIntent(userText)) ||
-          locationPick)
+        (isLiveEventBookingIntent(userText) || locationPick)
       ) {
         const conversation = [...messages, userMessage];
         const kickoffTurn = buildHostBookingTurn({
@@ -1725,7 +2047,7 @@ Is there anything else I can help you with?`,
       }
 
       const conversationForHost = [...messages, userMessage];
-      if (isVendorStorefront && !isLoggedInVendor && eventBookingBrief) {
+      if (isVendorStorefront && isLoggedInCustomer && eventBookingBrief) {
         const hostChoices = parseChatBookingChoices(
           conversationForHost,
           eventBookingBrief,
@@ -1763,6 +2085,28 @@ Is there anything else I can help you with?`,
             return;
           }
         }
+      }
+
+      const casualBrief = eventBookingBrief ?? pageBookingBrief;
+      const casualChoices = casualBrief
+        ? parseChatBookingChoices(conversationForHost, casualBrief)
+        : null;
+      if (
+        isVendorStorefront &&
+        !isLoggedInVendor &&
+        isCasualChatText(userText) &&
+        !shouldOfferChatBookingUi(userText, casualChoices)
+      ) {
+        const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
+        const venue = siteName?.trim() ? ` with ${siteName.trim()}` : "";
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `Hello${nameBit} — how can I help you${venue} today?`,
+          },
+        ]);
+        return;
       }
 
       const response = await fetch("/api/ai/chat", {
@@ -1858,21 +2202,20 @@ Is there anything else I can help you with?`,
         briefForHandoff,
       );
       const hasDates = choices.dates.length > 0;
+      const infoQuestion = isEventInfoQuestion(userText);
+      const offerBookingUi =
+        isLoggedInCustomer && shouldOfferChatBookingUi(userText, choices);
       const shouldOfferRooms =
-        asksRoomDifference(userText) ||
-        asksToChangeOrPickRoom(userText) ||
-        isLiveEventBookingIntent(userText) ||
-        isBookingConciergeFollowUp(userText) ||
-        choices.guestCount != null ||
-        messages.some(
-          (m) =>
-            m.role === "user" &&
-            (isLiveEventBookingIntent(m.content) ||
-              isBookingConciergeFollowUp(m.content)),
-        ) ||
-        /\b(book|booking|guests?|tables?|tickets?|which room|choose.{0,12}room)\b/i.test(
-          userText,
-        );
+        offerBookingUi &&
+        !infoQuestion &&
+        (asksRoomDifference(userText) ||
+          asksToChangeOrPickRoom(userText) ||
+          isLiveEventBookingIntent(userText) ||
+          isBookingConciergeFollowUp(userText) ||
+          choices.guestCount != null ||
+          /\b(book|booking|guests?|tables?|tickets?|which room|choose.{0,12}room)\b/i.test(
+            userText,
+          ));
       const replyWithRooms =
         isVendorStorefront && !isLoggedInVendor
           ? withGuaranteedRoomChoiceCopy(rawReply, {
@@ -1883,15 +2226,24 @@ Is there anything else I can help you with?`,
               guestCount: choices.guestCount,
             })
           : rawReply;
-      const reply =
-        isVendorStorefront && !isLoggedInVendor
+      const replyWithDates =
+        isVendorStorefront && !isLoggedInVendor && !infoQuestion
           ? withGuaranteedDateChoiceCopy(replyWithRooms, {
               brief: briefForHandoff,
               roomId: choices.roomId,
               roomChosen: choices.roomId != null,
               hasDates,
+              userText,
+              shouldOfferDates: offerBookingUi,
             })
           : replyWithRooms;
+      const reply =
+        isVendorStorefront &&
+        !isLoggedInVendor &&
+        isCasualChatText(userText) &&
+        !offerBookingUi
+          ? stripUnsolicitedBookingOfferCopy(replyWithDates)
+          : replyWithDates;
       const quickActions =
         isVendorStorefront && !isLoggedInVendor
           ? publicBookingQuickActions({
@@ -1901,6 +2253,7 @@ Is there anything else I can help you with?`,
                 ...conversation,
                 { role: "assistant", content: reply },
               ],
+              offerBookingUi,
             })
           : extractBookingQuickActions(reply)
               .filter((action) => Boolean(action.sendText) && !action.href)
@@ -1968,7 +2321,9 @@ Is there anything else I can help you with?`,
       ? "Enter your telephone number…"
       : supportFlow.step === "description"
         ? "Describe your issue…"
-        : "Type a message…";
+        : awaitingGuestEmail
+          ? "Your email address…"
+          : "Type a message…";
 
   // Onboarding is a full-screen editor + preview — the floating launcher
   // (site logo avatar) overlaps the right-hand preview panel.
@@ -2184,6 +2539,19 @@ Is there anything else I can help you with?`,
                     <AnimatePresence initial={false}>
                       {messages.map((message, index) => {
                         const isUser = message.role === "user";
+                        const hasBody = message.content.trim().length > 0;
+                        const hasActions =
+                          !isUser &&
+                          Boolean(
+                            message.quickActions &&
+                              message.quickActions.length > 0,
+                          );
+                        const hasCta = !isUser && Boolean(message.supportCta);
+                        if (!hasBody && !hasActions && !hasCta) return null;
+                        const dateActionCount =
+                          message.quickActions?.filter(isChatGridAction)
+                            .length ?? 0;
+                        const useDateGrid = dateActionCount >= 2;
                         return (
                           <motion.div
                             key={`msg-${index}-${message.role}-${message.content.slice(0, 24)}`}
@@ -2215,10 +2583,17 @@ Is there anything else I can help you with?`,
                                 size="sm"
                               />
                             )}
-                            <div className="flex max-w-[85%] min-w-0 flex-col gap-2">
+                            <div
+                              className={cn(
+                                "flex min-w-0 flex-col gap-2",
+                                useDateGrid ? "w-full" : "max-w-[85%]",
+                              )}
+                            >
+                              {hasBody && (
                               <div
                                 className={cn(
                                   "min-w-0 px-3.5 py-2.5 text-sm leading-relaxed",
+                                  useDateGrid ? "max-w-[85%]" : null,
                                   isUser
                                     ? "rounded-2xl rounded-br-md bg-slate-800 text-white"
                                     : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
@@ -2238,11 +2613,21 @@ Is there anything else I can help you with?`,
                                   )}
                                 </p>
                               </div>
+                              )}
                               {!isUser &&
                                 message.quickActions &&
                                 message.quickActions.length > 0 && (
-                                  <div className="flex flex-col gap-1.5">
-                                    {message.quickActions.map((action, actionIndex) => (
+                                  <div
+                                    className={
+                                      useDateGrid
+                                        ? "grid w-full grid-cols-2 gap-1.5"
+                                        : "flex flex-col gap-1.5"
+                                    }
+                                  >
+                                    {message.quickActions.map((action, actionIndex) => {
+                                      const isDateChip =
+                                        isChatGridAction(action);
+                                      return (
                                       <motion.button
                                         key={action.id}
                                         type="button"
@@ -2268,16 +2653,30 @@ Is there anything else I can help you with?`,
                                             : undefined
                                         }
                                         className={cn(
-                                          "w-fit max-w-full rounded-full border px-3 py-1.5 text-left text-xs font-semibold transition-colors",
+                                          "group rounded-2xl border px-3 py-1.5 text-left transition-colors",
+                                          isDateChip && useDateGrid
+                                            ? "min-w-0 w-full"
+                                            : "w-fit max-w-full",
+                                          useDateGrid && !isDateChip
+                                            ? "col-span-2"
+                                            : null,
                                           action.id === "cancel_flow"
                                             ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                                             : "border-slate-300 bg-white text-slate-700 hover:bg-slate-800 hover:text-white hover:border-slate-800",
                                           "disabled:pointer-events-none disabled:opacity-50",
                                         )}
                                       >
-                                        {action.label}
+                                        <span className="block truncate text-xs font-semibold leading-tight">
+                                          {action.label}
+                                        </span>
+                                        {action.hint ? (
+                                          <span className="mt-0.5 block truncate text-[10px] font-medium leading-tight text-slate-500 group-hover:text-white/80">
+                                            {action.hint}
+                                          </span>
+                                        ) : null}
                                       </motion.button>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 )}
                               {!isUser && message.supportCta && (
@@ -2318,12 +2717,9 @@ Is there anything else I can help you with?`,
                         className="flex items-end gap-2"
                       >
                         <ChatAvatar src={avatarSrc} alt={siteName} size="sm" />
-                        <div className="rounded-2xl rounded-bl-md border border-black/6 bg-white px-3.5 py-3 text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                          <div className="flex gap-1">
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
-                          </div>
+                        <div className="w-[min(100%,16rem)] space-y-1.5 rounded-2xl rounded-bl-md border border-black/6 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                          <Skeleton className="h-3.5 w-[85%] rounded-md" />
+                          <Skeleton className="h-3.5 w-[62%] rounded-md" />
                         </div>
                       </motion.div>
                     )}

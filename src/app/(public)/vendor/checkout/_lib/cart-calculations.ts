@@ -1391,6 +1391,13 @@ export function countActiveDates(eventData: ApiEventCartData | null): number {
   ).length;
 }
 
+/** True when GET cart has at least one date (including empty initialized shells). */
+export function apiCartHasAnyDates(apiCartData: unknown): boolean {
+  return extractEventsFromApiResponse(apiCartData).some(
+    (event) => getApiCartDateKeys(event).length > 0,
+  );
+}
+
 /** True when GET cart returns no event rows (fully empty cart). */
 export function isApiCartResponseEmpty(apiCartData: unknown): boolean {
   if (apiCartData == null) return false;

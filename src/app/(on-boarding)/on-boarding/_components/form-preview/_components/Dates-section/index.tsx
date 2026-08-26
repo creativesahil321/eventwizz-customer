@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CHECKOUT_CONSTANTS } from "@/app/(public)/vendor/checkout/_lib/constants";
 // Professional API-only approach - no cart store needed
@@ -51,8 +51,14 @@ import {
   CHECKOUT_HANDOFF_DATES,
   CHECKOUT_HANDOFF_PAY,
   buildCheckoutHandoffHref,
+  clearCartClearedByUser,
+  dateHandoffSignature,
+  isDateHandoffConsumed,
+  markDateHandoffConsumed,
   mergeCheckoutHandoffPending,
   parseCheckoutHandoffPay,
+  replaceEventUrlWithoutDateHandoff,
+  wasCartClearedByUser,
 } from "@/lib/checkout-chat-handoff";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
@@ -360,6 +366,7 @@ export default function DatesSection({
 }: DatesSectionProps) {
   const currencySymbol = useCurrencySymbol();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const chatDateHandoffRan = useRef(false);
   const { data: session, status } = useSession();
@@ -549,6 +556,8 @@ export default function DatesSection({
     if (isPreviewMode) return;
     if (selectingDateKey || isPending) return;
 
+    clearCartClearedByUser();
+
     const dateKey = getDateSelectionKey(dateItem.event_date);
     setSelectingDateKey(dateKey);
 
@@ -696,6 +705,17 @@ export default function DatesSection({
       .filter((item): item is DatesSectionType[0] => Boolean(item));
     if (toAdd.length === 0) return;
 
+    const signature = dateHandoffSignature(
+      eventSlug || "",
+      roomId,
+      toAdd.map((item) => isoDateKey(item.event_date)),
+    );
+    if (isDateHandoffConsumed(signature) || wasCartClearedByUser()) {
+      chatDateHandoffRan.current = true;
+      replaceEventUrlWithoutDateHandoff(pathname, searchParams);
+      return;
+    }
+
     chatDateHandoffRan.current = true;
 
     const pay = parseCheckoutHandoffPay(searchParams.get(CHECKOUT_HANDOFF_PAY));
@@ -746,6 +766,8 @@ export default function DatesSection({
             },
           });
         }
+        markDateHandoffConsumed(signature);
+        replaceEventUrlWithoutDateHandoff(pathname, searchParams);
         router.push(checkoutHref);
       } catch (error) {
         console.error("Chat date handoff failed:", error);
@@ -759,6 +781,7 @@ export default function DatesSection({
     eventSlug,
     isOnboarding,
     isPreviewMode,
+    pathname,
     roomId,
     router,
     searchParams,

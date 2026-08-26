@@ -10,6 +10,7 @@ import { SiteHeading } from "@/components/public/site-heading";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import {
   heroBandContentPadClass,
   heroBandCopyPlacementClass,
@@ -168,6 +169,15 @@ export default function HeroBanner({
       heroContact?.email?.trim() ||
       heroContact?.phone?.trim(),
   );
+  /**
+   * Contact is painted twice (heading stack + search dock) and toggled with
+   * `md:` + `@max-md/preview`. On a wide monitor the viewport is still `md+`,
+   * so both copies can show in the 390px Mobile frame and stack on the same
+   * pixels. Skip the heading copy in that frame.
+   */
+  const isPreviewMobile = usePreviewMobileLayout();
+  const showHeadingContact = hasContact && !isPreviewMobile;
+  const showDockContact = hasContact && Boolean(heroFooter);
 
   return (
     <section
@@ -255,7 +265,7 @@ export default function HeroBanner({
             </p>
           ) : null}
 
-          {hasContact ? (
+          {showHeadingContact ? (
             <div className={heroFooter ? previewFlexFromMd : undefined}>
               <HeroBannerContactMeta contact={heroContact} align={textAlign} />
             </div>
@@ -273,11 +283,16 @@ export default function HeroBanner({
                 "flex flex-col gap-3 sm:gap-3.5",
               )}
             >
-              {hasContact ? (
-                <div className={previewFlexOnlyUntilMd}>
+              {showDockContact ? (
+                <div
+                  className={
+                    isPreviewMobile ? undefined : previewFlexOnlyUntilMd
+                  }
+                >
                   <HeroBannerContactMeta
                     contact={heroContact}
                     align={textAlign}
+                    stacked={isPreviewMobile}
                   />
                 </div>
               ) : null}
@@ -293,9 +308,11 @@ export default function HeroBanner({
 function HeroBannerContactMeta({
   contact,
   align,
+  stacked = false,
 }: {
   contact?: HeroBannerProps["heroContact"];
   align: BannerHeadingAlign;
+  stacked?: boolean;
 }) {
   const address = contact?.address?.trim() || null;
   const email = contact?.email?.trim() || null;
@@ -303,7 +320,13 @@ function HeroBannerContactMeta({
   if (!address && !email && !phone) return null;
 
   return (
-    <div className={heroBannerVenueContactClass(align, { fromMd: true })}>
+    <div
+      className={cn(
+        heroBannerVenueContactClass(align, { fromMd: true }),
+        stacked &&
+          "!flex !w-full !max-w-full !flex-col !items-center !justify-center !gap-2",
+      )}
+    >
       {address ? (
         <HeroContactLine
           href={buildMapsDirectionsUrl(address)}
@@ -314,7 +337,13 @@ function HeroBannerContactMeta({
         />
       ) : null}
       {email || phone ? (
-        <div className={heroBannerVenueContactLinksClass(align, { fromMd: true })}>
+        <div
+          className={cn(
+            heroBannerVenueContactLinksClass(align, { fromMd: true }),
+            stacked &&
+              "!flex !w-full !flex-col !flex-nowrap !items-center !justify-center !gap-2",
+          )}
+        >
           {email ? (
             <HeroContactLine href={`mailto:${email}`} icon={Mail} label={email} />
           ) : null}

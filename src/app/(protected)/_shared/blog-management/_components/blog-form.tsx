@@ -24,13 +24,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   useCreateAdminBlog,
   useUpdateAdminBlog,
   adminBlogsService,
@@ -54,7 +47,9 @@ import {
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import {
   blogFormSchema,
+  blogPublicationDateBounds,
   getBlogImageError,
+  localIsoDate,
   type BlogFormValues,
 } from "../_lib/schema";
 import { BlogCardPreview } from "./blog-card-preview";
@@ -65,7 +60,7 @@ interface BlogFormProps {
 }
 
 function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  return localIsoDate();
 }
 
 export function BlogForm({ mode, initialPost }: BlogFormProps) {
@@ -254,6 +249,8 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
   };
 
   const coverImage = watched.cover_image;
+  const { min: minPublicationDate, max: maxPublicationDate } =
+    blogPublicationDateBounds();
 
   return (
     <Form {...form}>
@@ -312,35 +309,17 @@ export function BlogForm({ mode, initialPost }: BlogFormProps) {
                         ) : null}
                       </FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input
+                          type="date"
+                          min={minPublicationDate}
+                          max={maxPublicationDate}
+                          {...field}
+                        />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Status <span className="text-destructive">*</span>
-                      </FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="published">Published</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormDescription>
+                        Last 5 years only. Published posts cannot use a future
+                        date.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

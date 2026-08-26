@@ -29,6 +29,10 @@ import {
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
+import {
+  buildChatSafetyReply,
+  classifyChatSafetyIntent,
+} from "@/lib/chat-safety";
 
 /**
  * Get condensed knowledge base to reduce token count
@@ -269,12 +273,6 @@ function buildSystemPrompt(context: ChatContext): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const aiConfig = await resolveAiRuntimeConfig();
-
-    if (!aiConfig.isConfigured) {
-      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
-    }
-
     const { messages, context } = (await req.json()) as {
       messages: Message[];
       context?: ChatContext;
@@ -285,6 +283,26 @@ export async function POST(req: NextRequest) {
         { error: "Invalid messages format" },
         { status: 400 }
       );
+    }
+
+    const lastUser = [...messages]
+      .reverse()
+      .find((m) => m?.role === "user" && typeof m.content === "string");
+    const safetyKind = classifyChatSafetyIntent(lastUser?.content ?? "", {
+      allowFinancial: context?.accountType === "vendor",
+    });
+    if (safetyKind) {
+      return NextResponse.json({
+        message: buildChatSafetyReply(safetyKind, {
+          userName: context?.userName,
+        }),
+      });
+    }
+
+    const aiConfig = await resolveAiRuntimeConfig();
+
+    if (!aiConfig.isConfigured) {
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     // GROQ only accepts role + content — drop any UI-only fields (e.g. supportCta)

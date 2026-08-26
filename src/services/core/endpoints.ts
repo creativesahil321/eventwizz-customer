@@ -293,6 +293,8 @@ export const API_ENDPOINTS = {
     },
     PAYMENT: {
       STRIPE_SUCCESS: "/customer/payment/stripe/success",
+      /** Authenticated receipt by booking_number. Version follows NEXT_PUBLIC_API_URL. */
+      SUCCESS: "/customer/payment/success",
     },
     MENU_CHOICES: {
       ADD_MENU: "/customer/bookings/menu-items/{id}/{date}/{table_id}",

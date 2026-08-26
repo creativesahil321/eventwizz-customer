@@ -6,6 +6,7 @@ import type { Transaction } from "../_lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { parseFormattedMoney } from "@/lib/currency-format";
 import { formatTransactionPaymentMethod } from "@/lib/transaction-payment-method";
+import { isAdminTransactionReceiptAvailable } from "../_lib/filters";
 
 function ledgerAmount(value: string): number {
   const parsed = parseFormattedMoney(String(value ?? ""));
@@ -15,8 +16,8 @@ function ledgerAmount(value: string): number {
 }
 
 interface GetTransactionColumnsProps {
-  onDownloadReceipt: (paymentId: number) => void;
-  downloadingPaymentId: number | null;
+  onDownloadReceipt: (paymentId: number | string) => void;
+  downloadingPaymentId: number | string | null;
   formatMoneyLocale: (amount: number) => string;
 }
 
@@ -73,16 +74,6 @@ export function getTransactionColumns({
         </span>
       ),
       enableSorting: true,
-      sortingFn: (rowA, rowB) => {
-        const parseDate = (dateStr: string) => {
-          const [datePart] = dateStr.split(" ");
-          const [day, month, year] = datePart.split("-");
-          return new Date(`${year}-${month}-${day}`).getTime();
-        };
-        const dateA = parseDate(rowA.getValue("booking_date") as string);
-        const dateB = parseDate(rowB.getValue("booking_date") as string);
-        return dateA - dateB;
-      },
     },
     {
       accessorKey: "event_date",
@@ -99,15 +90,6 @@ export function getTransactionColumns({
         </span>
       ),
       enableSorting: true,
-      sortingFn: (rowA, rowB) => {
-        const parseDate = (dateStr: string) => {
-          const [day, month, year] = dateStr.split("-");
-          return new Date(`${year}-${month}-${day}`).getTime();
-        };
-        const dateA = parseDate(rowA.getValue("event_date") as string);
-        const dateB = parseDate(rowB.getValue("event_date") as string);
-        return dateA - dateB;
-      },
     },
     {
       accessorKey: "full_name",
@@ -195,9 +177,6 @@ export function getTransactionColumns({
         );
       },
       enableSorting: true,
-      sortingFn: (rowA, rowB) =>
-        ledgerAmount(rowA.original.amount) -
-        ledgerAmount(rowB.original.amount),
     },
     {
       accessorKey: "platform_fee",
@@ -217,16 +196,22 @@ export function getTransactionColumns({
         );
       },
       enableSorting: true,
-      sortingFn: (rowA, rowB) =>
-        ledgerAmount(rowA.original.platform_fee) -
-        ledgerAmount(rowB.original.platform_fee),
     },
     {
       id: "receipt",
       header: "Receipt",
       cell: ({ row }) => {
-        const paymentId = row.original.payment_id;
-        const isDownloading = downloadingPaymentId === paymentId;
+        const paymentId = row.original.payment_id ?? row.original.transaction_id;
+        const canDownload = isAdminTransactionReceiptAvailable(
+          row.original.status,
+        );
+        const isDownloading =
+          downloadingPaymentId != null &&
+          String(downloadingPaymentId) === String(paymentId);
+
+        if (!canDownload) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
 
         return (
           <Button

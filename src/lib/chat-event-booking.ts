@@ -1,4 +1,7 @@
 import { format, isValid, parseISO } from "date-fns";
+import { isLiveEventBookingIntent } from "@/lib/chat-live-events";
+import type { GuestBookableLink } from "@/lib/chat-live-events";
+import { isDisallowedChatSafetyIntent } from "@/lib/chat-safety";
 import { couponToStripProps } from "@/lib/coupon-strip-props";
 import { formatDateCardOfferBadge } from "@/components/public/date-card-offer";
 import { pickRoomHighlights } from "@/lib/event-room-chooser-item";
@@ -10,6 +13,7 @@ import {
 import type { EventDetail } from "@/services/common/events/type";
 import {
   buildEventBookingHandoffHref,
+  CHECKOUT_PATH,
 } from "@/lib/checkout-chat-handoff";
 import {
   DEFAULT_CURRENCY_SYMBOL,
@@ -43,6 +47,8 @@ export type ChatBookingDate = {
   bookingType?: "tickets" | "tables" | "both";
   tables: ChatBookingTable[];
   tickets: ChatBookingTicket[];
+  roomId?: number;
+  roomName?: string;
 };
 
 export type ChatBookingDrink = {
@@ -50,6 +56,26 @@ export type ChatBookingDrink = {
   title: string;
   price?: number;
   availableQuantity?: number;
+};
+
+export type ChatBookingMenuItem = {
+  title: string;
+  description?: string;
+};
+
+export type ChatBookingMenu = {
+  name: string;
+  items: ChatBookingMenuItem[];
+};
+
+export type ChatBookingFaq = {
+  question: string;
+  answer: string;
+};
+
+export type ChatBookingScheduleItem = {
+  time: string;
+  title: string;
 };
 
 export type ChatBookingRoom = {
@@ -62,6 +88,8 @@ export type ChatBookingRoom = {
   packageSummary?: string;
   highlights: string[];
   fromPrice?: number;
+  menus: ChatBookingMenu[];
+  schedule: ChatBookingScheduleItem[];
 };
 
 export type ChatEventBookingBrief = {
@@ -74,6 +102,12 @@ export type ChatEventBookingBrief = {
   rooms: ChatBookingRoom[];
   dates: ChatBookingDate[];
   drinks: ChatBookingDrink[];
+  aboutHeading?: string;
+  about?: string;
+  menus: ChatBookingMenu[];
+  schedule: ChatBookingScheduleItem[];
+  faqs: ChatBookingFaq[];
+  packageDetails: string[];
   currencySymbol: string;
   coupon?: {
     code: string;
@@ -87,6 +121,8 @@ export type ChatEventBookingBrief = {
 export type ChatQuickActionDraft = {
   id: string;
   label: string;
+  /** Small secondary line, e.g. the room name under a date. */
+  hint?: string;
   href?: string;
   sendText?: string;
 };
@@ -243,6 +279,62 @@ function lowestDateFromPrice(dates: ChatBookingDate[]): number | undefined {
   return prices.length > 0 ? Math.min(...prices) : undefined;
 }
 
+function mapMenus(
+  menus:
+    | Array<{
+        name?: string;
+        items?: Array<{ title?: string; description?: string }>;
+      }>
+    | undefined,
+): ChatBookingMenu[] {
+  if (!Array.isArray(menus)) return [];
+  return menus
+    .slice(0, 8)
+    .map((section) => ({
+      name: String(section.name ?? "").trim() || "Menu",
+      items: (section.items ?? [])
+        .slice(0, 10)
+        .map((item) => ({
+          title: String(item.title ?? "").trim(),
+          description: clipChatText(item.description, 140),
+        }))
+        .filter((item) => item.title),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+function mapSchedule(
+  items: Array<{ time?: string; title?: string }> | undefined,
+): ChatBookingScheduleItem[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .slice(0, 10)
+    .map((item) => ({
+      time: String(item.time ?? "").trim(),
+      title: String(item.title ?? "").trim(),
+    }))
+    .filter((item) => item.time || item.title);
+}
+
+function mapFaqs(
+  items: Array<{ question?: string; answer?: string }> | undefined,
+): ChatBookingFaq[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .slice(0, 8)
+    .map((item) => ({
+      question: String(item.question ?? "").trim(),
+      answer: clipChatText(item.answer, 220) ?? "",
+    }))
+    .filter((item) => item.question && item.answer);
+}
+
+export function isEventInfoQuestion(text: string): boolean {
+  return /\b(menu|menus|food|starter|starters|mains?|dessert|faq|faqs|frequently asked|schedule|programme|program|about (the |this |our )?event|dress code|what('?s| is) included|what time|brochure|tell me about|included in)\b/i.test(
+    text,
+  );
+}
+
 function mapDrinks(
   packages:
     | Array<{
@@ -308,7 +400,11 @@ export function summarizeEventDetailForChat(
   const rooms = hasRooms
     ? listPublicEventRooms(event).map((room, index) => {
       const slices = resolvePublicEventActiveSlices(event, index);
-      const dates = mapDates(slices.dates);
+      const dates = mapDates(slices.dates).map((item) => ({
+        ...item,
+        roomId: room.room_id,
+        roomName: room.name,
+      }));
       const inclusionHighlights = pickRoomHighlights(
         (slices.package_details ?? []).map((detail) => detail.title),
         4,
@@ -330,6 +426,8 @@ export function summarizeEventDetailForChat(
         packageSummary: clipChatText(slices.package_description),
         highlights,
         fromPrice: lowestDateFromPrice(dates),
+        menus: mapMenus(slices.menus),
+        schedule: mapSchedule(slices.event_schedular),
       };
     })
     : [];
@@ -366,6 +464,20 @@ export function summarizeEventDetailForChat(
     rooms,
     dates: hasRooms ? [] : mapDates(flat.dates),
     drinks: hasRooms ? [] : mapDrinks(flat.packages),
+    aboutHeading: clipChatText(event.about_event_heading, 80),
+    about: clipChatText(
+      [event.about_event_sub_heading, event.about_event_description]
+        .filter(Boolean)
+        .join(" — "),
+      420,
+    ),
+    menus: hasRooms ? [] : mapMenus(event.menus),
+    schedule: hasRooms ? [] : mapSchedule(event.event_schedular),
+    faqs: mapFaqs(event.faqs),
+    packageDetails: (event.package_details ?? [])
+      .map((detail) => String(detail.title ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 8),
     coupon: couponProps?.code
       ? {
         code: couponProps.code,
@@ -388,6 +500,7 @@ export function summarizeEventDetailForChat(
  * concierge with event data — not the canned “open the event page” redirect.
  */
 export function isBookingConciergeFollowUp(text: string): boolean {
+  if (isDisallowedChatSafetyIntent(text)) return false;
   const trimmed = text.trim();
   if (/^\d{1,3}$/.test(trimmed)) {
     const n = Number(trimmed);
@@ -395,9 +508,68 @@ export function isBookingConciergeFollowUp(text: string): boolean {
       return true;
     }
   }
-  return /\b(date|dates|available|25th|26th|december|dec\b|room|rooms|hall|space|difference|different|compare|which room|office|snowball|drink|drinks|package|packages|table|tables|ticket|tickets|group|persons?|people|guests?|coupon|discount|promo|code|deposit|pay|payment|checkout|both days|already logg|logged in|book for me|make a booking)\b/i.test(
+  return /\b(date|dates|available|25th|26th|december|dec\b|room|rooms|hall|space|difference|different|compare|which room|office|snowball|drink|drinks|package|packages|table|tables|ticket|tickets|group|persons?|people|guests?|coupon|discount|promo|code|deposit|pay|payment|checkout|both days|already logg|logged in|book for me|make a booking|that'?s all|that'?s everything|no more|same as last|no drinks)\b/i.test(
     text,
   );
+}
+
+/** Hellos and thanks are not a booking request — do not dump dates or Visit event page. */
+export function isCasualChatText(text: string): boolean {
+  const stripped = text
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, " ")
+    .replace(/[^a-z0-9\s']/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!stripped) return true;
+  return /^(hi+|hii+|hello|hey+|hiya|yo|sup|howdy|hi there|hello there|good (morning|afternoon|evening|night)|how are you|hows it going|how are things|whats up|thanks?( you)?|thank you|cheers|ok(ay)?|cool|great|nice|bye|goodbye|see you)(\s+(there|again|all|everyone|team))?$/i.test(
+    stripped,
+  );
+}
+
+export function shouldOfferChatBookingUi(
+  userText: string,
+  choices?: {
+    dates?: unknown[];
+    roomId?: number | null;
+    guestCount?: number | null;
+    seating?: unknown;
+    drinkTitles?: unknown[];
+    slots?: unknown[];
+    couponApplied?: boolean;
+  } | null,
+): boolean {
+  if (isDisallowedChatSafetyIntent(userText)) return false;
+  if (
+    choices &&
+    ((choices.dates?.length ?? 0) > 0 ||
+      (choices.slots?.length ?? 0) > 0 ||
+      (choices.drinkTitles?.length ?? 0) > 0 ||
+      choices.roomId != null ||
+      choices.guestCount != null ||
+      Boolean(choices.seating) ||
+      Boolean(choices.couponApplied))
+  ) {
+    return true;
+  }
+  if (isCasualChatText(userText)) return false;
+  if (isLiveEventBookingIntent(userText)) return true;
+  if (isBookingConciergeFollowUp(userText)) return true;
+  if (asksRoomDifference(userText) || asksToChangeOrPickRoom(userText)) {
+    return true;
+  }
+  return false;
+}
+
+/** Drop date dumps / Visit event page the model added to a hello. */
+export function stripUnsolicitedBookingOfferCopy(reply: string): string {
+  return reply
+    .replace(
+      /\n+(Available dates:|Here are the dates I can book:)\s*((?:\s*\[[^\]]+\]\(chat:[^)]+\))+)/gi,
+      "",
+    )
+    .replace(/\s*\[Visit event page\]\([^)]+\)/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function listBookableChatRooms(
@@ -434,8 +606,18 @@ export function buildRoomChoiceMarkdown(
   return `${buttons}${compare}`;
 }
 
-function shortDateButtonLabel(date: ChatBookingDate): string {
+export function shortDateButtonLabel(date: ChatBookingDate): string {
   return date.label.replace(/\s+\d{4}$/, "").trim() || date.label;
+}
+
+export function chatDateSlotKey(
+  date: Pick<ChatBookingDate, "date" | "roomId">,
+): string {
+  return `${date.roomId ?? 0}:${date.date.slice(0, 10)}`;
+}
+
+export function formatChatDateChoiceSendText(date: ChatBookingDate): string {
+  return date.roomName ? `${date.roomName} · ${date.label}` : date.label;
 }
 
 export function listChatDatesForRoom(
@@ -460,7 +642,12 @@ export function buildDateChoiceMarkdown(
 ): string {
   return listChatDatesForRoom(brief, roomId)
     .slice(0, 8)
-    .map((date) => `[${shortDateButtonLabel(date)}](chat:${date.label})`)
+    .map((date) => {
+      const label = date.roomName
+        ? `${shortDateButtonLabel(date)} · ${date.roomName}`
+        : shortDateButtonLabel(date);
+      return `[${label}](chat:${formatChatDateChoiceSendText(date)})`;
+    })
     .join(" ");
 }
 
@@ -537,9 +724,164 @@ export function buildVisitEventQuickAction(
       : `${String(brief.href).split("#")[0]}#booking`;
   return {
     id: "visit-event",
-    label: `Visit ${brief.title}`,
+    label: "Visit event page",
     href,
   };
+}
+
+export const CHAT_EMAIL_UPDATES_SEND = "email me updates";
+
+export function isChatEmailAddress(text: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(text.trim());
+}
+
+export function isChatEmailUpdatesText(text: string): boolean {
+  const n = text.replace(/\s+/g, " ").trim().toLowerCase();
+  return (
+    n === CHAT_EMAIL_UPDATES_SEND ||
+    n === "subscribe" ||
+    /\b(email me updates|join the newsletter|subscribe to (the )?newsletter)\b/i.test(
+      text,
+    )
+  );
+}
+
+export function buildGuestBookingGateCopy(options: {
+  brief?: ChatEventBookingBrief | null;
+  events?: GuestBookableLink[];
+  userName?: string | null;
+  includeEventLead?: boolean;
+  registerHref?: string;
+  loginHref?: string;
+}): string {
+  const nameBit = options.userName?.trim()
+    ? `, ${options.userName.trim()}`
+    : "";
+  const registerHref = options.registerHref ?? "/auth/register/customer";
+  const loginHref = options.loginHref ?? "/auth/login";
+  const fromBrief =
+    options.brief?.href
+      ? [
+          {
+            title: options.brief.title,
+            href: String(options.brief.href).split("#")[0],
+            locationCity: options.brief.locationCity || undefined,
+            locationHref: options.brief.locationSlug
+              ? `/${options.brief.locationSlug.replace(/^\/+|\/+$/g, "")}`
+              : undefined,
+          } satisfies GuestBookableLink,
+        ]
+      : [];
+  const events =
+    options.events && options.events.length > 0 ? options.events : fromBrief;
+
+  let lead = "";
+  if (options.includeEventLead !== false && events.length === 1) {
+    const event = events[0];
+    const city = event.locationCity ? ` in **${event.locationCity}**` : "";
+    const locationLine = event.locationHref
+      ? `\n[${event.locationCity || "Location"}](${event.locationHref})`
+      : "";
+    lead = `**${event.title}** is available${city}.\n\n[${event.title}](${event.href})${locationLine}\n\n`;
+  } else if (options.includeEventLead !== false && events.length > 1) {
+    lead = `These events are available to book:\n\n${events
+      .map((event) => {
+        const city = event.locationCity ? ` — ${event.locationCity}` : "";
+        return `- [${event.title}${city}](${event.href})`;
+      })
+      .join("\n")}\n\n`;
+  }
+
+  return `${lead}You’re not logged in${nameBit}. [Create account](${registerHref}) or [Log in](${loginHref}) to book.`;
+}
+
+export function buildExistingCartBookingGateCopy(options?: {
+  userName?: string | null;
+}): string {
+  const nameBit = options?.userName?.trim()
+    ? `, ${options.userName.trim()}`
+    : "";
+  return `You already have a date in Checkout${nameBit}. Please remove it there first, then I can help you book here.\n\n[Go to checkout](${CHECKOUT_PATH})`;
+}
+
+export function buildExistingCartBookingGateActions(): ChatQuickActionDraft[] {
+  return [
+    {
+      id: "open-checkout",
+      label: "Go to checkout",
+      href: CHECKOUT_PATH,
+    },
+  ];
+}
+
+export function buildGuestBookingGateActions(
+  brief?: ChatEventBookingBrief | null,
+  options?: {
+    registerHref?: string;
+    loginHref?: string;
+    events?: GuestBookableLink[];
+  },
+): ChatQuickActionDraft[] {
+  const fromBrief =
+    brief?.href
+      ? [
+          {
+            title: brief.title,
+            href: String(brief.href).split("#")[0],
+            locationCity: brief.locationCity || undefined,
+            locationHref: brief.locationSlug
+              ? `/${brief.locationSlug.replace(/^\/+|\/+$/g, "")}`
+              : undefined,
+          } satisfies GuestBookableLink,
+        ]
+      : [];
+  const events =
+    options?.events && options.events.length > 0 ? options.events : fromBrief;
+
+  const eventActions: ChatQuickActionDraft[] = [];
+  const seen = new Set<string>();
+  for (const event of events) {
+    if (eventActions.length >= 8) break;
+    if (!seen.has(event.href)) {
+      seen.add(event.href);
+      eventActions.push({
+        id: `event-${event.href}`,
+        label: event.title,
+        hint: event.locationCity,
+        href: event.href,
+      });
+    }
+    if (
+      eventActions.length < 8 &&
+      event.locationHref &&
+      !seen.has(event.locationHref)
+    ) {
+      seen.add(event.locationHref);
+      eventActions.push({
+        id: `location-${event.locationHref}`,
+        label: event.locationCity || "Explore location",
+        href: event.locationHref,
+      });
+    }
+  }
+  return [
+    ...eventActions,
+    {
+      id: "register",
+      label: "Create account",
+      href: options?.registerHref ?? "/auth/register/customer",
+    },
+    {
+      id: "login",
+      label: "Log in",
+      href: options?.loginHref ?? "/auth/login",
+    },
+    {
+      id: "newsletter",
+      label: "Email me updates",
+      sendText: CHAT_EMAIL_UPDATES_SEND,
+    },
+  ];
 }
 
 export function withVisitEventQuickAction<T extends ChatQuickActionDraft>(
@@ -596,7 +938,7 @@ export function buildBookingKickoffCopy(options: {
   const venue = formatEventVenuePhrase(options.brief);
   const bookable = listBookableChatRooms(options.brief);
   if (bookable.length >= 2) {
-    return `Yes${nameBit} — **${options.brief.title}** is available${venue}.\n\nWhich space would you like?`;
+    return `Yes${nameBit} — **${options.brief.title}** is available${venue}.\n\nWhich date would you like? Each date shows its room — you can add another space after this one.`;
   }
   if (bookable.length === 1) {
     return `Yes${nameBit} — **${options.brief.title}** is in **${bookable[0].name}**${venue}.\n\nWhich date would you like?`;
@@ -635,6 +977,16 @@ function formatRoomCompareBlock(
   if (room.highlights.length) {
     lines.push(`- Includes: ${room.highlights.slice(0, 3).join(", ")}`);
   }
+  if (room.menus.length) {
+    const dishes = room.menus
+      .flatMap((section) =>
+        section.items.slice(0, 2).map((item) => item.title),
+      )
+      .slice(0, 4);
+    if (dishes.length) {
+      lines.push(`- Menu: ${dishes.join(", ")}`);
+    }
+  }
   if (room.drinks.length) {
     lines.push(
       `- Drinks: ${room.drinks
@@ -662,6 +1014,152 @@ export function buildRoomDifferenceCopy(
     .join("\n\n")}\n\nTap a room below to continue.`;
 }
 
+function formatMenuSections(menus: ChatBookingMenu[]): string {
+  return menus
+    .map((section) => {
+      const items = section.items
+        .map((item) =>
+          item.description
+            ? `- **${item.title}** — ${item.description}`
+            : `- **${item.title}**`,
+        )
+        .join("\n");
+      return `**${section.name}**\n${items}`;
+    })
+    .join("\n\n");
+}
+
+function menusForRoom(
+  brief: ChatEventBookingBrief,
+  roomId?: number | null,
+): ChatBookingMenu[] {
+  if (brief.hasRooms) {
+    const room =
+      roomId != null
+        ? brief.rooms.find((item) => item.roomId === roomId)
+        : null;
+    if (room) return room.menus;
+    return [];
+  }
+  return brief.menus;
+}
+
+function formatMenusCopy(
+  brief: ChatEventBookingBrief,
+  roomId?: number | null,
+): string | null {
+  if (brief.hasRooms && roomId == null) {
+    const blocks = listBookableChatRooms(brief)
+      .map((room) => {
+        const body = formatMenuSections(room.menus);
+        if (!body) {
+          const named = room.highlights.filter(Boolean).join(", ");
+          return named
+            ? `**${room.name}** — ${named}`
+            : `**${room.name}** — no dish list is published for this space.`;
+        }
+        return `**${room.name}**\n${body}`;
+      })
+      .join("\n\n");
+    return blocks
+      ? `Here’s what’s on the menus for **${brief.title}**:\n\n${blocks}`
+      : null;
+  }
+  const menus = menusForRoom(brief, roomId);
+  const body = formatMenuSections(menus);
+  if (body) {
+    const roomName =
+      roomId != null
+        ? brief.rooms.find((room) => room.roomId === roomId)?.name
+        : null;
+    const where = roomName ? ` in **${roomName}**` : "";
+    return `Here’s the menu${where} for **${brief.title}**:\n\n${body}`;
+  }
+  const highlights =
+    roomId != null
+      ? brief.rooms.find((room) => room.roomId === roomId)?.highlights
+      : brief.packageDetails;
+  if (highlights?.length) {
+    return `The listed food for **${brief.title}** is: ${highlights.join(", ")}.`;
+  }
+  return null;
+}
+
+function formatFaqsCopy(brief: ChatEventBookingBrief, userText: string): string | null {
+  if (!brief.faqs.length) return null;
+  const n = userText.toLowerCase();
+  const matched = brief.faqs.filter(
+    (faq) =>
+      n.includes(faq.question.toLowerCase().slice(0, 24)) ||
+      faq.question.toLowerCase().split(/\s+/).some((word) => word.length > 4 && n.includes(word)),
+  );
+  const list = (matched.length > 0 ? matched : brief.faqs).slice(0, 6);
+  const body = list
+    .map((faq) => `**${faq.question}**\n${faq.answer}`)
+    .join("\n\n");
+  return `Here are the FAQs for **${brief.title}**:\n\n${body}`;
+}
+
+function formatScheduleCopy(
+  brief: ChatEventBookingBrief,
+  roomId?: number | null,
+): string | null {
+  const room =
+    roomId != null
+      ? brief.rooms.find((item) => item.roomId === roomId)
+      : null;
+  const schedule = room?.schedule?.length
+    ? room.schedule
+    : brief.hasRooms
+      ? listBookableChatRooms(brief).flatMap((item) =>
+          item.schedule.map((row) => ({
+            ...row,
+            title: `${item.name}: ${row.title}`,
+          })),
+        )
+      : brief.schedule;
+  if (!schedule.length) return null;
+  const lines = schedule
+    .map((row) => `- **${row.time}** — ${row.title}`)
+    .join("\n");
+  return `Here’s the schedule for **${brief.title}**:\n\n${lines}`;
+}
+
+export function buildEventInfoTurn(options: {
+  brief: ChatEventBookingBrief;
+  userText: string;
+  roomId?: number | null;
+}): { content: string; actions: ChatQuickActionDraft[] } | null {
+  const { brief, userText, roomId } = options;
+  const t = userText.toLowerCase();
+  let content: string | null = null;
+  if (/\b(menu|menus|food|starter|starters|mains?|dessert|included in)\b/i.test(t)) {
+    content = formatMenusCopy(brief, roomId);
+  } else if (/\b(faq|faqs|frequently asked|dress code|what time|cancel|guest)\b/i.test(t)) {
+    content = formatFaqsCopy(brief, userText);
+  } else if (/\b(schedule|programme|program|what time)\b/i.test(t)) {
+    content = formatScheduleCopy(brief, roomId) ?? formatFaqsCopy(brief, userText);
+  } else if (/\babout (the |this |our )?event\b/i.test(t) || /^tell me about\b/i.test(t)) {
+    content = brief.about
+      ? `**${brief.aboutHeading || brief.title}**\n\n${brief.about}`
+      : null;
+  }
+  if (!content) {
+    content =
+      formatMenusCopy(brief, roomId) ||
+      formatFaqsCopy(brief, userText) ||
+      formatScheduleCopy(brief, roomId) ||
+      (brief.about
+        ? `**${brief.aboutHeading || brief.title}**\n\n${brief.about}`
+        : null);
+  }
+  if (!content) return null;
+  return {
+    content: `${content}\n\nYou can keep booking here, or open the event page to do it yourself.`,
+    actions: [buildVisitEventQuickAction(brief, { roomId })],
+  };
+}
+
 export function withGuaranteedRoomChoiceCopy(
   reply: string,
   options: {
@@ -675,12 +1173,17 @@ export function withGuaranteedRoomChoiceCopy(
   const brief = options.brief;
   const bookable = listBookableChatRooms(brief);
   if (!brief?.hasRooms || bookable.length === 0) return reply;
+  if (isEventInfoQuestion(options.userText)) return reply;
+  if (isCasualChatText(options.userText) && !options.shouldOfferRooms) {
+    return reply;
+  }
 
   if (asksRoomDifference(options.userText) && bookable.length >= 2) {
     return buildRoomDifferenceCopy(brief);
   }
 
   if (
+    options.shouldOfferRooms &&
     isEventPageBrushOff(reply) &&
     !options.roomChosen &&
     bookable.length >= 1
@@ -698,7 +1201,7 @@ export function withGuaranteedRoomChoiceCopy(
   if (allNamed) return reply;
 
   const names = bookable.map((room) => `**${room.name}**`).join(" or ");
-  return `${reply.trim()}\n\nWe have ${bookable.length} spaces for this event: ${names}. Tap the one you’d like — or ask what’s different.\n\n${buildRoomChoiceMarkdown(brief)}`;
+  return `${reply.trim()}\n\nWe have ${bookable.length} spaces for this event: ${names}. Tap a room below — or ask what’s different.`;
 }
 
 export function buildEventBookingPromptBlock(
@@ -793,7 +1296,26 @@ EVENT BOOKING DATA:
   Dates:
 ${dateLines(room.dates)}
   Drinks:
-${drinkLines(room.drinks)}`;
+${drinkLines(room.drinks)}
+  Menu:
+${
+  room.menus.length
+    ? room.menus
+        .map(
+          (section) =>
+            `    - ${section.name}: ${section.items.map((item) => item.title).join("; ")}`,
+        )
+        .join("\n")
+    : "    (no dish list)"
+}
+  Schedule:
+${
+  room.schedule.length
+    ? room.schedule
+        .map((row) => `    - ${row.time} ${row.title}`.trim())
+        .join("\n")
+    : "    (none listed)"
+}`;
       })
       .join("\n")
     : `- Dates:
@@ -805,7 +1327,8 @@ ${drinkLines(brief.drinks)}`;
     }
 - ROOM CHOICE BUTTONS (copy these whenever you ask which room, or after explaining the difference):
   ${roomChoiceButtons || "(none bookable)"}
-- If they ask how the rooms differ / which is better / what’s in each room: compare ONLY the About / Dates / Drinks facts above. If two rooms share the same drinks or dates, say so. Never invent capacity, table counts, décor, or vibe. Then show the ROOM CHOICE BUTTONS again.`
+- If they ask how the rooms differ / which is better / what’s in each room: compare ONLY the About / Dates / Drinks / Menu facts above. If two rooms share the same drinks or dates, say so. Never invent capacity, table counts, décor, or vibe. Then show the ROOM CHOICE BUTTONS again.
+- Do NOT append room buttons when they ask about menus, FAQs, schedule, or about the event — answer those from EVENT INFO below.`
     : "";
 
   const couponBlock = brief.coupon
@@ -816,6 +1339,38 @@ ${drinkLines(brief.drinks)}`;
       }. Offer it LAST, after drinks. Use [Apply ${brief.coupon.code}](chat:please apply ${brief.coupon.code}). Do not send them to Checkout to apply it.`
     : `- No event coupon is listed. Do not invent a code. Date-level offers (if shown on a date above) still apply unless a coupon is used.`;
 
+  const infoBlock = `- About: ${brief.about || "(none listed)"}
+- Event menus: ${
+    brief.menus.length
+      ? brief.menus
+          .map(
+            (section) =>
+              `${section.name}: ${section.items.map((item) => item.title).join("; ")}`,
+          )
+          .join(" | ")
+      : brief.hasRooms
+        ? "see each room’s Menu above"
+        : "(none listed)"
+  }
+- Schedule: ${
+    brief.schedule.length
+      ? brief.schedule.map((row) => `${row.time} ${row.title}`.trim()).join("; ")
+      : brief.hasRooms
+        ? "see each room’s Schedule above"
+        : "(none listed)"
+  }
+- FAQs:
+${
+  brief.faqs.length
+    ? brief.faqs
+        .map((faq) => `    - Q: ${faq.question} A: ${faq.answer}`)
+        .join("\n")
+    : "    (none listed)"
+}
+- If they ask about menus, FAQs, schedule, or about the event, answer from this block. NEVER say you do not have the details if they are listed.
+- Greetings (hi, hello, thanks): greet back only — do not list dates, rooms, or Visit event page until they ask to book.
+- They may book in chat or open the event page: [Visit event page](${brief.href})`;
+
   return `
 EVENT BOOKING DATA (authoritative for this conversation — MUST FOLLOW):
 - Event: **${brief.title}** at **${formatChatLocationLabel(brief) || brief.locationCity || brief.locationSlug}**
@@ -823,6 +1378,7 @@ EVENT BOOKING DATA (authoritative for this conversation — MUST FOLLOW):
 ${roomChoiceBlock}
 ${roomsBlock}
 ${couponBlock}
+${infoBlock}
 - Drinks: ${
     anyDrinks
       ? "listed under each room above with prices. NEVER say drinks are not listed. After they pick a room, offer THAT room’s drink packages with prices. Do not show stock unless they ask for more than is available."
@@ -841,13 +1397,16 @@ ${couponBlock}
 export function buildBookingConciergeInstructions(isLoggedInCustomer: boolean): string {
   const loginLine = isLoggedInCustomer
     ? `- They are already logged in. NEVER ask them to create an account or log in.`
-    : `- Checkout needs a customer account. Only mention [Create account](/auth/register/customer) or [Log in](/auth/login) if they are not signed in and they are ready to pay.`;
+        : `- They are NOT signed in. If an event is available, give its event page link and the location page link. Then say they’re not logged in and include [Create account](/auth/register/customer) and [Log in](/auth/login). Do not collect dates, guests, drinks, or payment. Do not dump date chips.`;
 
   return `
 BOOKING CONCIERGE (MUST FOLLOW — THIS IS HOW YOU BOOK WITH THE GUEST):
 You are a professional venue host taking a booking in chat. You already have EVENT BOOKING DATA. Stay in chat. Payment is taken in the chat modal — never send them to cart or Checkout.
 
 ${loginLine}
+
+If they only greet (hi, hello, thanks, ok): greet back in one line. Do not start the booking steps, list dates/rooms, or offer Visit event page until they ask to book or continue a booking already in progress.
+If they mention weapons, violence, hacking, or destroying the venue — even in the same sentence as “book” — refuse and do not offer dates.
 
 Ask ONE question at a time, in this order (skip any step they already answered). Only show buttons for the current question:
 1. Location (only if LIVE EVENTS shows more than one city). Always name the city.
@@ -861,19 +1420,50 @@ Ask ONE question at a time, in this order (skip any step they already answered).
 
 CHOICE BUTTONS:
 - In-chat only: [Label](chat:the exact reply)
+- They can book in chat or open the event page themselves: [Visit event page](/{location_slug}/events/{event_slug}) from EVENT BOOKING DATA.
+- Only show room/date buttons for the current booking question. Do not repeat the same buttons twice. Do not re-offer rooms when they asked about menus, FAQs, or the schedule.
 - NEVER write /chat: or /chat — there is no slash before chat:
-- Do NOT add Visit / event page / Checkout links on a healthy booking turn.
-- Visit the event page only if you cannot continue.
+- Do NOT invent table counts, dates, rooms, drinks, menus, FAQs, or coupon codes.
 
 TONE:
 - Warm, concise, UK English. One short paragraph + the current question’s buttons. Always name the city.
 - Quote prices. Do not dump remaining stock, table counts, or “pages”.
-- Do NOT send them to the event page, cart, or Checkout.
-- Do NOT invent table counts, dates, rooms, drinks, or coupon codes.
+- They may book in chat or open [Visit event page] from EVENT BOOKING DATA to do it on the website.
+- Do NOT invent table counts, dates, rooms, drinks, menus, FAQs, or coupon codes.
 `.trim();
 }
 
-/** Parse markdown link targets. `/chat:` is a model typo for in-chat `chat:`. */
+/** Collapse unicode spaces/apostrophes so “Room 1” and “Room 1” are the same chip. */
+export function normalizeChatActionKey(label: string): string {
+  return label
+    .normalize("NFKC")
+    .replace(/[\u00A0\u202F\u2007\u2009\u200A\u2011\u2010\u2060]/g, " ")
+    .replace(/[’‘‛]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+export function dedupeChatQuickActions<T extends ChatQuickActionDraft>(
+  actions: T[],
+): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const action of actions) {
+    const labelKey = normalizeChatActionKey(action.label);
+    const identity = action.sendText
+      ? `send:${normalizeChatActionKey(action.sendText)}`
+      : action.href
+        ? `href:${action.href}`
+        : `id:${action.id}`;
+    if (seen.has(identity)) continue;
+    if (!action.sendText && seen.has(labelKey)) continue;
+    seen.add(identity);
+    if (!action.sendText) seen.add(labelKey);
+    out.push(action);
+  }
+  return out;
+}
 export function parseMarkdownLinkTarget(
   raw: string,
 ):
@@ -928,10 +1518,14 @@ export function extractBookingQuickActions(
     if (!label || !parsed) continue;
     const key =
       parsed.kind === "chat"
-        ? `${label}|chat:${parsed.sendText}`
-        : `${label}|${parsed.href}`;
+        ? `chat:${normalizeChatActionKey(parsed.sendText)}`
+        : `${normalizeChatActionKey(label)}|${parsed.href}`;
     if (seen.has(key)) continue;
+    if (parsed.kind !== "chat" && seen.has(normalizeChatActionKey(label))) {
+      continue;
+    }
     seen.add(key);
+    if (parsed.kind !== "chat") seen.add(normalizeChatActionKey(label));
     index += 1;
     if (parsed.kind === "chat") {
       actions.push({
@@ -993,6 +1587,9 @@ export function withRoomChoiceQuickActions<T extends ChatQuickActionDraft>(
     asksRoomDifference(options.userText) ||
     asksRoomDifference(options.reply) ||
     asksToChangeOrPickRoom(options.userText);
+  if (isEventInfoQuestion(options.userText) && !wantsCompare) {
+    return actions;
+  }
   const mentionsRoom =
     /\b(which room|choose.{0,24}room|event space|room (would|do) you|pick (a |your )?room|rooms?:)\b/i.test(
       options.reply,
@@ -1012,19 +1609,19 @@ export function withRoomChoiceQuickActions<T extends ChatQuickActionDraft>(
     (roomAction) =>
       actions.find(
         (action) =>
-          action.label.trim().toLowerCase() ===
-          roomAction.label.trim().toLowerCase(),
+          normalizeChatActionKey(action.label) ===
+          normalizeChatActionKey(roomAction.label),
       ) ?? roomAction,
   );
   const rest = actions.filter(
     (action) =>
       !roomActions.some(
         (roomAction) =>
-          roomAction.label.trim().toLowerCase() ===
-          action.label.trim().toLowerCase(),
+          normalizeChatActionKey(roomAction.label) ===
+          normalizeChatActionKey(action.label),
       ),
   );
-  return [...mergedRoom, ...rest].slice(0, 12);
+  return dedupeChatQuickActions([...mergedRoom, ...rest]).slice(0, 12);
 }
 
 export function buildDateChoiceQuickActions(
@@ -1032,11 +1629,12 @@ export function buildDateChoiceQuickActions(
   roomId?: number | null,
 ): ChatQuickActionDraft[] {
   return listChatDatesForRoom(brief, roomId)
-    .slice(0, 8)
+    .slice(0, 12)
     .map((date) => ({
-      id: `date-${date.date}`,
+      id: `date-${date.roomId ?? "event"}-${date.date.slice(0, 10)}`,
       label: shortDateButtonLabel(date),
-      sendText: date.label,
+      hint: date.roomName || undefined,
+      sendText: formatChatDateChoiceSendText(date),
     }));
 }
 
@@ -1052,7 +1650,6 @@ export function withDateChoiceQuickActions<T extends ChatQuickActionDraft>(
 ): Array<T | ChatQuickActionDraft> {
   const brief = options.brief;
   if (!brief || options.isBookingTurn === false) return actions;
-  if (brief.hasRooms && !options.roomChosen) return actions;
   if (options.hasDates) return actions;
 
   const dateActions = buildDateChoiceQuickActions(brief, options.roomId);
@@ -1062,18 +1659,14 @@ export function withDateChoiceQuickActions<T extends ChatQuickActionDraft>(
     (dateAction) =>
       actions.find(
         (action) =>
-          action.label.trim().toLowerCase() ===
-          dateAction.label.trim().toLowerCase() ||
-          action.sendText?.trim().toLowerCase() ===
-          dateAction.sendText?.trim().toLowerCase(),
+          (dateAction.sendText ?? "").trim().toLowerCase() ===
+          (action.sendText ?? "").trim().toLowerCase(),
       ) ?? dateAction,
   );
   const rest = actions.filter(
     (action) =>
       !dateActions.some(
         (dateAction) =>
-          dateAction.label.trim().toLowerCase() ===
-          action.label.trim().toLowerCase() ||
           (dateAction.sendText ?? "").trim().toLowerCase() ===
           (action.sendText ?? "").trim().toLowerCase(),
       ),
@@ -1088,12 +1681,17 @@ export function withGuaranteedDateChoiceCopy(
     roomId?: number | null;
     roomChosen: boolean;
     hasDates: boolean;
+    userText?: string;
+    shouldOfferDates?: boolean;
   },
 ): string {
   const brief = options.brief;
   if (!brief) return reply;
-  if (brief.hasRooms && !options.roomChosen) return reply;
   if (options.hasDates) return reply;
+  const offerDates =
+    options.shouldOfferDates ??
+    (options.userText ? shouldOfferChatBookingUi(options.userText) : true);
+  if (!offerDates) return reply;
   if (isEventPageBrushOff(reply)) {
     const dates = buildDateChoiceMarkdown(brief, options.roomId);
     if (!dates) return reply;

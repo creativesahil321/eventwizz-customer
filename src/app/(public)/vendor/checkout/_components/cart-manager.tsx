@@ -75,7 +75,7 @@ import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
 import { useCheckoutChatHandoff } from "../_lib/hooks/use-checkout-chat-handoff";
-import { readChatEventReturnHref } from "@/lib/checkout-chat-handoff";
+import { readChatEventReturnHref, markCartClearedByUser } from "@/lib/checkout-chat-handoff";
 
 type CartManagerProps = Record<string, never>;
 
@@ -548,6 +548,12 @@ export default function CartManager({}: CartManagerProps) {
         roomId: roomId ?? undefined,
         storeDateKey: dateKey,
       });
+      if (currentEventSlug) {
+        const remaining = useCartEditStore.getState().editingData[currentEventSlug];
+        if (!remaining || Object.keys(remaining).length === 0) {
+          markCartClearedByUser();
+        }
+      }
     } catch (error) {
       console.error("Error removing date:", error);
       toast.error("Couldn't remove this date. Please try again.");
@@ -561,6 +567,7 @@ export default function CartManager({}: CartManagerProps) {
     try {
       setIsProcessing(true);
       clearAllCarts();
+      markCartClearedByUser();
       // Drop reserved-payment UI + sessionStorage so the timer/"Payment required"
       // card cannot outlive an explicitly cleared cart.
       useCheckoutPaymentUiStore.getState().clearPaymentSession();

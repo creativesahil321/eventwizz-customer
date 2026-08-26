@@ -31,8 +31,12 @@ export interface AdminTransactionsParams {
   per_page?: number;
   search?: string;
   status?: string;
+  /** Single booking day (`YYYY-MM-DD`). Do not send with from_date/to_date. */
+  booking_date?: string;
   from_date?: string;
   to_date?: string;
+  sort_by?: "booking_date" | "event_date" | "amount" | "platform_fee";
+  sort_dir?: "asc" | "desc";
 }
 
 export interface AdminTransactionsResponse {
@@ -64,12 +68,14 @@ export interface AdminTransactionsResponse {
   earnings_formatted?: string;
 }
 
-/** Filters accepted by the transactions CSV export endpoint. */
+/** Filters accepted by the transactions CSV export endpoint. Date is required. */
 export interface AdminTransactionsExportParams {
+  /** Single booking day (`YYYY-MM-DD`). Do not send with from_date/to_date. */
+  booking_date?: string;
   /** Inclusive start date, format: YYYY-MM-DD */
-  from_date: string;
+  from_date?: string;
   /** Inclusive end date, format: YYYY-MM-DD */
-  to_date: string;
+  to_date?: string;
   search?: string;
   status?: string;
 }

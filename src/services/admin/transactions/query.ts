@@ -17,34 +17,26 @@ export const adminTransactionsKeys = {
     [...adminTransactionsKeys.all, "list", params] as const,
 };
 
+function listParams(params: AdminTransactionsParams): AdminTransactionsParams {
+  return {
+    page: params.page ?? 1,
+    per_page: params.per_page ?? 30,
+    search: params.search?.trim() || undefined,
+    status: params.status?.trim().toLowerCase() || undefined,
+    booking_date: params.booking_date || undefined,
+    from_date: params.from_date || undefined,
+    to_date: params.to_date || undefined,
+    sort_by: params.sort_by,
+    sort_dir: params.sort_dir,
+  };
+}
+
 export function useAdminTransactions(params: AdminTransactionsParams = {}) {
-  const {
-    page = 1,
-    per_page = 30,
-    search = "",
-    status = "",
-    from_date,
-    to_date,
-  } = params;
+  const queryParams = listParams(params);
 
   return useQuery<AdminTransactionsResponse>({
-    queryKey: adminTransactionsKeys.list({
-      page,
-      per_page,
-      search,
-      status,
-      from_date,
-      to_date,
-    }),
-    queryFn: () =>
-      adminTransactionsService.getTransactions({
-        page,
-        per_page,
-        search,
-        status,
-        from_date,
-        to_date,
-      }),
+    queryKey: adminTransactionsKeys.list(queryParams),
+    queryFn: () => adminTransactionsService.getTransactions(queryParams),
     placeholderData: keepPreviousData,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -64,6 +56,12 @@ export function useDownloadAdminReceipt() {
   });
 }
 
+function exportFilename(params: AdminTransactionsExportParams): string {
+  const from = params.booking_date ?? params.from_date ?? "from";
+  const to = params.booking_date ?? params.to_date ?? from;
+  return `transactions-${from}_to_${to}.csv`;
+}
+
 /**
  * Exports admin transactions as CSV from the server for the given date range.
  */
@@ -72,10 +70,7 @@ export function useExportAdminTransactions() {
     mutationFn: (params: AdminTransactionsExportParams) =>
       adminTransactionsService.exportTransactions(params),
     onSuccess: (blob, params) => {
-      downloadBlob(
-        blob,
-        `admin-transaction-history-${params.from_date}_${params.to_date}.csv`,
-      );
+      downloadBlob(blob, exportFilename(params));
     },
   });
 }

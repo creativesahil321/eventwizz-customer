@@ -89,7 +89,7 @@ const STAT_CARDS: {
   },
   {
     key: "unsynced_unsubscribes",
-    label: "Awaiting Mailchimp sync",
+    label: "Awaiting sync",
     icon: TriangleAlert,
     iconBg: "bg-orange-500/10",
     iconColor: "text-orange-600",
@@ -148,7 +148,7 @@ export default function NewsletterManager() {
                 <AllLocationsBadge />
               </div>
               <p className="text-muted-foreground">
-                Collect verified opt-ins, then export CSVs for Mailchimp.
+                Collect verified opt-ins, then export CSVs for your email tool.
                 Unsubscribes are kept on the list so they are not emailed again.
               </p>
             </div>
@@ -215,7 +215,7 @@ export default function NewsletterManager() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-64">
-                      <DropdownMenuLabel>Export for Mailchimp</DropdownMenuLabel>
+                      <DropdownMenuLabel>Export CSVs</DropdownMenuLabel>
                       <DropdownMenuItem
                         className="cursor-pointer"
                         onClick={() =>

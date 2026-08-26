@@ -3,10 +3,15 @@ import {
   buildCartDateLookupKey,
   calculateEditableCartDiscountableTotal,
   extractEventsFromApiResponse,
+  findApiCartEventBySlug,
   findEventBySlug,
 } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { hasViableTablePlan } from "@/app/(public)/vendor/checkout/_lib/table-recommendations";
-import type { ChatBookingChoices } from "@/lib/chat-booking-choices";
+import {
+  resolveSlotTableAndTicketCounts,
+  type ChatBookingChoices,
+  type ChatBookingSlot,
+} from "@/lib/chat-booking-choices";
 import type { ChatEventBookingBrief } from "@/lib/chat-event-booking";
 import { cartService } from "@/services/customer/cart/cart.service";
 import { checkoutService } from "@/services/customer/checkout/checkout.service";
@@ -32,10 +37,10 @@ export type ChatCheckoutFailureReason =
 export type ChatCheckoutResult =
   | { ok: true; action: CheckoutPaymentAction; payload: CheckoutRequest }
   | {
-      ok: false;
-      reason: ChatCheckoutFailureReason;
-      message: string;
-    };
+    ok: false;
+    reason: ChatCheckoutFailureReason;
+    message: string;
+  };
 
 function pickPaymentGatewayId(event: ApiEventCartData): number | null {
   const gateways = event.payment_gateways ?? [];
@@ -74,35 +79,116 @@ function resolveCartCoupon(
   return { coupon_code: code };
 }
 
+function checkoutSlots(choices: ChatBookingChoices): ChatBookingSlot[] {
+  if (choices.slots.length > 0) return choices.slots;
+  return choices.dates.map((date) => ({
+    roomId: choices.roomId,
+    roomName: choices.roomName,
+    date,
+    guestCount: choices.guestCount,
+    seating: choices.seating,
+    drinkTitles: choices.drinkTitles,
+    drinkQuantities: choices.drinkQuantities,
+    drinksDone: true,
+    tableGuestCount:
+      choices.seating === "tickets" ? 0 : choices.guestCount,
+    ticketCount: choices.seating === "tickets" ? choices.guestCount : 0,
+    tableMix: {},
+    tablePlan: [],
+    tablePlanDone: true,
+    mixingTables: false,
+  }));
+}
+
 export function bookingChoicesReadyForPay(
   brief: ChatEventBookingBrief | null | undefined,
   choices: ChatBookingChoices,
 ): boolean {
   if (!brief) return false;
-  if (brief.hasRooms && choices.roomId == null) return false;
-  if (choices.dates.length === 0) return false;
-  if (choices.guestCount == null || choices.guestCount < 1) return false;
-  if (!choices.seating) return false;
-  return true;
+  const slots = checkoutSlots(choices);
+  if (slots.length === 0) return false;
+  return slots.every((slot) => {
+    if (brief.hasRooms && (slot.roomId == null || slot.roomId <= 0)) {
+      return false;
+    }
+    if (!slot.date?.date) return false;
+    if (slot.guestCount == null || slot.guestCount < 1) return false;
+    return Boolean(slot.seating);
+  });
+}
+
+function liveCartEditStore() {
+  return useCartEditStore.getState();
+}
+
+function findChatCartEvent(
+  apiCartData: unknown,
+  slug: string,
+): ApiEventCartData | null {
+  const events = extractEventsFromApiResponse(apiCartData);
+  const want = normalizeSlug(slug);
+  return (
+    findApiCartEventBySlug(apiCartData, slug) ??
+    findEventBySlug(events, slug) ??
+    events.find((event) => normalizeSlug(event.event_slug) === want) ??
+    null
+  );
+}
+
+function cartRequestHasLineItems(cartData: {
+  tables: unknown[];
+  tickets: unknown[];
+  drink_package: unknown[];
+}): boolean {
+  return (
+    cartData.tables.length > 0 ||
+    cartData.tickets.length > 0 ||
+    cartData.drink_package.length > 0
+  );
+}
+
+function resolveChatCartDateKey(
+  eventSlug: string,
+  isoDate: string,
+  roomId: number | null | undefined,
+): string | null {
+  const store = liveCartEditStore();
+  const roomKey = buildCartDateLookupKey(isoDate, roomId);
+  if (store.getDateData(eventSlug, roomKey)) return roomKey;
+  if (store.getDateData(eventSlug, isoDate)) return isoDate;
+  return null;
+}
+
+function authFailureFromCartError(error: unknown): ChatCheckoutResult | null {
+  const status = (error as { response?: { status?: number } })?.response
+    ?.status;
+  if (status === 401 || status === 403) {
+    return {
+      ok: false,
+      reason: "login",
+      message:
+        "Please log in with a customer account so I can take payment here.",
+    };
+  }
+  return null;
 }
 
 function listChatDrinksForCheckout(
   brief: ChatEventBookingBrief,
-  choices: ChatBookingChoices,
+  slot: ChatBookingSlot,
 ) {
   const pool =
-    brief.hasRooms && choices.roomId != null
-      ? (brief.rooms.find((room) => room.roomId === choices.roomId)?.drinks ??
-        [])
+    brief.hasRooms && slot.roomId != null
+      ? (brief.rooms.find((room) => room.roomId === slot.roomId)?.drinks ?? [])
       : brief.drinks;
-  return choices.drinkTitles
+  return slot.drinkTitles
     .map((title) => {
       const drink = pool.find(
         (item) =>
           item.title.trim().toLowerCase() === title.trim().toLowerCase(),
       );
       if (!drink || drink.id <= 0) return null;
-      const qty = Math.max(1, choices.drinkQuantities[title] ?? 1);
+      const qty = Math.max(1, slot.drinkQuantities[title] ?? 1);
       return {
         id: drink.id,
         title: drink.title,
@@ -129,8 +215,8 @@ export async function runChatCheckout(options: {
   }
 
   const slug = normalizeSlug(brief.eventSlug);
-  const isoDate = choices.dates[0]?.date.slice(0, 10);
-  if (!isoDate) {
+  const slots = checkoutSlots(choices);
+  if (slots.length === 0) {
     return {
       ok: false,
       reason: "incomplete",
@@ -138,37 +224,30 @@ export async function runChatCheckout(options: {
     };
   }
 
-  const drinksPayload = listChatDrinksForCheckout(brief, choices);
-
   try {
-    await cartService.storeEventBooking({
-      slug,
-      event_date: isoDate,
-      ...(choices.roomId != null && choices.roomId > 0
-        ? { room_id: choices.roomId }
-        : {}),
-      people_quantity: choices.guestCount ?? undefined,
-      drink_package: drinksPayload,
-      tables: [],
-      tickets: [],
-    });
-  } catch (error) {
-    const status = (error as { response?: { status?: number } })?.response
-      ?.status;
-    if (status === 401 || status === 403) {
-      return {
-        ok: false,
-        reason: "login",
-        message:
-          "Please log in with a customer account so I can take payment here.",
-      };
+    for (const slot of slots) {
+      const isoDate = slot.date.date.slice(0, 10);
+      await cartService.storeEventBooking({
+        slug,
+        event_date: isoDate,
+        ...(slot.roomId != null && slot.roomId > 0
+          ? { room_id: slot.roomId }
+          : {}),
+        people_quantity: slot.guestCount ?? undefined,
+        drink_package: listChatDrinksForCheckout(brief, slot),
+        tables: [],
+        tickets: [],
+      });
     }
-    return {
-      ok: false,
-      reason: "unknown",
-      message:
-        "I couldn’t prepare this booking just now. You can finish on the event page instead.",
-    };
+  } catch (error) {
+    return (
+      authFailureFromCartError(error) ?? {
+        ok: false,
+        reason: "unknown",
+        message:
+          "I couldn’t prepare this booking just now. You can finish on the event page instead.",
+      }
+    );
   }
 
   let cartResponse: unknown;
@@ -183,10 +262,7 @@ export async function runChatCheckout(options: {
     };
   }
 
-  const event = findEventBySlug(
-    extractEventsFromApiResponse(cartResponse),
-    slug,
-  );
+  const event = findChatCartEvent(cartResponse, slug);
   if (!event) {
     return {
       ok: false,
@@ -195,6 +271,8 @@ export async function runChatCheckout(options: {
         "I couldn’t load your booking just now. You can finish on the event page instead.",
     };
   }
+
+  const storeSlug = event.event_slug?.trim() || slug;
 
   const gatewayId = pickPaymentGatewayId(event);
   if (gatewayId == null) {
@@ -206,103 +284,169 @@ export async function runChatCheckout(options: {
     };
   }
 
-  const dateKey = buildCartDateLookupKey(isoDate, choices.roomId);
-  const store = useCartEditStore.getState();
-  store.clearEditingData(slug);
-  store.initializeFromAPI(slug, event as unknown as Record<string, unknown>);
+  const store = liveCartEditStore();
+  store.clearEditingData(storeSlug);
+  if (storeSlug !== slug) store.clearEditingData(slug);
+  store.initializeFromAPI(storeSlug, event as unknown as Record<string, unknown>);
 
-  const seeded = store.getDateData(slug, dateKey);
-  if (!seeded) {
-    return {
-      ok: false,
-      reason: "unknown",
-      message:
-        "I couldn’t prepare tables and tickets for that date. Visit the event page to finish.",
-    };
-  }
-
-  if (choices.guestCount != null) {
-    store.updatePeopleCount(slug, dateKey, choices.guestCount);
-  }
-
-  if (choices.seating === "tickets") {
-    store.skipTableSeating(slug, dateKey);
-    const tickets = store.getDateData(slug, dateKey)?.tickets ?? [];
-    const ticket = tickets[0];
-    const qty = choices.guestCount ?? 1;
-    const remaining = ticket?.maxQuantity;
-    if (ticket && remaining != null && qty > remaining) {
+  for (const slot of slots) {
+    const isoDate = slot.date.date.slice(0, 10);
+    const dateKey = resolveChatCartDateKey(storeSlug, isoDate, slot.roomId);
+    const seeded = dateKey
+      ? store.getDateData(storeSlug, dateKey)
+      : null;
+    if (!dateKey || !seeded) {
       return {
         ok: false,
-        reason: "capacity",
-        message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${qty}.`,
-      };
-    }
-    if (ticket) {
-      store.updateQuantity(slug, dateKey, "ticket", ticket.id, qty);
-    }
-  } else {
-    const tables = store.getDateData(slug, dateKey)?.tables ?? [];
-    const guests = choices.guestCount ?? 0;
-    if (tables.length > 0 && guests > 0 && !hasViableTablePlan(tables, guests)) {
-      const remaining = tables.reduce(
-        (sum, table) =>
-          sum + (table.maxQuantity ?? 0) * (table.maxPersons ?? 0),
-        0,
-      );
-      return {
-        ok: false,
-        reason: "capacity",
+        reason: "unknown",
         message:
-          remaining > 0
-            ? `We can seat about **${remaining}** guests on the tables listed for that date — I can’t book **${guests}** as tables.`
-            : `I can’t seat **${guests}** guests on the tables listed for that date.`,
+          "I couldn’t prepare tables and tickets for that date. Visit the event page to finish.",
       };
     }
-    store.applyBestTableMatch(slug, dateKey);
-    const allocated = store.getDateData(slug, dateKey);
-    for (const table of allocated?.tables ?? []) {
-      if (table.quantity > 0) {
-        store.confirmTableSeating(
-          slug,
-          dateKey,
-          table.id,
-          table.allocation ?? [],
-        );
+
+    const catalogTables = seeded.tables ?? [];
+    const catalogTickets = seeded.tickets ?? [];
+    const catalogHasTables = catalogTables.length > 0;
+    const catalogHasTickets = catalogTickets.length > 0;
+    const guests = slot.guestCount ?? 0;
+    let { tableGuests, ticketQty } = resolveSlotTableAndTicketCounts(slot);
+    if (!catalogHasTables) {
+      if (tableGuests > 0) {
+        ticketQty = Math.max(ticketQty, tableGuests);
+        tableGuests = 0;
+      } else if (ticketQty === 0 && guests > 0 && catalogHasTickets) {
+        ticketQty = guests;
       }
     }
-  }
 
-  const drinkCatalog = store.getDateData(slug, dateKey)?.drinks ?? [];
-  for (const title of choices.drinkTitles) {
-    const drink = drinkCatalog.find(
-      (item) =>
-        item.title.trim().toLowerCase() === title.trim().toLowerCase(),
-    );
-    if (!drink) continue;
-    const qty = Math.max(1, choices.drinkQuantities[title] ?? 1);
-    const remaining = drink.maxQuantity;
-    if (remaining != null && qty > remaining) {
-      return {
-        ok: false,
-        reason: "capacity",
-        message: `We only have **${remaining}** ${drink.title} available — I can’t add ${qty}.`,
-      };
+    if (tableGuests > 0) {
+      store.updatePeopleCount(storeSlug, dateKey, tableGuests);
+    } else if (slot.guestCount != null) {
+      store.updatePeopleCount(storeSlug, dateKey, slot.guestCount);
     }
-    store.updateQuantity(slug, dateKey, "drink", drink.id, qty);
-  }
 
-  store.updatePaymentType(
-    slug,
-    dateKey,
-    payMode === "deposit" ? "deposit" : "full",
-  );
+    if (tableGuests <= 0) {
+      store.skipTableSeating(storeSlug, dateKey);
+    } else {
+      const tables = store.getDateData(storeSlug, dateKey)?.tables ?? [];
+      if (slot.tablePlan.length > 0) {
+        for (const item of slot.tablePlan) {
+          const table =
+            tables.find((row) => row.id === item.tableId) ??
+            tables.find(
+              (row) =>
+                row.minPersons === item.minPersons &&
+                row.maxPersons === item.maxPersons,
+            );
+          if (!table) continue;
+          const remaining = table.maxQuantity;
+          if (remaining != null && item.quantity > remaining) {
+            return {
+              ok: false,
+              reason: "capacity",
+              message: `We only have **${remaining}** ${table.title} available — I can’t book ${item.quantity}.`,
+            };
+          }
+          store.updateQuantity(storeSlug, dateKey, "table", table.id, item.quantity);
+          store.confirmTableSeating(storeSlug, dateKey, table.id, item.allocation);
+        }
+      } else {
+        if (tables.length > 0 && !hasViableTablePlan(tables, tableGuests)) {
+          const remaining = tables.reduce(
+            (sum, table) =>
+              sum + (table.maxQuantity ?? 0) * (table.maxPersons ?? 0),
+            0,
+          );
+          return {
+            ok: false,
+            reason: "capacity",
+            message:
+              remaining > 0
+                ? `We can seat about **${remaining}** guests on the tables listed for that date — I can’t book **${tableGuests}** as tables.`
+                : `I can’t seat **${tableGuests}** guests on the tables listed for that date.`,
+          };
+        }
+        store.applyBestTableMatch(storeSlug, dateKey);
+        const allocated = store.getDateData(storeSlug, dateKey);
+        for (const table of allocated?.tables ?? []) {
+          if (table.quantity > 0) {
+            store.confirmTableSeating(
+              storeSlug,
+              dateKey,
+              table.id,
+              table.allocation ?? [],
+            );
+          }
+        }
+      }
+    }
+
+    if (tableGuests > 0) {
+      const seated = store
+        .getDateData(storeSlug, dateKey)
+        ?.tables.some((table) => table.quantity > 0);
+      if (!seated) {
+        return {
+          ok: false,
+          reason: "capacity",
+          message: `I can’t seat **${tableGuests}** guests on the tables listed for that date.`,
+        };
+      }
+    }
+
+    if (ticketQty > 0) {
+      const tickets = store.getDateData(storeSlug, dateKey)?.tickets ?? [];
+      const ticket = tickets[0];
+      const remaining = ticket?.maxQuantity;
+      if (!ticket) {
+        return {
+          ok: false,
+          reason: "incomplete",
+          message:
+            "This date doesn’t have tickets I can add. Choose another date, or visit the event page.",
+        };
+      }
+      if (remaining != null && ticketQty > remaining) {
+        return {
+          ok: false,
+          reason: "capacity",
+          message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${ticketQty}.`,
+        };
+      }
+      store.updateQuantity(storeSlug, dateKey, "ticket", ticket.id, ticketQty);
+    }
+
+    const drinkCatalog = store.getDateData(storeSlug, dateKey)?.drinks ?? [];
+    for (const title of slot.drinkTitles) {
+      const drink = drinkCatalog.find(
+        (item) =>
+          item.title.trim().toLowerCase() === title.trim().toLowerCase(),
+      );
+      if (!drink) continue;
+      const qty = Math.max(1, slot.drinkQuantities[title] ?? 1);
+      const remaining = drink.maxQuantity;
+      if (remaining != null && qty > remaining) {
+        return {
+          ok: false,
+          reason: "capacity",
+          message: `We only have **${remaining}** ${drink.title} available — I can’t add ${qty}.`,
+        };
+      }
+      store.updateQuantity(storeSlug, dateKey, "drink", drink.id, qty);
+    }
+
+    store.updatePaymentType(
+      storeSlug,
+      dateKey,
+      payMode === "deposit" && tableGuests > 0 ? "deposit" : "full",
+    );
+  }
 
   const couponSource = resolveCartCoupon(event);
   const couponCode = choices.couponApplied
     ? couponSource?.coupon_code?.trim().toUpperCase() ||
-      brief.coupon?.code?.trim().toUpperCase() ||
-      null
+    brief.coupon?.code?.trim().toUpperCase() ||
+    null
     : null;
   if (couponCode) {
     useCheckoutPromoStore.getState().setCouponCode(couponCode);
@@ -310,9 +454,62 @@ export async function runChatCheckout(options: {
     useCheckoutPromoStore.getState().clearCoupon();
   }
 
-  const getEditableDate = (key: string) => store.getDateData(slug, key);
+  try {
+    for (const slot of slots) {
+      const isoDate = slot.date.date.slice(0, 10);
+      const dateKey = resolveChatCartDateKey(
+        storeSlug,
+        isoDate,
+        slot.roomId,
+      );
+      if (!dateKey) {
+        return {
+          ok: false,
+          reason: "incomplete",
+          message:
+            "I couldn’t add tables, tickets, or drinks for that date. Visit the event page to finish.",
+        };
+      }
+      const cartData = liveCartEditStore().getItemsForAPI(
+        storeSlug,
+        dateKey,
+        slot.roomId ?? undefined,
+      );
+      if (!cartRequestHasLineItems(cartData)) {
+        return {
+          ok: false,
+          reason: "incomplete",
+          message:
+            "I couldn’t add tables, tickets, or drinks for that date. Visit the event page to finish.",
+        };
+      }
+      await cartService.storeEventBooking({
+        ...cartData,
+        slug: storeSlug,
+      });
+    }
+  } catch (error) {
+    return (
+      authFailureFromCartError(error) ?? {
+        ok: false,
+        reason: "unknown",
+        message:
+          "I couldn’t save this booking just now. You can finish on the event page instead.",
+      }
+    );
+  }
+
+  try {
+    cartResponse = await cartService.getCartData();
+  } catch {
+    // Checkout still uses the in-memory cart; a stale GET must not block pay.
+  }
+
+  const checkoutEvent = findChatCartEvent(cartResponse, storeSlug) ?? event;
+  const getEditableDate = (key: string) =>
+    liveCartEditStore().getDateData(storeSlug, key);
   const discountable = calculateEditableCartDiscountableTotal(
-    event,
+    checkoutEvent,
     getEditableDate,
   );
   const discountAmount =
@@ -321,8 +518,8 @@ export async function runChatCheckout(options: {
       : 0;
 
   const payload = transformCartToCheckout(
-    slug,
-    store.editingData,
+    storeSlug,
+    liveCartEditStore().editingData,
     cartResponse,
     gatewayId,
     {

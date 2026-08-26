@@ -18,6 +18,8 @@ export const CHECKOUT_PATH = "/vendor/checkout";
 export const CHAT_EVENT_RETURN_HREF_KEY = "ew.checkout.chat-event-href";
 
 const PENDING_STORAGE_KEY = "ew.checkout.chat-handoff";
+const DATE_HANDOFF_CONSUMED_KEY = "ew.checkout.date-handoff-consumed";
+const CART_CLEARED_KEY = "ew.checkout.cart-cleared";
 const PENDING_TTL_MS = 30 * 60 * 1000;
 
 export type CheckoutHandoffPay = "full" | "deposit";
@@ -157,10 +159,124 @@ export function buildEventBookingHandoffHref(options: {
   return `${pathname}${query ? `?${query}` : ""}#booking`;
 }
 
+/**
+ * Event-page URL for "go pick dates" — keep room, drop one-shot cart handoff
+ * (`dates` / `pay` / `coupon`) so clearing the cart does not re-add a date.
+ */
+export function sanitizePublicEventReturnHref(href: string): string {
+  if (!isPublicEventBookingHref(href)) return href;
+  const raw = href.trim();
+  let pathname = "";
+  let search = "";
+  try {
+    const dummy = raw.startsWith("http")
+      ? new URL(raw)
+      : new URL(raw, "http://local.invalid");
+    pathname = dummy.pathname;
+    search = dummy.search;
+  } catch {
+    const withoutHash = raw.split("#")[0] ?? raw;
+    const q = withoutHash.indexOf("?");
+    pathname = q >= 0 ? withoutHash.slice(0, q) : withoutHash;
+    search = q >= 0 ? withoutHash.slice(q) : "";
+  }
+  const params = new URLSearchParams(
+    search.startsWith("?") ? search.slice(1) : search,
+  );
+  const roomId = Number(params.get("roomId"));
+  const kept = new URLSearchParams();
+  if (Number.isFinite(roomId) && roomId > 0) {
+    kept.set("roomId", String(roomId));
+  }
+  const query = kept.toString();
+  return `${pathname}${query ? `?${query}` : ""}#booking`;
+}
+
+export function eventUrlWithoutDateHandoff(
+  pathname: string,
+  searchParams: URLSearchParams,
+): string {
+  const next = new URLSearchParams(searchParams.toString());
+  next.delete(CHECKOUT_HANDOFF_DATES);
+  next.delete(CHECKOUT_HANDOFF_PAY);
+  next.delete(CHECKOUT_HANDOFF_COUPON);
+  next.delete("booking");
+  const query = next.toString();
+  return `${pathname}${query ? `?${query}` : ""}#booking`;
+}
+
+export function replaceEventUrlWithoutDateHandoff(
+  pathname: string,
+  searchParams: URLSearchParams,
+): void {
+  if (typeof window === "undefined") return;
+  const url = eventUrlWithoutDateHandoff(pathname, searchParams);
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (current === url) return;
+  window.history.replaceState(window.history.state, "", url);
+}
+
+export function dateHandoffSignature(
+  eventSlug: string,
+  roomId: number | null | undefined,
+  dates: string[],
+): string {
+  const room = roomId != null && roomId > 0 ? String(roomId) : "";
+  return `${eventSlug}|${room}|${dates.join(",")}`;
+}
+
+export function isDateHandoffConsumed(signature: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return sessionStorage.getItem(DATE_HANDOFF_CONSUMED_KEY) === signature;
+  } catch {
+    return false;
+  }
+}
+
+export function markDateHandoffConsumed(signature: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(DATE_HANDOFF_CONSUMED_KEY, signature);
+  } catch {
+    // ignore
+  }
+}
+
+export function markCartClearedByUser(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(CART_CLEARED_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+export function wasCartClearedByUser(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return sessionStorage.getItem(CART_CLEARED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function clearCartClearedByUser(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(CART_CLEARED_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function saveChatEventReturnHref(href: string | null | undefined): void {
   if (typeof window === "undefined" || !href) return;
+  const stored = isPublicEventBookingHref(href)
+    ? sanitizePublicEventReturnHref(href)
+    : href;
   try {
-    sessionStorage.setItem(CHAT_EVENT_RETURN_HREF_KEY, href);
+    sessionStorage.setItem(CHAT_EVENT_RETURN_HREF_KEY, stored);
   } catch {
     // ignore
   }
@@ -169,7 +285,14 @@ export function saveChatEventReturnHref(href: string | null | undefined): void {
 export function readChatEventReturnHref(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return sessionStorage.getItem(CHAT_EVENT_RETURN_HREF_KEY);
+    const raw = sessionStorage.getItem(CHAT_EVENT_RETURN_HREF_KEY);
+    if (!raw) return null;
+    if (!isPublicEventBookingHref(raw)) return raw;
+    const cleaned = sanitizePublicEventReturnHref(raw);
+    if (cleaned !== raw) {
+      sessionStorage.setItem(CHAT_EVENT_RETURN_HREF_KEY, cleaned);
+    }
+    return cleaned;
   } catch {
     return null;
   }
