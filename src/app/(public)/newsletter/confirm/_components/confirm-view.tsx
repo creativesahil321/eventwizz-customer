@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CheckCircle2, Loader2, Mail, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Info, Loader2, TriangleAlert } from "lucide-react";
 import {
   newsletterConfirmResult,
   newsletterApiMessage,
@@ -100,18 +100,21 @@ function ResultState({
   message: string;
 }) {
   const ok = result === "confirmed" || result === "already_confirmed";
+  const isInfo = result === "already_confirmed";
   return (
     <>
       <div
         className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full ${
-          ok
-            ? "bg-emerald-100 text-emerald-600"
-            : "bg-rose-100 text-rose-600"
+          isInfo
+            ? "bg-sky-100 text-sky-700"
+            : ok
+              ? "bg-emerald-100 text-emerald-600"
+              : "bg-rose-100 text-rose-600"
         }`}
       >
         {ok ? (
-          result === "already_confirmed" ? (
-            <Mail className="h-8 w-8" />
+          isInfo ? (
+            <Info className="h-8 w-8" />
           ) : (
             <CheckCircle2 className="h-8 w-8" />
           )

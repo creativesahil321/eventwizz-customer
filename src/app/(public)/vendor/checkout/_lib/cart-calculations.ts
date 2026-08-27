@@ -927,8 +927,24 @@ export function hasActiveApiDateSelections(
   );
   if (subtotal > 0) return true;
   if (getApiDateBucketAmount(dateData) > 0) return true;
+  if (hasApiBillableTables(dateData)) return true;
 
-  return hasApiBillableTables(dateData);
+  const tickets = dateData.tickets ?? [];
+  if (
+    tickets.some(
+      (ticket) => Number((ticket as { quantity?: unknown }).quantity) > 0,
+    )
+  ) {
+    return true;
+  }
+
+  const drinks = [
+    ...(dateData.drinks ?? []),
+    ...(dateData.selected_drinks ?? []),
+  ];
+  return drinks.some(
+    (drink) => Number((drink as { quantity?: unknown }).quantity) > 0,
+  );
 }
 
 /** Whether a date bucket exists in the API cart (including empty initialized shells). */
@@ -1395,6 +1411,36 @@ export function countActiveDates(eventData: ApiEventCartData | null): number {
 export function apiCartHasAnyDates(apiCartData: unknown): boolean {
   return extractEventsFromApiResponse(apiCartData).some(
     (event) => getApiCartDateKeys(event).length > 0,
+  );
+}
+
+/** True when GET cart has tables, tickets, or drinks — not just empty date shells. */
+export function apiCartHasBillableSelections(apiCartData: unknown): boolean {
+  if (isApiCartResponseEmpty(apiCartData)) return false;
+  return extractEventsFromApiResponse(apiCartData).some((event) =>
+    getApiCartDateKeys(event).some((dateKey) => {
+      const dateData = getApiDateData(event, dateKey);
+      if (!dateData) return false;
+      if (hasApiBillableTables(dateData)) return true;
+      const tickets = dateData.tickets ?? [];
+      if (
+        tickets.some(
+          (ticket) =>
+            Number((ticket as { quantity?: unknown }).quantity) > 0 ||
+            Number((ticket as { selected_quantity?: unknown }).selected_quantity) >
+              0,
+        )
+      ) {
+        return true;
+      }
+      const drinks = [
+        ...(dateData.drinks ?? []),
+        ...(dateData.selected_drinks ?? []),
+      ];
+      return drinks.some(
+        (drink) => Number((drink as { quantity?: unknown }).quantity) > 0,
+      );
+    }),
   );
 }
 

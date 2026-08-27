@@ -156,6 +156,8 @@ export function getSubscriberColumns({
         </span>
       ),
       enableSorting: true,
+      size: 140,
+      minSize: 140,
       sortingFn: (rowA, rowB) => {
         const dateA = new Date(rowA.original.created_at).getTime();
         const dateB = new Date(rowB.original.created_at).getTime();
@@ -164,12 +166,8 @@ export function getSubscriberColumns({
     },
     {
       id: "actions",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          className="text-foreground"
-          column={column}
-          title="Actions"
-        />
+      header: () => (
+        <span className="text-foreground">Actions</span>
       ),
       cell: ({ row }) => {
         const subscriber = row.original;
@@ -180,10 +178,11 @@ export function getSubscriberColumns({
         }
 
         return (
-          <nav className="flex space-x-3">
+          <nav className="flex items-center justify-end">
             <PermissionGuard permissionKey="update-newsletter">
               <Button
                 variant="destructive"
+                size="icon"
                 title="Unsubscribe"
                 disabled={isPending}
                 onClick={() => onUnsubscribe(subscriber)}
@@ -198,9 +197,11 @@ export function getSubscriberColumns({
           </nav>
         );
       },
-      size: 40,
+      size: 120,
+      minSize: 120,
       enableSorting: false,
       enableHiding: false,
+      meta: { className: "text-right" },
     },
   ];
 }

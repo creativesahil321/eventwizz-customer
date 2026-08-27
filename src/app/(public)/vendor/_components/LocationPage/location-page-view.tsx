@@ -188,6 +188,7 @@ export function LocationPageView({
         previewBackButtonOffset={
           headerVariant === "preview" ? false : undefined
         }
+        solidBar={isSearchMode}
       />
 
       {isSearchMode ? (

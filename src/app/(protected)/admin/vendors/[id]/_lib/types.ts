@@ -122,7 +122,7 @@ export interface VenueDetail {
   venueId: string;
   name: string;
   image: string;
-  status: "active" | "disabled";
+  status: "active" | "inactive";
   subdomain: string;
   /** Primary/first location is the default shown */
   locations: VenueLocation[];

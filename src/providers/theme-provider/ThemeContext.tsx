@@ -128,6 +128,32 @@ const createDefaultSEO = (title: string = "EventWizz"): SEO => ({
 });
 
 /**
+ * Theme `/theme/settings` → `live_events` now sends flat `category_name`.
+ * Older payloads nested it as `category.name` (or a category string).
+ */
+function readThemeLiveEventCategoryName(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as {
+    category_name?: unknown;
+    category?: { name?: unknown } | string | null;
+  };
+  const flat =
+    typeof rec.category_name === "string" ? rec.category_name.trim() : "";
+  if (flat) return flat;
+  const nested = rec.category;
+  if (typeof nested === "string" && nested.trim()) return nested.trim();
+  if (
+    nested &&
+    typeof nested === "object" &&
+    typeof nested.name === "string" &&
+    nested.name.trim()
+  ) {
+    return nested.name.trim();
+  }
+  return null;
+}
+
+/**
  * Converts domain theme schema to application theme settings
  * @param schema - Domain theme schema or null
  * @returns Properly formatted ThemeSettings object
@@ -196,6 +222,7 @@ const mapSchemaToSettings = (
             slug: e.slug.trim(),
             location_slug: e.location_slug.trim(),
             location_city: (e.location_city || e.location_slug).trim(),
+            category_name: readThemeLiveEventCategoryName(e),
           }))
       : [],
     locations: Array.isArray(schema.locations) ? schema.locations : [],

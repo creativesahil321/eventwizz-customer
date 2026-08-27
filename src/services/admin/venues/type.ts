@@ -51,8 +51,10 @@ export interface AdminVenuesResponse {
   errors: unknown[];
 }
 
+export type AdminVenueListStatus = "all" | "active" | "inactive";
+
 export interface AdminVenuesParams {
-  status?: string;
+  status?: AdminVenueListStatus;
   search?: string;
   page?: number;
   per_page?: number;

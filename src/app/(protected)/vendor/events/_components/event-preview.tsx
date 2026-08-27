@@ -495,18 +495,36 @@ export function EventPreview({
   );
 
   const showGallery = (galleryImages?.length ?? 0) > 0;
+  const showPackages = Boolean(
+    String(activePackage?.package_title ?? "").trim() ||
+      String(activePackage?.package_description ?? "").trim() ||
+      activePackage?.package_image ||
+      (activePackage?.package_details?.length ?? 0) > 0,
+  );
   const sectionNavItems = useMemo(
     () =>
       buildEventSectionNavItems({
         about: true,
         rooms: showRoomSelector,
         schedule: showTimeline,
+        packages: showPackages,
         dates: true,
         gallery: showGallery,
         menu: showMenu,
+        drinks: showDrinks,
+        drinksLabel: activeDrinks?.drink_title,
         faqs: showFaqs,
       }),
-    [showRoomSelector, showTimeline, showGallery, showMenu, showFaqs],
+    [
+      showRoomSelector,
+      showTimeline,
+      showPackages,
+      showGallery,
+      showMenu,
+      showDrinks,
+      activeDrinks?.drink_title,
+      showFaqs,
+    ],
   );
   const showSectionNav = sectionNavItems.length > 0;
   const sectionNavStickyTop = ONBOARDING_PREVIEW_HEADER_OFFSET;
@@ -682,19 +700,24 @@ export function EventPreview({
           </div>
         ) : null}
 
-        <RoomContentTransition roomKey={roomContentKey}>
-          <PackageSec
-            heading={activePackage?.package_title || ""}
-            subHeading={activePackage?.package_description || ""}
-            image={activePackage?.package_image || null}
-            packageDetails={(activePackage?.package_details ?? []).map(
-              (detail) => ({
-                title: String(detail.title ?? ""),
-              }),
-            )}
-            headingEmphasis={headingEmphasisForHero}
-          />
-        </RoomContentTransition>
+        <div
+          id={showPackages ? EVENT_SECTION_IDS.packages : undefined}
+          className={showPackages ? sectionAnchorClass : undefined}
+        >
+          <RoomContentTransition roomKey={roomContentKey}>
+            <PackageSec
+              heading={activePackage?.package_title || ""}
+              subHeading={activePackage?.package_description || ""}
+              image={activePackage?.package_image || null}
+              packageDetails={(activePackage?.package_details ?? []).map(
+                (detail) => ({
+                  title: String(detail.title ?? ""),
+                }),
+              )}
+              headingEmphasis={headingEmphasisForHero}
+            />
+          </RoomContentTransition>
+        </div>
 
         <div
           ref={bookingRef}
@@ -744,15 +767,17 @@ export function EventPreview({
         )}
 
         {showDrinks && (
-          <RoomContentTransition roomKey={roomContentKey}>
-            <LazyDrinkSection
-              title={activeDrinks?.drink_title || ""}
-              description={activeDrinks?.drink_description || ""}
-              packages={drinkPackages}
-              eventSlug={eventSlug}
-              headingEmphasis={headingEmphasisForHero}
-            />
-          </RoomContentTransition>
+          <div id={EVENT_SECTION_IDS.drinks} className={sectionAnchorClass}>
+            <RoomContentTransition roomKey={roomContentKey}>
+              <LazyDrinkSection
+                title={activeDrinks?.drink_title || ""}
+                description={activeDrinks?.drink_description || ""}
+                packages={drinkPackages}
+                eventSlug={eventSlug}
+                headingEmphasis={headingEmphasisForHero}
+              />
+            </RoomContentTransition>
+          </div>
         )}
 
         <LazyBrochureSection

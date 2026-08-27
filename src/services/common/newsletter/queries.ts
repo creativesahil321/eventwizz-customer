@@ -3,7 +3,9 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
 } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { downloadBlob } from "@/lib/export";
 import { newsletterService } from "./newsletter.service";
@@ -41,6 +43,36 @@ export const newsletterKeys = {
 
 function invalidateVendorLists(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: newsletterKeys.vendor });
+}
+
+/**
+ * Branch subscribe UX on `data.result`, not `status` or `data.state`.
+ * `notify: "silent"` when the caller renders inline UI (no duplicate toast).
+ */
+export function handleSubscribeResponse(
+  res: Pick<SubscribeResult, "result" | "message">,
+  queryClient: QueryClient,
+  options?: { notify?: "toast" | "silent" },
+) {
+  const { result, message } = res;
+  const notify = options?.notify ?? "toast";
+
+  switch (result) {
+    case "pending":
+      if (notify === "toast") toast.success(message);
+      break;
+    case "confirmation_pending":
+      if (notify === "toast") toast.info(message);
+      break;
+    case "subscribed":
+      if (notify === "toast") toast.success(message);
+      void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+      break;
+    case "already_subscribed":
+      if (notify === "toast") toast.info(message);
+      void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+      break;
+  }
 }
 
 /* ------------------------------ Vendor ------------------------------ */
@@ -87,10 +119,15 @@ export const useVendorUnsubscribe = () => {
 
 /* ------------------------------ Public ------------------------------ */
 
-export const usePublicSubscribe = () =>
-  useMutation<SubscribeResult, Error, SubscribePayload>({
+export const usePublicSubscribe = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<SubscribeResult, Error, SubscribePayload>({
     mutationFn: (payload) => newsletterService.subscribe(payload),
+    onSuccess: (data) =>
+      handleSubscribeResponse(data, queryClient, { notify: "silent" }),
   });
+};
 
 export const useResendNewsletterConfirmation = () =>
   useMutation<SubscribeResult, Error, SubscribePayload>({
@@ -140,8 +177,17 @@ export const useCustomerNewsletterToggle = () => {
         location_id: vars.location_id,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: themeKeys.all });
+    onSuccess: (data, vars) => {
+      const isUnsubscribe =
+        vars === "unsubscribe" ||
+        (typeof vars !== "string" && vars.action === "unsubscribe");
+      if (isUnsubscribe) {
+        void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+        return;
+      }
+      handleSubscribeResponse(data as CustomerSubscribeResult, queryClient, {
+        notify: "toast",
+      });
     },
   });
 };

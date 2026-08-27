@@ -43,6 +43,11 @@ const safeToast = {
       console.warn(message);
     }
   },
+  info: (message: string) => {
+    if (isBrowser) {
+      toast.info(message);
+    }
+  },
 };
 
 // Auth store state interface
@@ -439,17 +444,28 @@ apiClient.interceptors.response.use(
       return Promise.reject(response.data);
     }
 
-    // Show success toast for data modification operations only
+    // Show success toast for data modification operations only.
+    // Newsletter subscribe uses data.result: already_subscribed is info, not a new success.
     const method = response.config.method?.toUpperCase();
     const suppressSuccessToast =
       suppressSuccessToastDepth > 0 ||
       (response.config as RequestOptions | undefined)?.suppressSuccessToast;
+    const payload = response.data?.data;
+    const subscribeResult =
+      payload &&
+      typeof payload === "object" &&
+      !Array.isArray(payload) &&
+      "result" in payload
+        ? (payload as { result?: unknown }).result
+        : undefined;
     if (
       !suppressSuccessToast &&
       response.data.status === true &&
       response.data.message &&
       method &&
-      ["POST", "PUT", "PATCH", "DELETE"].includes(method)
+      ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+      subscribeResult !== "already_subscribed" &&
+      subscribeResult !== "confirmation_pending"
     ) {
       safeToast.success(response.data.message);
     }

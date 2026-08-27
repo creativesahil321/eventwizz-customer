@@ -87,8 +87,26 @@ export interface SubscribePayload {
   location_id?: number;
 }
 
+export type NewsletterSubscribeResult =
+  | "pending"
+  | "confirmation_pending"
+  | "subscribed"
+  | "already_subscribed";
+
+/** Laravel envelope for POST /subscribe, /customer/newsletter/subscribe, and /newsletters/resend. */
+export interface SubscribeApiResponse {
+  status: true;
+  message: string;
+  data: {
+    state: Extract<SubscriberStatus, "pending" | "subscribed">;
+    result: NewsletterSubscribeResult;
+  };
+  errors?: unknown[];
+}
+
 export interface SubscribeResult {
   state: Extract<SubscriberStatus, "pending" | "subscribed">;
+  result: NewsletterSubscribeResult;
   message: string;
 }
 
@@ -119,7 +137,4 @@ export interface PublicUnsubscribeResult {
 
 /* ------------------------------ Customer ------------------------------ */
 
-export interface CustomerSubscribeResult {
-  state: Extract<SubscriberStatus, "subscribed" | "pending">;
-  message: string;
-}
+export type CustomerSubscribeResult = SubscribeResult;

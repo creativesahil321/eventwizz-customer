@@ -133,7 +133,7 @@ type LocationPageHeroSearchProps = {
   enableAvailability?: boolean;
 };
 
-/** Search dock for location heroes — city is locked; bar stays bottom-fixed in HeroBanner. */
+/** Search dock for location heroes — city is locked (no city field); bar stays bottom-fixed in HeroBanner. */
 export function LocationPageHeroSearch({
   cityLabel,
   locationSlug,

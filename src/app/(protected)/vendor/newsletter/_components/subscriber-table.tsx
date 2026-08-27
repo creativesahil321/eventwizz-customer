@@ -101,5 +101,5 @@ export default function SubscriberDataTable({
     );
   }
 
-  return <DataTable table={table} />;
+  return <DataTable table={table} tableClassName="min-w-[1080px]" />;
 }

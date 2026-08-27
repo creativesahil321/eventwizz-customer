@@ -937,13 +937,17 @@ export default function FormPreview() {
     const showDatesPreview = activeStep === 5 || datesPreviewItems.length > 0;
     const showGalleryPreview = galleryPreviewItems.length > 0;
     const showMenuPreview = (activePreviewCatering?.menus?.length ?? 0) > 0;
+    const showDrinksPreview = (activePreviewDrinks?.packages?.length ?? 0) > 0;
     const sectionNavItems = buildEventSectionNavItems({
       about: true,
       rooms: showRoomChooser,
       schedule: showTimelineSection,
+      packages: hasPackagePreview,
       dates: showDatesPreview,
       gallery: showGalleryPreview,
       menu: showMenuPreview,
+      drinks: showDrinksPreview,
+      drinksLabel: activePreviewDrinks?.drink_title,
       faqs: hasPreviewFaqs,
     });
     const showSectionNav = sectionNavItems.length > 0;
@@ -1159,8 +1163,9 @@ export default function FormPreview() {
         {/* Package — hide empty shell (matches live: only real package content) */}
         {hasPackagePreview ? (
           <div
+            id={EVENT_SECTION_IDS.packages}
             ref={packageRef}
-            className={`transition-all duration-300 ${getHighlightClass(
+            className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
               4,
               "package",
             )}`}
@@ -1289,7 +1294,8 @@ export default function FormPreview() {
         {/* Drinks — before brochure, same order as live event page */}
         <div
           ref={drinkRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          id={showDrinksPreview ? EVENT_SECTION_IDS.drinks : undefined}
+          className={`${showDrinksPreview ? sectionAnchorClass : ""} transition-all duration-300 ${getHighlightClass(
             8,
             "other-packages",
           )}`}

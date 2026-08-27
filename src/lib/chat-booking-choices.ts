@@ -9,6 +9,7 @@ import {
   buildRoomDifferenceCopy,
   buildVisitEventQuickAction,
   chatDateSlotKey,
+  chatDatesShowRooms,
   CHAT_PAY_DEPOSIT_ID,
   CHAT_PAY_FULL_ID,
   formatChatDateChoiceSendText,
@@ -20,7 +21,9 @@ import {
   isCasualChatText,
   isChatEmailAddress,
   isChatEmailUpdatesText,
+  isBrochureQuestion,
   isEventInfoQuestion,
+  brochureQuestionWantsAllRooms,
   listBookableChatRooms,
   listChatDatesForRoom,
   listChatDrinks,
@@ -31,7 +34,8 @@ import {
   type ChatEventBookingBrief,
   type ChatQuickActionDraft,
 } from "@/lib/chat-event-booking";
-import { isLiveEventBookingIntent, normalizeChatBookingQuery } from "@/lib/chat-live-events";
+import { CHECKOUT_PATH } from "@/lib/checkout-chat-handoff";
+import { isBroadEventListIntent, isLiveEventAvailabilityQuestion, isLiveEventBookingIntent, normalizeChatBookingQuery } from "@/lib/chat-live-events";
 import { isDisallowedChatSafetyIntent } from "@/lib/chat-safety";
 import {
   chatTableKey,
@@ -105,6 +109,7 @@ export const CHAT_TABLE_MIX_DONE_SEND = "that's the table mix";
 export const CHAT_ALL_AT_TABLES_SEND = "all guests at tables";
 export const CHAT_TYPE_TABLE_GUESTS_SEND = "I'll type how many sit at tables";
 export const CHAT_TICKETS_DONE_SEND = "that's all for tickets";
+export const CHAT_OPEN_CHECKOUT_SEND = "go to checkout";
 
 function normalize(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -244,7 +249,48 @@ function dateOffersTables(date: ChatBookingDate): boolean {
 }
 
 function dateOffersTickets(date: ChatBookingDate): boolean {
-  return date.tickets.length > 0;
+  return date.tickets.some((ticket) => !isTicketSoldOut(ticket));
+}
+
+function ticketStock(ticket: ChatBookingTicket): number | null {
+  if (ticket.remaining != null) return ticket.remaining;
+  if (ticket.capacity != null) return ticket.capacity;
+  return null;
+}
+
+function isTicketSoldOut(ticket: ChatBookingTicket): boolean {
+  const stock = ticketStock(ticket);
+  return stock != null && stock <= 0;
+}
+
+function ticketStockHint(ticket: ChatBookingTicket): string | undefined {
+  const stock = ticketStock(ticket);
+  if (stock == null) return undefined;
+  return stock <= 0 ? "Sold out" : `${stock} left`;
+}
+
+function removeTicketSend(title: string): string {
+  return `0 × ${title}`;
+}
+
+function isBareTicketQuantityText(text: string): boolean {
+  const t = text.trim();
+  if (/^\d{1,3}$/.test(t)) {
+    const n = Number(t);
+    return n >= 0 && n <= 500 && n !== 2025 && n !== 2026 && n !== 2027;
+  }
+  return /^\d{1,3}\s+tickets?$/i.test(t);
+}
+
+function slotHasTicketOverstock(slot: ChatBookingSlot): boolean {
+  return slot.ticketTitles.some((title) => {
+    const ticket = slot.date.tickets.find(
+      (item) => normalize(item.title) === normalize(title),
+    );
+    const qty = slot.ticketQuantities[title] ?? 0;
+    const stock = ticket ? ticketStock(ticket) : null;
+    return Boolean(ticket && stock != null && qty > stock);
+  });
 }
 
 function slotPickedTicketQty(slot: ChatBookingSlot): number {
@@ -261,39 +307,33 @@ export function resolveSlotTableAndTicketCounts(slot: ChatBookingSlot): {
   const guests = slot.guestCount ?? 0;
   const offersTables = dateOffersTables(slot.date);
   const offersTickets = dateOffersTickets(slot.date);
-  const pickedTickets =
-    slot.ticketTitles.length > 0 ? slotPickedTicketQty(slot) : null;
 
   if (slot.tablePlan.length > 0) {
     const tableGuests = chatSeatingPlanGuests(slot.tablePlan);
     return {
       tableGuests,
-      ticketQty:
-        pickedTickets ??
-        slot.ticketCount ??
-        Math.max(0, guests - tableGuests),
+      ticketQty: Math.max(0, guests - tableGuests),
     };
   }
 
   if (!offersTables || slot.seating === "tickets") {
     return {
       tableGuests: 0,
-      ticketQty:
-        pickedTickets ?? slot.ticketCount ?? (offersTickets ? guests : 0),
+      ticketQty: offersTickets ? guests : 0,
     };
   }
   if (slot.seating === "tables" || !offersTickets) {
     return {
       tableGuests: slot.tableGuestCount ?? guests,
-      ticketQty: pickedTickets ?? 0,
+      ticketQty: 0,
     };
   }
   const tableGuests = slot.tableGuestCount ?? guests;
-  const ticketQty =
-    pickedTickets ??
-    slot.ticketCount ??
-    (slot.tableGuestCount != null ? Math.max(0, guests - tableGuests) : 0);
-  return { tableGuests, ticketQty };
+  return {
+    tableGuests,
+    ticketQty:
+      slot.tableGuestCount != null ? Math.max(0, guests - tableGuests) : 0,
+  };
 }
 
 function applyInventorySeating(slot: ChatBookingSlot): void {
@@ -338,10 +378,33 @@ function isTicketsDoneText(text: string): boolean {
   const n = normalize(text);
   return (
     n === normalize(CHAT_TICKETS_DONE_SEND) ||
-    /\b(that'?s all for tickets|no more tickets|done with tickets|tickets are fine)\b/.test(
+    n === normalize(CHAT_OPEN_CHECKOUT_SEND) ||
+    /\b(that'?s all for tickets|no more tickets|done with tickets|tickets are fine|that'?s enough)\b/.test(
+      n,
+    ) ||
+    /\b(go to checkout|take me to checkout|open checkout)\b/.test(n)
+  );
+}
+
+export function isChatCheckoutHandoffIntent(text: string): boolean {
+  const n = normalize(text);
+  return (
+    n === normalize(CHAT_OPEN_CHECKOUT_SEND) ||
+    /\b(go to checkout|take me to checkout|open checkout|that'?s enough)\b/.test(
       n,
     )
   );
+}
+
+export function chatChoicesHaveLineItems(choices: ChatBookingChoices): boolean {
+  return choices.slots.some((slot) => {
+    if (slotPickedTicketQty(slot) > 0) return true;
+    if (slot.tablePlan.some((item) => item.quantity > 0)) return true;
+    if (Object.values(slot.tableMix).some((qty) => qty > 0)) return true;
+    return slot.drinkTitles.some(
+      (title) => Math.max(0, slot.drinkQuantities[title] ?? 1) > 0,
+    );
+  });
 }
 
 function typeTicketQtySend(title: string): string {
@@ -372,14 +435,14 @@ function parseTicketQuantity(
   );
   if (after) {
     const qty = Number(after[1]);
-    if (qty >= 1 && qty <= 500) return qty;
+    if (qty >= 0 && qty <= 500) return qty;
   }
   const before = n.match(
     new RegExp(`(\\d{1,3})\\s*(?:x|×|of)?\\s*${title.replace(/ /g, "\\s+")}`),
   );
   if (before) {
     const qty = Number(before[1]);
-    if (qty >= 1 && qty <= 500) return qty;
+    if (qty >= 0 && qty <= 500) return qty;
   }
   return 1;
 }
@@ -612,7 +675,7 @@ export function parseChatBookingChoices(
         assistant,
       );
     const askingTickets =
-      /which ticket|ticket type|how many .+ tickets|that'?s all for tickets|tickets so far|tickets to choose/i.test(
+      /which ticket|ticket type|how many .+ tickets|that'?s all for tickets|tickets so far|tickets to choose|can'?t book|smaller quantity|sold out|still need \*\*\d+/i.test(
         assistant,
       );
     const askingMoreDates =
@@ -663,16 +726,35 @@ export function parseChatBookingChoices(
       continue;
     }
 
-    if (pendingTicketQtyTitle && active) {
-      const qty = extractGuestCount(text);
-      if (qty != null) {
-        if (!active.ticketTitles.includes(pendingTicketQtyTitle)) {
-          active.ticketTitles.push(pendingTicketQtyTitle);
+    if (pendingTicketQtyTitle && active && isBareTicketQuantityText(text)) {
+      const qty = Number(text.trim().match(/^(\d{1,3})/)?.[1]);
+      if (Number.isFinite(qty) && qty >= 0 && qty <= 500) {
+        const pendingTitle = pendingTicketQtyTitle;
+        const ticket = ticketPool.find(
+          (item) => normalize(item.title) === normalize(pendingTitle),
+        );
+        const stock = ticket ? ticketStock(ticket) : null;
+        if (qty <= 0) {
+          active.ticketTitles = active.ticketTitles.filter(
+            (title) => title !== pendingTicketQtyTitle,
+          );
+          delete active.ticketQuantities[pendingTicketQtyTitle];
+        } else if (!ticket || stock == null || stock > 0) {
+          const nextQty = stock != null ? Math.min(qty, stock) : qty;
+          if (!active.ticketTitles.includes(pendingTicketQtyTitle)) {
+            active.ticketTitles.push(pendingTicketQtyTitle);
+          }
+          active.ticketQuantities[pendingTicketQtyTitle] = nextQty;
         }
-        active.ticketQuantities[pendingTicketQtyTitle] = qty;
         pendingTicketQtyTitle = null;
         continue;
       }
+    }
+    if (
+      pendingTicketQtyTitle &&
+      !n.includes(normalize(pendingTicketQtyTitle))
+    ) {
+      pendingTicketQtyTitle = null;
     }
 
     const typedDrinkTitle = parseTypeDrinkQtyTitle(text, drinkPool);
@@ -694,7 +776,9 @@ export function parseChatBookingChoices(
     }
 
     if (isTicketsDoneText(text) && active && (askingTickets || !askingDrinks)) {
-      active.ticketsDone = true;
+      if (!slotHasTicketOverstock(active) && slotPickedTicketQty(active) > 0) {
+        active.ticketsDone = true;
+      }
       continue;
     }
 
@@ -895,20 +979,35 @@ export function parseChatBookingChoices(
         0,
         party.ticketQty - slotPickedTicketQty(active),
       );
-      const needed = Math.max(
-        1,
-        remainingTickets ||
-          party.ticketQty ||
-          (active.guestCount ?? 1),
-      );
       for (const ticket of mentionedTickets) {
+        const titleOnly = n === normalize(ticket.title);
+        if (titleOnly || isTicketSoldOut(ticket)) {
+          pendingTicketQtyTitle = ticket.title;
+          continue;
+        }
         const qty = parseTicketQuantity(text, ticket);
+        if (qty != null && qty <= 0) {
+          active.ticketTitles = active.ticketTitles.filter(
+            (title) => title !== ticket.title,
+          );
+          delete active.ticketQuantities[ticket.title];
+          if (pendingTicketQtyTitle === ticket.title) {
+            pendingTicketQtyTitle = null;
+          }
+          continue;
+        }
+        const stock = ticketStock(ticket);
+        const needed = Math.max(
+          1,
+          remainingTickets || party.ticketQty || (active.guestCount ?? 1),
+        );
+        const parsedQty = /\d/.test(text) && qty != null ? qty : needed;
         const nextQty =
-          qty != null && qty > 1
-            ? qty
-            : n === normalize(ticket.title)
-              ? needed
-              : (qty ?? needed);
+          stock != null ? Math.min(parsedQty, stock) : parsedQty;
+        if (nextQty <= 0) {
+          pendingTicketQtyTitle = ticket.title;
+          continue;
+        }
         if (!active.ticketTitles.includes(ticket.title)) {
           active.ticketTitles.push(ticket.title);
         }
@@ -964,9 +1063,19 @@ export function parseChatBookingChoices(
 }
 
 export function isChatPayIntent(text: string): boolean {
-  return /\b(pay in full|pay a table deposit|pay the deposit|pay now)\b/i.test(
+  return /\b(pay in full|pay a table deposit|pay the deposit|pay now|pay with (card|paypal|stripe|worldpay|klarna)|pay by (card|bank))\b/i.test(
     text,
   );
+}
+
+export function parseChatPaymentGatewaySlug(text: string): string | null {
+  const n = normalize(text);
+  if (/\bpaypal\b/.test(n)) return "paypal";
+  if (/\b(truelayer|bank transfer)\b/.test(n)) return "truelayer";
+  if (/\bklarna\b/.test(n)) return "klarna";
+  if (/\bworldpay\b/.test(n)) return "worldpay";
+  if (/\b(card|stripe|credit card|debit card)\b/.test(n)) return "stripe";
+  return null;
 }
 
 export function parseChatPayMode(text: string): "full" | "deposit" | null {
@@ -975,6 +1084,8 @@ export function parseChatPayMode(text: string): "full" | "deposit" | null {
     return "deposit";
   }
   if (/\bpay in full\b/.test(n) || n === "pay now") return "full";
+  if (/\bpay with\b/.test(n) && parseChatPaymentGatewaySlug(text)) return "full";
+  if (/\bpay by\b/.test(n) && parseChatPaymentGatewaySlug(text)) return "full";
   return null;
 }
 
@@ -995,6 +1106,7 @@ export function isHostBookingUserText(
     isDrinksDoneText(text) ||
     isNoDrinksText(text) ||
     isTicketsDoneText(text) ||
+    isChatCheckoutHandoffIntent(text) ||
     isDatesDoneText(text) ||
     isSameAsLastText(text) ||
     isChangeGuestsText(text) ||
@@ -1055,6 +1167,7 @@ export function isGuestBookingConciergeText(
     return false;
   }
   if (isEventInfoQuestion(text) && !asksRoomDifference(text)) return false;
+  if (isLiveEventAvailabilityQuestion(text)) return false;
   if (isLiveEventBookingIntent(text)) return true;
   if (brief && isHostBookingUserText(text, brief)) return true;
   return /\b(book|booking|reserve)\b/i.test(normalizeChatBookingQuery(text));
@@ -1068,6 +1181,8 @@ export function isChatExistingCartBookingIntent(
   if (isCasualChatText(text) || isChatEmailAddress(text) || isChatEmailUpdatesText(text)) {
     return false;
   }
+  if (isBrochureQuestion(text) || isBroadEventListIntent(text)) return false;
+  if (isLiveEventAvailabilityQuestion(text)) return false;
   if (isEventInfoQuestion(text) && !isLiveEventBookingIntent(text)) return false;
   if (
     asksRoomDifference(text) &&
@@ -1081,13 +1196,51 @@ export function isChatExistingCartBookingIntent(
   return /\b(book|booking|reserve)\b/i.test(normalizeChatBookingQuery(text));
 }
 
-function guestChoiceActions(): ChatQuickActionDraft[] {
+function dateGuestCap(date?: ChatBookingDate): number {
+  if (!date) return 40;
+  const ticketCap = date.tickets.reduce((sum, ticket) => {
+    const stock = ticketStock(ticket);
+    return sum + (stock != null && stock > 0 ? stock : 0);
+  }, 0);
+  const tableCap = date.tables.reduce((sum, table) => {
+    const remaining = table.remaining ?? table.total ?? 0;
+    const seats = table.maxPersons || 0;
+    return sum + Math.max(0, remaining) * Math.max(0, seats);
+  }, 0);
+  const cap = Math.max(ticketCap, tableCap);
+  return cap > 0 ? Math.min(cap, 200) : 40;
+}
+
+function guestChoiceActions(date?: ChatBookingDate): ChatQuickActionDraft[] {
+  const cap = dateGuestCap(date);
+  const presets = [2, 4, 10, 20].filter((n) => n <= cap);
   return [
-    { id: "guests-40", label: "40 guests", sendText: "40 guests" },
+    ...presets.map((n) => ({
+      id: `guests-${n}`,
+      label: `${n} guests`,
+      sendText: `${n} guests`,
+    })),
     {
       id: "guests-type",
       label: "I’ll type a number",
       sendText: "I'll type the guest number",
+    },
+  ];
+}
+
+function checkoutTicketActions(have: number): ChatQuickActionDraft[] {
+  if (have <= 0) return [];
+  return [
+    {
+      id: "tickets-done",
+      label: "That's all for tickets",
+      sendText: CHAT_TICKETS_DONE_SEND,
+    },
+    {
+      id: "open-checkout",
+      label: "Go to checkout",
+      sendText: CHAT_OPEN_CHECKOUT_SEND,
+      href: CHECKOUT_PATH,
     },
   ];
 }
@@ -1350,17 +1503,23 @@ function overstockDrinkTurn(
 
 function payActions(
   seating: ChatBookingSeating | null,
+  gateways?: Array<{ slug: string; label: string }>,
 ): ChatQuickActionDraft[] {
-  const actions: ChatQuickActionDraft[] = [
-    { id: CHAT_PAY_FULL_ID, label: "Pay in full" },
-  ];
+  const methods: ChatQuickActionDraft[] =
+    gateways && gateways.length > 1
+      ? gateways.map((gateway) => ({
+          id: `pay-gateway-${gateway.slug}`,
+          label: gateway.label,
+          sendText: gateway.label,
+        }))
+      : [{ id: CHAT_PAY_FULL_ID, label: "Pay in full" }];
   if (seating !== "tickets") {
-    actions.push({
+    methods.push({
       id: CHAT_PAY_DEPOSIT_ID,
       label: "Pay a table deposit",
     });
   }
-  return actions;
+  return methods;
 }
 
 function couponActions(brief: ChatEventBookingBrief): ChatQuickActionDraft[] {
@@ -1438,38 +1597,93 @@ function ticketChoiceActions(
 ): ChatQuickActionDraft[] {
   const remaining = tickets.filter(
     (ticket) =>
+      !isTicketSoldOut(ticket) &&
       !selected.some((title) => normalize(title) === normalize(ticket.title)),
   );
   return remaining.slice(0, 6).map((ticket) => ({
     id: `ticket-${ticket.id || ticket.title}`,
     label: formatChatTicketLabel(ticket, symbol),
+    hint: ticketStockHint(ticket),
     sendText: ticket.title,
   }));
+}
+
+function suggestedTicketQuantities(
+  needed: number,
+  stock: number | null,
+  current?: number,
+): number[] {
+  const max = stock ?? Math.min(Math.max(needed, 1), 500);
+  if (max <= 0) return [];
+  const cover = Math.min(Math.max(needed, 1), max);
+  const options = [cover];
+  if (cover > 10) options.push(10);
+  else if (cover > 5) options.push(5);
+  if (cover > 1) options.push(1);
+  return [...new Set(options)].filter(
+    (qty) => qty >= 1 && qty <= max && qty !== current,
+  ).slice(0, 3);
 }
 
 function ticketQuantityActions(
   slot: ChatBookingSlot,
   tickets: ChatBookingTicket[],
   pendingTitle: string | null,
+  needed: number,
 ): ChatQuickActionDraft[] {
   const actions: ChatQuickActionDraft[] = [];
   const seen = new Set<string>();
-  for (const title of slot.ticketTitles) {
+  const titles =
+    pendingTitle &&
+    !slot.ticketTitles.some((title) => normalize(title) === normalize(pendingTitle))
+      ? [...slot.ticketTitles, pendingTitle]
+      : slot.ticketTitles;
+  for (const title of titles) {
     const ticket = tickets.find((item) => normalize(item.title) === normalize(title));
-    const current = slot.ticketQuantities[title] ?? 1;
-    const stock = ticket?.remaining ?? ticket?.capacity;
-    const candidates = [2, 5, 10, current + 5].filter(
-      (qty) => qty !== current && qty >= 1 && (stock == null || qty <= stock),
-    );
-    for (const qty of [...new Set(candidates)].slice(0, 2)) {
+    const current = slot.ticketQuantities[title];
+    const stock = ticket ? ticketStock(ticket) : null;
+    if (ticket && isTicketSoldOut(ticket)) {
+      if (current != null && current > 0) {
+        const sendText = removeTicketSend(title);
+        if (!seen.has(sendText)) {
+          seen.add(sendText);
+          actions.push({
+            id: `ticket-qty-remove-${title}`,
+            label: `Remove ${title}`,
+            sendText,
+          });
+        }
+      }
+      continue;
+    }
+    const others = slotPickedTicketQty({
+      ...slot,
+      ticketTitles: slot.ticketTitles.filter((item) => item !== title),
+      ticketQuantities: { ...slot.ticketQuantities, [title]: 0 },
+    });
+    const stillNeed = Math.max(0, needed - others);
+    const candidates = suggestedTicketQuantities(stillNeed, stock, current);
+    for (const qty of candidates) {
       const sendText = `${qty} × ${title}`;
       if (seen.has(sendText)) continue;
       seen.add(sendText);
       actions.push({
         id: `ticket-qty-${title}-${qty}`,
         label: `${qty} × ${title}`,
+        hint: qty === stillNeed && stillNeed > 0 ? "covers the rest" : undefined,
         sendText,
       });
+    }
+    if (current != null && current > 0) {
+      const sendText = removeTicketSend(title);
+      if (!seen.has(sendText)) {
+        seen.add(sendText);
+        actions.push({
+          id: `ticket-qty-remove-${title}`,
+          label: `Remove ${title}`,
+          sendText,
+        });
+      }
     }
   }
   const typeFor = pendingTitle || slot.ticketTitles[slot.ticketTitles.length - 1];
@@ -1480,7 +1694,7 @@ function ticketQuantityActions(
         sendText: typeTicketQtySend(typeFor),
       }
     : null;
-  return [...actions.slice(0, 5), ...(typeAction ? [typeAction] : [])];
+  return [...actions.slice(0, 6), ...(typeAction ? [typeAction] : [])];
 }
 
 function slotNeedsSeatingPlan(slot: ChatBookingSlot): boolean {
@@ -1499,9 +1713,10 @@ function slotNeedsTicketPick(slot: ChatBookingSlot): boolean {
   if (!dateOffersTickets(slot.date)) return false;
   if (slot.seating === "both" && slot.tableGuestCount == null) return false;
   if (slotNeedsSeatingPlan(slot)) return false;
+  if (slotHasTicketOverstock(slot)) return true;
   const { ticketQty } = resolveSlotTableAndTicketCounts(slot);
   const picked = slotPickedTicketQty(slot);
-  if (slot.ticketsDone && (picked > 0 || ticketQty <= 0)) return false;
+  if (slot.ticketsDone && picked > 0) return false;
   return ticketQty > 0 || picked > 0;
 }
 
@@ -1510,6 +1725,7 @@ function buildSummaryTurn(options: {
   choices: ChatBookingChoices;
   userName?: string | null;
   includeCouponAsk: boolean;
+  paymentGateways?: Array<{ slug: string; label: string }>;
 }): ChatHostBookingTurn {
   const { brief, choices } = options;
   const nameBit = options.userName?.trim()
@@ -1624,11 +1840,16 @@ ${moneyLines.join("\n")}${offerCopy}`;
   }
 
   return {
-    content: `${body}\n\nReady to pay from here?`,
+    content: `${body}\n\nReady to pay from here?${
+      (options.paymentGateways?.length ?? 0) > 1
+        ? " Choose a payment method."
+        : ""
+    }`,
     actions: payActions(
       choices.slots.some((slot) => slot.seating !== "tickets")
         ? "tables"
         : "tickets",
+      options.paymentGateways,
     ),
   };
 }
@@ -1659,8 +1880,9 @@ export function buildHostBookingTurn(options: {
   userText: string;
   choices: ChatBookingChoices;
   userName?: string | null;
+  paymentGateways?: Array<{ slug: string; label: string }>;
 }): ChatHostBookingTurn | null {
-  const { brief, userText, choices, userName } = options;
+  const { brief, userText, choices, userName, paymentGateways } = options;
   const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
   const venue = formatEventVenuePhrase(brief);
   const bookable = listBookableChatRooms(brief);
@@ -1681,12 +1903,33 @@ export function buildHostBookingTurn(options: {
   }
 
   if (isEventInfoQuestion(last) && !asksRoomDifference(last)) {
+    const wantsAllRooms = brochureQuestionWantsAllRooms(last);
     const info = buildEventInfoTurn({
       brief,
       userText: last,
-      roomId: active?.roomId ?? choices.roomId,
+      roomId: wantsAllRooms ? null : (active?.roomId ?? choices.roomId),
     });
-    if (info) return info;
+    if (info) {
+      if (active && active.guestCount == null) {
+        return {
+          content: `${info.content}\n\nWhen you’re ready, how many guests will be attending?`,
+          actions: [...info.actions, ...guestChoiceActions(active.date)],
+        };
+      }
+      if (choices.slots.length === 0) {
+        const dateActions = buildDateChoiceQuickActions(
+          brief,
+          choices.pendingRoomId,
+        );
+        if (dateActions.length > 0) {
+          return {
+            content: `${info.content}\n\nWhen you’re ready, which date would you like?`,
+            actions: [...info.actions, ...dateActions],
+          };
+        }
+      }
+      return info;
+    }
   }
 
   if (asksRoomDifference(last) && bookable.length >= 2) {
@@ -1750,10 +1993,10 @@ export function buildHostBookingTurn(options: {
       };
     }
     return {
-      content: `Which date would you like${nameBit}? Each date shows its room — you can add another space after this one.`,
+      content: buildBookingKickoffCopy({ brief, userName }),
       actions: [
         ...dateActions,
-        ...(bookable.length >= 2
+        ...(bookable.length >= 2 && chatDatesShowRooms(brief, roomId)
           ? [
               {
                 id: "room-compare",
@@ -1806,7 +2049,7 @@ export function buildHostBookingTurn(options: {
     }
     return {
       content: `Great${nameBit} — **${brief.title}**${venue} on **${slotHeading(active)}**.\n\nHow many guests will be attending?`,
-      actions: guestChoiceActions(),
+      actions: guestChoiceActions(active.date),
     };
   }
 
@@ -2000,23 +2243,65 @@ export function buildHostBookingTurn(options: {
   }
 
   const party = resolveSlotTableAndTicketCounts(active);
+  const ticketsNeeded =
+    party.ticketQty > 0
+      ? party.ticketQty
+      : Math.max(0, (active.guestCount ?? 0) - (active.tableGuestCount ?? 0));
 
-  if (
-    /i'?ll type the ticket quantity for /i.test(last) &&
-    choices.pendingTicketQtyTitle
-  ) {
-    return {
-      content: `Type how many **${choices.pendingTicketQtyTitle}** tickets you want.`,
-      actions: [],
-    };
+  if (choices.pendingTicketQtyTitle) {
+    const pendingTitle = choices.pendingTicketQtyTitle;
+    const pendingTicket = active.date.tickets.find(
+      (item) => normalize(item.title) === normalize(pendingTitle),
+    );
+    const pendingStock = pendingTicket ? ticketStock(pendingTicket) : null;
+    const remainingTypes = ticketChoiceActions(
+      active.date.tickets,
+      brief.currencySymbol,
+      active.ticketTitles,
+    );
+    if (!pendingTicket || isTicketSoldOut(pendingTicket)) {
+      return {
+        content: `**${pendingTitle}** is sold out for **${slotHeading(active)}**${nameBit}. You still need **${ticketsNeeded} tickets** — pick a type that still has stock.`,
+        actions: [
+          ...ticketQuantityActions(
+            active,
+            active.date.tickets,
+            null,
+            ticketsNeeded,
+          ),
+          ...(remainingTypes.length > 0
+            ? remainingTypes
+            : [buildVisitEventQuickAction(brief)]),
+        ],
+      };
+    }
+    if (
+      /i'?ll type the ticket quantity for /i.test(last)
+    ) {
+      const stockBit =
+        pendingStock != null ? ` There are **${pendingStock}** left.` : "";
+      return {
+        content: `Type how many **${pendingTitle}** tickets you want for **${slotHeading(active)}**.${stockBit} You still need **${ticketsNeeded}**.`,
+        actions: [],
+      };
+    }
+    if (active.ticketQuantities[pendingTitle] == null) {
+      const stockBit =
+        pendingStock != null ? ` There are **${pendingStock}** left.` : "";
+      return {
+        content: `How many **${pendingTitle}** tickets would you like for **${slotHeading(active)}**?${stockBit} You still need **${ticketsNeeded}**.`,
+        actions: ticketQuantityActions(
+          active,
+          active.date.tickets,
+          pendingTitle,
+          ticketsNeeded,
+        ),
+      };
+    }
   }
 
   if (slotNeedsTicketPick(active)) {
     const tickets = active.date.tickets;
-    const needed =
-      party.ticketQty > 0
-        ? party.ticketQty
-        : Math.max(1, (active.guestCount ?? 0) - (active.tableGuestCount ?? 0));
     const selected = active.ticketTitles;
     const remainingTypes = ticketChoiceActions(
       tickets,
@@ -2027,57 +2312,72 @@ export function buildHostBookingTurn(options: {
       active,
       tickets,
       choices.pendingTicketQtyTitle,
+      ticketsNeeded,
     );
+    const overstocked = selected.filter((title) => {
+      const ticket = tickets.find((item) => normalize(item.title) === normalize(title));
+      const qty = active.ticketQuantities[title] ?? 0;
+      const stock = ticket ? ticketStock(ticket) : null;
+      return ticket && stock != null && qty > stock;
+    });
     if (selected.length === 0) {
+      const ticketLead =
+        active.seating === "tickets"
+          ? `Thanks${nameBit} — **${ticketsNeeded} tickets** for **${slotHeading(active)}**.`
+          : `Thanks${nameBit} — **${ticketsNeeded} tickets** for **${slotHeading(active)}** (the rest of your party after tables).`;
       return {
-        content: `Thanks${nameBit} — **${needed} tickets** for **${slotHeading(active)}**.\n\nWhich ticket type would you like? You can add more than one, then set the quantity.`,
-        actions: remainingTypes,
+        content: `${ticketLead}\n\nWhich ticket type would you like? Each type shows how many are left.`,
+        actions:
+          remainingTypes.length > 0
+            ? remainingTypes
+            : [buildVisitEventQuickAction(brief)],
       };
     }
-    const picked = selected
+    const pickedLines = selected
       .map((title) => {
-        const qty = active.ticketQuantities[title] ?? 1;
-        return `${qty} × ${title}`;
+        const ticket = tickets.find((item) => normalize(item.title) === normalize(title));
+        const qty = active.ticketQuantities[title] ?? 0;
+        const stock = ticket ? ticketStock(ticket) : null;
+        if (stock != null && qty > stock) {
+          return `- **${qty} × ${title}** — only **${stock}** left`;
+        }
+        return `- **${qty} × ${title}**`;
       })
-      .join(", ");
+      .join("\n");
     const have = slotPickedTicketQty(active);
-    const stillNeed = Math.max(0, needed - have);
+    const stillNeed = Math.max(0, ticketsNeeded - have);
+    const listedStock = tickets
+      .filter((ticket) => !isTicketSoldOut(ticket))
+      .reduce((sum, ticket) => sum + (ticketStock(ticket) ?? 0), 0);
+    const stockNote =
+      stillNeed > 0 && listedStock > 0 && listedStock < ticketsNeeded
+        ? ` Listed stock is **${listedStock}** — add what you can, then go to checkout.`
+        : "";
+    if (overstocked.length > 0) {
+      return {
+        content: `I can’t keep that ticket mix for **${slotHeading(active)}**${nameBit}:\n${pickedLines}\n\nRemove the sold-out type or drop the quantity, then I’ll continue.`,
+        actions: [
+          ...qtyActions,
+          ...remainingTypes,
+        ],
+      };
+    }
     const needLine =
       stillNeed > 0
-        ? ` You still need **${stillNeed}** more to cover the party.`
-        : "";
+        ? have > 0
+          ? `You still need **${stillNeed}** more to cover **${ticketsNeeded} tickets**. You can go to checkout with **${have}** if that’s enough.${stockNote}`
+          : `You still need **${stillNeed}** more to cover **${ticketsNeeded} tickets**.${stockNote}`
+        : have > ticketsNeeded
+          ? `That’s **${have}** tickets for **${ticketsNeeded}** guests — extra tickets are fine if you want them.`
+          : `That covers your **${ticketsNeeded} tickets**.`;
     return {
-      content: `Tickets so far for **${slotHeading(active)}**: **${picked}**${nameBit}.${needLine}\n\nChange a quantity, add another ticket, or continue.`,
+      content: `Tickets so far for **${slotHeading(active)}**${nameBit}:\n${pickedLines}\n\n${needLine}`,
       actions: [
         ...qtyActions,
         ...remainingTypes,
-        {
-          id: "tickets-done",
-          label: "That's all for tickets",
-          sendText: CHAT_TICKETS_DONE_SEND,
-        },
+        ...checkoutTicketActions(have),
       ],
     };
-  }
-
-  if (party.ticketQty > 0) {
-    for (const title of active.ticketTitles) {
-      const ticket = active.date.tickets.find(
-        (item) => normalize(item.title) === normalize(title),
-      );
-      const qty = active.ticketQuantities[title] ?? 0;
-      const remaining = ticket?.remaining ?? ticket?.capacity ?? null;
-      if (ticket && remaining != null && qty > remaining) {
-        return {
-          content: `This date has **${remaining}** ${ticket.title} left — I can’t book **${qty}**. Choose a smaller quantity.`,
-          actions: ticketQuantityActions(
-            active,
-            active.date.tickets,
-            ticket.title,
-          ),
-        };
-      }
-    }
   }
 
   if (/i'?ll type the quantity for /i.test(last) && choices.pendingDrinkQtyTitle) {
@@ -2130,8 +2430,13 @@ export function buildHostBookingTurn(options: {
 
   const remainingDates = remainingDateActions(brief, choices.slots);
   if (remainingDates.length > 0 && !choices.moreDatesDeclined) {
+    const showRooms = remainingDates.some((action) => Boolean(action.hint?.trim()));
     return {
-      content: `That's **${slotHeading(active)}** noted${nameBit}.\n\nWould you like another date or room? Each date shows its room.`,
+      content: `That's **${slotHeading(active)}** noted${nameBit}.\n\n${
+        showRooms
+          ? "Would you like another date or room? Each date shows its room."
+          : "Would you like another date?"
+      }`,
       actions: [
         ...remainingDates.slice(0, 10),
         {
@@ -2153,7 +2458,15 @@ export function buildHostBookingTurn(options: {
       choices,
       userName,
       includeCouponAsk,
+      paymentGateways,
     });
+  }
+
+  if (active) {
+    return {
+      content: `I’m still booking **${brief.title}**${nameBit}. Tell me the next detail, or open the event page.`,
+      actions: [buildVisitEventQuickAction(brief)],
+    };
   }
 
   return null;
@@ -2163,7 +2476,11 @@ export function toChatQuickActions(
   actions: ChatQuickActionDraft[],
 ): ChatQuickActionDraft[] {
   return actions.filter((action) => {
-    if (action.id === CHAT_PAY_FULL_ID || action.id === CHAT_PAY_DEPOSIT_ID) {
+    if (
+      action.id === CHAT_PAY_FULL_ID ||
+      action.id === CHAT_PAY_DEPOSIT_ID ||
+      action.id.startsWith("pay-gateway-")
+    ) {
       return true;
     }
     if (action.id === "visit-event") return true;

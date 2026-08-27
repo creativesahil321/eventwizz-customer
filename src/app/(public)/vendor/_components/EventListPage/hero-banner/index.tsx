@@ -10,7 +10,11 @@ import { SiteHeading } from "@/components/public/site-heading";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
-import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
+import { useIsPreviewMode } from "@/contexts/preview-context";
+import {
+  usePreviewDeviceFramesEnabled,
+  usePreviewMobileLayout,
+} from "@/hooks/use-preview-narrow-layout";
 import {
   heroBandContentPadClass,
   heroBandCopyPlacementClass,
@@ -181,6 +185,15 @@ export default function HeroBanner({
    * vertically centers the subtitle on top of the docked contact + search.
    */
   const isPreviewMobile = usePreviewMobileLayout();
+  const isPreview = useIsPreviewMode();
+  const previewFrames = usePreviewDeviceFramesEnabled();
+  /**
+   * Onboarding device frames sit in a wide monitor, so viewport `md:` still
+   * thinks the page is desktop. Stack address then email/phone so the hero
+   * column stays as tight as the live location page.
+   */
+  const stackHeroContact =
+    isPreviewMobile || (isPreview && previewFrames);
   const showHeadingContact = hasContact && !isPreviewMobile;
   const showDockContact = hasContact && Boolean(heroFooter);
   const previewAlign: BannerHeadingAlign = isPreviewMobile
@@ -286,6 +299,8 @@ export default function HeroBanner({
               <HeroBannerContactMeta
                 contact={heroContact}
                 align={previewAlign}
+                stacked={stackHeroContact}
+                linksInline={!isPreviewMobile}
               />
             </div>
           ) : null}
@@ -318,7 +333,8 @@ export default function HeroBanner({
                   <HeroBannerContactMeta
                     contact={heroContact}
                     align={previewAlign}
-                    stacked={isPreviewMobile}
+                    stacked={stackHeroContact}
+                    linksInline={!isPreviewMobile}
                   />
                 </div>
               ) : null}
@@ -335,10 +351,13 @@ function HeroBannerContactMeta({
   contact,
   align,
   stacked = false,
+  linksInline = false,
 }: {
   contact?: HeroBannerProps["heroContact"];
   align: BannerHeadingAlign;
   stacked?: boolean;
+  /** When stacked, keep email + phone on one row (desktop/tablet preview). */
+  linksInline?: boolean;
 }) {
   const address = contact?.address?.trim() || null;
   const email = contact?.email?.trim() || null;
@@ -350,7 +369,7 @@ function HeroBannerContactMeta({
       className={cn(
         heroBannerVenueContactClass(align, { fromMd: true }),
         stacked &&
-          "!flex !w-full !max-w-full !flex-col !items-center !justify-center !gap-2",
+          "!flex !w-fit !max-w-xl !flex-col !items-center !justify-center !gap-2 sm:!max-w-2xl",
       )}
     >
       {address ? (
@@ -367,7 +386,9 @@ function HeroBannerContactMeta({
           className={cn(
             heroBannerVenueContactLinksClass(align, { fromMd: true }),
             stacked &&
-              "!flex !w-full !flex-col !flex-nowrap !items-center !justify-center !gap-2",
+              (linksInline
+                ? "!flex !w-fit !max-w-full !flex-row !flex-wrap !items-center !justify-center !gap-x-5 !gap-y-1.5"
+                : "!flex !w-fit !max-w-full !flex-col !flex-nowrap !items-center !justify-center !gap-2"),
           )}
         >
           {email ? (
@@ -402,8 +423,10 @@ function HeroContactLine({
         ? { target: "_blank", rel: "noopener noreferrer" }
         : {})}
       className={cn(
-        "inline-flex min-w-0 items-center gap-2 text-[13px] leading-snug text-white/90 transition-colors hover:text-white sm:text-sm @max-md/preview:!text-[13px]",
-        block ? "max-w-[min(100%,28rem)] text-pretty" : "w-auto max-w-full shrink-0",
+        "inline-flex min-w-0 items-start gap-2 text-[13px] leading-snug text-white/90 transition-colors hover:text-white sm:text-sm @max-md/preview:!text-[13px]",
+        block
+          ? "max-w-full justify-center text-pretty"
+          : "w-auto max-w-full shrink-0",
       )}
     >
       <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />

@@ -5,6 +5,8 @@ export {
   newsletterService,
   newsletterApiMessage,
   newsletterConfirmResult,
+  newsletterEmailFieldError,
+  normalizeSubscribeResult,
   subscriberPhone,
   normalizeCounts,
 } from "./newsletter.service";

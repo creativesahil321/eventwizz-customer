@@ -236,6 +236,12 @@ interface CommonHeaderProps {
    * Renders inside the same fixed/sticky chrome so it never covers the header.
    */
   topBanner?: ReactNode;
+  /**
+   * Use the theme header fill + on-header contrast instead of the transparent
+   * overlay used over a dark hero. Required when the hero is not behind the nav
+   * (e.g. location search results). Matches LocationSelectionHeader on main search.
+   */
+  solidBar?: boolean;
 }
 
 export default function CommonHeader({
@@ -252,6 +258,7 @@ export default function CommonHeader({
   scrollContainerRef,
   locationSlug,
   topBanner,
+  solidBar = false,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
   // Theme refetch after logo save updates this → busts browser cache for same URL path
@@ -434,8 +441,9 @@ export default function CommonHeader({
         if (headerIsLight) {
           return solidHeaderBarStyles(isScrolled);
         }
-        // With a top banner, keep a solid nav bar so chrome stays readable.
-        if (topBanner) {
+        // Solid bar when there is no dark hero behind the nav (search results,
+        // coupon strip) so light logos stay readable — same as main-landing search.
+        if (topBanner || solidBar) {
           return solidHeaderBarStyles(true);
         }
         // Dark header: transparent bar over hero until scroll (white nav pills).
@@ -461,6 +469,7 @@ export default function CommonHeader({
   const pillGlassOnHero =
     (variant === "default" &&
       !topBanner &&
+      !solidBar &&
       !isScrolled &&
       !headerIsLight) ||
     (variant === "onboarding" && hasBackgroundImage);

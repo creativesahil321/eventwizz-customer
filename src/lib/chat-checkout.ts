@@ -7,6 +7,7 @@ import {
   findEventBySlug,
   getApiDateData,
   isRoomBasedCart,
+  apiCartHasBillableSelections,
 } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { hasViableTablePlan } from "@/app/(public)/vendor/checkout/_lib/table-recommendations";
 import {
@@ -32,16 +33,25 @@ import type { CheckoutRequest } from "@/services/customer/checkout/type";
 import type { ApiEventCartData } from "@/lib/types/cart.types";
 import type { CouponStripSource } from "@/lib/coupon-strip-props";
 import { useCartEditStore } from "@/store/cart-edit.store";
+import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
 import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { normalizeSlug } from "@/lib/utils";
 
 export type ChatCheckoutFailureReason =
   | "login"
   | "incomplete"
+  | "conflict"
   | "no-gateway"
+  | "need-gateway"
   | "capacity"
   | "checkout"
   | "unknown";
+
+export type ChatPaymentGatewayOption = {
+  id: number;
+  slug: string;
+  label: string;
+};
 
 export type ChatCheckoutResult =
   | { ok: true; action: CheckoutPaymentAction; payload: CheckoutRequest }
@@ -49,15 +59,61 @@ export type ChatCheckoutResult =
     ok: false;
     reason: ChatCheckoutFailureReason;
     message: string;
+    gateways?: ChatPaymentGatewayOption[];
   };
 
-function pickPaymentGatewayId(event: ApiEventCartData): number | null {
-  const gateways = event.payment_gateways ?? [];
-  const stripe = gateways.find((gateway) =>
-    /stripe/i.test(String(gateway.slug ?? "")),
-  );
-  const id = Number((stripe ?? gateways[0])?.id);
-  return Number.isFinite(id) && id > 0 ? id : null;
+export type ChatCartSyncResult =
+  | {
+      ok: true;
+      storeSlug: string;
+      cartResponse: unknown;
+      event: ApiEventCartData;
+    }
+  | {
+      ok: false;
+      reason: ChatCheckoutFailureReason;
+      message: string;
+    };
+
+const CHAT_GATEWAY_LABELS: Record<string, string> = {
+  stripe: "Pay with card",
+  paypal: "Pay with PayPal",
+  truelayer: "Pay by bank transfer",
+  worldpay: "Pay with WorldPay",
+  klarna: "Pay with Klarna",
+};
+
+export function listChatPaymentGateways(
+  event: ApiEventCartData | null | undefined,
+): ChatPaymentGatewayOption[] {
+  const seen = new Set<string>();
+  const list: ChatPaymentGatewayOption[] = [];
+  for (const gateway of event?.payment_gateways ?? []) {
+    const id = Number(gateway.id);
+    const slug = String(gateway.slug ?? "").trim().toLowerCase();
+    if (!Number.isFinite(id) || id <= 0 || !slug || seen.has(slug)) continue;
+    seen.add(slug);
+    list.push({
+      id,
+      slug,
+      label: CHAT_GATEWAY_LABELS[slug] ?? `Pay with ${slug}`,
+    });
+  }
+  return list;
+}
+
+export function pickPaymentGatewayId(
+  event: ApiEventCartData,
+  preferredSlug?: string | null,
+): number | null {
+  const gateways = listChatPaymentGateways(event);
+  if (preferredSlug) {
+    const match = gateways.find((gateway) => gateway.slug === preferredSlug);
+    if (match) return match.id;
+  }
+  if (gateways.length === 1) return gateways[0].id;
+  const stripe = gateways.find((gateway) => gateway.slug === "stripe");
+  return stripe?.id ?? gateways[0]?.id ?? null;
 }
 
 function couponDiscountAmount(
@@ -204,8 +260,18 @@ export async function hydrateChatBriefCatalogs(
   }
 
   if (chatCartConflictsWithEvent(cartResponse, brief.eventSlug)) {
-    for (const slot of pending) markEmpty(slot);
-    return withChatDateInventory(brief, catalogs);
+    if (!apiCartHasBillableSelections(cartResponse)) {
+      try {
+        await cartService.deleteCartData("all");
+        cartResponse = await cartService.getCartData();
+      } catch {
+        for (const slot of pending) markEmpty(slot);
+        return withChatDateInventory(brief, catalogs);
+      }
+    } else {
+      for (const slot of pending) markEmpty(slot);
+      return withChatDateInventory(brief, catalogs);
+    }
   }
 
   let event = findChatCartEvent(cartResponse, slug);
@@ -275,7 +341,9 @@ function resolveChatCartDateKey(
   return null;
 }
 
-function authFailureFromCartError(error: unknown): ChatCheckoutResult | null {
+function authFailureFromCartError(
+  error: unknown,
+): { ok: false; reason: ChatCheckoutFailureReason; message: string } | null {
   const status = (error as { response?: { status?: number } })?.response
     ?.status;
   if (status === 401 || status === 403) {
@@ -289,128 +357,19 @@ function authFailureFromCartError(error: unknown): ChatCheckoutResult | null {
   return null;
 }
 
-function listChatDrinksForCheckout(
-  brief: ChatEventBookingBrief,
-  slot: ChatBookingSlot,
-) {
-  const pool =
-    brief.hasRooms && slot.roomId != null
-      ? (brief.rooms.find((room) => room.roomId === slot.roomId)?.drinks ?? [])
-      : brief.drinks;
-  return slot.drinkTitles
-    .map((title) => {
-      const drink = pool.find(
-        (item) =>
-          item.title.trim().toLowerCase() === title.trim().toLowerCase(),
-      );
-      if (!drink || drink.id <= 0) return null;
-      const qty = Math.max(1, slot.drinkQuantities[title] ?? 1);
-      return {
-        id: drink.id,
-        title: drink.title,
-        price: drink.price ?? 0,
-        quantity: qty,
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item != null);
-}
-
-export async function runChatCheckout(options: {
-  brief: ChatEventBookingBrief;
-  choices: ChatBookingChoices;
+function applyChatSlotsToStore(options: {
+  storeSlug: string;
+  slots: ChatBookingSlot[];
   payMode: "full" | "deposit";
-}): Promise<ChatCheckoutResult> {
-  const { brief, choices, payMode } = options;
-  if (!bookingChoicesReadyForPay(brief, choices)) {
-    return {
-      ok: false,
-      reason: "incomplete",
-      message:
-        "I still need a room, date, guest count and seating before I can take payment.",
-    };
-  }
-
-  const slug = normalizeSlug(brief.eventSlug);
-  const slots = checkoutSlots(choices);
-  if (slots.length === 0) {
-    return {
-      ok: false,
-      reason: "incomplete",
-      message: "I still need a date before I can take payment.",
-    };
-  }
-
-  try {
-    for (const slot of slots) {
-      const isoDate = slot.date.date.slice(0, 10);
-      await cartService.storeEventBooking({
-        slug,
-        event_date: isoDate,
-        ...(slot.roomId != null && slot.roomId > 0
-          ? { room_id: slot.roomId }
-          : {}),
-        people_quantity: slot.guestCount ?? undefined,
-        drink_package: listChatDrinksForCheckout(brief, slot),
-        tables: [],
-        tickets: [],
-      });
-    }
-  } catch (error) {
-    return (
-      authFailureFromCartError(error) ?? {
-        ok: false,
-        reason: "unknown",
-        message:
-          "I couldn’t prepare this booking just now. You can finish on the event page instead.",
-      }
-    );
-  }
-
-  let cartResponse: unknown;
-  try {
-    cartResponse = await cartService.getCartData();
-  } catch {
-    return {
-      ok: false,
-      reason: "unknown",
-      message:
-        "I couldn’t load your booking just now. You can finish on the event page instead.",
-    };
-  }
-
-  const event = findChatCartEvent(cartResponse, slug);
-  if (!event) {
-    return {
-      ok: false,
-      reason: "unknown",
-      message:
-        "I couldn’t load your booking just now. You can finish on the event page instead.",
-    };
-  }
-
-  const storeSlug = event.event_slug?.trim() || slug;
-
-  const gatewayId = pickPaymentGatewayId(event);
-  if (gatewayId == null) {
-    return {
-      ok: false,
-      reason: "no-gateway",
-      message:
-        "Payment isn’t available in chat for this event. Visit the event page to finish.",
-    };
-  }
-
+  fillUnpickedTickets: boolean;
+}): { ok: true } | { ok: false; reason: ChatCheckoutFailureReason; message: string } {
+  const { storeSlug, slots, payMode, fillUnpickedTickets } = options;
   const store = liveCartEditStore();
-  store.clearEditingData(storeSlug);
-  if (storeSlug !== slug) store.clearEditingData(slug);
-  store.initializeFromAPI(storeSlug, event as unknown as Record<string, unknown>);
 
   for (const slot of slots) {
     const isoDate = slot.date.date.slice(0, 10);
     const dateKey = resolveChatCartDateKey(storeSlug, isoDate, slot.roomId);
-    const seeded = dateKey
-      ? store.getDateData(storeSlug, dateKey)
-      : null;
+    const seeded = dateKey ? store.getDateData(storeSlug, dateKey) : null;
     if (!dateKey || !seeded) {
       return {
         ok: false,
@@ -443,61 +402,63 @@ export async function runChatCheckout(options: {
 
     if (tableGuests <= 0) {
       store.skipTableSeating(storeSlug, dateKey);
-    } else {
+    } else if (slot.tablePlan.length > 0) {
       const tables = store.getDateData(storeSlug, dateKey)?.tables ?? [];
-      if (slot.tablePlan.length > 0) {
-        for (const item of slot.tablePlan) {
-          const table =
-            tables.find((row) => row.id === item.tableId) ??
-            tables.find(
-              (row) =>
-                row.minPersons === item.minPersons &&
-                row.maxPersons === item.maxPersons,
-            );
-          if (!table) continue;
-          const remaining = table.maxQuantity;
-          if (remaining != null && item.quantity > remaining) {
-            return {
-              ok: false,
-              reason: "capacity",
-              message: `We only have **${remaining}** ${table.title} available — I can’t book ${item.quantity}.`,
-            };
-          }
-          store.updateQuantity(storeSlug, dateKey, "table", table.id, item.quantity);
-          store.confirmTableSeating(storeSlug, dateKey, table.id, item.allocation);
-        }
-      } else {
-        if (tables.length > 0 && !hasViableTablePlan(tables, tableGuests)) {
-          const remaining = tables.reduce(
-            (sum, table) =>
-              sum + (table.maxQuantity ?? 0) * (table.maxPersons ?? 0),
-            0,
+      for (const item of slot.tablePlan) {
+        const table =
+          tables.find((row) => row.id === item.tableId) ??
+          tables.find(
+            (row) =>
+              row.minPersons === item.minPersons &&
+              row.maxPersons === item.maxPersons,
           );
+        if (!table) continue;
+        const remaining = table.maxQuantity;
+        if (remaining != null && item.quantity > remaining) {
           return {
             ok: false,
             reason: "capacity",
-            message:
-              remaining > 0
-                ? `We can seat about **${remaining}** guests on the tables listed for that date — I can’t book **${tableGuests}** as tables.`
-                : `I can’t seat **${tableGuests}** guests on the tables listed for that date.`,
+            message: `We only have **${remaining}** ${table.title} available — I can’t book ${item.quantity}.`,
           };
         }
-        store.applyBestTableMatch(storeSlug, dateKey);
-        const allocated = store.getDateData(storeSlug, dateKey);
-        for (const table of allocated?.tables ?? []) {
-          if (table.quantity > 0) {
-            store.confirmTableSeating(
-              storeSlug,
-              dateKey,
-              table.id,
-              table.allocation ?? [],
-            );
-          }
+        store.updateQuantity(storeSlug, dateKey, "table", table.id, item.quantity);
+        store.confirmTableSeating(storeSlug, dateKey, table.id, item.allocation);
+      }
+    } else if (fillUnpickedTickets) {
+      const tables = store.getDateData(storeSlug, dateKey)?.tables ?? [];
+      if (tables.length > 0 && !hasViableTablePlan(tables, tableGuests)) {
+        const remaining = tables.reduce(
+          (sum, table) =>
+            sum + (table.maxQuantity ?? 0) * (table.maxPersons ?? 0),
+          0,
+        );
+        return {
+          ok: false,
+          reason: "capacity",
+          message:
+            remaining > 0
+              ? `We can seat about **${remaining}** guests on the tables listed for that date — I can’t book **${tableGuests}** as tables.`
+              : `I can’t seat **${tableGuests}** guests on the tables listed for that date.`,
+        };
+      }
+      store.applyBestTableMatch(storeSlug, dateKey);
+      const allocated = store.getDateData(storeSlug, dateKey);
+      for (const table of allocated?.tables ?? []) {
+        if (table.quantity > 0) {
+          store.confirmTableSeating(
+            storeSlug,
+            dateKey,
+            table.id,
+            table.allocation ?? [],
+          );
         }
       }
     }
 
-    if (tableGuests > 0) {
+    if (
+      tableGuests > 0 &&
+      (fillUnpickedTickets || slot.tablePlan.length > 0)
+    ) {
       const seated = store
         .getDateData(storeSlug, dateKey)
         ?.tables.some((table) => table.quantity > 0);
@@ -510,46 +471,47 @@ export async function runChatCheckout(options: {
       }
     }
 
-    if (ticketQty > 0) {
-      const tickets = store.getDateData(storeSlug, dateKey)?.tickets ?? [];
-      if (slot.ticketTitles.length > 0) {
-        for (const title of slot.ticketTitles) {
-          const ticket = tickets.find(
-            (item) =>
-              item.title.trim().toLowerCase() === title.trim().toLowerCase(),
-          );
-          const qty = Math.max(0, slot.ticketQuantities[title] ?? 0);
-          if (!ticket || qty < 1) continue;
-          const remaining = ticket.maxQuantity;
-          if (remaining != null && qty > remaining) {
-            return {
-              ok: false,
-              reason: "capacity",
-              message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${qty}.`,
-            };
-          }
-          store.updateQuantity(storeSlug, dateKey, "ticket", ticket.id, qty);
-        }
-      } else {
-        const ticket = tickets[0];
-        const remaining = ticket?.maxQuantity;
-        if (!ticket) {
-          return {
-            ok: false,
-            reason: "incomplete",
-            message:
-              "This date doesn’t have tickets I can add. Choose another date, or visit the event page.",
-          };
-        }
-        if (remaining != null && ticketQty > remaining) {
+    const tickets = store.getDateData(storeSlug, dateKey)?.tickets ?? [];
+    const pickedTitles = slot.ticketTitles.filter(
+      (title) => Math.max(0, slot.ticketQuantities[title] ?? 0) > 0,
+    );
+    if (pickedTitles.length > 0) {
+      for (const title of pickedTitles) {
+        const ticket = tickets.find(
+          (item) =>
+            item.title.trim().toLowerCase() === title.trim().toLowerCase(),
+        );
+        const qty = Math.max(0, slot.ticketQuantities[title] ?? 0);
+        if (!ticket || qty < 1) continue;
+        const remaining = ticket.maxQuantity;
+        if (remaining != null && qty > remaining) {
           return {
             ok: false,
             reason: "capacity",
-            message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${ticketQty}.`,
+            message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${qty}.`,
           };
         }
-        store.updateQuantity(storeSlug, dateKey, "ticket", ticket.id, ticketQty);
+        store.updateQuantity(storeSlug, dateKey, "ticket", ticket.id, qty);
       }
+    } else if (fillUnpickedTickets && ticketQty > 0) {
+      const ticket = tickets[0];
+      const remaining = ticket?.maxQuantity;
+      if (!ticket) {
+        return {
+          ok: false,
+          reason: "incomplete",
+          message:
+            "This date doesn’t have tickets I can add. Choose another date, or visit the event page.",
+        };
+      }
+      if (remaining != null && ticketQty > remaining) {
+        return {
+          ok: false,
+          reason: "capacity",
+          message: `We only have **${remaining}** ${ticket.title} available for that date — I can’t book ${ticketQty}.`,
+        };
+      }
+      store.updateQuantity(storeSlug, dateKey, "ticket", ticket.id, ticketQty);
     }
 
     const drinkCatalog = store.getDateData(storeSlug, dateKey)?.drinks ?? [];
@@ -578,33 +540,157 @@ export async function runChatCheckout(options: {
     );
   }
 
-  const couponSource = resolveCartCoupon(event);
-  const couponCode = choices.couponApplied
-    ? couponSource?.coupon_code?.trim().toUpperCase() ||
-    brief.coupon?.code?.trim().toUpperCase() ||
-    null
-    : null;
-  if (couponCode) {
-    useCheckoutPromoStore.getState().setCouponCode(couponCode);
-  } else {
-    useCheckoutPromoStore.getState().clearCoupon();
+  return { ok: true };
+}
+
+/**
+ * Write the current chat picks into the customer cart so Checkout shows
+ * the same tickets/tables/drinks. Empty leftover date shells are cleared
+ * when they belong to a different event.
+ */
+export async function syncChatBookingToCart(options: {
+  brief: ChatEventBookingBrief;
+  choices: ChatBookingChoices;
+  payMode?: "full" | "deposit";
+  fillUnpickedTickets?: boolean;
+  requireLineItems?: boolean;
+}): Promise<ChatCartSyncResult> {
+  const {
+    brief,
+    choices,
+    payMode = "full",
+    fillUnpickedTickets = false,
+    requireLineItems = false,
+  } = options;
+  const slug = normalizeSlug(brief.eventSlug);
+  const slots = checkoutSlots(choices);
+  if (slots.length === 0) {
+    return {
+      ok: false,
+      reason: "incomplete",
+      message: "I still need a date before I can save this booking.",
+    };
   }
 
+  await hydrateChatBriefCatalogs(brief, slots);
+
+  let cartResponse: unknown;
   try {
+    cartResponse = await cartService.getCartData();
+  } catch (error) {
+    return (
+      authFailureFromCartError(error) ?? {
+        ok: false,
+        reason: "unknown",
+        message:
+          "I couldn’t load your booking just now. You can finish on the event page instead.",
+      }
+    );
+  }
+
+  if (chatCartConflictsWithEvent(cartResponse, brief.eventSlug)) {
+    if (!apiCartHasBillableSelections(cartResponse)) {
+      try {
+        await cartService.deleteCartData("all");
+        await hydrateChatBriefCatalogs(brief, slots);
+        cartResponse = await cartService.getCartData();
+      } catch (error) {
+        return (
+          authFailureFromCartError(error) ?? {
+            ok: false,
+            reason: "unknown",
+            message:
+              "I couldn’t prepare this booking just now. You can finish on the event page instead.",
+          }
+        );
+      }
+    }
+  }
+
+  if (
+    chatCartConflictsWithEvent(cartResponse, brief.eventSlug) &&
+    apiCartHasBillableSelections(cartResponse)
+  ) {
+    return {
+      ok: false,
+      reason: "conflict",
+      message:
+        "You already have another event in Checkout. Open Checkout to remove it, then I can continue here.",
+    };
+  }
+
+  let event = findChatCartEvent(cartResponse, slug);
+  if (!event) {
+    try {
+      for (const slot of slots) {
+        const isoDate = slot.date.date.slice(0, 10);
+        await cartService.storeEventBooking(
+          {
+            slug,
+            event_date: isoDate,
+            ...(slot.roomId != null && slot.roomId > 0
+              ? { room_id: slot.roomId }
+              : {}),
+            people_quantity: slot.guestCount ?? undefined,
+            drink_package: [],
+            tables: [],
+            tickets: [],
+          },
+          { suppressSuccessToast: true, suppressErrorToast: true },
+        );
+      }
+      cartResponse = await cartService.getCartData();
+      event = findChatCartEvent(cartResponse, slug);
+    } catch (error) {
+      return (
+        authFailureFromCartError(error) ?? {
+          ok: false,
+          reason: "unknown",
+          message:
+            "I couldn’t prepare this booking just now. You can finish on the event page instead.",
+        }
+      );
+    }
+  }
+
+  if (!event) {
+    return {
+      ok: false,
+      reason: "unknown",
+      message:
+        "I couldn’t load your booking just now. You can finish on the event page instead.",
+    };
+  }
+
+  const storeSlug = event.event_slug?.trim() || slug;
+  const store = liveCartEditStore();
+  store.clearEditingData(storeSlug);
+  if (storeSlug !== slug) store.clearEditingData(slug);
+  store.initializeFromAPI(storeSlug, event as unknown as Record<string, unknown>);
+
+  const applied = applyChatSlotsToStore({
+    storeSlug,
+    slots,
+    payMode,
+    fillUnpickedTickets,
+  });
+  if (!applied.ok) return applied;
+
+  try {
+    let wroteLineItems = false;
     for (const slot of slots) {
       const isoDate = slot.date.date.slice(0, 10);
-      const dateKey = resolveChatCartDateKey(
-        storeSlug,
-        isoDate,
-        slot.roomId,
-      );
+      const dateKey = resolveChatCartDateKey(storeSlug, isoDate, slot.roomId);
       if (!dateKey) {
-        return {
-          ok: false,
-          reason: "incomplete",
-          message:
-            "I couldn’t add tables, tickets, or drinks for that date. Visit the event page to finish.",
-        };
+        if (requireLineItems) {
+          return {
+            ok: false,
+            reason: "incomplete",
+            message:
+              "I couldn’t add tables, tickets, or drinks for that date. Visit the event page to finish.",
+          };
+        }
+        continue;
       }
       const cartData = liveCartEditStore().getItemsForAPI(
         storeSlug,
@@ -612,17 +698,32 @@ export async function runChatCheckout(options: {
         slot.roomId ?? undefined,
       );
       if (!cartRequestHasLineItems(cartData)) {
-        return {
-          ok: false,
-          reason: "incomplete",
-          message:
-            "I couldn’t add tables, tickets, or drinks for that date. Visit the event page to finish.",
-        };
+        if (requireLineItems) {
+          return {
+            ok: false,
+            reason: "incomplete",
+            message:
+              "I couldn’t add tables, tickets, or drinks for that date. Visit the event page to finish.",
+          };
+        }
+        continue;
       }
-      await cartService.storeEventBooking({
-        ...cartData,
-        slug: storeSlug,
-      });
+      await cartService.storeEventBooking(
+        {
+          ...cartData,
+          slug: storeSlug,
+        },
+        { suppressSuccessToast: true, suppressErrorToast: true },
+      );
+      wroteLineItems = true;
+    }
+    if (requireLineItems && !wroteLineItems) {
+      return {
+        ok: false,
+        reason: "incomplete",
+        message:
+          "I couldn’t add tables, tickets, or drinks for that date. Visit the event page to finish.",
+      };
     }
   } catch (error) {
     return (
@@ -638,7 +739,90 @@ export async function runChatCheckout(options: {
   try {
     cartResponse = await cartService.getCartData();
   } catch {
-    // Checkout still uses the in-memory cart; a stale GET must not block pay.
+    // Checkout can still use the in-memory cart if GET is stale.
+  }
+
+  const syncedEvent = findChatCartEvent(cartResponse, storeSlug) ?? event;
+  return {
+    ok: true,
+    storeSlug,
+    cartResponse,
+    event: syncedEvent,
+  };
+}
+
+export async function runChatCheckout(options: {
+  brief: ChatEventBookingBrief;
+  choices: ChatBookingChoices;
+  payMode: "full" | "deposit";
+  gatewaySlug?: string | null;
+  gatewayId?: number | null;
+}): Promise<ChatCheckoutResult> {
+  const { brief, choices, payMode } = options;
+  if (!bookingChoicesReadyForPay(brief, choices)) {
+    return {
+      ok: false,
+      reason: "incomplete",
+      message:
+        "I still need a room, date, guest count and seating before I can take payment.",
+    };
+  }
+
+  const synced = await syncChatBookingToCart({
+    brief,
+    choices,
+    payMode,
+    fillUnpickedTickets: true,
+    requireLineItems: true,
+  });
+  if (!synced.ok) return synced;
+
+  const { storeSlug, event, cartResponse } = synced;
+  const gateways = listChatPaymentGateways(event);
+  if (gateways.length === 0) {
+    return {
+      ok: false,
+      reason: "no-gateway",
+      message:
+        "Payment isn’t available in chat for this event. Visit the event page to finish.",
+    };
+  }
+
+  const preferredSlug = options.gatewaySlug?.trim().toLowerCase() || null;
+  const hasExplicitGateway =
+    (options.gatewayId != null && options.gatewayId > 0) || Boolean(preferredSlug);
+  if (gateways.length > 1 && !hasExplicitGateway) {
+    return {
+      ok: false,
+      reason: "need-gateway",
+      gateways,
+      message: "How would you like to pay? Choose a payment method to continue.",
+    };
+  }
+
+  const gatewayId =
+    options.gatewayId != null && options.gatewayId > 0
+      ? options.gatewayId
+      : pickPaymentGatewayId(event, preferredSlug);
+  if (gatewayId == null) {
+    return {
+      ok: false,
+      reason: "no-gateway",
+      message:
+        "Payment isn’t available in chat for this event. Visit the event page to finish.",
+    };
+  }
+
+  const couponSource = resolveCartCoupon(event);
+  const couponCode = choices.couponApplied
+    ? couponSource?.coupon_code?.trim().toUpperCase() ||
+    brief.coupon?.code?.trim().toUpperCase() ||
+    null
+    : null;
+  if (couponCode) {
+    useCheckoutPromoStore.getState().setCouponCode(couponCode);
+  } else {
+    useCheckoutPromoStore.getState().clearCoupon();
   }
 
   const checkoutEvent = findChatCartEvent(cartResponse, storeSlug) ?? event;
@@ -673,8 +857,27 @@ export async function runChatCheckout(options: {
     };
   }
 
+  const payStore = useCheckoutPaymentUiStore.getState();
+  const pendingNumber = event.pending_payment?.booking_number?.trim();
+  const storedNumber = payStore.stripePaymentSession?.bookingNumber?.trim();
+  const resumeNumber =
+    pendingNumber &&
+    !payStore.isBookingCompleted(pendingNumber) &&
+    !payStore.isPendingPaymentExpired(pendingNumber)
+      ? pendingNumber
+      : storedNumber &&
+          !payStore.isBookingCompleted(storedNumber) &&
+          !payStore.isPendingPaymentExpired(storedNumber)
+        ? storedNumber
+        : null;
+
   try {
-    const response = await checkoutService.processCheckout(payload);
+    const response = resumeNumber
+      ? await checkoutService.resumeCheckout({
+          booking_number: resumeNumber,
+          payment_gateway: gatewayId,
+        })
+      : await checkoutService.processCheckout(payload);
     if (!response.status || !response.data) {
       return {
         ok: false,

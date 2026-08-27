@@ -28,7 +28,7 @@ export interface Vendor {
   image: string;
   name: string;
   address: string;
-  status: "active" | "disabled";
+  status: "active" | "inactive";
   liveEvents: number;
   totalEvents: number;
   totalEarnings: number;

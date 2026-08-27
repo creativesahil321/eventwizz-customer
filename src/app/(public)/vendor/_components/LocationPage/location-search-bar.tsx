@@ -68,11 +68,8 @@ export type LocationSearchBarProps = {
   value: LocationSearchFilters;
   onChange: (value: LocationSearchFilters) => void;
   onSearch: () => void;
-  /**
-   * Location pages already know the city — hide the dropdown and optionally
-   * show a locked city chip instead.
-   */
   hideCity?: boolean;
+  /** Optional. Kept for callers; location chrome no longer shows a city chip. */
   lockedCityLabel?: string | null;
   /**
    * When set, the date picker loads `/availability` and only enables
@@ -110,7 +107,6 @@ export function LocationSearchBar({
   onChange,
   onSearch,
   hideCity = false,
-  lockedCityLabel = null,
   availability,
   enableNearMe = false,
 }: LocationSearchBarProps) {
@@ -252,9 +248,6 @@ export function LocationSearchBar({
     isPreviewMobile && "!min-w-0 !px-2",
   );
 
-  /** Location pages: hide locked city on small screens — already on that city. */
-  const showLockedCity = hideCity && Boolean(lockedCityLabel);
-
   return (
     <div
       id={id}
@@ -290,17 +283,13 @@ export function LocationSearchBar({
               onChange={(e) => patch({ query: e.target.value })}
               placeholder={
                 hideCity
-                  ? lockedCityLabel
-                    ? `Search ${lockedCityLabel} events`
-                    : "Search location events"
+                  ? "Search location events"
                   : "Search event and category"
               }
               className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-dimmed)]"
               aria-label={
                 hideCity
-                  ? lockedCityLabel
-                    ? `Search ${lockedCityLabel} events`
-                    : "Search location events"
+                  ? "Search location events"
                   : "Search event and category"
               }
             />
@@ -316,8 +305,8 @@ export function LocationSearchBar({
           />
 
           {/*
-            Mobile location search: [date] [Search] on one row (no city chip).
-            Multi-city / desktop: city + date + search in the pill.
+            Location page (hideCity): query | date | Search events — same as live.
+            Multi-city home: query | city | date | Search events.
           */}
           <div
             className={cn(
@@ -335,26 +324,6 @@ export function LocationSearchBar({
                   : "!grid !grid-cols-2"),
             )}
           >
-            {showLockedCity ? (
-              <div
-                className={cn(
-                  fieldBtnClass,
-                  "hidden cursor-default hover:bg-transparent sm:flex",
-                  previewHideUntilSm,
-                  isPreviewMobile && "!hidden",
-                )}
-                aria-label={`Location ${lockedCityLabel}`}
-              >
-                <MapPin
-                  className="h-4 w-4 shrink-0 text-[var(--color-primary)]"
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1 truncate text-[var(--color-text)]">
-                  {lockedCityLabel}
-                </span>
-              </div>
-            ) : null}
-
             {!hideCity ? (
               <Popover open={cityOpen} onOpenChange={setCityOpen}>
                 <PopoverTrigger asChild>
@@ -428,14 +397,16 @@ export function LocationSearchBar({
               </Popover>
             ) : null}
 
-            <div
-              className={cn(
-                "mx-2.5 hidden h-7 w-px shrink-0 bg-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] sm:block",
-                previewHideUntilSm,
-                isPreviewMobile && "!hidden",
-              )}
-              aria-hidden
-            />
+            {!hideCity ? (
+              <div
+                className={cn(
+                  "mx-2.5 hidden h-7 w-px shrink-0 bg-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] sm:block",
+                  previewHideUntilSm,
+                  isPreviewMobile && "!hidden",
+                )}
+                aria-hidden
+              />
+            ) : null}
 
             <Popover
               open={dateOpen}

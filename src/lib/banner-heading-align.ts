@@ -147,7 +147,7 @@ export function heroBannerVenueContactClass(
   scope?: HeroAlignScope,
 ): string {
   return cn(
-    "flex w-fit max-w-full flex-col gap-2 text-sm text-white/90",
+    "flex w-fit max-w-xl flex-col gap-2 text-sm text-white/90 sm:max-w-2xl",
     "md:flex-row md:flex-wrap md:items-center md:gap-x-6 md:gap-y-2",
     "@max-md/preview:!flex-col @max-md/preview:!gap-2",
     measureAlignClass(align, scope?.fromMd),

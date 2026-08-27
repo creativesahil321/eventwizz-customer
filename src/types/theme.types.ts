@@ -90,12 +90,15 @@ export interface LatestUpcomingEvent {
 /**
  * Lightweight live/bookable event from GET /theme/settings → data.live_events.
  * Used by the public chatbot for direct booking redirects.
+ * `category_name` is the event type (Christmas, weddings, DJ nights). It may
+ * be null. Older payloads nested this as `category.name`.
  */
 export interface LiveEvent {
   title: string;
   slug: string;
   location_slug: string;
   location_city: string;
+  category_name?: string | null;
 }
 
 /**
@@ -173,7 +176,7 @@ export interface ThemeSchema {
 
   /**
    * Active/bookable events for public chat redirects.
-   * Keep lean: title + slugs only (no heavy event payloads).
+   * title, slugs, city, and category_name (event type; null if unset).
    */
   live_events?: LiveEvent[];
 

@@ -19,9 +19,11 @@ export const PREVIEW_SECTION_EDITOR: Record<string, PreviewEditorTarget> = {
   [EVENT_SECTION_IDS.about]: { step: 3, field: "about_event_heading" },
   [EVENT_SECTION_IDS.rooms]: { step: 4, field: "event_schedular_title" },
   [EVENT_SECTION_IDS.schedule]: { step: 4, field: "event_schedular" },
+  [EVENT_SECTION_IDS.packages]: { step: 4, field: "package_title" },
   [EVENT_SECTION_IDS.dates]: { step: 5, field: "dates" },
   [EVENT_SECTION_IDS.gallery]: { step: 4, field: "gallery" },
   [EVENT_SECTION_IDS.menu]: { step: 6, field: "menu_title" },
+  [EVENT_SECTION_IDS.drinks]: { step: 8, field: "drink_title" },
   [EVENT_SECTION_IDS.faqs]: { step: 9, field: "question" },
 };
 

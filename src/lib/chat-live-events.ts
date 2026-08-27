@@ -50,13 +50,217 @@ const STOP_WORDS = new Set([
   "get",
   "go",
   "help",
+  "category",
+  "categories",
+  "hi",
+  "hii",
+  "hello",
+  "hey",
+  "yo",
 ]);
+
+/** Keep the chat picker short enough to read in the widget. */
+export const MAX_LIVE_EVENT_CHAT_CHOICES = 6;
+
+type LiveEventTheme = {
+  key: string;
+  label: string;
+};
+
+const LIVE_EVENT_THEMES: Array<LiveEventTheme & { pattern: RegExp }> = [
+  {
+    key: "christmas",
+    label: "Christmas party",
+    pattern: /\b(christmas|xmas)\b/i,
+  },
+  {
+    key: "festive",
+    label: "festive event",
+    pattern: /\bfestive\b/i,
+  },
+  {
+    key: "halloween",
+    label: "Halloween event",
+    pattern: /\bhalloween\b/i,
+  },
+  {
+    key: "diwali",
+    label: "Diwali event",
+    pattern: /\b(diwali|deepavali)\b/i,
+  },
+  {
+    key: "new-year",
+    label: "New Year event",
+    pattern: /\b(new\s*year|nye|hogmanay)\b/i,
+  },
+  {
+    key: "wedding",
+    label: "wedding",
+    pattern: /\bwedding\b/i,
+  },
+  {
+    key: "corporate",
+    label: "corporate event",
+    pattern: /\bcorporate\b/i,
+  },
+  {
+    key: "valentine",
+    label: "Valentine's event",
+    pattern: /\bvalentines?\b/i,
+  },
+  {
+    key: "networking",
+    label: "networking event",
+    pattern: /\b(networking|business events?)\b/i,
+  },
+  {
+    key: "dj-club",
+    label: "DJ / club night",
+    pattern: /\b(dj nights?|club events?|club nights?|nightlife)\b/i,
+  },
+  {
+    key: "themed",
+    label: "themed party",
+    pattern: /\b(themed parties|themed party|ibiza)\b/i,
+  },
+];
+
+export function extractLiveEventTheme(text: string): LiveEventTheme | null {
+  const query = normalizeChatBookingQuery(text);
+  if (!query) return null;
+  for (const theme of LIVE_EVENT_THEMES) {
+    if (theme.pattern.test(query)) {
+      return { key: theme.key, label: theme.label };
+    }
+  }
+  return null;
+}
+
+function eventSearchText(event: LiveEvent): string {
+  return `${event.title} ${event.category_name || ""}`;
+}
+
+function eventTitleMatchesTheme(
+  event: LiveEvent,
+  theme: LiveEventTheme,
+): boolean {
+  const def = LIVE_EVENT_THEMES.find((item) => item.key === theme.key);
+  return Boolean(def && def.pattern.test(event.title || ""));
+}
+
+function eventMatchesTheme(event: LiveEvent, theme: LiveEventTheme): boolean {
+  const def = LIVE_EVENT_THEMES.find((item) => item.key === theme.key);
+  if (!def) return false;
+  if (def.pattern.test(event.title || "")) return true;
+  if (theme.key === "christmas") {
+    return /\b(christmas|xmas)\b/i.test(event.category_name || "");
+  }
+  if (theme.key === "festive") {
+    return /\bfestive\b/i.test(event.category_name || "");
+  }
+  return def.pattern.test(event.category_name || "");
+}
+
+/** True when they named a type (Christmas, Halloween) and this event is that type. */
+export function liveEventMatchesRequestedTheme(
+  event: LiveEvent,
+  userText: string,
+): boolean {
+  const theme = extractLiveEventTheme(userText);
+  if (!theme) return true;
+  return eventMatchesTheme(event, theme);
+}
+
+const BROCHURE_WORD_DENY = new Set([
+  "bridge",
+  "bright",
+  "britain",
+  "british",
+  "bristol",
+  "broadcast",
+  "broadway",
+  "broken",
+  "bronze",
+  "brother",
+  "brothers",
+  "brought",
+  "browse",
+  "browser",
+  "browsers",
+  "bruise",
+  "bruised",
+  "brushes",
+]);
+
+function brochureEditDistance(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 3) return 4;
+  const row = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diagonal = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const nextDiagonal = row[j];
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + cost);
+      diagonal = nextDiagonal;
+    }
+  }
+  return row[b.length];
+}
+
+function isBrochureLikeWord(word: string): boolean {
+  if (word.length < 5 || word.length > 12) return false;
+  if (BROCHURE_WORD_DENY.has(word)) return false;
+  if (
+    word === "brochure" ||
+    word === "brochures" ||
+    word === "flyer" ||
+    word === "flier" ||
+    word === "flayer"
+  ) {
+    return true;
+  }
+  if (word.startsWith("fl")) {
+    return (
+      brochureEditDistance(word, "flyer") <= 2 ||
+      brochureEditDistance(word, "flier") <= 2
+    );
+  }
+  if (!word.startsWith("br")) return false;
+  return (
+    brochureEditDistance(word, "brochure") <= 3 ||
+    brochureEditDistance(word, "brochures") <= 3
+  );
+}
+
+/** True when they asked for an event brochure / flyer / PDF, including common typos. */
+export function isBrochureQuestion(text: string): boolean {
+  const t = normalizeChatBookingQuery(text);
+  if (/\b(event\s+)?pdfs?\b/i.test(t)) return true;
+  if (/\bdownloads? (the )?(brochure|flyer|pdf|pack)\b/i.test(t)) return true;
+  return t
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .some((word) => isBrochureLikeWord(word));
+}
+
+export function isBroadEventListIntent(text: string): boolean {
+  const t = normalizeChatBookingQuery(text);
+  return /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|which\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?|events?\s+(do you |have you )?have)\b/i.test(
+    t,
+  );
+}
 
 /** Fix glued words / typos so “bookchristmas” and “nwat to book” still match. */
 export function normalizeChatBookingQuery(text: string): string {
   return text
     .replace(/\bnwat\b/gi, "want")
     .replace(/\bwana\b/gi, "want to")
+    .replace(/\bwhicj\b/gi, "which")
+    .replace(/\bwich\b/gi, "which")
+    .replace(/\bavaiable\b/gi, "available")
+    .replace(/\bavailble\b/gi, "available")
+    .replace(/\bavaliable\b/gi, "available")
     .replace(
       /\bbook(christmas|xmas|diwali|halloween|nye|event|events|party)\b/gi,
       "book $1",
@@ -72,11 +276,7 @@ export function isLiveEventBookingIntent(text: string): boolean {
   if (!t) return false;
   if (isDisallowedChatSafetyIntent(t)) return false;
 
-  if (
-    /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?)\b/i.test(
-      t,
-    )
-  ) {
+  if (isBroadEventListIntent(t)) {
     return true;
   }
 
@@ -99,7 +299,32 @@ export function isLiveEventBookingIntent(text: string): boolean {
     return true;
   }
 
+  // Picker tap: “Book Corporate Event in Bristol” — not “Book in Bristol”
+  if (
+    /^book\s+.+\s+in\s+.+/i.test(t) &&
+    !/^book(\s+an?)?\s+in\s+/i.test(t)
+  ) {
+    return true;
+  }
+
   return false;
+}
+
+/** “Is Christmas available?” — listing, not starting a booking. */
+export function isLiveEventAvailabilityQuestion(text: string): boolean {
+  const t = normalizeChatBookingQuery(text);
+  if (!t) return false;
+  if (/\b(book|booking|reserve|checkout|pay)\b/i.test(t)) return false;
+  const asksIfListed =
+    /\b(available|availability)\b/i.test(t) ||
+    /\b((is|are) there|do you have|have you (got|got any)|got any|any)\b/i.test(
+      t,
+    );
+  if (!asksIfListed) return false;
+  return Boolean(
+    extractLiveEventTheme(t) ||
+      /\b(event|events|party|parties)\b/i.test(t),
+  );
 }
 
 export function buildLiveEventHref(event: LiveEvent): string {
@@ -137,7 +362,7 @@ export function listGuestBookableLinks(
       locationCity: event.location_city?.trim() || undefined,
       locationHref: locationHref || undefined,
     });
-    if (out.length >= 8) break;
+    if (out.length >= MAX_LIVE_EVENT_CHAT_CHOICES) break;
   }
   return out;
 }
@@ -196,47 +421,87 @@ function tokens(text: string): string[] {
     .filter((w) => w.length > 1 && !STOP_WORDS.has(w));
 }
 
+function significantTokenOverlap(queryToken: string, candidate: string): boolean {
+  if (!queryToken || !candidate) return false;
+  if (queryToken === candidate) return true;
+  if (queryToken.length >= 4 && candidate.length >= 4) {
+    return candidate.includes(queryToken) || queryToken.includes(candidate);
+  }
+  return false;
+}
+
 function scoreEvent(query: string, event: LiveEvent): number {
   const q = normalize(query);
   const title = normalize(event.title);
+  const category = normalize(event.category_name || "");
+  const haystack = normalize(eventSearchText(event));
   const city = normalize(event.location_city);
   const qTokens = tokens(query);
   const titleTokens = tokens(event.title);
+  const categoryTokens = tokens(event.category_name || "");
 
   if (!q) return 0;
 
-  // Exact / contains title
-  if (q.includes(title) || title.includes(q)) return 100;
+  // Exact / contains title (not the whole chat sentence vs a short name)
+  if (title.length >= 4 && (q.includes(title) || title.includes(q))) return 100;
+  if (category.length >= 4 && (q.includes(category) || category.includes(q))) {
+    return 90;
+  }
 
-  // Alias boosts
   let score = 0;
-  if (/\b(christmas|xmas|festive)\b/.test(q) && /\bchristmas\b/.test(title)) {
+  if (/\b(christmas|xmas|festive)\b/.test(q) && /\b(christmas|xmas|festive)\b/.test(haystack)) {
     score += 80;
   }
-  if (/\b(diwali|deepavali)\b/.test(q) && /\bdiwali\b/.test(title)) {
+  if (/\b(diwali|deepavali)\b/.test(q) && /\b(diwali|deepavali)\b/.test(haystack)) {
     score += 80;
   }
   if (
     /\b(new\s*year|nye|hogmanay)\b/.test(q) &&
-    /\bnew\s*year\b/.test(title)
+    /\b(new\s*year|nye|hogmanay)\b/.test(haystack)
   ) {
     score += 80;
   }
-  if (/\bhalloween\b/.test(q) && /\bhalloween\b/.test(title)) {
+  if (/\bhalloween\b/.test(q) && /\bhalloween\b/.test(haystack)) {
+    score += 80;
+  }
+  if (/\bvalentines?\b/.test(q) && /\bvalentines?\b/.test(haystack)) {
+    score += 80;
+  }
+  if (/\bwedding\b/.test(q) && /\bwedding\b/.test(haystack)) {
     score += 80;
   }
 
-  // Token overlap on title
   for (const qt of qTokens) {
-    if (titleTokens.some((tt) => tt === qt || tt.includes(qt) || qt.includes(tt))) {
+    if (titleTokens.some((tt) => significantTokenOverlap(qt, tt))) {
       score += 18;
     }
-    if (city === qt || city.includes(qt) || qt.includes(city)) {
+    if (categoryTokens.some((ct) => significantTokenOverlap(qt, ct))) {
+      score += 28;
+    }
+    if (city === qt || (qt.length >= 4 && (city.includes(qt) || qt.includes(city)))) {
       score += 8;
     }
   }
 
   return score;
+}
+
+function eventsMatchingCategoryQuery(
+  query: string,
+  events: LiveEvent[],
+): LiveEvent[] {
+  const qTokens = tokens(query).filter((token) => token.length >= 4);
+  if (qTokens.length === 0) return [];
+  return events.filter((event) => {
+    const category = normalize(event.category_name || "");
+    if (!category) return false;
+    const categoryTokens = tokens(event.category_name || "");
+    return qTokens.some(
+      (qt) =>
+        category.includes(qt) ||
+        categoryTokens.some((ct) => significantTokenOverlap(qt, ct)),
+    );
+  });
 }
 
 function extractMentionedCity(
@@ -273,7 +538,7 @@ export function mentionedLiveEventCity(
   return extractMentionedCity(query, events);
 }
 
-/** True when the message is a location tap / “Book in {city}”, not a later booking step. */
+/** True when the message is a location tap / “Book in {city}”, not a named event. */
 export function isLiveEventLocationChoiceText(
   text: string,
   events: LiveEvent[],
@@ -282,9 +547,55 @@ export function isLiveEventLocationChoiceText(
   if (!city) return false;
   const n = normalize(text);
   if (n === city) return true;
-  if (n.startsWith("book in ") && n.includes(city)) return true;
-  if (/\bbook\b/.test(n) && n.includes(" in ") && n.includes(city)) return true;
+  if (n === `book in ${city}`) return true;
+  if (n.startsWith("book in ") && n.endsWith(city)) return true;
   return false;
+}
+
+function toMatch(event: LiveEvent, score: number): LiveEventChatMatch {
+  return {
+    event,
+    href: buildLiveEventHref(event),
+    score,
+  };
+}
+
+/** Tap payload: `Book Corporate Event in Bristol`. */
+function matchExactEventBookChoice(
+  text: string,
+  liveEvents: LiveEvent[],
+): LiveEventChatMatch[] {
+  const match = text.trim().match(/^book\s+(.+?)\s+in\s+(.+)$/i);
+  if (!match) return [];
+  const title = normalize(match[1]);
+  const city = normalize(match[2]);
+  if (!title || !city || title === "in") return [];
+  if (/^(an?\s+)?events?$/.test(title)) return [];
+
+  const exact = liveEvents.filter(
+    (event) =>
+      normalize(event.title) === title &&
+      normalize(event.location_city) === city,
+  );
+  if (exact.length > 0) return exact.map((event) => toMatch(event, 100));
+
+  const byTitle = liveEvents.filter((event) => {
+    const eventTitle = normalize(event.title);
+    if (eventTitle === title) return true;
+    if (
+      title.length >= 8 &&
+      eventTitle.length >= 8 &&
+      (eventTitle.includes(title) || title.includes(eventTitle))
+    ) {
+      return true;
+    }
+    return false;
+  });
+  const inCity = byTitle.filter(
+    (event) => normalize(event.location_city) === city,
+  );
+  const chosen = inCity.length > 0 ? inCity : byTitle;
+  return chosen.map((event) => toMatch(event, 90));
 }
 
 export type LiveEventChatMatch = {
@@ -297,14 +608,60 @@ export type LiveEventChatMatch = {
  * Match user text against theme `live_events`.
  * Returns matches sorted by score (best first). Empty = no confident match.
  */
+export function asWeakMatches(events: LiveEvent[]): LiveEventChatMatch[] {
+  return events.map((event) => ({
+    event,
+    href: buildLiveEventHref(event),
+    score: 1,
+  }));
+}
+
+function themeMatchesFromPool(
+  pool: LiveEvent[],
+  theme: LiveEventTheme,
+  scored: LiveEventChatMatch[],
+): LiveEventChatMatch[] {
+  const themeEvents = pool.filter((event) => eventMatchesTheme(event, theme));
+  if (themeEvents.length === 0) return [];
+  const titleHits = themeEvents.filter((event) =>
+    eventTitleMatchesTheme(event, theme),
+  );
+  const use = titleHits.length > 0 ? titleHits : themeEvents;
+  const scoreByKey = new Map(
+    scored.map((item) => [
+      `${item.event.location_slug}/${item.event.slug}`,
+      item.score,
+    ]),
+  );
+  return use
+    .map((event) =>
+      toMatch(
+        event,
+        scoreByKey.get(`${event.location_slug}/${event.slug}`) ?? 80,
+      ),
+    )
+    .sort((a, b) => b.score - a.score);
+}
+
 export function matchLiveEvents(
   userText: string,
   liveEvents: LiveEvent[] | null | undefined,
 ): LiveEventChatMatch[] {
   if (!liveEvents?.length) return [];
-  const query = normalizeChatBookingQuery(userText);
+  const exact = matchExactEventBookChoice(userText, liveEvents);
+  if (exact.length > 0) return exact;
 
-  const scored = liveEvents
+  const query = normalizeChatBookingQuery(userText);
+  const mentionedCity = extractMentionedCity(query, liveEvents);
+  const theme = extractLiveEventTheme(query);
+  const pool = mentionedCity
+    ? liveEvents.filter(
+        (event) => normalize(event.location_city) === mentionedCity,
+      )
+    : liveEvents;
+  if (pool.length === 0) return [];
+
+  const scored = pool
     .map((event) => ({
       event,
       href: buildLiveEventHref(event),
@@ -313,26 +670,31 @@ export function matchLiveEvents(
     .filter((m) => m.score >= 18)
     .sort((a, b) => b.score - a.score);
 
-  // Listing intent with no specific name → return all
-  if (
-    scored.length === 0 &&
-    (/\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?)\b/i.test(
-      query,
-    ) ||
-      /\b(book|booking|reserve)\b/i.test(query))
-  ) {
-    return liveEvents.map((event) => ({
-      event,
-      href: buildLiveEventHref(event),
-      score: 1,
-    }));
+  const listingIntent = isBroadEventListIntent(query);
+  const bookingIntent = /\b(book|booking|reserve)\b/i.test(query);
+  const brochureIntent = isBrochureQuestion(query);
+
+  if (theme) {
+    const themed = themeMatchesFromPool(pool, theme, scored);
+    if (themed.length > 0) return themed;
   }
 
-  if (scored.length === 0) return [];
+  if (scored.length > 0) {
+    const top = scored[0].score;
+    const close = scored.filter((m) => m.score >= Math.max(18, top - 25));
+    return close;
+  }
 
-  const top = scored[0].score;
-  // Keep close ties (same event across locations, or similar confidence)
-  return scored.filter((m) => m.score >= Math.max(18, top - 25));
+  const categoryHits = eventsMatchingCategoryQuery(query, pool);
+  if (categoryHits.length > 0) {
+    return categoryHits.map((event) => toMatch(event, 70));
+  }
+
+  if (listingIntent || bookingIntent || brochureIntent || mentionedCity || theme) {
+    return asWeakMatches(pool);
+  }
+
+  return [];
 }
 
 /**
@@ -345,6 +707,9 @@ export function matchLiveEventsFromConversation(
   liveEvents: LiveEvent[] | null | undefined,
 ): LiveEventChatMatch[] {
   if (!liveEvents?.length) return [];
+
+  const exact = matchExactEventBookChoice(userText, liveEvents);
+  if (exact.length > 0) return exact;
 
   const mentionedCity = extractMentionedCity(userText, liveEvents);
   const priorCorpus = messages.map((m) => m.content).join("\n");
@@ -438,14 +803,33 @@ export function needsLiveEventLocationChoice(
   allLiveEvents: LiveEvent[],
 ): boolean {
   if (!matches.length) return false;
+  const theme = extractLiveEventTheme(userText);
   if (
-    matches.every((m) => m.score <= 1) ||
-    /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|list\s+(of\s+)?events?)\b/i.test(
-      userText,
-    )
+    theme &&
+    !matches.some((item) => eventMatchesTheme(item.event, theme))
   ) {
     return true;
   }
+  if (theme) {
+    const themed = matches.filter((item) => eventMatchesTheme(item.event, theme));
+    const themeCities = new Set(
+      themed.map((item) => normalize(item.event.location_city)).filter(Boolean),
+    );
+    if (themeCities.size > 1 && !extractMentionedCity(userText, allLiveEvents)) {
+      return true;
+    }
+    if (distinctEventTitles(themed) > 1) return true;
+  }
+  if (
+    matches.every((m) => m.score <= 1) ||
+    isBroadEventListIntent(userText) ||
+    isBrochureQuestion(userText)
+  ) {
+    return true;
+  }
+
+  const titles = new Set(matches.map((m) => normalize(m.event.title)));
+  if (titles.size > 1) return true;
 
   const byTitle = new Map<string, LiveEventChatMatch[]>();
   for (const m of matches) {
@@ -471,8 +855,58 @@ function titleCaseCity(city: string): string {
     .join(" ");
 }
 
+function formatCityList(cities: string[]): string {
+  if (cities.length <= 1) return cities[0] ?? "";
+  if (cities.length === 2) return `${cities[0]} and ${cities[1]}`;
+  return `${cities.slice(0, -1).join(", ")} and ${cities[cities.length - 1]}`;
+}
+
 function chatChoiceMarkdown(label: string, sendText: string): string {
   return `[${label}](chat:${sendText})`;
+}
+
+function eventBookSendText(event: LiveEvent): string {
+  const city = titleCaseCity(event.location_city);
+  return `Book ${event.title} in ${city}`;
+}
+
+function eventChoiceLabel(event: LiveEvent): string {
+  const category = event.category_name?.trim();
+  const raw = category ? `${event.title} · ${category}` : event.title;
+  if (raw.length <= 120) return raw;
+  return event.title.length <= 120
+    ? event.title
+    : `${event.title.slice(0, 117)}…`;
+}
+
+function formatLiveEventChoiceMarkdown(events: LiveEvent[]): string {
+  return events
+    .map((event) =>
+      chatChoiceMarkdown(eventChoiceLabel(event), eventBookSendText(event)),
+    )
+    .join("\n");
+}
+
+function distinctEventTitles(matches: LiveEventChatMatch[]): number {
+  return new Set(matches.map((m) => normalize(m.event.title))).size;
+}
+
+function buildEventPickerReply(options: {
+  intro: string;
+  events: LiveEvent[];
+  totalCount?: number;
+  footer?: string;
+}): string {
+  const shown = options.events.slice(0, MAX_LIVE_EVENT_CHAT_CHOICES);
+  const total = options.totalCount ?? options.events.length;
+  const more =
+    total > shown.length
+      ? ` Showing ${shown.length} of ${total} — tell me the event name if you don’t see it.`
+      : "";
+  const footer =
+    options.footer ??
+    "Tap the one you’d like and I’ll book it here in chat.";
+  return `${options.intro}${more}\n\n${formatLiveEventChoiceMarkdown(shown)}\n\n${footer}`;
 }
 
 /**
@@ -494,6 +928,11 @@ export function buildLiveEventsDirectReply(options: {
   const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
   const brand = siteName?.trim() || "our venue";
   const mentionedCity = extractMentionedCity(userText, allLiveEvents);
+  const askedCity = mentionedCity ? titleCaseCity(mentionedCity) : null;
+  const theme = extractLiveEventTheme(userText);
+  const themeHits = theme
+    ? matches.filter((m) => eventMatchesTheme(m.event, theme))
+    : [];
 
   // Group by event title (case-insensitive)
   const byTitle = new Map<string, LiveEventChatMatch[]>();
@@ -512,19 +951,104 @@ export function buildLiveEventsDirectReply(options: {
   ];
   const primary = primaryGroup[0];
 
-  // Listing all events
+  const askedBrochure = isBrochureQuestion(userText);
+  const themeCities = [
+    ...new Set(
+      themeHits
+        .map((item) => titleCaseCity(item.event.location_city))
+        .filter(Boolean),
+    ),
+  ];
+
   if (
-    matches.every((m) => m.score <= 1) ||
-    /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|list\s+(of\s+)?events?)\b/i.test(
-      userText,
-    )
+    theme &&
+    themeHits.length > 0 &&
+    !askedBrochure &&
+    !isBroadEventListIntent(userText)
   ) {
-    const lines = matches.map((m) => {
-      const city = titleCaseCity(m.event.location_city);
-      return `- **${m.event.title}** in **${city}** — ${chatChoiceMarkdown(`Book now`, `Book ${m.event.title} in ${city}`)}`;
-    });
+    if (!askedCity && themeCities.length > 1) {
+      const sameTitle = distinctEventTitles(themeHits) === 1;
+      const intro = sameTitle
+        ? `**${themeHits[0].event.title}** is currently available in **${formatCityList(themeCities)}**${nameBit}.`
+        : `**${theme.label}** listings are currently available in **${formatCityList(themeCities)}**${nameBit}.`;
+      const linkLines = sameTitle
+        ? themeHits.map((item) => {
+            const city = titleCaseCity(item.event.location_city);
+            return chatChoiceMarkdown(`Book in ${city}`, `Book in ${city}`);
+          })
+        : themeHits.slice(0, MAX_LIVE_EVENT_CHAT_CHOICES).map((item) => {
+            const city = titleCaseCity(item.event.location_city);
+            return chatChoiceMarkdown(
+              city ? `${item.event.title} · ${city}` : item.event.title,
+              eventBookSendText(item.event),
+            );
+          });
+      return {
+        content: `${intro}\n\n${linkLines.join("\n")}\n\n${
+          sameTitle
+            ? "Which location would you like? I’ll help you book it here."
+            : "Tap the one you’d like and I’ll help you book it here in chat."
+        }`,
+      };
+    }
+    if (distinctEventTitles(themeHits) > 1) {
+      const cityBit = askedCity ? ` in **${askedCity}**` : "";
+      return {
+        content: buildEventPickerReply({
+          intro: `These look closest to a **${theme.label}**${cityBit}${nameBit}:`,
+          events: themeHits.map((item) => item.event),
+          totalCount: themeHits.length,
+          footer:
+            "Tap the one you’d like and I’ll help you book it here in chat.",
+        }),
+      };
+    }
+  }
+
+  const browsingCatalogue =
+    askedBrochure ||
+    matches.every((m) => m.score <= 1) ||
+    isBroadEventListIntent(userText) ||
+    (!theme && distinctEventTitles(matches) > 1);
+
+  if (browsingCatalogue) {
+    const pickerEvents =
+      themeHits.length > 0 ? themeHits.map((m) => m.event) : matches.map((m) => m.event);
+    let intro: string;
+    if (askedBrochure) {
+      intro = `Which event would you like the brochure for${nameBit}?`;
+    } else if (theme && themeHits.length === 0) {
+      const elsewhereCities = [
+        ...new Set(
+          allLiveEvents
+            .filter((event) => eventMatchesTheme(event, theme))
+            .map((event) => titleCaseCity(event.location_city))
+            .filter(Boolean),
+        ),
+      ];
+      const elsewhereBit =
+        elsewhereCities.length > 0
+          ? ` It’s currently listed in **${elsewhereCities.join(" and ")}**.`
+          : "";
+      intro = askedCity
+        ? `I couldn’t find a **${theme.label}** in **${askedCity}** on the current list${nameBit}.${elsewhereBit}\n\nHere are events you can book in **${askedCity}**:`
+        : `I couldn’t find a **${theme.label}** on the current list${nameBit}.\n\nHere are events you can book at **${brand}**:`;
+    } else if (theme && themeHits.length > 0 && askedCity) {
+      intro = `These look closest to a **${theme.label}** in **${askedCity}**${nameBit}:`;
+    } else if (askedCity) {
+      intro = `Here’s what’s available to book in **${askedCity}**${nameBit}:`;
+    } else {
+      intro = `Here’s what’s currently available to book at **${brand}**${nameBit}:`;
+    }
     return {
-      content: `Here’s what’s currently available to book at **${brand}**${nameBit}:\n\n${lines.join("\n")}\n\nWhich would you like? I’ll book it here in chat.`,
+      content: buildEventPickerReply({
+        intro,
+        events: pickerEvents,
+        totalCount: pickerEvents.length,
+        footer: askedBrochure
+          ? "Tap an event and I’ll send the brochure files I have for it."
+          : undefined,
+      }),
     };
   }
 
@@ -551,7 +1075,7 @@ export function buildLiveEventsDirectReply(options: {
   if (primaryGroup.length === 1) {
     const city = titleCaseCity(primary.event.location_city);
     return {
-      content: `Yes${nameBit} — **${displayTitle}** is available in **${city}**. I’ll help you book it here.\n\nHow many guests are you booking for? ${chatChoiceMarkdown("10 guests", "10 guests")} ${chatChoiceMarkdown("20 guests", "20 guests")} ${chatChoiceMarkdown("40 guests", "40 guests")} ${chatChoiceMarkdown("I’ll type a number", "I'll type the guest number")}`,
+      content: `Yes${nameBit} — **${displayTitle}** is available in **${city}**. I’ll help you book it here.`,
     };
   }
 
@@ -561,7 +1085,7 @@ export function buildLiveEventsDirectReply(options: {
     return chatChoiceMarkdown(`Book in ${city}`, `Book in ${city}`);
   });
   return {
-    content: `**${displayTitle}** is currently available in **${cities.join(" and ")}**.\n\n${linkLines.join(" · ")}\n\nWhich location would you like? I’ll then check dates, rooms, tables and drinks with you.`,
+    content: `**${displayTitle}** is currently available in **${cities.join(" and ")}**.\n\n${linkLines.join(" · ")}\n\nWhich location would you like? I’ll help you book it here.`,
   };
 }
 
@@ -570,8 +1094,9 @@ export function buildLiveEventsNoMatchReply(options: {
   allLiveEvents: LiveEvent[];
   siteName?: string | null;
   userName?: string | null;
+  userText?: string | null;
 }): { content: string } {
-  const { allLiveEvents, siteName, userName } = options;
+  const { allLiveEvents, siteName, userName, userText } = options;
   const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
   const brand = siteName?.trim() || "our venue";
   if (!allLiveEvents.length) {
@@ -579,12 +1104,25 @@ export function buildLiveEventsNoMatchReply(options: {
       content: `I don’t have any events listed to book on **${brand}** right now${nameBit}. Please choose a location from the directory, or tell me which city you have in mind.`,
     };
   }
-  const lines = allLiveEvents.slice(0, 8).map((event) => {
-    const city = titleCaseCity(event.location_city);
-    return `- **${event.title}** in **${city}** — ${chatChoiceMarkdown(`Book now`, `Book ${event.title} in ${city}`)}`;
-  });
+  const theme = userText ? extractLiveEventTheme(userText) : null;
+  const askedCity = userText
+    ? extractMentionedCity(userText, allLiveEvents)
+    : null;
+  const cityLabel = askedCity ? titleCaseCity(askedCity) : null;
+  let intro: string;
+  if (cityLabel) {
+    intro = `I don’t have that event listed in **${cityLabel}** right now${nameBit}. Here’s what’s available to book at **${brand}**:`;
+  } else if (theme) {
+    intro = `I couldn’t find a **${theme.label}** among our current listings${nameBit}. Here’s what’s available to book at **${brand}**:`;
+  } else {
+    intro = `I couldn’t find that event among our current locations${nameBit}. Here’s what’s available to book at **${brand}**:`;
+  }
   return {
-    content: `I couldn’t find that event among our current locations${nameBit}. Here’s what’s available to book at **${brand}**:\n\n${lines.join("\n")}\n\nWhich would you like?`,
+    content: buildEventPickerReply({
+      intro,
+      events: allLiveEvents,
+      totalCount: allLiveEvents.length,
+    }),
   };
 }
 
@@ -600,12 +1138,15 @@ LIVE EVENTS (names + cities only):
   }
   const lines = liveEvents.slice(0, 10).map((event) => {
     const city = event.location_city?.trim() || event.location_slug;
-    return `- ${event.title} (${city})`;
+    const category = event.category_name?.trim();
+    return category
+      ? `- ${event.title} (${city} · ${category})`
+      : `- ${event.title} (${city})`;
   });
   return `
-LIVE EVENTS (names + cities only — current booking is EVENT BOOKING DATA):
+LIVE EVENTS (names, cities, categories — current booking is EVENT BOOKING DATA):
 ${lines.join("\n")}
-If they ask about a different event, use this list. Do not dump this list unless they ask.
+If they ask about a different event or category, use this list. Titles may be people's names — match category_name (Christmas, weddings, DJ nights). If category_name is null, only match the title. Never pick a random name because they said “book an event”.
 `;
 }
 export function buildLiveEventsPromptBlock(
@@ -619,21 +1160,24 @@ LIVE EVENTS (theme):
 `;
   }
 
-  const lines = liveEvents.map((e) => {
+  const lines = liveEvents.slice(0, MAX_LIVE_EVENT_CHAT_CHOICES).map((e) => {
     const city = e.location_city?.trim() || e.location_slug;
-    return `- ${e.title} | ${city} | in-chat: [Book in ${city}](chat:Book in ${city})`;
+    const category = e.category_name?.trim() || "uncategorised";
+    return `- ${e.title} | ${city} | ${category} | in-chat: [${e.title} · ${city}](chat:Book ${e.title} in ${city})`;
   });
 
   return `
 LIVE EVENTS (authoritative — only these cities exist on this site):
-When the guest asks about an event by name (e.g. Christmas, Diwali, New Year):
+When the guest asks about an event by name or category (e.g. Christmas, Diwali, New Year, weddings):
 1. Answer from this list only — never invent events, cities, or URLs.
-2. Say which location(s) have it. Location buttons stay in chat: [Book in City](chat:Book in City)
-3. NEVER write /chat: or /chat — the prefix is chat: with no slash. Dates: [Thu 27 Aug](chat:Thu 27 Aug 2026)
-4. NEVER send [Book in City](/location-slug/events/event-slug) — that leaves chat.
-5. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room → guests → tables/tickets → which table types and quantities → which ticket types and quantities → drinks, then another date/room if they want → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
-6. If they ask for a city that is not listed for that event, say it is not available there and offer the cities that are.
-7. Dates must show the room name. Guests can pick more than one drink and more than one room/date. Quote prices. Coupon last — after they apply a code, repeat it on the summary with the discount. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
+2. Event titles are often people's names. The type is category_name. Match category_name when they ask for Christmas, Halloween, weddings, etc. If category_name is null, only match the title.
+3. If they named a city or category, only offer matching events. If none match, say so in one sentence, then offer at most ${MAX_LIVE_EVENT_CHAT_CHOICES} alternatives in that city (or at this venue). Never start booking a different category.
+4. Event buttons MUST be unique — never repeat “Book now”. Use [Event name · City](chat:Book Event name in City).
+5. Location-only picks stay in chat: [Book in City](chat:Book in City)
+6. NEVER write /chat: or /chat — the prefix is chat: with no slash. Dates: [Thu 27 Aug](chat:Thu 27 Aug 2026)
+7. NEVER send [Book in City](/location-slug/events/event-slug) — that leaves chat.
+8. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room when this event has rooms → guests → tables/tickets → which table types and quantities → which ticket types and quantities → drinks, then another date if they want, or another room only when rooms exist → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
+9. Dates must show the room name only when this event has rooms. Guests can pick more than one drink and more than one date (and more than one room when rooms exist). Quote prices. Coupon last — after they apply a code, repeat it on the summary with the discount. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
 
 ${lines.join("\n")}
 `;

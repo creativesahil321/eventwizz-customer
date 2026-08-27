@@ -273,6 +273,13 @@ export default function EventDetailClient({
   const showGallery = (galleryItems?.length ?? 0) > 0;
   const showMenu = Boolean(slices.menus && slices.menus.length > 0);
   const showFaqs = Boolean(eventData.faqs && eventData.faqs.length > 0);
+  const showPackages = Boolean(
+    String(slices.package_title ?? "").trim() ||
+      String(slices.package_description ?? "").trim() ||
+      slices.package_image ||
+      (slices.package_details?.length ?? 0) > 0,
+  );
+  const showDrinks = drinkPackages.length > 0;
 
   const sectionNavItems = useMemo(
     () =>
@@ -280,12 +287,24 @@ export default function EventDetailClient({
         about: true,
         rooms: showRoomSelector,
         schedule: showTimeline,
+        packages: showPackages,
         dates: true,
         gallery: showGallery,
         menu: showMenu,
+        drinks: showDrinks,
+        drinksLabel: slices.drink_title,
         faqs: showFaqs,
       }),
-    [showRoomSelector, showTimeline, showGallery, showMenu, showFaqs],
+    [
+      showRoomSelector,
+      showTimeline,
+      showPackages,
+      showGallery,
+      showMenu,
+      showDrinks,
+      slices.drink_title,
+      showFaqs,
+    ],
   );
   const showSectionNav = sectionNavItems.length > 0;
   const sectionNavStickyTop = roomBarStickyTop;
@@ -432,7 +451,11 @@ export default function EventDetailClient({
           </div>
         ) : null}
 
-        <div ref={packageRef}>
+        <div
+          ref={packageRef}
+          id={showPackages ? EVENT_SECTION_IDS.packages : undefined}
+          className={showPackages ? sectionAnchorClass : undefined}
+        >
           <RoomContentTransition roomKey={roomContentKey}>
             <PackageSec
               heading={slices.package_title}
@@ -498,7 +521,11 @@ export default function EventDetailClient({
         )}
 
         {drinkPackages.length > 0 && (
-          <div ref={drinkRef}>
+          <div
+            ref={drinkRef}
+            id={EVENT_SECTION_IDS.drinks}
+            className={sectionAnchorClass}
+          >
             <RoomContentTransition roomKey={roomContentKey}>
               <LazyDrinkSection
                 title={slices.drink_title}

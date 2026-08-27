@@ -16,6 +16,7 @@ import type {
   NewsletterCounts,
   NewsletterCsvFile,
   NewsletterSubscriber,
+  NewsletterSubscribeResult,
   PublicUnsubscribeResult,
   SubscribePayload,
   SubscribeResult,
@@ -52,6 +53,77 @@ export function newsletterApiMessage(
     if (typeof message === "string" && message.trim()) return message;
   }
   return fallback;
+}
+
+export function normalizeSubscribeResult(
+  result: unknown,
+  state: unknown,
+  message: string,
+): NewsletterSubscribeResult {
+  if (
+    result === "pending" ||
+    result === "confirmation_pending" ||
+    result === "subscribed" ||
+    result === "already_subscribed"
+  ) {
+    return result;
+  }
+  const lower = message.toLowerCase();
+  if (state === "pending") {
+    if (
+      lower.includes("already sent") ||
+      lower.includes("already have a confirmation")
+    ) {
+      return "confirmation_pending";
+    }
+    return "pending";
+  }
+  if (lower.includes("already")) return "already_subscribed";
+  return state === "subscribed" ? "subscribed" : "pending";
+}
+
+function subscribeFallbackMessage(result: NewsletterSubscribeResult): string {
+  switch (result) {
+    case "pending":
+      return "Thank you. Please check your email to confirm your subscription.";
+    case "confirmation_pending":
+      return "We already sent a confirmation email. Check your inbox or spam folder.";
+    case "already_subscribed":
+      return "You are already subscribed.";
+    default:
+      return "Your newsletter subscription has been confirmed.";
+  }
+}
+
+function parseSubscribeEnvelope(raw: unknown): SubscribeResult {
+  const data = envelopeData<{ state?: unknown; result?: unknown }>(raw);
+  const message = envelopeMessage(raw, "");
+  const result = normalizeSubscribeResult(data?.result, data?.state, message);
+  return {
+    state:
+      result === "subscribed" || result === "already_subscribed"
+        ? "subscribed"
+        : "pending",
+    result,
+    message: message || subscribeFallbackMessage(result),
+  };
+}
+
+/** Laravel 422 `errors.email` (e.g. venue team address blocked). */
+export function newsletterEmailFieldError(error: unknown): string | null {
+  const payload = axios.isAxiosError(error) ? error.response?.data : error;
+  if (!isRecord(payload)) return null;
+  const errors = payload.errors;
+  if (!isRecord(errors)) return null;
+  const email = errors.email;
+  if (Array.isArray(email)) {
+    const first = email.find(
+      (item): item is string => typeof item === "string" && item.trim().length > 0,
+    );
+    return first?.trim() ?? null;
+  }
+  if (typeof email === "string" && email.trim()) return email.trim();
+  return null;
 }
 
 export function newsletterConfirmResult(error: unknown): ConfirmResult {
@@ -334,41 +406,33 @@ export const newsletterService = {
   },
 
   async subscribe(payload: SubscribePayload): Promise<SubscribeResult> {
-    const raw = await api.post<ApiResponse<{ state?: SubscriberStatus }>>(
+    const raw = await api.post<
+      ApiResponse<{ state?: SubscriberStatus; result?: NewsletterSubscribeResult }>
+    >(
       API_ENDPOINTS.PUBLIC.SUBSCRIBE,
       { ...payload, source: "landing" },
       {
         returnFullResponse: true,
+        suppressSuccessToast: true,
+        suppressErrorToast: true,
       },
     );
-    const data = envelopeData<{ state?: SubscriberStatus }>(raw);
-    const state = data?.state === "subscribed" ? "subscribed" : "pending";
-    return {
-      state,
-      message: envelopeMessage(
-        raw,
-        state === "pending"
-          ? "Thank you. Please check your email to confirm your subscription."
-          : "You are already subscribed.",
-      ),
-    };
+    return parseSubscribeEnvelope(raw);
   },
 
   async resendConfirmation(payload: SubscribePayload): Promise<SubscribeResult> {
-    const raw = await api.post<ApiResponse<{ state?: SubscriberStatus }>>(
+    const raw = await api.post<
+      ApiResponse<{ state?: SubscriberStatus; result?: NewsletterSubscribeResult }>
+    >(
       API_ENDPOINTS.PUBLIC.SUBSCRIBE_RESEND,
       { ...payload, source: "landing" },
       {
         returnFullResponse: true,
+        suppressSuccessToast: true,
+        suppressErrorToast: true,
       },
     );
-    return {
-      state: "pending",
-      message: envelopeMessage(
-        raw,
-        "Thank you. Please check your email to confirm your subscription.",
-      ),
-    };
+    return parseSubscribeEnvelope(raw);
   },
 
   async confirmSubscription(token: string): Promise<ConfirmSubscriptionResult> {
@@ -426,19 +490,14 @@ export const newsletterService = {
     phone?: string;
     location_id?: number;
   }): Promise<CustomerSubscribeResult> {
-    const raw = await api.post<ApiResponse<{ state?: SubscriberStatus }>>(
+    const raw = await api.post<
+      ApiResponse<{ state?: SubscriberStatus; result?: NewsletterSubscribeResult }>
+    >(
       API_ENDPOINTS.CUSTOMER.NEWSLETTER.SUBSCRIBE,
       { ...payload, source: "dashboard" },
-      { returnFullResponse: true },
+      { returnFullResponse: true, suppressSuccessToast: true },
     );
-    const data = envelopeData<{ state?: SubscriberStatus }>(raw);
-    return {
-      state: data?.state === "pending" ? "pending" : "subscribed",
-      message: envelopeMessage(
-        raw,
-        "Your newsletter subscription has been confirmed.",
-      ),
-    };
+    return parseSubscribeEnvelope(raw);
   },
 
   async customerUnsubscribe(): Promise<{ message: string }> {

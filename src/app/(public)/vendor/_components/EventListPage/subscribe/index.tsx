@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Loader2, Mail } from "lucide-react";
+import { CheckCircle2, Info, Loader2, Mail } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,10 +15,13 @@ import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { useAuthStore } from "@/store/auth.store";
 import { useLocationStore } from "@/store/location.store";
 import {
+  newsletterApiMessage,
+  newsletterEmailFieldError,
   useCustomerNewsletterToggle,
   usePublicSubscribe,
   useResendNewsletterConfirmation,
   useThemeNewsletterSubscription,
+  type NewsletterSubscribeResult,
   type SubscribePayload,
 } from "@/services/common/newsletter";
 
@@ -221,26 +225,63 @@ function GuestSubscribeForm() {
     email: "",
     phone: "",
   });
-  const [result, setResult] = useState<{
-    state: "pending" | "subscribed";
+  const [checkEmail, setCheckEmail] = useState<string | null>(null);
+  const [justSubscribed, setJustSubscribed] = useState<string | null>(null);
+  const [inlineInfo, setInlineInfo] = useState<{
+    result: Extract<
+      NewsletterSubscribeResult,
+      "confirmation_pending" | "already_subscribed"
+    >;
     message: string;
   } | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [lastPayload, setLastPayload] = useState<SubscribePayload | null>(null);
   const narrowPreview = usePreviewNarrowLayout();
   const locationId = useLocationStore((s) => s.getLocationId());
   const subscribeMutation = usePublicSubscribe();
   const resendMutation = useResendNewsletterConfirmation();
 
+  const applyResult = (data: {
+    result: NewsletterSubscribeResult;
+    message: string;
+  }) => {
+    switch (data.result) {
+      case "pending":
+        setInlineInfo(null);
+        setJustSubscribed(null);
+        setCheckEmail(data.message);
+        setFormData({ name: "", email: "", phone: "" });
+        break;
+      case "confirmation_pending":
+      case "already_subscribed":
+        setCheckEmail(null);
+        setJustSubscribed(null);
+        setInlineInfo({ result: data.result, message: data.message });
+        break;
+      case "subscribed":
+        setInlineInfo(null);
+        setCheckEmail(null);
+        setJustSubscribed(data.message);
+        setFormData({ name: "", email: "", phone: "" });
+        break;
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+    if (e.target.name === "email") {
+      if (emailError) setEmailError(null);
+      if (inlineInfo) setInlineInfo(null);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isPreviewMode || subscribeMutation.isPending) return;
+    setEmailError(null);
     const payload: SubscribePayload = {
       email: formData.email.trim(),
       name: formData.name.trim() || undefined,
@@ -251,8 +292,35 @@ function GuestSubscribeForm() {
     subscribeMutation.mutate(payload, {
       onSuccess: (data) => {
         setLastPayload(payload);
-        setResult({ state: data.state, message: data.message });
-        setFormData({ name: "", email: "", phone: "" });
+        applyResult(data);
+      },
+      onError: (error) => {
+        const fieldError = newsletterEmailFieldError(error);
+        if (fieldError) {
+          setEmailError(fieldError);
+          return;
+        }
+        toast.error(
+          newsletterApiMessage(
+            error,
+            "Could not subscribe. Please try again.",
+          ),
+        );
+      },
+    });
+  };
+
+  const handleResend = () => {
+    if (!lastPayload || resendMutation.isPending) return;
+    resendMutation.mutate(lastPayload, {
+      onSuccess: (data) => applyResult(data),
+      onError: (error) => {
+        toast.error(
+          newsletterApiMessage(
+            error,
+            "Could not resend the confirmation email. Please try again.",
+          ),
+        );
       },
     });
   };
@@ -260,26 +328,45 @@ function GuestSubscribeForm() {
   const fieldClass =
     "h-[42px] rounded-xl border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-background)]/90 text-[var(--color-text)] placeholder:text-[var(--color-text-dimmed)] focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]";
 
-  if (result) {
+  if (checkEmail) {
     return (
-      <SubscribeSuccess
-        state={result.state}
-        message={result.message}
+      <SubscribeSuccessPanel
+        variant="pending"
+        message={checkEmail}
         resendPending={resendMutation.isPending}
-        resendMessage={resendMutation.data?.message}
-        onResend={
-          lastPayload ? () => resendMutation.mutate(lastPayload) : undefined
-        }
+        onResend={lastPayload ? handleResend : undefined}
         onReset={() => {
-          setResult(null);
+          setCheckEmail(null);
           resendMutation.reset();
         }}
       />
     );
   }
 
+  if (justSubscribed) {
+    return (
+      <SubscribeSuccessPanel
+        variant="subscribed"
+        message={justSubscribed}
+        onReset={() => setJustSubscribed(null)}
+      />
+    );
+  }
+
   return (
     <>
+      {inlineInfo ? (
+        <SubscribeInfoBanner
+          result={inlineInfo.result}
+          message={inlineInfo.message}
+          resendPending={resendMutation.isPending}
+          onResend={
+            inlineInfo.result === "confirmation_pending" && lastPayload
+              ? handleResend
+              : undefined
+          }
+        />
+      ) : null}
       <form
         onSubmit={handleSubmit}
         className={subscribeCardClass(narrowPreview)}
@@ -298,20 +385,34 @@ function GuestSubscribeForm() {
           )}
         />
 
-        <Input
-          type="email"
-          name="email"
-          placeholder="Email Address"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          disabled={subscribeMutation.isPending}
+        <div
           className={cn(
-            fieldClass,
             "w-full",
             !narrowPreview && "md:min-w-[200px] md:flex-1",
           )}
-        />
+        >
+          <Input
+            type="email"
+            name="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            disabled={subscribeMutation.isPending}
+            aria-invalid={emailError ? true : undefined}
+            aria-describedby={emailError ? "subscribe-email-error" : undefined}
+            className={cn(fieldClass, "w-full")}
+          />
+          {emailError ? (
+            <p
+              id="subscribe-email-error"
+              role="alert"
+              className="mt-1.5 text-left text-xs text-destructive"
+            >
+              {emailError}
+            </p>
+          ) : null}
+        </div>
 
         <Input
           type="tel"
@@ -332,7 +433,7 @@ function GuestSubscribeForm() {
           variant="event-primary"
           disabled={isPreviewMode || subscribeMutation.isPending}
           title={isPreviewMode ? "Preview only — subscribe is disabled" : undefined}
-          className="h-[42px] rounded-xl px-6 font-semibold"
+          className="h-[42px] shrink-0 rounded-xl px-6 font-semibold"
         >
           {subscribeMutation.isPending ? (
             <>
@@ -352,22 +453,81 @@ function GuestSubscribeForm() {
   );
 }
 
-function SubscribeSuccess({
-  state,
+function SubscribeInfoBanner({
+  result,
   message,
   resendPending,
-  resendMessage,
+  onResend,
+}: {
+  result: Extract<
+    NewsletterSubscribeResult,
+    "confirmation_pending" | "already_subscribed"
+  >;
+  message: string;
+  resendPending: boolean;
+  onResend?: () => void;
+}) {
+  const title =
+    result === "confirmation_pending"
+      ? "Check your inbox"
+      : "Already subscribed";
+
+  return (
+    <div
+      role="status"
+      className="mx-auto mb-4 flex max-w-4xl flex-col items-start gap-3 rounded-[20px] border border-sky-200 bg-sky-50 px-5 py-4 text-left sm:flex-row sm:items-center"
+    >
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
+        {result === "confirmation_pending" ? (
+          <Mail className="h-5 w-5" />
+        ) : (
+          <Info className="h-5 w-5" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-[var(--color-on-surface)]">
+          {title}
+        </p>
+        <p className="mt-0.5 text-sm leading-relaxed text-[var(--color-text-dimmed)]">
+          {message}
+        </p>
+      </div>
+      {onResend ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="shrink-0 rounded-xl"
+          disabled={resendPending}
+          onClick={onResend}
+        >
+          {resendPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            "Resend email"
+          )}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function SubscribeSuccessPanel({
+  variant,
+  message,
+  resendPending,
   onResend,
   onReset,
 }: {
-  state: "pending" | "subscribed";
+  variant: "pending" | "subscribed";
   message: string;
-  resendPending: boolean;
-  resendMessage?: string;
+  resendPending?: boolean;
   onResend?: () => void;
   onReset: () => void;
 }) {
-  const isPending = state === "pending";
+  const isPending = variant === "pending";
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-8 text-center shadow-[0_16px_40px_-28px_rgba(0,0,0,0.28)]">
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
@@ -381,7 +541,7 @@ function SubscribeSuccess({
         {isPending ? "Check your email" : "You're subscribed"}
       </h3>
       <p className="max-w-md text-sm leading-relaxed text-[var(--color-text-dimmed)]">
-        {resendMessage ?? message}
+        {message}
       </p>
       <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
         {isPending && onResend ? (

@@ -404,7 +404,7 @@ export function checkoutHandoffNavCopy(
   if (pay === "full") {
     return `Opening Checkout to pay in full. Choose card, PayPal, or bank transfer on that page to complete payment.${loginBit}`;
   }
-  return `Opening Checkout so you can choose how to pay.${loginBit}`;
+  return `Opening Checkout. You can remove a date there, or continue to pay.${loginBit}`;
 }
 
 const PAYMENT_INTENT_USER =

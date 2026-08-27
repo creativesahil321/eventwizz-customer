@@ -1,5 +1,9 @@
 import { format, isValid, parseISO } from "date-fns";
-import { isLiveEventBookingIntent } from "@/lib/chat-live-events";
+import {
+  isBroadEventListIntent,
+  isBrochureQuestion,
+  isLiveEventBookingIntent,
+} from "@/lib/chat-live-events";
 import type { GuestBookableLink } from "@/lib/chat-live-events";
 import { isDisallowedChatSafetyIntent } from "@/lib/chat-safety";
 import { couponToStripProps } from "@/lib/coupon-strip-props";
@@ -10,6 +14,7 @@ import {
   isPublicEventRoomMode,
   listPublicEventRooms,
   resolvePublicEventActiveSlices,
+  resolvePublicEventRoomPayloadSlices,
 } from "@/lib/resolve-public-event-room-slices";
 import type { EventDetail } from "@/services/common/events/type";
 import {
@@ -200,14 +205,21 @@ function mapTables(raw: unknown): ChatBookingTable[] {
     const item = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
     const minPersons = firstFinite(item.min_persons, item.minPersons, item.min);
     const maxPersons = firstFinite(item.max_persons, item.maxPersons, item.max);
-    const price = firstFinite(item.price);
+    const price = firstFinite(item.price, item.price_per_person, item.pricePerPerson);
     const total = firstFinite(item.total_tables, item.totalTables, item.total);
     const sold = firstFinite(item.sold_tables, item.soldTables, item.sold);
+    const available = firstFinite(
+      item.available_tables,
+      item.availableTables,
+      item.maxQuantity,
+      item.max_quantity,
+    );
     const id = firstFinite(item.id);
-    const remaining =
-      Number.isFinite(total) && Number.isFinite(sold)
+    const remaining = Number.isFinite(available)
+      ? Math.max(0, available)
+      : Number.isFinite(total) && Number.isFinite(sold)
         ? Math.max(0, total - sold)
-        : Number.isFinite(total)
+        : Number.isFinite(total) && total > 0
           ? total
           : undefined;
     if (!Number.isFinite(minPersons) && !Number.isFinite(maxPersons)) {
@@ -232,18 +244,29 @@ function mapTickets(raw: unknown): ChatBookingTicket[] {
     const item = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
     const title = String(item.title ?? item.name ?? "").trim();
     if (!title) continue;
-    const price = firstFinite(item.price);
+    const price = firstFinite(
+      item.price,
+      item.price_per_ticket,
+      item.pricePerTicket,
+    );
     const capacity = firstFinite(
       item.total_capacity,
       item.totalCapacity,
       item.capacity,
     );
     const sold = firstFinite(item.sold_tickets, item.soldTickets, item.sold);
+    const available = firstFinite(
+      item.available_tickets,
+      item.availableTickets,
+      item.maxQuantity,
+      item.max_quantity,
+    );
     const id = firstFinite(item.id);
-    const remaining =
-      Number.isFinite(capacity) && Number.isFinite(sold)
+    const remaining = Number.isFinite(available)
+      ? Math.max(0, available)
+      : Number.isFinite(capacity) && Number.isFinite(sold)
         ? Math.max(0, capacity - sold)
-        : Number.isFinite(capacity)
+        : Number.isFinite(capacity) && capacity > 0
           ? capacity
           : undefined;
     tickets.push({
@@ -279,7 +302,11 @@ function mapDates(dates: unknown): ChatBookingDate[] {
       bookingTypeRaw === "both"
         ? bookingTypeRaw
         : undefined;
-    const eventDate = String(item.event_date ?? item.eventDate ?? "").trim();
+    const eventDate = String(
+      item.event_date ?? item.eventDate ?? item.date ?? "",
+    ).trim();
+    const roomName = String(item.room_name ?? item.roomName ?? "").trim();
+    const roomIdRaw = firstFinite(item.room_id, item.roomId);
     return {
       date: eventDate,
       label: formatChatEventDate(eventDate),
@@ -289,6 +316,9 @@ function mapDates(dates: unknown): ChatBookingDate[] {
       bookingType,
       tables: mapTables(item.tables ?? item.table_types ?? item.tableTypes),
       tickets: mapTickets(item.tickets ?? item.ticket_types ?? item.ticketTypes),
+      roomName: roomName || undefined,
+      roomId:
+        Number.isFinite(roomIdRaw) && roomIdRaw !== 0 ? roomIdRaw : undefined,
     };
   });
 }
@@ -402,13 +432,51 @@ export function listChatBrochures(
   return brief.brochures;
 }
 
-export function isBrochureQuestion(text: string): boolean {
-  return (
-    /\b(brochure|brochures|broucher|brocure|brousture|brosure|flyer|flier|flayer)\b/i.test(
-      text,
-    ) ||
-    /\b(event\s+)?pdfs?\b/i.test(text) ||
-    /\bdownloads? (the )?(brochure|flyer|pdf|pack)\b/i.test(text)
+export { isBrochureQuestion };
+
+export const CHAT_EVENT_BROCHURE_ID = "brochure-event";
+export const CHAT_EVENT_BROCHURE_SEND = "I want the brochure";
+
+export function listChatEventBrochureFiles(
+  brief: ChatEventBookingBrief | null | undefined,
+  roomId?: number | null,
+): ChatBookingPdf[] {
+  return listChatBrochures(brief, roomId).filter(
+    (pdf) => !/faq/i.test(pdf.title),
+  );
+}
+
+export function buildEventBrochureQuickAction(
+  brief?: ChatEventBookingBrief | null,
+  roomId?: number | null,
+): ChatQuickActionDraft | null {
+  const files = listChatEventBrochureFiles(brief, roomId);
+  if (files.length === 0) return null;
+  if (files.length === 1) {
+    return {
+      id: CHAT_EVENT_BROCHURE_ID,
+      label: "Event brochure",
+      hint: files[0].roomName,
+      href: files[0].href,
+    };
+  }
+  return {
+    id: CHAT_EVENT_BROCHURE_ID,
+    label: "Event brochure",
+    sendText: CHAT_EVENT_BROCHURE_SEND,
+  };
+}
+
+function hasEventBrochureChip(actions: ChatQuickActionDraft[]): boolean {
+  return actions.some(
+    (action) =>
+      action.id === CHAT_EVENT_BROCHURE_ID || /^brochure-\d+$/.test(action.id),
+  );
+}
+
+export function brochureQuestionWantsAllRooms(text: string): boolean {
+  return /\b(both rooms|all rooms|each room|every room|all (the )?spaces|both spaces)\b/i.test(
+    text,
   );
 }
 
@@ -490,24 +558,31 @@ export function summarizeEventDetailForChat(
     currencySymbol?: string;
   },
 ): ChatEventBookingBrief {
-  const hasRooms = isPublicEventRoomMode(event);
+  const listedRooms = listPublicEventRooms(event);
+  const bookableListed = listedRooms.filter((room) => !room.disabled);
+  // Trust is_rooms when the public page is in room mode. If the flag is off,
+  // only treat leftover room payloads as rooms when there are two+ bookable
+  // spaces — a single named payload is often a flat event, not a room picker.
+  const hasRooms =
+    (isPublicEventRoomMode(event) && bookableListed.length > 0) ||
+    bookableListed.length >= 2;
   const rooms = hasRooms
-    ? listPublicEventRooms(event).map((room, index) => {
-      const slices = resolvePublicEventActiveSlices(event, index);
-      const dates = mapDates(slices.dates).map((item) => ({
+    ? listedRooms.map((room, index) => {
+      const slices = resolvePublicEventRoomPayloadSlices(event, index);
+      const dates = mapDates(slices?.dates).map((item) => ({
         ...item,
         roomId: room.room_id,
         roomName: room.name,
       }));
       const inclusionHighlights = pickRoomHighlights(
-        (slices.package_details ?? []).map((detail) => detail.title),
+        (slices?.package_details ?? []).map((detail) => detail.title),
         4,
       );
       const highlights =
         inclusionHighlights.length > 0
           ? inclusionHighlights
           : pickRoomHighlights(
-            (slices.packages ?? []).map((pkg) => pkg.title),
+            (slices?.packages ?? []).map((pkg) => pkg.title),
             4,
           );
       return {
@@ -515,17 +590,17 @@ export function summarizeEventDetailForChat(
         roomId: room.room_id,
         disabled: room.disabled === true,
         dates,
-        drinks: mapDrinks(slices.packages),
-        packageTitle: slices.package_title?.trim() || undefined,
-        packageSummary: clipChatText(slices.package_description),
+        drinks: mapDrinks(slices?.packages),
+        packageTitle: slices?.package_title?.trim() || undefined,
+        packageSummary: clipChatText(slices?.package_description),
         highlights,
         fromPrice: lowestDateFromPrice(dates),
-        menus: mapMenus(slices.menus),
-        schedule: mapSchedule(slices.event_schedular),
+        menus: mapMenus(slices?.menus),
+        schedule: mapSchedule(slices?.event_schedular),
         brochures: mapChatPdfs(
           {
-            brochure_pdf: slices.brochure_pdf,
-            brochure_pdf_2: slices.brochure_pdf_2,
+            brochure_pdf: slices?.brochure_pdf,
+            brochure_pdf_2: slices?.brochure_pdf_2,
             faq_pdf: event.faq_pdf,
           },
           room.name,
@@ -755,7 +830,7 @@ function listAllChatDates(brief: ChatEventBookingBrief): ChatBookingDate[] {
 
 export function chatDateNeedsInventoryHydrate(date: ChatBookingDate): boolean {
   if (date.inventoryLoaded) return false;
-  return date.tables.length === 0 && date.tickets.length === 0;
+  return date.tables.length === 0 || date.tickets.length === 0;
 }
 
 export function withChatDateInventory(
@@ -767,13 +842,9 @@ export function withChatDateInventory(
     const catalog = catalogs.get(chatDateSlotKey(date));
     if (!catalog) return date;
     const tables =
-      catalog.tables.length > 0 || catalog.loaded
-        ? catalog.tables
-        : date.tables;
+      catalog.tables.length > 0 ? catalog.tables : date.tables;
     const tickets =
-      catalog.tickets.length > 0 || catalog.loaded
-        ? catalog.tickets
-        : date.tickets;
+      catalog.tickets.length > 0 ? catalog.tickets : date.tickets;
     return {
       ...date,
       tables,
@@ -827,14 +898,57 @@ export function listChatDatesForRoom(
 ): ChatBookingDate[] {
   if (!brief) return [];
   if (brief.hasRooms) {
-    const room =
+    const rooms =
       roomId != null
-        ? brief.rooms.find((item) => item.roomId === roomId)
-        : null;
-    const pool = room?.dates ?? brief.rooms.flatMap((item) => item.dates);
-    return pool.filter((date) => !date.soldOut);
+        ? brief.rooms.filter((item) => item.roomId === roomId)
+        : brief.rooms;
+    return rooms.flatMap((room) =>
+      room.dates
+        .filter((date) => !date.soldOut)
+        .map((date) => ({
+          ...date,
+          roomId: date.roomId ?? room.roomId,
+          roomName: date.roomName?.trim() || room.name,
+        })),
+    );
   }
   return brief.dates.filter((date) => !date.soldOut);
+}
+
+export function chatDatesShowRooms(
+  brief: ChatEventBookingBrief | null | undefined,
+  roomId?: number | null,
+): boolean {
+  return listChatDatesForRoom(brief, roomId).some((date) =>
+    Boolean(date.roomName?.trim()),
+  );
+}
+
+export function formatChatDatePickerQuestion(options: {
+  brief: ChatEventBookingBrief;
+  nameBit?: string;
+  roomId?: number | null;
+}): string {
+  const nameBit = options.nameBit ?? "";
+  if (options.roomId != null) {
+    return `Which date would you like${nameBit}?`;
+  }
+  const bookable = listBookableChatRooms(options.brief);
+  const namedRooms = [
+    ...new Set(
+      listChatDatesForRoom(options.brief)
+        .map((date) => date.roomName?.trim())
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ];
+  if (namedRooms.length >= 2) {
+    return `Which date would you like${nameBit}? Each date shows its room — you can add another space after this one.`;
+  }
+  const singleRoom = bookable[0]?.name ?? namedRooms[0];
+  if (singleRoom) {
+    return `Which date would you like${nameBit} in **${singleRoom}**?`;
+  }
+  return `Which date would you like${nameBit}?`;
 }
 
 export function buildDateChoiceMarkdown(
@@ -1002,7 +1116,7 @@ export function buildExistingCartBookingGateCopy(options?: {
   const nameBit = options?.userName?.trim()
     ? `, ${options.userName.trim()}`
     : "";
-  return `You already have a date in Checkout${nameBit}. Please remove it there first, then I can help you book here.\n\n[Go to checkout](${CHECKOUT_PATH})`;
+  return `You already have items in Checkout${nameBit}. Open Checkout to remove them, then I can book a new event here.`;
 }
 
 export function buildExistingCartBookingGateActions(): ChatQuickActionDraft[] {
@@ -1100,7 +1214,11 @@ export function withVisitEventQuickAction<T extends ChatQuickActionDraft>(
     if (isBareEventPageHref(action.href, brief)) return false;
     return true;
   });
-  return [...rest.slice(0, 12), visit];
+  const brochure = hasEventBrochureChip(rest)
+    ? null
+    : buildEventBrochureQuickAction(brief, options?.roomId);
+  const cap = Math.max(0, 12 - (brochure ? 1 : 0));
+  return [...rest.slice(0, cap), ...(brochure ? [brochure] : []), visit];
 }
 
 /** Manual booking handoff — only when chat cannot continue. */
@@ -1108,7 +1226,7 @@ export function buildRecoveryQuickActions(
   brief: ChatEventBookingBrief,
   options?: { roomId?: number | null; dates?: string[] },
 ): ChatQuickActionDraft[] {
-  return [buildVisitEventQuickAction(brief, options)];
+  return withVisitEventQuickAction([], brief, options);
 }
 
 export function isUnsafeChatProviderError(text: string | null | undefined): boolean {
@@ -1126,7 +1244,11 @@ export function buildBookingRecoveryCopy(options: {
     ? `, ${options.userName.trim()}`
     : "";
   const venue = formatEventVenuePhrase(options.brief);
-  return `I can’t finish that in chat just now${nameBit}. **${options.brief.title}** is available${venue || ""}.\n\nVisit the event page to pick your room and date there, or tell me the next detail and I’ll continue here.`;
+  const roomBit =
+    listBookableChatRooms(options.brief).length >= 2
+      ? "pick your room and date there"
+      : "pick your date there";
+  return `I can’t finish that in chat just now${nameBit}. **${options.brief.title}** is available${venue || ""}.\n\nVisit the event page to ${roomBit}, or tell me the next detail and I’ll continue here.`;
 }
 
 export function buildBookingKickoffCopy(options: {
@@ -1138,13 +1260,14 @@ export function buildBookingKickoffCopy(options: {
     : "";
   const venue = formatEventVenuePhrase(options.brief);
   const bookable = listBookableChatRooms(options.brief);
+  const here = " I’ll help you book it here.";
   if (bookable.length >= 2) {
-    return `Yes${nameBit} — **${options.brief.title}** is available${venue}.\n\nWhich date would you like? Each date shows its room — you can add another space after this one.`;
+    return `Yes${nameBit} — **${options.brief.title}** is available${venue}.${here}\n\n${formatChatDatePickerQuestion({ brief: options.brief })}`;
   }
   if (bookable.length === 1) {
-    return `Yes${nameBit} — **${options.brief.title}** is in **${bookable[0].name}**${venue}.\n\nWhich date would you like?`;
+    return `Yes${nameBit} — **${options.brief.title}** is in **${bookable[0].name}**${venue}.${here}\n\nWhich date would you like?`;
   }
-  return `Yes${nameBit} — **${options.brief.title}** is available${venue}.\n\nWhich date would you like?`;
+  return `Yes${nameBit} — **${options.brief.title}** is available${venue}.${here}\n\nWhich date would you like?`;
 }
 
 export function buildRoomChoiceHostCopy(
@@ -1341,14 +1464,16 @@ function formatBrochureCopy(
       return `- [${pdf.title}${room}](${pdf.href})`;
     })
     .join("\n");
-  return `Here’s the brochure for **${brief.title}**${venue}. Tap a file to open the PDF.\n\n${lines}`;
+  const roomBit = pdfs.some((pdf) => pdf.roomName)
+    ? " Files are labelled by room."
+    : "";
+  return `Here’s the brochure for **${brief.title}**${venue}.${roomBit} Tap a file to open the PDF.\n\n${lines}`;
 }
 
 function brochureActions(pdfs: ChatBookingPdf[]): ChatQuickActionDraft[] {
   return pdfs.map((pdf, index) => ({
     id: `brochure-${index}`,
-    label: pdf.title,
-    hint: pdf.roomName,
+    label: pdf.roomName ? `${pdf.title} · ${pdf.roomName}` : pdf.title,
     href: pdf.href,
   }));
 }
@@ -1373,8 +1498,8 @@ export function buildEventInfoTurn(options: {
       };
     }
     return {
-      content: `I don’t have a brochure file listed for **${brief.title}**. You can still open the event page to check.`,
-      actions: [buildVisitEventQuickAction(brief, { roomId })],
+      content: `**${brief.title}** doesn’t have a brochure available, I’m afraid. We can keep booking here in chat.`,
+      actions: [],
     };
   }
   let content: string | null = null;
@@ -1631,14 +1756,14 @@ ${
         .join("\n")
     : "    (none listed)"
 }
-- If they ask about menus, FAQs, schedule, about the event, or the brochure/PDF, answer from this block. NEVER say you do not have the brochure if a URL is listed — give the markdown link.
+- If they ask about menus, FAQs, schedule, about the event, or the brochure/PDF, answer from this block. NEVER say you do not have the brochure if a URL is listed — give the markdown link. If none are listed, say professionally that this event doesn’t have a brochure and keep booking in chat — do not send them to the event page to look for one.
 - Greetings (hi, hello, thanks): greet back only — do not list dates, rooms, or Visit event page until they ask to book.
 - They may book in chat or open the event page: [Visit event page](${brief.href})`;
 
   return `
 EVENT BOOKING DATA (authoritative for this conversation — MUST FOLLOW):
 - Event: **${brief.title}** at **${formatChatLocationLabel(brief) || brief.locationCity || brief.locationSlug}**
-- Rooms enabled: ${brief.hasRooms ? "yes — you MUST ask which room before dates or drinks" : "no"}
+- Rooms enabled: ${brief.hasRooms ? "yes — you MUST ask which room before dates or drinks" : "no — do not mention rooms, halls, or event spaces"}
 ${roomChoiceBlock}
 ${roomsBlock}
 ${couponBlock}
@@ -1681,11 +1806,12 @@ Ask ONE question at a time, in this order (skip any step they already answered).
 6. If tables: which table type(s) and how many of each (min–max guests). If both, how many sit at tables first. If tickets: which ticket type(s) and how many of each. Do not skip to drinks until those are chosen.
 7. Drinks for that room, with prices. If they ask for more than available, say the stock figure then.
 8. Short summary with prices. Coupon LAST — which dates have a date offer, then Apply CODE.
-9. Pay in full / Pay a table deposit (deposit is tables only). Stay in chat.
+9. Ask how they want to pay when more than one method is available (card / PayPal). Then Pay in full / Pay a table deposit (deposit is tables only). Stay in chat.
 
 CHOICE BUTTONS:
 - In-chat only: [Label](chat:the exact reply)
 - They can book in chat or open the event page themselves: [Visit event page](/{location_slug}/events/{event_slug}) from EVENT BOOKING DATA.
+- Event picks: [Event name · City](chat:Book Event name in City). Never repeat “Book now”. At most 6 event buttons. If they asked for a city or category with no match, say so then offer alternatives.
 - Only show room/date buttons for the current booking question. Do not repeat the same buttons twice. Do not re-offer rooms when they asked about menus, FAQs, the brochure, or the schedule.
 - NEVER write /chat: or /chat — there is no slash before chat:
 - Do NOT invent table counts, dates, rooms, drinks, menus, FAQs, or coupon codes.
@@ -1761,10 +1887,121 @@ export function parseMarkdownLinkTarget(
 export function stripInChatChoiceMarkdown(content: string): string {
   return content
     .replace(/\[([^\]]+)\]\(\/?chat(?::[^)]*)?\)/gi, "")
+    .replace(/[ \t]+—[ \t]*$/gm, "")
     .replace(/[ \t]+$/gm, "")
+    .replace(/^[ \t]*-[ \t]*$/gm, "")
     .replace(/[ \t]*·[ \t]*·/g, " · ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+const GENERIC_CHAT_BOOK_LABELS = new Set([
+  "book now",
+  "book",
+  "book it",
+  "book this",
+]);
+
+/** `Book Corporate Event in Bristol` — not `Book in Bristol`. */
+export function parseBookEventInCitySendText(
+  sendText?: string | null,
+): { title: string; city: string } | null {
+  if (!sendText) return null;
+  const match = sendText.trim().match(/^book\s+(.+?)\s+in\s+(.+)$/i);
+  if (!match) return null;
+  const title = match[1].trim();
+  const city = match[2].trim();
+  if (!title || !city || /^in$/i.test(title)) return null;
+  if (/^(an?\s+)?events?$/i.test(title)) return null;
+  return { title, city };
+}
+
+/** True when the guest asked for a brochure, then tapped an event chip. */
+export function shouldSendBrochureForEventPick(
+  userText: string,
+  messages: Array<{ role: string; content: string }>,
+): boolean {
+  if (!parseBookEventInCitySendText(userText)) return false;
+  const recent = messages
+    .filter((message) => message.role === "user")
+    .slice(-4);
+  if (!recent.some((message) => isBrochureQuestion(message.content))) {
+    return false;
+  }
+  const last = recent[recent.length - 1];
+  return Boolean(
+    last &&
+      (isBrochureQuestion(last.content) ||
+        isBroadEventListIntent(last.content)),
+  );
+}
+
+function eventPickHint(
+  originalLabel: string,
+  pick: { title: string; city: string },
+  existingHint?: string,
+): string {
+  const parts = originalLabel
+    .split(" · ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => {
+      const key = normalizeChatActionKey(part);
+      return (
+        key !== normalizeChatActionKey(pick.title) &&
+        key !== normalizeChatActionKey(pick.city)
+      );
+    });
+  if (existingHint) {
+    const hintKey = normalizeChatActionKey(existingHint);
+    if (!parts.some((part) => normalizeChatActionKey(part) === hintKey)) {
+      parts.push(existingHint);
+    }
+  }
+  if (
+    pick.city &&
+    !parts.some(
+      (part) => normalizeChatActionKey(part) === normalizeChatActionKey(pick.city),
+    )
+  ) {
+    parts.push(pick.city);
+  }
+  return parts.join(" · ") || pick.city;
+}
+
+/**
+ * Identical “Book now” chips are unusable. Event picks get a unique title
+ * plus the city as a hint so guests can tell them apart.
+ */
+export function decorateChatEventPickActions<T extends ChatQuickActionDraft>(
+  actions: T[],
+): T[] {
+  const parsed = actions.map((action, index) => ({
+    action,
+    pick: parseBookEventInCitySendText(action.sendText),
+    index,
+  }));
+
+  return parsed.map((item) => {
+    if (!item.pick) {
+      const generic = GENERIC_CHAT_BOOK_LABELS.has(
+        normalizeChatActionKey(item.action.label),
+      );
+      if (generic) {
+        return {
+          ...item.action,
+          label: item.action.sendText?.trim() || item.action.label,
+        };
+      }
+      return item.action;
+    }
+    return {
+      ...item.action,
+      id: `event-pick-${item.index + 1}`,
+      label: item.pick.title,
+      hint: eventPickHint(item.action.label, item.pick, item.action.hint),
+    };
+  });
 }
 
 /** Pull tappable choices out of an assistant reply (`[Label](/path)` / `[Label](chat:…)`). */
@@ -1774,7 +2011,7 @@ export function extractBookingQuickActions(
   const actions: ChatQuickActionDraft[] = [];
   const seen = new Set<string>();
   const pattern =
-    /\[([^\]]{1,80})\]\((\/?chat(?::[^)]*)?|https?:\/\/[^)\s]+|\/[^)\s]+)\)/g;
+    /\[([^\]]{1,120})\]\((\/?chat(?::[^)]*)?|https?:\/\/[^)\s]+|\/[^)\s]+)\)/g;
   let match: RegExpExecArray | null;
   let index = 0;
   while ((match = pattern.exec(content)) !== null) {
@@ -1807,7 +2044,7 @@ export function extractBookingQuickActions(
     }
     if (actions.length >= 16) break;
   }
-  return actions;
+  return decorateChatEventPickActions(actions);
 }
 
 export function buildRoomChoiceQuickActions(
@@ -1898,7 +2135,7 @@ export function buildDateChoiceQuickActions(
     .map((date) => ({
       id: `date-${date.roomId ?? "event"}-${date.date.slice(0, 10)}`,
       label: shortDateButtonLabel(date),
-      hint: date.roomName || undefined,
+      hint: date.roomName?.trim() || undefined,
       sendText: formatChatDateChoiceSendText(date),
     }));
 }

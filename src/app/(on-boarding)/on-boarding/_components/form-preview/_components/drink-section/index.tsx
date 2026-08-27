@@ -102,13 +102,10 @@ export default function DrinkSection({
     <section className="w-full overflow-hidden bg-[var(--color-background)] px-4 py-16 text-[var(--color-text)]">
       <section className="mx-auto w-full max-w-5xl text-center">
         <div className="space-y-3 px-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-            Drinks
-          </p>
           <SiteHeading
             level={2}
             title={title || "Other Packages"}
-            emphasis={headingEmphasis}
+            emphasis={headingEmphasis as HeadingEmphasis}
             variant="onSurface"
             align="center"
             className="!text-3xl !font-black tracking-tight md:!text-4xl"

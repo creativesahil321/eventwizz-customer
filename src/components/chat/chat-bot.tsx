@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -14,6 +15,7 @@ import {
   Send,
   Loader2,
   X,
+  ChevronsLeft,
   Minus,
   MessageCircle,
   ExternalLink,
@@ -54,6 +56,11 @@ import {
   buildLiveEventsNoMatchReply,
   filterLiveEventsToPublishedLocations,
   listGuestBookableLinks,
+  extractLiveEventTheme,
+  liveEventMatchesRequestedTheme,
+  isBroadEventListIntent,
+  isLiveEventAvailabilityQuestion,
+  asWeakMatches,
   type LiveEventChatMatch,
 } from "@/lib/chat-live-events";
 import type { LiveEvent, LocationData } from "@/types/theme.types";
@@ -79,12 +86,15 @@ import {
   isChatEmailAddress,
   isChatEmailUpdatesText,
   isEventInfoQuestion,
+  isBrochureQuestion,
   isUnsafeChatProviderError,
   shouldOfferChatBookingUi,
   stripUnsolicitedBookingOfferCopy,
   mergeChatBriefInventory,
   parseMarkdownLinkTarget,
   parsePublicEventPath,
+  parseBookEventInCitySendText,
+  shouldSendBrochureForEventPick,
   stripInChatChoiceMarkdown,
   summarizeEventDetailForChat,
   withDateChoiceQuickActions,
@@ -97,18 +107,24 @@ import {
 } from "@/lib/chat-event-booking";
 import {
   buildHostBookingTurn,
+  chatChoicesHaveLineItems,
+  isChatCheckoutHandoffIntent,
   isChatExistingCartBookingIntent,
   isGuestBookingConciergeText,
   isHostBookingUserText,
   parseChatBookingChoices,
   parseChatPayMode,
+  parseChatPaymentGatewaySlug,
   toChatQuickActions,
 } from "@/lib/chat-booking-choices";
 import {
   bookingChoicesReadyForPay,
   chatCartConflictsWithEvent,
   hydrateChatBriefCatalogs,
+  listChatPaymentGateways,
   runChatCheckout,
+  syncChatBookingToCart,
+  type ChatPaymentGatewayOption,
 } from "@/lib/chat-checkout";
 import {
   buildChatSafetyReply,
@@ -126,10 +142,15 @@ import {
 import {
   CHECKOUT_PATH,
   checkoutHandoffNavCopy,
+  isCheckoutHandoffHref,
   persistCheckoutHandoffFromHref,
 } from "@/lib/checkout-chat-handoff";
-import { apiCartHasAnyDates } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import { apiCartHasBillableSelections } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import { cartService } from "@/services/customer/cart/cart.service";
 import { useGetCartData } from "@/services/customer/cart/query";
+import { useCartEditStore } from "@/store/cart-edit.store";
+import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
+import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
 import { eventsService } from "@/services/common/events/events.service";
 import {
@@ -158,7 +179,16 @@ function isChatGridAction(action: QuickAction): boolean {
     action.id.startsWith("date-") ||
     action.id.startsWith("table-") ||
     action.id.startsWith("drink-qty-") ||
-    action.id.startsWith("ticket-qty-")
+    action.id.startsWith("ticket-")
+  );
+}
+
+function isEventPickAction(action: QuickAction): boolean {
+  return (
+    action.id.startsWith("event-pick-") ||
+    Boolean(
+      action.sendText && /^book .+\s+in\s+.+/i.test(action.sendText.trim()),
+    )
   );
 }
 
@@ -199,6 +229,50 @@ const INITIAL_FLOW: SupportFlowState = {
   issueSummary: "",
 };
 
+function vendorGreetingActions(options?: {
+  showBookings?: boolean;
+}): QuickAction[] {
+  const actions: QuickAction[] = [
+    {
+      id: "start-book",
+      label: "Book an event",
+      sendText: "I want to book an event",
+    },
+    {
+      id: "start-whats-on",
+      label: "What’s on",
+      sendText: "What events are on?",
+    },
+    {
+      id: "ask-question",
+      label: "Ask a question",
+    },
+  ];
+  if (options?.showBookings) {
+    actions.push({
+      id: "my-bookings",
+      label: "My bookings",
+      href: "/customer/bookings",
+    });
+  }
+  return actions;
+}
+
+function isPaymentSuccessPath(path: string | null | undefined): boolean {
+  if (!path) return false;
+  return (
+    path === "/vendor/payment/success" ||
+    path.startsWith("/vendor/payment/success") ||
+    path === "/payment/success" ||
+    path.startsWith("/payment/success")
+  );
+}
+
+const CHAT_CHROME =
+  "bg-[color:var(--color-header,#1e293b)] text-[color:var(--color-on-header,#fff)]";
+const CHAT_CHROME_HOVER =
+  "hover:bg-[color:color-mix(in_srgb,var(--color-header,#1e293b)_88%,black)]";
+
 const CATEGORY_ACTIONS: QuickAction[] = [
   {
     id: "general_support",
@@ -216,7 +290,7 @@ const CATEGORY_ACTIONS: QuickAction[] = [
 
 /** Guest auth options — register / login from chat */
 const SUPPORT_INTENT_RE =
-  /\b(support|help desk|customer service|enquiry|inquiry|ticket|contact (us|team|support)|speak to|talk to|get in touch|connect with|raise (a |an )?(query|issue|ticket|enquiry|inquiry)|not able to book|can'?t book|cannot book|booking (issue|problem|error)|technical issue|fix (my |the )?issue|having (a |an )?(issue|problem))\b/i;
+  /\b(support|help desk|customer service|contact (us|support|the team)|speak to (support|a person|someone|the team|an? agent)|talk to (support|a person|someone|the team|an? agent)|get in touch|connect with (support|the team)|raise (a |an )?(support )?(query|issue|ticket|enquiry|inquiry)|technical issue)\b/i;
 
 const AUTH_INTENT_RE =
   /\b(register|sign\s*up|create (an? )?account|log\s*in|sign\s*in|need (an? )?account|asked?( me)? to register|ask(s|ed)? for register|registration|make an account)\b/i;
@@ -230,7 +304,10 @@ const DECLINE_INTENT_RE =
   /\b(no|nope|nah|cancel|stop|never\s*mind|nevermind|don'?t want|do not want|not now|no thanks|no thank you|forget (it|that)|leave it)\b/i;
 
 function isSupportIntent(text: string): boolean {
-  return SUPPORT_INTENT_RE.test(text);
+  const t = text.trim();
+  if (/i'?ll type the ticket quantity/i.test(t)) return false;
+  if (/^\d{1,3}\s*[x×]\s+/i.test(t)) return false;
+  return SUPPORT_INTENT_RE.test(t);
 }
 
 function isAuthIntent(text: string): boolean {
@@ -268,6 +345,7 @@ function inChatChoiceMessage(content: string): {
     .map((action) => ({
       id: action.id,
       label: action.label,
+      hint: action.hint,
       sendText: action.sendText,
     }));
   return {
@@ -304,7 +382,7 @@ function publicBookingQuickActions(options: {
       }),
     );
   }
-  if (options.hostActions && options.hostActions.length > 0) {
+  if (options.hostActions !== undefined) {
     const choices = brief
       ? parseChatBookingChoices(options.conversation, brief)
       : null;
@@ -324,6 +402,7 @@ function publicBookingQuickActions(options: {
       if (action.id === CHAT_PAY_FULL_ID || action.id === CHAT_PAY_DEPOSIT_ID) {
         return true;
       }
+      if (action.id.startsWith("pay-gateway-")) return true;
       if (action.href && /^https?:\/\//i.test(action.href)) return true;
       if (!action.sendText || action.href) return false;
       if (action.label.replace(/\s+/g, " ").toLowerCase().startsWith("visit ")) {
@@ -549,7 +628,7 @@ function ChatAvatar({
   return (
     <span
       className={cn(
-        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-800 ring-1 ring-black/5",
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--color-header,#1e293b)] ring-1 ring-black/5",
         sizeClass,
         className,
       )}
@@ -771,7 +850,7 @@ export function ChatBot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `Hello — how can I help you today?`,
+      content: `Hello — how can I help you today? Book an event, ask what’s on, or type any other question.`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -787,13 +866,37 @@ export function ChatBot() {
     useState<CheckoutStripePaymentSession | null>(null);
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
   const eventBookingBriefRef = useRef<ChatEventBookingBrief | null>(null);
+  const chatPayGatewaysRef = useRef<ChatPaymentGatewayOption[]>([]);
+  const checkoutInProgressRef = useRef(false);
+  const paymentCompletedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const composerInputRef = useRef<HTMLInputElement>(null);
+  const keepComposerFocusRef = useRef(false);
+  const prevPathnameRef = useRef(pathname);
   const prefersReducedMotion = useReducedMotion();
   const motionSafe = !prefersReducedMotion;
 
+  function focusComposer() {
+    const el = composerInputRef.current;
+    if (!el || el.disabled) return;
+    el.focus({ preventScroll: true });
+  }
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const end = messagesEndRef.current;
+    if (!end) return;
+    const viewport = end.closest("[data-slot='scroll-area-viewport']");
+    if (viewport instanceof HTMLElement) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (!isOpen || isMinimized || isLoading) return;
+    if (supportFlow.step === "submitting") return;
+    if (!keepComposerFocusRef.current) return;
+    focusComposer();
+  }, [isLoading, isOpen, isMinimized, supportFlow.step]);
 
   useEffect(() => {
     if (!pageBookingBrief) return;
@@ -819,13 +922,18 @@ export function ChatBot() {
       if (!isDefaultGreeting) return prev;
 
       const nameBit = userName ? `, ${userName}` : "";
+      const greetingActions =
+        isVendorStorefront && !isLoggedInVendor
+          ? vendorGreetingActions({ showBookings: isLoggedInCustomer })
+          : undefined;
 
       // Keep greetings short and professional — never mention “signed in / venue account”
       if (isVendorStorefront && accountType === "customer") {
         return [
           {
             role: "assistant",
-            content: `Hello${nameBit} — how can I help you today?`,
+            content: `Hello${nameBit} — how can I help you today? Book an event, ask what’s on, or type any other question.`,
+            quickActions: greetingActions,
           },
         ];
       }
@@ -833,11 +941,97 @@ export function ChatBot() {
       return [
         {
           role: "assistant",
-          content: `Hello${nameBit} — how can I help you today?`,
+          content: `Hello${nameBit} — how can I help you today? Book an event, ask what’s on, or type any other question.`,
+          quickActions: greetingActions,
         },
       ];
     });
-  }, [sessionStatus, accountType, userName, isVendorStorefront]);
+  }, [sessionStatus, accountType, userName, isVendorStorefront, isLoggedInVendor, isLoggedInCustomer]);
+
+  useEffect(() => {
+    if (!isVendorStorefront || isLoggedInVendor) return;
+    setMessages((prev) => {
+      if (prev.length !== 1 || prev[0]?.role !== "assistant") return prev;
+      if (prev[0].quickActions?.length) return prev;
+      return [
+        {
+          ...prev[0],
+          quickActions: vendorGreetingActions({
+            showBookings: isLoggedInCustomer,
+          }),
+        },
+      ];
+    });
+  }, [isVendorStorefront, isLoggedInVendor, isLoggedInCustomer]);
+
+  useEffect(() => {
+    const wasCheckout =
+      prevPathnameRef.current === "/vendor/checkout" ||
+      Boolean(prevPathnameRef.current?.startsWith("/vendor/checkout/"));
+    const nowCheckout =
+      pathname === "/vendor/checkout" ||
+      Boolean(pathname?.startsWith("/vendor/checkout/"));
+    prevPathnameRef.current = pathname;
+    if (isOpen && nowCheckout && !wasCheckout) {
+      keepComposerFocusRef.current = false;
+      setIsMinimized(true);
+    }
+  }, [pathname, isOpen]);
+
+  function postPaymentGreetingActions(): QuickAction[] {
+    return vendorGreetingActions({ showBookings: isLoggedInCustomer });
+  }
+
+  function resetChatAfterPaidBooking(bookingNumber?: string | null) {
+    paymentCompletedRef.current = true;
+    checkoutInProgressRef.current = false;
+    eventBookingBriefRef.current = null;
+    chatPayGatewaysRef.current = [];
+    setIsStripePaymentOpen(false);
+    setStripePaymentSession(null);
+    const store = useCheckoutPaymentUiStore.getState();
+    if (bookingNumber) {
+      store.completePaymentSession(bookingNumber);
+    } else {
+      store.clearPaymentSession();
+    }
+    useCartEditStore.getState().clearAllCarts();
+    useDrinkSelectionStore.getState().clearDrinksForNewEvent();
+    void refetchCustomerCart();
+    const nameBit = userName ? `, ${userName}` : "";
+    const bookingBit = bookingNumber?.trim()
+      ? ` Booking **${bookingNumber.trim()}** is confirmed.`
+      : " Your payment went through.";
+    setMessages([
+      {
+        role: "assistant",
+        content: `Thanks${nameBit} — you’re all set.${bookingBit} I can help with another booking, what’s on, or any other question.`,
+        quickActions: postPaymentGreetingActions(),
+      },
+    ]);
+  }
+
+  useEffect(() => {
+    if (!isPaymentSuccessPath(pathname)) return;
+    const params =
+      typeof window === "undefined"
+        ? null
+        : new URLSearchParams(window.location.search);
+    const bookingNumber =
+      params?.get("booking_number") ??
+      stripePaymentSession?.bookingNumber ??
+      null;
+    if (
+      !isStripePaymentOpen &&
+      !stripePaymentSession &&
+      !checkoutInProgressRef.current &&
+      paymentCompletedRef.current
+    ) {
+      return;
+    }
+    resetChatAfterPaidBooking(bookingNumber);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset once when landing on success
+  }, [pathname]);
 
   function startGuidedSupport(issueText: string) {
     setSupportFlow({
@@ -1021,8 +1215,8 @@ export function ChatBot() {
   async function customerCartHasDates(): Promise<boolean> {
     if (!isLoggedInCustomer) return false;
     try {
-      const result = await refetchCustomerCart();
-      return apiCartHasAnyDates(result.data);
+      const data = await cartService.getCartData();
+      return apiCartHasBillableSelections(data);
     } catch {
       return false;
     }
@@ -1040,25 +1234,150 @@ export function ChatBot() {
   }
 
   function sendExistingCartBookingGate() {
-    const href = CHECKOUT_PATH;
     setMessages((prev) => [
       ...clearQuickActions(prev),
       {
         role: "assistant",
         content: buildExistingCartBookingGateCopy({ userName }),
         quickActions: toUiQuickActions(buildExistingCartBookingGateActions()),
-        supportCta: { href, label: "Go to checkout" },
       },
     ]);
-    if (pathname !== CHECKOUT_PATH) {
-      router.push(href);
+  }
+
+  async function persistChatBookingCart(
+    brief: ChatEventBookingBrief,
+    choices: ReturnType<typeof parseChatBookingChoices>,
+  ) {
+    if (!chatChoicesHaveLineItems(choices)) return { ok: true as const };
+    try {
+      const result = await syncChatBookingToCart({ brief, choices });
+      if (result.ok && "event" in result) {
+        chatPayGatewaysRef.current = listChatPaymentGateways(result.event);
+        try {
+          await refetchCustomerCart();
+        } catch {
+          // Checkout GET can still pick up the POST.
+        }
+      }
+      return result;
+    } catch {
+      return {
+        ok: false as const,
+        reason: "unknown" as const,
+        message:
+          "I couldn’t save this booking just now. You can finish on the event page instead.",
+      };
     }
+  }
+
+  async function openVendorCheckout(options?: {
+    href?: string;
+    extraMessages?: Array<{ role: string; content: string }>;
+  }) {
+    const href = options?.href || CHECKOUT_PATH;
+    const brief = eventBookingBriefRef.current ?? pageBookingBrief;
+    const conversation = [
+      ...messages.map(({ role, content }) => ({
+        role,
+        content,
+      })),
+      ...(options?.extraMessages ?? []),
+    ];
+    const choices = brief
+      ? parseChatBookingChoices(conversation, brief)
+      : null;
+
+    if (brief && choices && chatChoicesHaveLineItems(choices)) {
+      setIsLoading(true);
+      const sync = await persistChatBookingCart(brief, choices);
+      setIsLoading(false);
+      if (!sync.ok) {
+        if (sync.reason === "conflict") {
+          sendExistingCartBookingGate();
+          return;
+        }
+        if (sync.reason === "login") {
+          const callback = pathname || "/";
+          saveAuthCallbackUrl(callback);
+          setMessages((prev) => [
+            ...clearQuickActions(prev),
+            {
+              role: "assistant",
+              content:
+                "Please log in with a customer account so I can take this booking to Checkout.",
+              quickActions: [
+                {
+                  id: "login",
+                  label: "Log in",
+                  href: `/auth/login?callbackUrl=${encodeURIComponent(callback)}`,
+                },
+              ],
+            },
+          ]);
+          return;
+        }
+        if (sync.reason === "capacity") {
+          setMessages((prev) => [
+            ...clearQuickActions(prev),
+            {
+              role: "assistant",
+              content: sync.message,
+            },
+          ]);
+          return;
+        }
+      }
+    }
+
+    persistCheckoutHandoffFromHref(href);
+    const checkoutCopy = checkoutHandoffNavCopy(href, isLoggedInCustomer);
+    setMessages((prev) => [
+      ...clearQuickActions(prev),
+      {
+        role: "assistant",
+        content:
+          checkoutCopy ??
+          "Opening Checkout so you can review and pay.",
+      },
+    ]);
+    keepComposerFocusRef.current = false;
+    setIsMinimized(true);
+    router.push(href);
   }
 
   async function startChatPayment(
     payMode: "full" | "deposit",
     extraMessages: Array<{ role: string; content: string }> = [],
   ) {
+    const lastUserText =
+      extraMessages[extraMessages.length - 1]?.content ?? "";
+    const gatewaySlug = parseChatPaymentGatewaySlug(lastUserText);
+
+    if (isPaymentSuccessPath(pathname)) {
+      setMessages((prev) => [
+        ...clearQuickActions(prev),
+        {
+          role: "assistant",
+          content:
+            "This booking is already paid. I can help with another booking, what’s on, or any other question.",
+          quickActions: postPaymentGreetingActions(),
+        },
+      ]);
+      return;
+    }
+
+    if (isStripePaymentOpen || checkoutInProgressRef.current) {
+      setMessages((prev) => [
+        ...clearQuickActions(prev),
+        {
+          role: "assistant",
+          content:
+            "The payment form is already open — finish there. I won’t start another payment for the same booking.",
+        },
+      ]);
+      return;
+    }
+
     const brief = eventBookingBriefRef.current ?? pageBookingBrief;
     const conversation = [
       ...messages.map(({ role, content }) => ({ role, content })),
@@ -1111,21 +1430,17 @@ export function ChatBot() {
       // Checkout still tries to prepare the cart.
     }
 
+    checkoutInProgressRef.current = true;
     setIsLoading(true);
-    setMessages((prev) => [
-      ...clearQuickActions(prev),
-      {
-        role: "assistant",
-        content:
-          payMode === "deposit"
-            ? "Opening payment so you can pay a table deposit…"
-            : "Opening payment so you can pay in full…",
-      },
-    ]);
 
     let result: Awaited<ReturnType<typeof runChatCheckout>>;
     try {
-      result = await runChatCheckout({ brief, choices, payMode });
+      result = await runChatCheckout({
+        brief,
+        choices,
+        payMode,
+        gatewaySlug,
+      });
     } catch {
       result = {
         ok: false,
@@ -1137,6 +1452,32 @@ export function ChatBot() {
     setIsLoading(false);
 
     if (!result.ok) {
+      checkoutInProgressRef.current = false;
+      if (result.reason === "conflict") {
+        sendExistingCartBookingGate();
+        return;
+      }
+      if (result.reason === "need-gateway") {
+        const gateways = result.gateways ?? [];
+        chatPayGatewaysRef.current = gateways;
+        setMessages((prev) => [
+          ...clearQuickActions(prev),
+          {
+            role: "assistant",
+            content:
+              result.message.trim() ||
+              "How would you like to pay? Choose a payment method to continue.",
+            quickActions: toUiQuickActions(
+              gateways.map((gateway) => ({
+                id: `pay-gateway-${gateway.slug}`,
+                label: gateway.label,
+                sendText: gateway.label,
+              })),
+            ),
+          },
+        ]);
+        return;
+      }
       const recovery =
         result.reason === "capacity" || result.reason === "incomplete"
           ? null
@@ -1175,6 +1516,17 @@ export function ChatBot() {
       return;
     }
 
+    setMessages((prev) => [
+      ...clearQuickActions(prev),
+      {
+        role: "assistant",
+        content:
+          payMode === "deposit"
+            ? "Opening payment so you can pay a table deposit…"
+            : "Opening payment…",
+      },
+    ]);
+
     if (result.action.type === "stripe") {
       if (!result.action.session) {
         setMessages((prev) => [
@@ -1187,6 +1539,9 @@ export function ChatBot() {
         ]);
         return;
       }
+      const payStore = useCheckoutPaymentUiStore.getState();
+      payStore.setStripePaymentSession(result.action.session);
+      payStore.setAwaitingStripePayment(true);
       setStripePaymentSession(result.action.session);
       setIsStripePaymentOpen(true);
       const couponBit =
@@ -1216,6 +1571,20 @@ export function ChatBot() {
   async function handleQuickAction(action: QuickAction) {
     if (isLoading || supportFlow.step === "submitting") return;
 
+    if (action.id === "ask-question") {
+      setMessages((prev) => [
+        ...clearQuickActions(prev),
+        {
+          role: "assistant",
+          content:
+            "Of course — type whatever you’d like to ask. Bookings, events, the venue, or anything else.",
+        },
+      ]);
+      keepComposerFocusRef.current = true;
+      focusComposer();
+      return;
+    }
+
     if (action.id === CHAT_PAY_FULL_ID || action.id === CHAT_PAY_DEPOSIT_ID) {
       setMessages((prev) => [
         ...prev,
@@ -1244,6 +1613,17 @@ export function ChatBot() {
         window.open(href, "_blank", "noopener,noreferrer");
         return;
       }
+      if (isCheckoutHandoffHref(href) || action.id === "open-checkout") {
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: action.label },
+        ]);
+        await openVendorCheckout({
+          href,
+          extraMessages: [{ role: "user", content: action.label }],
+        });
+        return;
+      }
       persistCheckoutHandoffFromHref(href);
       const checkoutCopy = checkoutHandoffNavCopy(href, isLoggedInCustomer);
       setMessages((prev) => [
@@ -1258,10 +1638,12 @@ export function ChatBot() {
               : action.id === "login"
                 ? "Taking you to log in. Once you’re signed in, you can continue with your booking."
                 : "Taking you there now."),
-          supportCta: {
-            href,
-            label: action.label,
-          },
+          supportCta: isCheckoutHandoffHref(href)
+            ? undefined
+            : {
+                href,
+                label: action.label,
+              },
         },
       ]);
       router.push(href);
@@ -1383,7 +1765,12 @@ export function ChatBot() {
     if (!userText || isLoading) return;
 
     const userMessage: Message = { role: "user", content: userText };
-    if (!overrideText) setInput("");
+    if (!overrideText) {
+      setInput("");
+      keepComposerFocusRef.current = true;
+      focusComposer();
+      requestAnimationFrame(() => focusComposer());
+    }
 
     // Active guided support flow — handle without calling the AI
     if (supportFlow.step !== "idle" && supportFlow.step !== "submitting") {
@@ -1503,8 +1890,14 @@ export function ChatBot() {
       isLoggedInCustomer &&
       isSupportIntent(userText)
     ) {
-      startGuidedSupport(userText);
-      return;
+      const brief = eventBookingBriefRef.current ?? pageBookingBrief;
+      const bookingInProgress = Boolean(
+        brief && parseChatBookingChoices(messages, brief).slots.length > 0,
+      );
+      if (!bookingInProgress) {
+        startGuidedSupport(userText);
+        return;
+      }
     }
 
     // Guest on vendor site: offer Register / Log in buttons
@@ -1548,7 +1941,8 @@ Is there anything else I can help you with?`,
       isChatExistingCartBookingIntent(
         userText,
         eventBookingBriefRef.current ?? pageBookingBrief,
-      )
+      ) &&
+      !shouldSendBrochureForEventPick(userText, messages)
     ) {
       const brief = eventBookingBriefRef.current ?? pageBookingBrief;
       const bookingInProgress = Boolean(
@@ -1562,6 +1956,45 @@ Is there anything else I can help you with?`,
           sendExistingCartBookingGate();
           return;
         }
+      }
+    }
+
+    const catalogueBrief = eventBookingBriefRef.current ?? pageBookingBrief;
+    if (
+      isVendorStorefront &&
+      !isLoggedInVendor &&
+      liveEvents.length > 0 &&
+      !parseBookEventInCitySendText(userText) &&
+      (isBroadEventListIntent(userText) ||
+        isLiveEventAvailabilityQuestion(userText) ||
+        (isBrochureQuestion(userText) && !catalogueBrief))
+    ) {
+      const matched = matchLiveEvents(userText, liveEvents);
+      const matches = matched.length > 0 ? matched : asWeakMatches(liveEvents);
+      const pickerText =
+        isBrochureQuestion(userText) ||
+        messages.some(
+          (message) =>
+            message.role === "user" && isBrochureQuestion(message.content),
+        )
+          ? `${userText} brochure`
+          : userText;
+      const direct = buildLiveEventsDirectReply({
+        userText: pickerText,
+        matches,
+        allLiveEvents: liveEvents,
+        siteName,
+        userName,
+      });
+      if (direct) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            ...inChatChoiceMessage(direct.content),
+          },
+        ]);
+        return;
       }
     }
 
@@ -1591,6 +2024,7 @@ Is there anything else I can help you with?`,
             allLiveEvents: liveEvents,
             siteName,
             userName,
+            userText,
           }).content,
         );
         return;
@@ -1619,6 +2053,7 @@ Is there anything else I can help you with?`,
             allLiveEvents: liveEvents,
             siteName,
             userName,
+            userText,
           }).content,
         );
         return;
@@ -1903,6 +2338,17 @@ Is there anything else I can help you with?`,
 
       let eventBookingBrief: ChatEventBookingBrief | null = pageBookingBrief;
       const pinnedBrief = eventBookingBriefRef.current;
+      const askedTheme = extractLiveEventTheme(userText);
+      const pinnedWrongTheme = Boolean(
+        pinnedBrief &&
+          askedTheme &&
+          !liveEvents.some(
+            (event) =>
+              event.slug === pinnedBrief.eventSlug &&
+              event.location_slug === pinnedBrief.locationSlug &&
+              liveEventMatchesRequestedTheme(event, userText),
+          ),
+      );
       const namedOtherEvent = matchLiveEvents(userText, liveEvents).some(
         (item) => {
           const title = item.event.title.trim().toLowerCase();
@@ -1914,7 +2360,14 @@ Is there anything else I can help you with?`,
           );
         },
       );
-      if (!eventBookingBrief && pinnedBrief && !namedOtherEvent) {
+      if (
+        !eventBookingBrief &&
+        pinnedBrief &&
+        !namedOtherEvent &&
+        !pinnedWrongTheme &&
+        !isBroadEventListIntent(userText) &&
+        !isLiveEventAvailabilityQuestion(userText)
+      ) {
         eventBookingBrief = pinnedBrief;
       }
       const locationPick = isLiveEventLocationChoiceText(userText, liveEvents);
@@ -1925,18 +2378,36 @@ Is there anything else I can help you with?`,
           messages,
           liveEvents,
         );
+        const needsEventChoice = needsLiveEventLocationChoice(
+          userText,
+          matches,
+          liveEvents,
+        );
+        if (matches.length > 1 && needsEventChoice) {
+          const direct = buildLiveEventsDirectReply({
+            userText,
+            matches,
+            allLiveEvents: liveEvents,
+            siteName,
+            userName,
+          });
+          if (direct) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                ...inChatChoiceMessage(direct.content),
+              },
+            ]);
+            return;
+          }
+        }
         const pick =
           matches.length === 1
             ? matches[0]
-            : matches.find((item) =>
-                [userText, ...messages.map((m) => m.content)]
-                  .join("\n")
-                  .toLowerCase()
-                  .includes(item.event.location_city.toLowerCase()),
-              ) ??
-              (needsLiveEventLocationChoice(userText, matches, liveEvents)
-                ? undefined
-                : matches[0]);
+            : needsEventChoice
+              ? undefined
+              : matches[0];
         pickedLiveEvent = pick;
         if (pick) {
           try {
@@ -1997,6 +2468,7 @@ Is there anything else I can help you with?`,
                 allLiveEvents: liveEvents,
                 siteName,
                 userName,
+                userText,
               });
         if (direct) {
           setMessages((prev) => [
@@ -2004,6 +2476,36 @@ Is there anything else I can help you with?`,
             {
               role: "assistant",
               ...inChatChoiceMessage(direct.content),
+            },
+          ]);
+          return;
+        }
+      }
+
+      if (
+        isVendorStorefront &&
+        !isLoggedInVendor &&
+        eventBookingBrief &&
+        shouldSendBrochureForEventPick(userText, messages)
+      ) {
+        const brochureTurn = buildEventInfoTurn({
+          brief: eventBookingBrief,
+          userText: "brochure",
+        });
+        if (brochureTurn) {
+          const brochureActions = publicBookingQuickActions({
+            content: brochureTurn.content,
+            brief: eventBookingBrief,
+            conversation: [...messages, userMessage],
+            hostActions: brochureTurn.actions,
+          });
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: brochureTurn.content,
+              quickActions:
+                brochureActions.length > 0 ? brochureActions : undefined,
             },
           ]);
           return;
@@ -2056,6 +2558,7 @@ Is there anything else I can help you with?`,
         isVendorStorefront &&
         isLoggedInCustomer &&
         eventBookingBrief &&
+        !isLiveEventAvailabilityQuestion(userText) &&
         (isLiveEventBookingIntent(userText) || locationPick)
       ) {
         const conversation = [...messages, userMessage];
@@ -2105,18 +2608,39 @@ Is there anything else I can help you with?`,
         );
         const payMode = parseChatPayMode(userText);
         if (
+          isChatCheckoutHandoffIntent(userText) &&
+          (chatChoicesHaveLineItems(hostChoices) ||
+            (await customerCartHasDates()))
+        ) {
+          await openVendorCheckout({ extraMessages: [userMessage] });
+          return;
+        }
+        if (
           payMode &&
           bookingChoicesReadyForPay(eventBookingBrief, hostChoices)
         ) {
           await startChatPayment(payMode, [userMessage]);
           return;
         }
-        if (isHostBookingUserText(userText, eventBookingBrief)) {
+        const bookingInProgress = hostChoices.slots.length > 0;
+        if (
+          bookingInProgress ||
+          isHostBookingUserText(userText, eventBookingBrief)
+        ) {
+          if (chatChoicesHaveLineItems(hostChoices)) {
+            setIsLoading(true);
+            try {
+              await persistChatBookingCart(eventBookingBrief, hostChoices);
+            } finally {
+              setIsLoading(false);
+            }
+          }
           const hostTurn = buildHostBookingTurn({
             brief: eventBookingBrief,
             userText,
             choices: hostChoices,
             userName,
+            paymentGateways: chatPayGatewaysRef.current,
           });
           if (hostTurn) {
             const hostActions = publicBookingQuickActions({
@@ -2346,6 +2870,7 @@ Is there anything else I can help you with?`,
               .map((action) => ({
                 id: action.id,
                 label: action.label,
+                hint: action.hint,
                 sendText: action.sendText,
               }));
       const eventPageCta = isBareEventPageHref(
@@ -2426,7 +2951,7 @@ Is there anything else I can help you with?`,
     return null;
   }
 
-  return (
+  const chatOverlay = (
     <>
       {shouldLoadVendorChatStats && (
         <VendorChatStatsLoader
@@ -2451,7 +2976,7 @@ Is there anything else I can help you with?`,
             exit={motionSafe ? { opacity: 0, scale: 0.85, y: 12 } : undefined}
             transition={{ type: "spring", stiffness: 420, damping: 24 }}
             className={cn(
-              "fixed right-4 z-40 sm:right-6",
+              "fixed right-4 z-[80] sm:right-6",
               isVendorCheckout
                 ? "bottom-[calc(var(--checkout-mobile-chrome-height,9rem)+0.75rem)] lg:bottom-8"
                 : "bottom-20 sm:bottom-8",
@@ -2462,6 +2987,7 @@ Is there anything else I can help you with?`,
               type="button"
               onClick={() => {
                 setHasOpenedChat(true);
+                setIsMinimized(false);
                 setIsOpen(true);
               }}
               aria-label="Open chat"
@@ -2517,7 +3043,7 @@ Is there anything else I can help you with?`,
               className={cn(
                 "absolute -right-1.5 -top-1.5 z-30",
                 "flex h-5 w-5 items-center justify-center rounded-full",
-                "bg-slate-800 text-white shadow-sm",
+                "bg-[color:var(--color-header,#1e293b)] text-[color:var(--color-on-header,#fff)] shadow-sm",
                 "ring-2 ring-white",
                 "hover:bg-slate-950",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
@@ -2530,41 +3056,94 @@ Is there anything else I can help you with?`,
       </AnimatePresence>
 
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && !isMinimized && (
+          <motion.button
+            key="chat-scrim"
+            type="button"
+            aria-label="Minimise chat"
+            initial={motionSafe ? { opacity: 0 } : { opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={motionSafe ? { opacity: 0 } : undefined}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[70] bg-black/25 sm:hidden"
+            onClick={() => {
+              keepComposerFocusRef.current = false;
+              setIsMinimized(true);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isOpen && isMinimized && (
+          <motion.button
+            key="chat-dock"
+            type="button"
+            aria-label="Open chat assistant"
+            initial={motionSafe ? { x: 72, opacity: 0 } : { opacity: 1 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={motionSafe ? { x: 72, opacity: 0 } : undefined}
+            transition={{ type: "spring", stiffness: 420, damping: 30 }}
+            onClick={() => setIsMinimized(false)}
+            className={cn(
+              "fixed right-0 z-[80] flex items-center gap-2 rounded-l-2xl rounded-r-none",
+              "bg-[color:var(--color-header,#1e293b)] py-2.5 pl-2 pr-1.5 text-[color:var(--color-on-header,#fff)] shadow-[0_8px_24px_rgba(15,23,42,0.22)]",
+              "ring-1 ring-white/10",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+              isVendorCheckout
+                ? "bottom-[calc(var(--checkout-mobile-chrome-height,9rem)+0.75rem)] lg:bottom-24"
+                : "bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] sm:bottom-24",
+            )}
+            style={isVendorCheckout ? undefined : previewReviewChromeLiftStyle}
+          >
+            <ChatAvatar
+              src={avatarSrc}
+              alt={siteName}
+              size="sm"
+              className="ring-1 ring-white/25"
+            />
+            <ChevronsLeft className="h-4 w-4 text-white/80" strokeWidth={2} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isOpen && !isMinimized && (
           <motion.div
             key="chat-panel"
             initial={
               motionSafe
-                ? { opacity: 0, y: 28, scale: 0.94 }
+                ? { opacity: 0.6, x: "110%" }
                 : { opacity: 1 }
             }
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            animate={{ opacity: 1, x: 0 }}
             exit={
               motionSafe
-                ? { opacity: 0, y: 20, scale: 0.96 }
+                ? { opacity: 0, x: "110%" }
                 : { opacity: 0 }
             }
-            transition={{ type: "spring", stiffness: 380, damping: 28 }}
+            transition={{ type: "spring", stiffness: 380, damping: 32 }}
             className={cn(
-              "fixed right-4 z-40 flex w-[min(100vw-2rem,22rem)] flex-col overflow-hidden sm:right-6 md:w-96",
-              isVendorCheckout
-                ? "bottom-[calc(var(--checkout-mobile-chrome-height,9rem)+0.5rem)] lg:bottom-10"
-                : "bottom-10",
-              "rounded-2xl border border-slate-200 bg-white",
+              "fixed z-[80] flex flex-col overflow-hidden bg-white",
               "shadow-[0_16px_48px_rgba(15,23,42,0.16)]",
-              "origin-bottom-right",
-              isMinimized ? "h-14" : "h-[min(530px,70vh)]",
+              "border border-slate-200",
+              "right-0 w-[min(100vw-2.25rem,24rem)] rounded-l-2xl rounded-r-none",
+              "top-0 h-[100dvh] pb-[env(safe-area-inset-bottom)]",
+              "sm:right-6 sm:top-auto sm:h-[min(560px,calc(100dvh-5.5rem))] sm:w-96 sm:rounded-2xl sm:pb-0",
+              isVendorCheckout
+                ? "max-sm:top-auto max-sm:h-[min(530px,calc(100dvh-var(--checkout-mobile-chrome-height,9rem)-1rem))] max-sm:bottom-[calc(var(--checkout-mobile-chrome-height,9rem)+0.5rem)] lg:bottom-10"
+                : "sm:bottom-10",
             )}
-            style={{
-              transition: "height 300ms ease-out",
-              ...(isVendorCheckout ? {} : previewReviewChromeLiftStyle),
-            }}
+            style={isVendorCheckout ? undefined : previewReviewChromeLiftStyle}
           >
-            <div className="flex h-14 shrink-0 items-center justify-between gap-2 bg-slate-800 px-3.5 text-white">
+            <div className={cn(
+              "flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-end justify-between gap-2 px-3.5 pb-1.5 sm:h-14 sm:items-center sm:pb-0",
+              CHAT_CHROME,
+            )}>
               <div className="flex min-w-0 items-center gap-2.5">
                 <motion.div
                   animate={
-                    motionSafe && !isMinimized
+                    motionSafe
                       ? { rotate: [0, -6, 6, -4, 0] }
                       : undefined
                   }
@@ -2599,28 +3178,35 @@ Is there anything else I can help you with?`,
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-white hover:bg-white/15 hover:text-white"
-                  onClick={() => setIsMinimized(!isMinimized)}
-                  aria-label={isMinimized ? "Expand chat" : "Minimise chat"}
+                  className="h-11 w-11 text-white hover:bg-white/15 hover:text-white sm:h-8 sm:w-8"
+                  onClick={() => {
+                    keepComposerFocusRef.current = false;
+                    setIsMinimized(true);
+                  }}
+                  aria-label="Hide chat to the side"
+                  title="Hide chat"
                 >
-                  <Minus className="h-4 w-4" strokeWidth={2} />
+                  <Minus className="h-5 w-5 sm:h-4 sm:w-4" strokeWidth={2} />
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-white hover:bg-white/15 hover:text-white"
-                  onClick={() => setIsOpen(false)}
+                  className="h-11 w-11 text-white hover:bg-white/15 hover:text-white sm:h-8 sm:w-8"
+                  onClick={() => {
+                    keepComposerFocusRef.current = false;
+                    setIsOpen(false);
+                    setIsMinimized(false);
+                  }}
                   aria-label="Close chat"
+                  title="Close chat"
                 >
-                  <X className="h-4 w-4" strokeWidth={2} />
+                  <X className="h-5 w-5 sm:h-4 sm:w-4" strokeWidth={2} />
                 </Button>
               </div>
             </div>
 
-            {!isMinimized && (
-              <>
-                <ScrollArea className="min-h-0 flex-1 bg-slate-50 px-3.5 py-4">
+            <ScrollArea className="min-h-0 flex-1 bg-slate-50 px-3.5 py-4">
                   <div className="space-y-4 pb-1">
                     <AnimatePresence initial={false}>
                       {messages.map((message, index) => {
@@ -2637,7 +3223,11 @@ Is there anything else I can help you with?`,
                         const dateActionCount =
                           message.quickActions?.filter(isChatGridAction)
                             .length ?? 0;
+                        const eventPickCount =
+                          message.quickActions?.filter(isEventPickAction)
+                            .length ?? 0;
                         const useDateGrid = dateActionCount >= 2;
+                        const useEventList = !useDateGrid && eventPickCount >= 2;
                         return (
                           <motion.div
                             key={`msg-${index}-${message.role}-${message.content.slice(0, 24)}`}
@@ -2672,16 +3262,20 @@ Is there anything else I can help you with?`,
                             <div
                               className={cn(
                                 "flex min-w-0 flex-col gap-2",
-                                useDateGrid ? "w-full" : "max-w-[85%]",
+                                useDateGrid || useEventList
+                                  ? "w-full"
+                                  : "max-w-[85%]",
                               )}
                             >
                               {hasBody && (
                               <div
                                 className={cn(
                                   "min-w-0 px-3.5 py-2.5 text-sm leading-relaxed",
-                                  useDateGrid ? "max-w-[85%]" : null,
+                                  useDateGrid || useEventList
+                                    ? "max-w-[85%]"
+                                    : null,
                                   isUser
-                                    ? "rounded-2xl rounded-br-md bg-slate-800 text-white"
+                                    ? "rounded-2xl rounded-br-md bg-[color:var(--color-header,#1e293b)] text-[color:var(--color-on-header,#fff)]"
                                     : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
                                 )}
                               >
@@ -2707,12 +3301,16 @@ Is there anything else I can help you with?`,
                                     className={
                                       useDateGrid
                                         ? "grid w-full grid-cols-2 gap-1.5"
-                                        : "flex flex-col gap-1.5"
+                                        : useEventList
+                                          ? "flex w-full flex-col gap-1.5"
+                                          : "flex flex-col gap-1.5"
                                     }
                                   >
                                     {message.quickActions.map((action, actionIndex) => {
                                       const isDateChip =
                                         isChatGridAction(action);
+                                      const isEventChip =
+                                        isEventPickAction(action);
                                       return (
                                       <motion.button
                                         key={action.id}
@@ -2740,7 +3338,8 @@ Is there anything else I can help you with?`,
                                         }
                                         className={cn(
                                           "group rounded-2xl border px-3 py-1.5 text-left transition-colors",
-                                          isDateChip && useDateGrid
+                                          (isDateChip && useDateGrid) ||
+                                            (isEventChip && useEventList)
                                             ? "min-w-0 w-full"
                                             : "w-fit max-w-full",
                                           useDateGrid && !isDateChip
@@ -2748,15 +3347,35 @@ Is there anything else I can help you with?`,
                                             : null,
                                           action.id === "cancel_flow"
                                             ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                                            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-800 hover:text-white hover:border-slate-800",
+                                            : action.id === "open-checkout"
+                                              ? cn(
+                                                  "border-transparent",
+                                                  CHAT_CHROME,
+                                                  CHAT_CHROME_HOVER,
+                                                )
+                                              : "border-slate-300 bg-white text-slate-700 hover:bg-[color:var(--color-header,#1e293b)] hover:text-[color:var(--color-on-header,#fff)] hover:border-[color:var(--color-header,#1e293b)]",
                                           "disabled:pointer-events-none disabled:opacity-50",
                                         )}
                                       >
-                                        <span className="block truncate text-xs font-semibold leading-tight">
+                                        <span
+                                          className={cn(
+                                            "block text-xs font-semibold leading-snug",
+                                            isEventChip || isDateChip
+                                              ? "whitespace-normal"
+                                              : "truncate leading-tight",
+                                          )}
+                                        >
                                           {action.label}
                                         </span>
                                         {action.hint ? (
-                                          <span className="mt-0.5 block truncate text-[10px] font-medium leading-tight text-slate-500 group-hover:text-white/80">
+                                          <span
+                                            className={cn(
+                                              "mt-0.5 block text-[10px] font-medium leading-tight text-slate-500 group-hover:text-white/80",
+                                              isDateChip
+                                                ? "whitespace-normal"
+                                                : "truncate",
+                                            )}
+                                          >
                                             {action.hint}
                                           </span>
                                         ) : null}
@@ -2778,8 +3397,9 @@ Is there anything else I can help you with?`,
                                   <Link
                                     href={message.supportCta.href}
                                     className={cn(
-                                      "inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
-                                      "bg-slate-800 text-white shadow-sm transition hover:bg-slate-900",
+                                      "inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm transition",
+                                      CHAT_CHROME,
+                                      CHAT_CHROME_HOVER,
                                     )}
                                   >
                                     {message.supportCta.label}
@@ -2816,11 +3436,14 @@ Is there anything else I can help you with?`,
                 <div className="shrink-0 border-t border-black/6 bg-white text-slate-900">
                   <div className="flex items-center gap-2 p-3">
                     <Input
+                      ref={composerInputRef}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
                       placeholder={inputPlaceholder}
-                      disabled={isLoading || supportFlow.step === "submitting"}
+                      disabled={supportFlow.step === "submitting"}
+                      enterKeyHint="send"
+                      autoComplete="off"
                       className="h-10 flex-1 rounded-full border-black/10 bg-white px-4 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:ring-offset-0"
                     />
                     <Button
@@ -2835,7 +3458,7 @@ Is there anything else I can help you with?`,
                       className={cn(
                         "h-10 w-10 shrink-0 rounded-full transition-transform",
                         input.trim()
-                          ? "bg-slate-800 text-white hover:bg-slate-900 hover:scale-105"
+                          ? cn(CHAT_CHROME, CHAT_CHROME_HOVER, "hover:scale-105")
                           : "bg-black/5 text-black/35",
                       )}
                       aria-label="Send message"
@@ -2848,8 +3471,6 @@ Is there anything else I can help you with?`,
                     </Button>
                   </div>
                 </div>
-              </>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -2858,9 +3479,15 @@ Is there anything else I can help you with?`,
         open={isStripePaymentOpen}
         onOpenChange={(open) => {
           setIsStripePaymentOpen(open);
-          if (!open) setStripePaymentSession(null);
+          if (open) return;
+          checkoutInProgressRef.current = false;
+          setStripePaymentSession(null);
+          useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
         }}
         session={stripePaymentSession}
+        onPaymentComplete={() => {
+          resetChatAfterPaidBooking(stripePaymentSession?.bookingNumber);
+        }}
       />
 
       <style
@@ -2882,4 +3509,7 @@ Is there anything else I can help you with?`,
       />
     </>
   );
+
+  if (typeof document === "undefined") return chatOverlay;
+  return createPortal(chatOverlay, document.body);
 }

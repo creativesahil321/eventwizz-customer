@@ -256,6 +256,25 @@ function roomSlicesFromPayload(
   };
 }
 
+/**
+ * Per-room slices for chat booking — never snap a date-less room onto
+ * another room, and never flatten to event-level dates when named rooms exist.
+ */
+export function resolvePublicEventRoomPayloadSlices(
+  event: EventDetail,
+  roomIndex: number,
+): PublicEventActiveSlices | null {
+  const rooms = listPublicEventRooms(event);
+  const room = rooms[roomIndex];
+  if (!room) return null;
+  const payload = roomPayloadAtIndex(event, roomIndex);
+  if (!payload) return null;
+  if (room.disabled) {
+    return roomSlicesFromPayload(event, room, { ...payload, dates: undefined });
+  }
+  return roomSlicesFromPayload(event, room, payload);
+}
+
 /** Resolve room-aware section data for the live event detail page. */
 export function resolvePublicEventActiveSlices(
   event: EventDetail,
