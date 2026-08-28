@@ -3,7 +3,7 @@ import { withDateCardOffersFromApi } from "@/components/public/date-card-offer";
 import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 import type { EventDetail, EventDetailRoom } from "@/services/common/events/type";
 import {
-  lowestPositivePrice,
+  lowestBookableFromPrice,
   pickRoomHighlights,
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
@@ -135,9 +135,10 @@ export function listPublicEventRoomSummaries(
       name: name || `Room ${index + 1}`,
       index,
       thumbnail: packageImage || galleryImage || bannerFallback,
-      fromPrice: lowestPositivePrice(
-        (payload.packages ?? []).map((pkg) => pkg.price),
-      ),
+      fromPrice: lowestBookableFromPrice({
+        datePrices: (payload.dates ?? []).map((date) => date.price),
+        packagePrices: (payload.packages ?? []).map((pkg) => pkg.price),
+      }),
       packageCount: payload.packages?.length ?? 0,
       highlights,
       disabled,

@@ -14,7 +14,7 @@ type CheckoutPaymentQuickAction = {
 export const CHECKOUT_HANDOFF_PAY = "pay";
 export const CHECKOUT_HANDOFF_COUPON = "coupon";
 export const CHECKOUT_HANDOFF_DATES = "dates";
-export const CHECKOUT_PATH = "/vendor/checkout";
+export const CHECKOUT_PATH = "/checkout";
 export const CHAT_EVENT_RETURN_HREF_KEY = "ew.checkout.chat-event-href";
 
 const PENDING_STORAGE_KEY = "ew.checkout.chat-handoff";
@@ -85,7 +85,12 @@ function hrefSearchParams(href: string): URLSearchParams {
 export function isCheckoutHandoffHref(href: string | null | undefined): boolean {
   if (!href) return false;
   const path = hrefPathname(href);
-  return path === CHECKOUT_PATH || path.startsWith(`${CHECKOUT_PATH}/`);
+  return (
+    path === CHECKOUT_PATH ||
+    path.startsWith(`${CHECKOUT_PATH}/`) ||
+    path === "/vendor/checkout" ||
+    path.startsWith("/vendor/checkout/")
+  );
 }
 
 export function isPublicEventBookingHref(href: string | null | undefined): boolean {

@@ -74,6 +74,8 @@ interface AddressAutocompleteProps {
     address: string;
     city: string | null;
     phone: string | null;
+    latitude: number | null;
+    longitude: number | null;
   }) => void;
   onFocus?: () => void;
   placeholder?: string;
@@ -299,6 +301,8 @@ const AddressAutocomplete = forwardRef<
         address: string,
         city: string | null,
         phone: string | null = null,
+        latitude: number | null = null,
+        longitude: number | null = null,
       ) => {
         onSelect?.(suggestion.place_id, address);
         onResolved?.({
@@ -306,6 +310,8 @@ const AddressAutocomplete = forwardRef<
           address,
           city,
           phone,
+          latitude,
+          longitude,
         });
       };
 
@@ -327,6 +333,7 @@ const AddressAutocomplete = forwardRef<
                 place.international_phone_number?.trim() ||
                 place.formatted_phone_number?.trim() ||
                 null;
+              const loc = place.geometry?.location;
               finish(
                 place.formatted_address || suggestion.description,
                 cityFromGooglePlace({
@@ -334,9 +341,11 @@ const AddressAutocomplete = forwardRef<
                   formatted_address: place.formatted_address,
                 }),
                 phone,
+                loc ? loc.lat() : null,
+                loc ? loc.lng() : null,
               );
             } else {
-              finish(suggestion.description, null, null);
+              finish(suggestion.description, null, null, null, null);
             }
           },
         );

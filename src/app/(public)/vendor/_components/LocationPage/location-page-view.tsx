@@ -19,6 +19,7 @@ import {
   type VenueContactOverride,
 } from "@/lib/resolve-venue-contact";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
+import { locationDisplayName } from "@/lib/slug-short-label";
 import { ServerContext } from "@/lib/server-context";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import CommonHeader from "@/components/shared/common-header";
@@ -28,7 +29,10 @@ import ExperienceSection from "../EventListPage/experience";
 import FooterSection from "../EventListPage/footer";
 import SubscribeSection from "../EventListPage/subscribe";
 import { LocationEventSearchResults } from "./location-event-search-results";
-import { PublicSearchResults } from "./public-search-results";
+import {
+  PublicSearchResults,
+  isPublicSearchEmpty,
+} from "./public-search-results";
 import {
   LocationPageHeroSearch,
   useLocationPageSearch,
@@ -144,21 +148,25 @@ export function LocationPageView({
     previewMode: forcePreviewSearch,
   });
 
-  const cityLabel = locationData.city || settings?.name || "";
+  const cityLabel = locationDisplayName(locationData.city, locationSlug);
   const brandName = settings?.name?.trim() || "";
-  const cityEyebrow = locationData.city?.trim() || "";
   const headingEyebrow =
-    cityEyebrow &&
-    (!brandName || cityEyebrow.toLowerCase() !== brandName.toLowerCase())
-      ? cityEyebrow
+    locationData.city?.trim() &&
+    (!brandName ||
+      locationData.city.trim().toLowerCase() !== brandName.toLowerCase())
+      ? cityLabel
       : null;
   const headingEmphasis =
     settings?.typography?.headingEmphasis != null
       ? normalizeHeadingEmphasis(settings.typography.headingEmphasis)
       : undefined;
+  const searchEmpty = isPublicSearchEmpty(searchData, {
+    isLoading: isSearchLoading,
+    isError: isSearchError,
+  });
   const searchBar = (
     <LocationPageHeroSearch
-      cityLabel={locationData.city || cityLabel || null}
+      cityLabel={cityLabel || null}
       locationSlug={locationSlug}
       filters={filters}
       onFiltersChange={setFilters}
@@ -203,16 +211,37 @@ export function LocationPageView({
               isLoading={isSearchLoading}
               isError={isSearchError}
               onClear={clearSearch}
+              emptyHint="Browse this venue’s events below."
             />
           ) : (
             <LocationEventSearchResults
               events={searchResults}
               locationSlug={locationSlug}
-              locationLabel={locationData.city ?? cityLabel ?? null}
+              locationLabel={cityLabel || null}
               filters={filters}
               onClear={clearSearch}
             />
           )}
+          {(useApi ? searchEmpty : searchResults.length === 0) ? (
+            <LocationMarketingBody
+              className={marketingClassName}
+              style={marketingStyle}
+              latestEvents={latestEvents}
+              upcomingEvents={upcomingEvents}
+              popularSectionTitle={
+                locationData.event_title_1 || "Popular Events"
+              }
+              upcomingSectionTitle={
+                locationData.event_title_2 || "Upcoming Events"
+              }
+              galleryTitle={
+                locationData.event_gallery_title || "Recent Events Glimpse"
+              }
+              galleryImages={galleryImages ?? locationData.event_gallery ?? []}
+              locationSlug={locationSlug}
+              locationLabel={cityLabel || null}
+            />
+          ) : null}
         </div>
       ) : (
         <>
@@ -255,7 +284,7 @@ export function LocationPageView({
             }
             galleryImages={galleryImages ?? locationData.event_gallery ?? []}
             locationSlug={locationSlug}
-            locationLabel={locationData.city ?? cityLabel ?? null}
+            locationLabel={cityLabel || null}
           />
         </>
       )}

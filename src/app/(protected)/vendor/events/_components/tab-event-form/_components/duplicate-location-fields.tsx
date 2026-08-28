@@ -55,6 +55,15 @@ function applyExistingLocation(
   form.setValue("contact_number", location.contact_number?.trim() || "", {
     shouldValidate: true,
   });
+  const lat = Number(location.latitude);
+  const lng = Number(location.longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    form.setValue("latitude", lat, { shouldValidate: true });
+    form.setValue("longitude", lng, { shouldValidate: true });
+  } else {
+    form.setValue("latitude", undefined, { shouldValidate: true });
+    form.setValue("longitude", undefined, { shouldValidate: true });
+  }
 }
 
 function clearExistingLocation(form: UseFormReturn<StepEightType>) {
@@ -62,6 +71,8 @@ function clearExistingLocation(form: UseFormReturn<StepEightType>) {
   form.setValue("address", "", { shouldValidate: true });
   form.setValue("city", "", { shouldValidate: true });
   form.setValue("contact_number", "", { shouldValidate: true });
+  form.setValue("latitude", undefined, { shouldValidate: true });
+  form.setValue("longitude", undefined, { shouldValidate: true });
 }
 
 export function DuplicateLocationFields({

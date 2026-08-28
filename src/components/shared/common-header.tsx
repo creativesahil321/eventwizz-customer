@@ -50,6 +50,7 @@ import {
 } from "@/hooks/use-preview-narrow-layout";
 import { getNearestScrollContainer } from "@/components/public/event-section-nav";
 import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 import { resolvePublicPageContact } from "@/lib/resolve-venue-contact";
 import {
   previewBrowseIconVisibility,
@@ -735,7 +736,7 @@ export default function CommonHeader({
             {disableLogoHomeLink ? (
               <div className="flex h-14 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
-                  <img
+                  <BrandLogoImage
                     src={addCacheBusting(
                       logoPath as string,
                       themeMediaVersion,
@@ -762,7 +763,7 @@ export default function CommonHeader({
               >
                 <div className="flex h-14 max-w-full items-center justify-center">
                   {logoPath ? (
-                    <img
+                    <BrandLogoImage
                       src={addCacheBusting(
                         logoPath as string,
                         themeMediaVersion,
@@ -1095,7 +1096,7 @@ export default function CommonHeader({
             {disableLogoHomeLink ? (
               <div className="flex h-9 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
-                  <img
+                  <BrandLogoImage
                     src={addCacheBusting(
                       logoPath as string,
                       themeMediaVersion,
@@ -1122,7 +1123,7 @@ export default function CommonHeader({
               >
                 <div className="flex h-9 max-w-full items-center justify-center">
                   {logoPath ? (
-                    <img
+                    <BrandLogoImage
                       src={addCacheBusting(
                         logoPath as string,
                         themeMediaVersion,

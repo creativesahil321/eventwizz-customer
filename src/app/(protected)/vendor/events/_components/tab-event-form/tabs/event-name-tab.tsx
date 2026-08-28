@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
@@ -40,6 +40,13 @@ import {
 } from "@/lib/word-count";
 import { mapGlobalStepOneToLocal } from "../../../_lib/map-global-step-to-local";
 import { useSyncStepFormFromGlobal } from "../../../_lib/use-sync-step-form-from-global";
+import AddressAutocomplete from "./_components/address-autocomplete";
+import EventLocationMap from "./_components/event-location-map";
+import { useLocationStore } from "@/store/location.store";
+import {
+  resolveVenueLocationAddress,
+  resolveVenueLocationCoords,
+} from "@/lib/venue-location-address";
 
 export default function EventNameTab() {
   // No need to use session update as we get data from API
@@ -69,13 +76,32 @@ export default function EventNameTab() {
   // URL strings from backend for existing videos/images
   const [bannerImageUrl, setBannerImageUrl] = useState<string>("");
   const [bannerVideoUrl, setBannerVideoUrl] = useState<string>("");
+  const selectedLocation = useLocationStore((state) => state.selectedLocation);
+  const venueAddressHint = useMemo(
+    () => resolveVenueLocationAddress(selectedLocation),
+    [selectedLocation],
+  );
+  const venueCoords = useMemo(
+    () =>
+      resolveVenueLocationCoords(
+        selectedLocation as
+          | (NonNullable<typeof selectedLocation> & Record<string, unknown>)
+          | null,
+      ),
+    [selectedLocation],
+  );
+  const addressSearchFunctionRef = useRef<((address: string) => void) | null>(
+    null,
+  );
 
   // Initialize form with combined step data
   const stepOneDefaults = globalForm.getValues().stepOne;
   const { data: session } = useSession();
   const vendorLocationId = (() => {
     const sessionLocationId = session?.user?.vendor_location_id;
-    const parsedId = sessionLocationId ? parseInt(sessionLocationId, 10) : 0;
+    const parsedId = sessionLocationId
+      ? parseInt(String(sessionLocationId), 10)
+      : 0;
     const globalFormId = globalForm.getValues("stepOne.vendor_location_id");
     const validId =
       !isNaN(parsedId) && parsedId > 0 ? parsedId : globalFormId || 0;
@@ -97,6 +123,14 @@ export default function EventNameTab() {
       about_event_heading: stepOneDefaults?.about_event_heading || "",
       about_event_sub_heading: stepOneDefaults?.about_event_sub_heading || "",
       about_event_description: stepOneDefaults?.about_event_description || "",
+      event_address: stepOneDefaults?.event_address || venueAddressHint || "",
+      latitude: stepOneDefaults?.latitude ?? venueCoords?.latitude,
+      longitude: stepOneDefaults?.longitude ?? venueCoords?.longitude,
+      location: stepOneDefaults?.location || {
+        title: "LOCATION",
+        description: venueAddressHint || "",
+        icon: "MapPin",
+      },
       remove_event_banner_image: false,
       remove_event_banner_video: false,
     } as StepOneType,
@@ -130,6 +164,33 @@ export default function EventNameTab() {
   useEffect(() => {
     form.setValue("vendor_location_id", vendorLocationId);
   }, [vendorLocationId, form]);
+
+  useEffect(() => {
+    const currentAddress = globalForm.getValues("stepOne.event_address")?.trim();
+    if (!currentAddress && venueAddressHint) {
+      globalForm.setValue("stepOne.event_address", venueAddressHint, {
+        shouldDirty: false,
+      });
+      form.setValue("event_address", venueAddressHint, { shouldDirty: false });
+    }
+
+    const currentLatitude = globalForm.getValues("stepOne.latitude");
+    const currentLongitude = globalForm.getValues("stepOne.longitude");
+    if (
+      venueCoords &&
+      (!Number.isFinite(Number(currentLatitude)) ||
+        !Number.isFinite(Number(currentLongitude)))
+    ) {
+      globalForm.setValue("stepOne.latitude", venueCoords.latitude, {
+        shouldDirty: false,
+      });
+      globalForm.setValue("stepOne.longitude", venueCoords.longitude, {
+        shouldDirty: false,
+      });
+      form.setValue("latitude", venueCoords.latitude, { shouldDirty: false });
+      form.setValue("longitude", venueCoords.longitude, { shouldDirty: false });
+    }
+  }, [form, globalForm, venueAddressHint, venueCoords]);
 
   // Initialize banner image and video from existing data
   useEffect(() => {
@@ -349,64 +410,6 @@ export default function EventNameTab() {
       setIsLoading(true);
 
       try {
-        // Manually re-trigger validation on all fields to force error display
-        console.log("Form values before validation:", form.getValues());
-        const isValid = await form.trigger();
-
-        // If form is not valid, only highlight fields - no toast
-        if (!isValid) {
-          // Get all validation errors
-          const errors = form.formState.errors;
-          const errorFields = Object.keys(errors);
-
-          // Check if banner image/video validation failed
-          if (errors.event_banner_image) {
-            const errorMessage =
-              typeof errors.event_banner_image === "object" &&
-              "message" in errors.event_banner_image
-                ? String(errors.event_banner_image.message)
-                : "Please upload either a banner image or video for your event.";
-            toast.error("Banner image or video required", {
-              description: errorMessage,
-              duration: 5000,
-            });
-            // Scroll to banner section
-            const bannerSection =
-              document
-                .querySelector('[name="event_banner_image"]')
-                ?.closest(".space-y-6") ||
-              document.querySelector("[data-banner-section]");
-            if (bannerSection) {
-              bannerSection.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
-            }
-            setIsLoading(false);
-            return;
-          }
-
-          // Find the first error field and scroll to it
-          if (errorFields.length > 0) {
-            setActiveField(errorFields[0]);
-
-            // Try to find and focus the field with an error
-            const errorElement = document.querySelector(
-              `[name="${errorFields[0]}"]`,
-            );
-            if (errorElement) {
-              (errorElement as HTMLElement).focus();
-              errorElement.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
-            }
-          }
-
-          setIsLoading(false);
-          return;
-        }
-
         // Continue with valid data - don't include vendor_location_id as it's sent in headers
         const formData = {
           ...data,
@@ -553,6 +556,15 @@ export default function EventNameTab() {
           }
 
           if (eventId) {
+            const persistedEventId = Number(eventId);
+            if (Number.isFinite(persistedEventId) && persistedEventId > 0) {
+              const currentStepOne = globalForm.getValues().stepOne;
+              globalForm.setValue("stepOne", {
+                ...currentStepOne,
+                event_id: persistedEventId,
+              });
+            }
+
             // Only redirect if this is a new event
             // Success message is handled by axios interceptor
             if (!existingEventId) {
@@ -587,12 +599,25 @@ export default function EventNameTab() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            form.trigger().then((valid) => {
-              if (valid) {
-                form.handleSubmit(handleSubmit)(e);
-              }
-              // No toast error - let the form display validation errors natively
-            });
+            void form.handleSubmit(
+              handleSubmit,
+              (errors) => {
+                const firstError = Object.keys(errors)[0];
+                if (!firstError) return;
+
+                setActiveField(firstError);
+                const errorElement = document.querySelector(
+                  `[name="${firstError}"]`,
+                );
+                if (errorElement instanceof HTMLElement) {
+                  errorElement.focus();
+                  errorElement.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                  });
+                }
+              },
+            )(e);
           }}
           className="space-y-4 sm:space-y-6"
           noValidate
@@ -953,6 +978,110 @@ export default function EventNameTab() {
               </div>
             </div>
 
+            <div className="space-y-4" data-event-location-section>
+              <div className="flex items-center gap-3 title-header">
+                <h2 className="text-xl font-bold">Event Location</h2>
+              </div>
+              <p className="text-sm text-gray-500">
+                Set the exact event location near your selected venue.
+              </p>
+
+              <div className="space-y-4 border border-[#E5E7EB] p-6 rounded-md bg-white">
+                <FormField
+                  control={form.control}
+                  name="event_address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Event address (exact location){" "}
+                        <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <AddressAutocomplete
+                          value={field.value}
+                          biasCity={
+                            selectedLocation?.city ??
+                            selectedLocation?.name ??
+                            null
+                          }
+                          biasLatitude={venueCoords?.latitude ?? null}
+                          biasLongitude={venueCoords?.longitude ?? null}
+                          onChange={(address) => {
+                            field.onChange(address);
+                            globalForm.setValue("stepOne.event_address", address);
+                            globalForm.setValue("stepOne.location", {
+                              title: "LOCATION",
+                              description: address,
+                              icon: "MapPin",
+                            });
+                          }}
+                          onSelect={(_placeId, address) => {
+                            field.onChange(address);
+                            globalForm.setValue("stepOne.event_address", address);
+                            globalForm.setValue("stepOne.location", {
+                              title: "LOCATION",
+                              description: address,
+                              icon: "MapPin",
+                            });
+                            addressSearchFunctionRef.current?.(address);
+                          }}
+                          onFocus={() => handleFieldFocus("event_address")}
+                          placeholder="Type to search for a UK address or location..."
+                          className="w-full"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-blue-600 mt-1 font-medium">
+                        Restricted to{" "}
+                        {selectedLocation?.city ||
+                          selectedLocation?.name ||
+                          "your selected location"}{" "}
+                        (~50km). Search nearby addresses, or drag the pin inside
+                        that area.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <EventLocationMap
+                  initialAddress={form.watch("event_address")}
+                  initialLatitude={form.watch("latitude")}
+                  initialLongitude={form.watch("longitude")}
+                  restrictLatitude={venueCoords?.latitude ?? null}
+                  restrictLongitude={venueCoords?.longitude ?? null}
+                  restrictLabel={
+                    selectedLocation?.city ?? selectedLocation?.name ?? null
+                  }
+                  onLocationChange={(location) => {
+                    form.setValue("event_address", location.address, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    form.setValue("latitude", location.latitude, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    form.setValue("longitude", location.longitude, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    globalForm.setValue("stepOne.event_address", location.address);
+                    globalForm.setValue("stepOne.latitude", location.latitude);
+                    globalForm.setValue("stepOne.longitude", location.longitude);
+                    globalForm.setValue("stepOne.location", {
+                      title: "LOCATION",
+                      description: location.address,
+                      icon: "MapPin",
+                    });
+                  }}
+                  onAddressSearch={(searchFunction) => {
+                    addressSearchFunctionRef.current = searchFunction;
+                  }}
+                  className="mt-4"
+                />
+              </div>
+            </div>
+
             {/* Tell Guests What It's About Section */}
             <div className="space-y-6">
               <div className="flex items-center gap-3 title-header">
@@ -1068,30 +1197,6 @@ export default function EventNameTab() {
             <div className="flex justify-end mt-6">
               <Button
                 type="submit"
-                onClick={async () => {
-                  // First trigger validation on all fields to show errors
-                  const valid = await form.trigger();
-                  if (!valid) {
-                    const errors = form.formState.errors;
-                    const errorFields = Object.keys(errors);
-
-                    // Attempt to focus the first error field
-                    if (errorFields.length > 0) {
-                      const firstErrorElement = document.querySelector(
-                        `[name="${errorFields[0]}"]`,
-                      );
-                      if (firstErrorElement) {
-                        (firstErrorElement as HTMLElement).focus();
-                        firstErrorElement.scrollIntoView({
-                          behavior: "smooth",
-                          block: "center",
-                        });
-                      }
-                    }
-                  } else {
-                    form.handleSubmit(handleSubmit)();
-                  }
-                }}
                 disabled={isLoading || globalLoading || readOnly}
                 variant="event-primary"
               >

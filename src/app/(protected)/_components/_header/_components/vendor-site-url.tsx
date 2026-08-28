@@ -7,7 +7,13 @@ import { useSession } from "next-auth/react";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { useProfileData } from "@/app/(protected)/_shared/profile/_lib";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface VendorSiteUrlProps {
   className?: string;
@@ -76,33 +82,50 @@ const VendorSiteUrl: React.FC<VendorSiteUrlProps> = ({ className }) => {
   if (!shouldShow) return null;
 
   return (
-    <div className={`flex items-center gap-2 ${className || ""}`}>
-      <span className="whitespace-nowrap text-sm">Site URL</span>
-      <div className="relative flex max-w-[300px] items-center">
+    <div
+      className={cn(
+        "hidden min-w-0 shrink-0 items-center gap-1.5 lg:flex 2xl:gap-2",
+        className,
+      )}
+    >
+      <span className="hidden whitespace-nowrap text-sm 2xl:inline">
+        Site URL
+      </span>
+      <div className="relative flex w-[8.75rem] min-w-0 items-center xl:w-[10.5rem] 2xl:w-[300px] 2xl:max-w-[300px]">
         <Input
           ref={inputRef}
           value={siteUrl}
           readOnly
-          className="h-9 truncate border-gray-200 bg-gray-50 pr-20 text-sm"
+          className="h-9 min-w-0 w-full truncate border-gray-200 bg-gray-50 pr-16 text-xs 2xl:pr-20 2xl:text-sm"
           onClick={(e) => (e.target as HTMLInputElement).select()}
           aria-label="Vendor site URL for preview"
         />
         <div className="absolute right-0 flex h-9 items-center">
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 px-1.5 2xl:px-2"
+                onClick={copySiteUrl}
+                aria-label="Copy site URL"
+              >
+                <Copy className="h-4 w-4 text-black" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              className="max-w-[min(90vw,24rem)] border border-[var(--color-border)] shadow-md"
+            >
+              Copy {siteUrl}
+            </TooltipContent>
+          </Tooltip>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-9 px-2"
-            onClick={copySiteUrl}
-            aria-label="Copy site URL"
-          >
-            <Copy className="h-4 w-4 text-black" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 px-2"
+            className="h-9 px-1.5 2xl:px-2"
             asChild
           >
             <Link

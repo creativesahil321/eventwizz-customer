@@ -23,6 +23,17 @@ function hasNonEmptyText(value: unknown): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function readCoordinate(
+  source: Record<string, unknown>,
+  primaryKey: "latitude" | "longitude",
+  legacyKey: "lat" | "long",
+): number | undefined {
+  const value = source[primaryKey] ?? source[legacyKey];
+  const coordinate =
+    typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  return Number.isFinite(coordinate) ? coordinate : undefined;
+}
+
 function hasPersistedUpload(value: unknown): boolean {
   if (typeof File !== "undefined" && value instanceof File) {
     return value.size > 0 || value.name.trim().length > 0;
@@ -184,6 +195,49 @@ export function patchOnboardingPayloadFromApi(
       ...(hasMultiple !== undefined
         ? { has_multiple_locations: hasMultiple }
         : {}),
+    };
+  }
+
+  // Location moved from the legacy brochure step to Step 3. Prefer new Step 3
+  // values, but copy Step 7 values forward so existing events remain editable.
+  const persistedStepThree = (dataAny.stepThree ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const legacyStepSeven = (dataAny.stepSeven ?? {}) as Record<string, unknown>;
+  const eventAddress =
+    hasNonEmptyText(persistedStepThree.event_address)
+      ? String(persistedStepThree.event_address)
+      : hasNonEmptyText(legacyStepSeven.event_address)
+        ? String(legacyStepSeven.event_address)
+        : "";
+  const latitude =
+    readCoordinate(persistedStepThree, "latitude", "lat") ??
+    readCoordinate(legacyStepSeven, "latitude", "lat");
+  const longitude =
+    readCoordinate(persistedStepThree, "longitude", "long") ??
+    readCoordinate(legacyStepSeven, "longitude", "long");
+  if (
+    dataAny.stepThree !== undefined ||
+    eventAddress ||
+    latitude !== undefined ||
+    longitude !== undefined
+  ) {
+    dataAny.stepThree = {
+      ...defaultValues.stepThree,
+      ...persistedStepThree,
+      ...(eventAddress
+        ? {
+            event_address: eventAddress,
+            location: {
+              title: "LOCATION",
+              description: eventAddress,
+              icon: "MapPin",
+            },
+          }
+        : {}),
+      ...(latitude !== undefined ? { latitude } : {}),
+      ...(longitude !== undefined ? { longitude } : {}),
     };
   }
 

@@ -63,8 +63,7 @@ const SECTIONS = [
   { id: "stepTwo", title: "Packages and schedule", icon: "📦" },
   { id: "stepThree", title: "Dates and tickets", icon: "🎟️" },
   { id: "stepFour", title: "Catering and menu", icon: "🍽️" },
-  { id: "stepFive", title: "Other packages", icon: "🥂" },
-  { id: "stepSix", title: "Location and pricing", icon: "📍" },
+  { id: "stepFive", title: "Drinks & extras", icon: "🥂" },
   { id: "stepSeven", title: "FAQs", icon: "❓" },
 ] as const;
 
@@ -282,6 +281,7 @@ export default function AIEventReviewContent({
                           <StepOneEditor
                             content={editedContent.stepOne}
                             onChange={(f, v) => updateField("stepOne", f, v)}
+                            eventInput={eventInput}
                           />
                         )}
                         {section.id === "stepTwo" && (
@@ -306,12 +306,6 @@ export default function AIEventReviewContent({
                           <StepFiveEditor
                             content={editedContent.stepFive}
                             onChange={updateStepFive}
-                          />
-                        )}
-                        {section.id === "stepSix" && (
-                          <StepSixEditor
-                            content={editedContent.stepSix}
-                            onChange={(f, v) => updateField("stepSix", f, v)}
                           />
                         )}
                         {section.id === "stepSeven" && (
@@ -482,9 +476,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function StepOneEditor({
   content,
   onChange,
+  eventInput,
 }: {
   content: AIEventGeneratedContent["stepOne"];
   onChange: (f: string, v: unknown) => void;
+  eventInput: AIEventInput;
 }) {
   return (
     <>
@@ -525,6 +521,21 @@ function StepOneEditor({
         maxLength={340}
         multiline
       />
+      <div className="space-y-1.5">
+        <label className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
+          Event address
+        </label>
+        <AddressAutocomplete
+          value={content.event_address || ""}
+          onChange={(address) => onChange("event_address", address)}
+          onSelect={(_, address) => onChange("event_address", address)}
+          biasCity={eventInput.venueCity || eventInput.venueName || null}
+          biasLatitude={eventInput.venueLatitude ?? null}
+          biasLongitude={eventInput.venueLongitude ?? null}
+          placeholder="Type to search for a UK address or location…"
+          className="w-full"
+        />
+      </div>
     </>
   );
 }
@@ -1244,7 +1255,7 @@ function StepFourEditor({
 }
 
 /* ─────────────────────────────────────────────────
-   Step 5 — Other Packages  (full CRUD)
+   Step 5 — Drinks & extras (full CRUD)
 ───────────────────────────────────────────────── */
 
 function StepFiveEditor({
@@ -1413,35 +1424,6 @@ function StepFiveEditor({
         </div>
       </div>
     </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────
-   Step 6 — Location & Pricing
-───────────────────────────────────────────────── */
-
-function StepSixEditor({
-  content,
-  onChange,
-}: {
-  content: AIEventGeneratedContent["stepSix"];
-  onChange: (f: string, v: unknown) => void;
-}) {
-  return (
-    <>
-      <div className="space-y-1.5">
-        <label className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
-          Event address
-        </label>
-        <AddressAutocomplete
-          value={content?.event_address || ""}
-          onChange={(address) => onChange("event_address", address)}
-          onSelect={(_, address) => onChange("event_address", address)}
-          placeholder="Type to search for a UK address or location…"
-          className="w-full"
-        />
-      </div>
-    </>
   );
 }
 

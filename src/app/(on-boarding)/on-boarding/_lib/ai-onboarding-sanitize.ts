@@ -717,7 +717,7 @@ export function buildAiOnboardingJsonSchemaBlock(stepNineMaxFaqs: number): strin
   return `Return this JSON shape (compact keys, no extra commentary):
 {
   "stepTwo": {"banner_heading":"≤30 words","banner_sub_heading":"≤80 chars","about_title":"≤40 chars","about_description":"≤340 chars, no HTML","footer_brand_description":"≤180 chars, no HTML, footer blurb under logo"},
-  "stepThree": {"event_name":"≤40 chars","event_banner_heading":"≤30 words","event_banner_sub_heading":"≤80 chars","about_event_heading":"≤50 chars","about_event_sub_heading":"≤80 chars","about_event_description":"≤340 chars, no HTML"},
+  "stepThree": {"event_name":"≤40 chars","event_address":"exact event address near the venue","event_banner_heading":"≤30 words","event_banner_sub_heading":"≤80 chars","about_event_heading":"≤50 chars","about_event_sub_heading":"≤80 chars","about_event_description":"≤340 chars, no HTML"},
   "stepFour": {"package_title":"≤40","package_description":"≤160","package_button_name":"≤18","package_details":[{"title":"≤40"},{"title":"≤40"},{"title":"≤40"},{"title":"≤40"},{"title":"≤40"}],"event_schedular_title":"≤40","event_schedule_subtitle":"≤160 optional","event_schedular":[{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"}]},
   "stepFive": {
     "dates":[{"event_date":"YYYY-MM-DD","booking_type":"tickets|tables|both","tickets":[{"title":"≤25","description":"≤160","total_capacity":"n","price":"n"}],"tables":[{"min_persons":"n","max_persons":"n","price":"n","total_tables":"n"}],"payment_type":"full|deposit","is_deposit_enabled":false,"deposit_type":"amount|percentage","deposit_value":"n","deposit_due_date":"YYYY-MM-DD"}],
@@ -725,7 +725,7 @@ export function buildAiOnboardingJsonSchemaBlock(stepNineMaxFaqs: number): strin
   },
   "stepSix": {"menu_title":"≤40","menu_description":"≤160","menus":[{"name":"≤40","items":[{"title":"≤40","description":"≤160"}]}]},
   "stepSeven": {"drink_title":"≤40","drink_description":"≤160","packages":[{"title":"≤25","description":"≤160","price":0,"available_quantity":0}],"rooms":[{"room_name":"exact","drink_title":"s","drink_description":"s","packages":[]}]},
-  "stepEight": {"event_address":"s","price_start_from":"n","price_start_from_button_text":"Book Now","location":{"title":"≤40","description":"≤160"}},
+  "stepEight": {"price_start_from":"n","price_start_from_button_text":"Book Now","location":{"title":"≤40","description":"≤160"}},
   "stepNine": {"faqs":[{"question":"≤160","answer":"≤500"}]}
 }
 Rules: one stepFive date object per vendor-listed date (otherwise 2 future dates); stepNine.faqs at most ${stepNineMaxFaqs} (prefer 5-8); empty menus/packages as []; times ascending; prices must match vendor facts when given.`;
@@ -1140,6 +1140,11 @@ export function fillOnboardingContentDefaults(
       next.stepThree?.event_name,
       clipText(venue, 40),
     ),
+    event_address: firstNonEmpty(
+      next.stepThree?.event_address,
+      next.stepEight?.event_address,
+      address,
+    ),
     event_banner_heading: firstNonEmpty(
       next.stepThree?.event_banner_heading,
       clipText(`Welcome to ${venue}`, 80),
@@ -1292,7 +1297,6 @@ export function fillOnboardingContentDefaults(
   if (sevenIsBrochure) {
     next.stepSeven = {
       ...next.stepSeven,
-      event_address: brochureAddress,
       price_start_from: brochurePrice,
     } as typeof next.stepSeven;
   } else {

@@ -91,11 +91,11 @@ export function AuthContent({
         title="Discover Amazing Events Near You!"
         description="Join our community of event enthusiasts. Get early access to tickets, exclusive discounts, and personalised event recommendations tailored just for you."
         stats={[
-          { value: "1M+", label: "Happy Attendees" },
-          { value: "5K+", label: "Events Monthly" },
-          { value: "4.9★", label: "User Rating" },
+          { value: "Early access", label: "To new dates" },
+          { value: "Your bookings", label: "In one place" },
+          { value: "Secure", label: "Checkout" },
         ]}
-        trust="Join millions of happy event-goers"
+        trust="Create an account to book and manage events"
       />
     );
   }
@@ -121,25 +121,32 @@ export function AuthContent({
         <AuthPanel
           title={`Welcome back to ${siteName}`}
           description="Sign in to continue setting up your venue website. We’ll pick up your onboarding where you left off."
-          stats={[
-            { value: "11", label: "Setup steps" },
-            { value: "~5 min", label: "AI draft" },
-            { value: "24/7", label: "Support" },
-          ]}
           trust="For event organisers setting up their EventWizz site"
         />
       );
     }
+
+    const resumeCheckout = Boolean(
+      callbackUrl &&
+        (callbackUrl.includes("/checkout") ||
+          callbackUrl.includes("/vendor/checkout")),
+    );
+
+    if (resumeCheckout) {
+      return (
+        <AuthPanel
+          title="Save your booking"
+          description={`Sign in to ${siteName} to keep the date you selected and finish checkout. Your selection is saved — you’ll return to the same booking after login.`}
+          trust="We only use your account to complete and manage this booking"
+        />
+      );
+    }
+
     return (
       <AuthPanel
         title={`Welcome Back to ${siteName}`}
         description="Sign in to book events, manage your bookings, and pick up right where you left off."
-        stats={[
-          { value: "500+", label: "Events Daily" },
-          { value: "98%", label: "Success Rate" },
-          { value: "24/7", label: "Support" },
-        ]}
-        trust="Trusted by thousands of event-goers and organisers"
+        trust="Secure sign-in for bookings and your account"
       />
     );
   }

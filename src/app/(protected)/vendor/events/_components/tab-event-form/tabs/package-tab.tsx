@@ -1106,10 +1106,12 @@ export default function PackageTab() {
           noValidate
           autoComplete="off"
         >
-          {/* Event Package Section */}
+          {/* Event Highlights Section */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold title-header">Event Package</h2>
+              <h2 className="text-xl font-bold title-header">
+                Event highlights
+              </h2>
             </div>
 
             <FormField
@@ -1146,8 +1148,8 @@ export default function PackageTab() {
                     </RadioGroup>
                   </FormControl>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Enable this if packages, dates, menu and brochure details
-                    differ by room.
+                    Enable this if event highlights, dates, menu, and brochure
+                    details differ by room.
                   </p>
                 </FormItem>
               )}
@@ -1164,13 +1166,13 @@ export default function PackageTab() {
                   return (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
-                        Event Package Heading{" "}
+                        Main event heading{" "}
                         <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="e.g., The Package"
+                          placeholder="e.g., What's included"
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                           maxLength={maxLength}
                           onFocus={() => handleFieldFocus("package_title")}
@@ -1233,7 +1235,7 @@ export default function PackageTab() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-base font-medium">
-                    Package Image
+                    Highlights image
                   </FormLabel>
                   <FormControl>
                     <div className="relative min-h-[15rem]">
@@ -1322,11 +1324,11 @@ export default function PackageTab() {
             />
           </div>
 
-          {/* Package Details Section */}
+          {/* Event Highlights Details Section */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold title-header">
-                Package Details
+                What guests can expect
               </h3>
               {fields.length < 10 && (
                 <Button

@@ -7,6 +7,7 @@ import {
 } from "@/lib/resolve-public-event-room-slices";
 import type { EditableDateData } from "@/store/cart-edit.store";
 import {
+  buildRoomDateKey,
   resolveDateCartStatus,
   shouldShowViewCartOnDateCard,
 } from "./cart-calculations";
@@ -40,12 +41,17 @@ export function listBookableEventDates(
  * When `eventDetail` is missing (still loading), returns `true` so Add Dates
  * stays visible until we can prove there is nothing left to add.
  */
-export function hasRemainingDatesToAdd(params: {
+type RemainingDatesParams = {
   eventDetail: EventDetail | null | undefined;
   cartEventData: ApiEventCartData | null | undefined;
   roomId?: number | null;
-  getLocalDateData?: (date: string) => EditableDateData | null;
-}): boolean {
+  /** Lookup by cart store key (`roomId:date` in room mode). */
+  getLocalDateData?: (storeKey: string) => EditableDateData | null;
+};
+
+export function hasRemainingDatesToAdd(
+  params: RemainingDatesParams,
+): boolean {
   const { eventDetail, cartEventData, roomId, getLocalDateData } = params;
   if (!eventDetail) return true;
 
@@ -53,12 +59,42 @@ export function hasRemainingDatesToAdd(params: {
   if (dates.length === 0) return false;
 
   return dates.some((date) => {
+    const storeKey =
+      roomId != null && roomId > 0 ? buildRoomDateKey(roomId, date) : date;
     const status = resolveDateCartStatus({
       date,
       roomId,
       cartEventData,
-      localData: getLocalDateData?.(date) ?? null,
+      localData: getLocalDateData?.(storeKey) ?? null,
     });
     return !shouldShowViewCartOnDateCard(status);
   });
+}
+
+/** First room that still has a date the customer can add. */
+export function firstRoomIdWithRemainingDates(
+  params: Omit<RemainingDatesParams, "roomId">,
+): number | null {
+  const { eventDetail } = params;
+  if (!eventDetail || !isPublicEventRoomMode(eventDetail)) return null;
+
+  for (const room of listPublicEventRooms(eventDetail)) {
+    if (room.disabled) continue;
+    if (hasRemainingDatesToAdd({ ...params, roomId: room.room_id })) {
+      return room.room_id;
+    }
+  }
+  return null;
+}
+
+/** True when any room (or the flat event) still has a date to add. */
+export function hasRemainingDatesToAddAnywhere(
+  params: Omit<RemainingDatesParams, "roomId">,
+): boolean {
+  const { eventDetail } = params;
+  if (!eventDetail) return true;
+  if (!isPublicEventRoomMode(eventDetail)) {
+    return hasRemainingDatesToAdd({ ...params, roomId: null });
+  }
+  return firstRoomIdWithRemainingDates(params) != null;
 }

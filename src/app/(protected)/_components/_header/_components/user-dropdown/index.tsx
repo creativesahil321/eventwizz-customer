@@ -106,7 +106,7 @@ const UserDropdown = memo(() => {
   const isVendor = accountType === "vendor";
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button className="flex items-center gap-2 bg-transparent text-[var(--color-on-header)] shadow-none hover:bg-transparent hover:text-[var(--color-on-header)]/90 pr-2">
@@ -121,19 +121,18 @@ const UserDropdown = memo(() => {
                 {userName.charAt(0).toUpperCase()}
               </div>
             )}
-            <div className="text-start">
+            <div className="hidden text-start 2xl:block">
               <div className="flex items-center gap-1">
-                <span className="hidden xl:block text-sm font-semibold">
-                  {userName}
-                </span>
+                <span className="text-sm font-semibold">{userName}</span>
                 <ChevronDown size={16} />
               </div>
-              <span className="hidden xl:block text-xs">
+              <span className="text-xs">
                 {toTitleCase(
                   user?.active_role || session?.user?.active_role || ""
                 )}
               </span>
             </div>
+            <ChevronDown size={16} className="2xl:hidden" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">

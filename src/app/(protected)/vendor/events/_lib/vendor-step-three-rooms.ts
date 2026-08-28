@@ -342,15 +342,11 @@ export function formatVendorStepThreeDateForApi(
         cancellation_reason: date.cancel_reason.trim(),
       }),
     total_table_types:
-      bookingType !== "tickets"
-        ? date.total_table_types ?? (date.tables?.length ?? 0)
-        : 0,
-    tables: bookingType !== "tickets" ? (date.tables ?? []) : [],
+      date.total_table_types ?? (date.tables?.length ?? 0),
+    tables: date.tables ?? [],
     total_ticket_types:
-      bookingType !== "tables"
-        ? date.total_ticket_types ?? (date.tickets?.length ?? 0)
-        : 0,
-    tickets: bookingType !== "tables" ? (date.tickets ?? []) : [],
+      date.total_ticket_types ?? (date.tickets?.length ?? 0),
+    tickets: date.tickets ?? [],
   };
 
   if (bookingType === "tickets") {
@@ -434,13 +430,16 @@ export function cleanVendorStepThreeDatesForForm(
 
     if (date.booking_type === "tickets") {
       return {
+        ...date,
         ...actionMeta,
         event_date: date.event_date,
         booking_type: date.booking_type,
-        total_ticket_types: Number(date.total_ticket_types) || 0,
+        total_ticket_types:
+          Number(date.total_ticket_types) || (date.tickets?.length ?? 0),
         tickets: date.tickets ?? [],
-        total_table_types: 0,
-        tables: [],
+        total_table_types:
+          Number(date.total_table_types) || (date.tables?.length ?? 0),
+        tables: date.tables ?? [],
       };
     }
 

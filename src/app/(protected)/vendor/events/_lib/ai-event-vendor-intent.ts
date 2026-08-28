@@ -290,7 +290,8 @@ export function buildAiEventJsonSchemaBlock(
     "event_banner_sub_heading": "string (max 80 chars)",
     "about_event_heading": "string (max 50 chars)",
     "about_event_sub_heading": "string (max 80 chars)",
-    "about_event_description": "string (max 340 chars, no HTML)"
+    "about_event_description": "string (max 340 chars, no HTML)",
+    "event_address": "${input.venueAddress || input.venueCity || ""}"
   },
   "stepTwo": {
     "package_title": "string (max 40 chars)",
@@ -327,7 +328,6 @@ export function buildAiEventJsonSchemaBlock(
     "packages": [{"title": "string (max 25)", "description": "string (max 160)", "price": number, "available_quantity": number}]${stepFiveRoomBlock}
   },
   "stepSix": {
-    "event_address": "${input.venueAddress || input.venueCity || ""}",
     "price_start_from": "string (e.g. '55')",
     "price_start_from_button_text": "Book Now"${stepSixRoomBlock}
   },
@@ -415,6 +415,7 @@ ${input.venueCity ? `- City: "${input.venueCity}"` : ""}
 ${input.venueAddress ? `- Address: "${input.venueAddress}"` : ""}
 ${input.guestCount ? `- Expected Guests: "${input.guestCount}"` : ""}
 ${input.priceRange ? `- Price Range: "${input.priceRange}"` : ""}
+LOCATION RULE: stepOne.event_address MUST be the venue address above (or a more specific street address in the same city). Do NOT substitute London or another UK city.
 ROOM SYSTEM: ${hasRoomSystem ? "YES" : "NO"}
 ${hasRoomSystem ? `- Room names (use EXACTLY): ${roomNames.map((n) => `"${n}"`).join(", ")}` : ""}
 ${descriptionBlock}${factsBlock ? `\n${factsBlock}\n` : ""}${exampleBlock}

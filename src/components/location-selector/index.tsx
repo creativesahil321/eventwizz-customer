@@ -127,7 +127,7 @@ export function LocationSelector({
         <Button
           variant="outline"
           className={cn(
-            "flex max-w-[200px] items-center gap-2 border-[var(--color-secondary,#009ead)] text-black",
+            "flex max-w-[11rem] shrink-0 items-center gap-1.5 border-[var(--color-secondary,#009ead)] px-2 text-black 2xl:max-w-[200px] 2xl:gap-2 2xl:px-3",
             className,
           )}
           disabled={isPending}

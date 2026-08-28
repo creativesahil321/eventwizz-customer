@@ -11,7 +11,7 @@ export interface LocationMarketingBodyProps {
   className: string;
   style?: CSSProperties;
   /** About / experience block — caller supplies `ExperienceSection` (optionally wrapped for onboarding highlights) */
-  experience: ReactNode;
+  experience?: ReactNode;
   latestEvents: Event[];
   upcomingEvents: Event[];
   popularSectionTitle: string;

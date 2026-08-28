@@ -59,6 +59,7 @@ import {
 } from "@/components/public/event-section-nav";
 import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
 import { slugToShortLabel } from "@/lib/slug-short-label";
+import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
   formatEventHeroDateRange,
   formatEventHeroTimeRange,
@@ -411,12 +412,18 @@ export function EventPreview({
     const dates = slices.roomMode ? slices.dates : data.stepThree?.dates;
     return (
       dates?.map((date) => {
-        const ticketPrices = (date.tickets ?? [])
-          .map((t) => Number(t.price))
-          .filter((n) => !Number.isNaN(n) && n >= 0);
-        const tablePrices = (date.tables ?? [])
-          .map((t) => Number(t.price))
-          .filter((n) => !Number.isNaN(n) && n >= 0);
+        const ticketPrices =
+          date.booking_type !== "tables"
+            ? (date.tickets ?? [])
+                .map((t) => Number(t.price))
+                .filter((n) => !Number.isNaN(n) && n >= 0)
+            : [];
+        const tablePrices =
+          date.booking_type !== "tickets"
+            ? (date.tables ?? [])
+                .map((t) => Number(t.price))
+                .filter((n) => !Number.isNaN(n) && n >= 0)
+            : [];
         const allPrices = [...ticketPrices, ...tablePrices];
         const price = allPrices.length > 0 ? Math.min(...allPrices) : 0;
         return {
@@ -443,15 +450,14 @@ export function EventPreview({
   const faqs = s7?.faqs ?? [];
   const showFaqs = faqs.length > 0;
 
-  const firstPkg = activeDrinks?.packages?.[0];
-  const brochureFallbackAmount =
-    firstPkg != null
-      ? typeof firstPkg.price === "number"
-        ? firstPkg.price
-        : parseFloat(String(firstPkg.price || 0)) || 45
-      : 45;
-  const brochureAmount = brochureFallbackAmount;
-  const brochurePriceDescription = `${formatMoney(brochureAmount)} PP exc VAT`;
+  const brochureAmount = lowestBookableFromPrice({
+    datePrices: datesForSection.map((date) => date.price),
+    packagePrices: drinkPackages.map((pkg) => pkg.price),
+  });
+  const brochurePriceDescription =
+    brochureAmount != null
+      ? `${formatMoney(brochureAmount)} per person`
+      : "See dates below";
 
   const bannerImage = s1?.event_banner_image || "";
   const bannerVideo = s1?.event_banner_video || null;
@@ -535,18 +541,23 @@ export function EventPreview({
     "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
 
   const brochureAddress =
+    s1?.event_address ||
     slices.eventAddress ||
     activeBrochure?.event_address ||
     data.stepFive?.event_address ||
     "";
 
   const brochureLat =
+    s1?.lat ??
+    s1?.latitude ??
     data.lat ??
     data.stepFive?.lat ??
     data.stepFive?.latitude ??
     s8?.latitude ??
     null;
   const brochureLng =
+    s1?.long ??
+    s1?.longitude ??
     data.long ??
     data.stepFive?.long ??
     data.stepFive?.longitude ??
@@ -783,6 +794,7 @@ export function EventPreview({
         <LazyBrochureSection
           showMapImmediately
           headingEmphasis={headingEmphasisForHero}
+          bookNowScrollOffsetPx={HEADER_OFFSET_PX + EVENT_SECTION_NAV_HEIGHT_PX}
           location={{
             title: "EVENT LOCATION",
             description:

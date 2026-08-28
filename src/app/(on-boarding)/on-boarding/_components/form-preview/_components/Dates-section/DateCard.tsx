@@ -25,11 +25,24 @@ export const DateCard = ({
   const narrowPreview = usePreviewNarrowLayout();
   const dateInfo = getDateInfo(dateItem);
   const listPrice = Number.parseFloat(String(dateInfo.price));
+  const soldOut = Boolean(dateItem.sold_out);
+  const priceLabel = Number.isFinite(listPrice)
+    ? `${currencySymbol}${dateInfo.price}`
+    : "";
+  const ariaLabel = soldOut
+    ? `${dateInfo.day} ${dateInfo.date} ${dateInfo.month}, sold out`
+    : `Book ${dateInfo.day} ${dateInfo.date} ${dateInfo.month}${
+        priceLabel ? `, from ${priceLabel}` : ""
+      }`;
 
   return (
-    <motion.div
+    <motion.button
+      type="button"
+      aria-label={ariaLabel}
+      disabled={soldOut}
       className={cn(
         "cursor-pointer overflow-hidden rounded-2xl border border-[var(--color-primary)] bg-transparent text-center shadow-[0_0_15px_rgba(60,70,147,0.25)] transition-all duration-300 hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] flex-shrink-0",
+        soldOut && "cursor-not-allowed opacity-60 hover:shadow-[0_0_15px_rgba(60,70,147,0.25)]",
         narrowPreview
           ? "w-[85px]"
           : "w-[85px] sm:w-[100px] md:w-[120px]",
@@ -38,13 +51,16 @@ export const DateCard = ({
       initial={{ opacity: 1, y: 0 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.1, delay: index * 0.02 }}
-      whileHover={{
+      whileHover={soldOut ? undefined : {
         scale: 1.02,
         boxShadow: "0 0 25px rgba(60,70,147,0.5)",
         transition: { duration: 0.2 },
       }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => onDateClick(dateItem)}
+      whileTap={soldOut ? undefined : { scale: 0.98 }}
+      onClick={() => {
+        if (soldOut) return;
+        onDateClick(dateItem);
+      }}
     >
       <div className={narrowPreview ? "p-2" : "p-2 sm:p-3"}>
         <p
@@ -77,6 +93,6 @@ export const DateCard = ({
           compact={narrowPreview}
         />
       </div>
-    </motion.div>
+    </motion.button>
   );
 };

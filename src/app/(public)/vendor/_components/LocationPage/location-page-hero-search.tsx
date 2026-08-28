@@ -65,6 +65,12 @@ export function useLocationPageSearch({
     { enabled: useApi && isSearchMode },
   );
 
+  /** Never leave skeleton up after the current query key has settled (incl. total=0). */
+  const isSearchLoading =
+    searchQuery.isFetching &&
+    !searchQuery.isFetched &&
+    searchQuery.data === undefined;
+
   const allEvents = useMemo(
     () => mergeLocationEvents(latestEvents, upcomingEvents),
     [latestEvents, upcomingEvents],
@@ -110,7 +116,7 @@ export function useLocationPageSearch({
     setFilters,
     isSearchMode,
     searchData: searchQuery.data,
-    isSearchLoading: searchQuery.isFetching,
+    isSearchLoading,
     isSearchError: searchQuery.isError,
     /** @deprecated Prefer `searchData` on live pages */
     searchResults: clientSearchResults,

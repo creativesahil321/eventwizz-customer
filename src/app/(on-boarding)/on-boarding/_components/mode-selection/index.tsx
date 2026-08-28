@@ -15,6 +15,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { ServerContext } from "@/lib/server-context";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 
 interface ModeSelectionProps {
   onSelectMode: (mode: "ai" | "manual") => void;
@@ -91,10 +92,10 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
         >
           {/* EventWizz Logo — use logoPath as-is to avoid hydration mismatch (addCacheBusting uses Date.now()) */}
           <div className="flex justify-center mb-6">
-            <img
+            <BrandLogoImage
               src={logoPath}
               alt="EventWizz"
-              className="h-10 w-auto object-contain [filter:drop-shadow(0_0_1px_white)_drop-shadow(0_0_6px_rgba(255,255,255,0.65))_drop-shadow(0_0_14px_rgba(255,255,255,0.35))]"
+              className="h-10 w-auto object-contain drop-shadow-sm"
             />
           </div>
 

@@ -35,6 +35,8 @@ export interface VenueLocation {
   contact_number?: string;
   address?: string;
   city?: string;
+  latitude?: number | string;
+  longitude?: number | string;
   logo?: string;
   cover_image?: string;
   is_default: boolean;

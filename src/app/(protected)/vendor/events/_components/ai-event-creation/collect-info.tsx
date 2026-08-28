@@ -129,7 +129,13 @@ interface AICollectInfoProps {
   onSwitchToManual: () => void;
   isLoading: boolean;
   initialData?: AIEventInput | null;
-  venueInfo?: { name?: string; city?: string; address?: string };
+  venueInfo?: {
+    name?: string;
+    city?: string;
+    address?: string;
+    latitude?: number | string;
+    longitude?: number | string;
+  };
 }
 
 const GUEST_OPTIONS = [
@@ -383,6 +389,8 @@ export default function AIEventCollectInfo({
       venueName: venueInfo?.name,
       venueCity: venueInfo?.city,
       venueAddress: addr,
+      venueLatitude: venueInfo?.latitude,
+      venueLongitude: venueInfo?.longitude,
       has_room_system: data.hasRoomSystem === "yes",
       room_names: roomNames,
       selected_room_ids:
@@ -573,14 +581,19 @@ export default function AIEventCollectInfo({
                           void form.trigger("venueAddress");
                         }}
                         onBlur={field.onBlur}
-                        placeholder="Start typing — search UK addresses and places"
+                        biasCity={venueInfo?.city ?? venueInfo?.name ?? null}
+                        biasLatitude={venueInfo?.latitude ?? null}
+                        biasLongitude={venueInfo?.longitude ?? null}
+                        placeholder="Start typing — search nearby UK addresses"
                         variant="dark"
                       />
                     </FormControl>
                     <p className="text-xs text-slate-500 leading-relaxed">
-                      Choose a suggestion so we can save a full formatted
-                      address. You can adjust the pin on the map in the event
-                      editor.
+                      Restricted to{" "}
+                      {venueInfo?.city || venueInfo?.name || "your selected location"}{" "}
+                      (~50km). Choose a suggestion so we can save a full
+                      formatted address. You can adjust the pin on the map in
+                      the event editor.
                     </p>
                     <FormMessage />
                   </FormItem>

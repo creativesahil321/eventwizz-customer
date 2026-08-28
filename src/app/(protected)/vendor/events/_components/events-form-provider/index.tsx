@@ -24,6 +24,8 @@ import {
 } from "../../_lib/hydrate-event-from-api";
 import { EventSchemaType, eventSchema } from "../tab-event-form/schema";
 import { initialData } from "../tab-event-form/initialData";
+import { useLocationStore } from "@/store/location.store";
+import { resolveVenueLocationAddress, resolveVenueLocationCoords } from "@/lib/venue-location-address";
 
 interface EventFormContextType {
   form: UseFormReturn<EventSchemaType>;
@@ -70,6 +72,7 @@ export function FormProvider({
 
   const canUpdateEvent = usePermission("update-event");
   const readOnly = !canUpdateEvent;
+  const selectedLocation = useLocationStore((s) => s.selectedLocation);
 
   const hasServerDataProp = Boolean(
     serverData?.status && serverData.data,
@@ -107,8 +110,35 @@ export function FormProvider({
         resolvedServerData.data as unknown as Record<string, unknown>,
       );
     }
-    return initialData;
-  }, [resolvedServerData]);
+    // New event: start from the selected venue location address + pin.
+    const venueAddress = resolveVenueLocationAddress(selectedLocation);
+    const venueCoords = resolveVenueLocationCoords(
+      selectedLocation as (typeof selectedLocation & Record<string, unknown>) | null,
+    );
+    if (!venueAddress && !venueCoords) return initialData;
+    return {
+      ...initialData,
+      stepOne: {
+        ...initialData.stepOne,
+        ...(venueAddress
+          ? {
+              event_address: venueAddress,
+              location: {
+                title: "LOCATION",
+                description: venueAddress,
+                icon: "MapPin",
+              },
+            }
+          : {}),
+        ...(venueCoords
+          ? {
+              latitude: venueCoords.latitude,
+              longitude: venueCoords.longitude,
+            }
+          : {}),
+      },
+    };
+  }, [resolvedServerData, selectedLocation]);
 
   // Initialize the form
   const form = useForm<EventSchemaType>({

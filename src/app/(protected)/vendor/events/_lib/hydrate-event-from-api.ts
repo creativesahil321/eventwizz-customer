@@ -61,6 +61,21 @@ export function patchEventPayloadFromApi(
   raw: Record<string, unknown>,
 ): EventSchemaType {
   const eventDataAny = raw as unknown as EventSchemaType;
+  const rawStepOneLocation = (eventDataAny.stepOne ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const rawLegacyStepFive = (eventDataAny.stepFive ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const stepOneCoords = parseStepFiveCoordinates(rawStepOneLocation);
+  const legacyStepFiveCoords = parseStepFiveCoordinates(rawLegacyStepFive);
+  const hydratedEventAddress = String(
+    rawStepOneLocation.event_address ??
+      rawLegacyStepFive.event_address ??
+      "",
+  );
 
   type StepSixWithLegacy = typeof eventDataAny.stepSix & {
     latitude?: number;
@@ -226,6 +241,26 @@ export function patchEventPayloadFromApi(
       ...(eventDataAny.stepOne || initialData.stepOne),
       vendor_location_id:
         eventDataAny.stepOne?.vendor_location_id ?? eventRoot.vendor_location_id,
+      event_address: hydratedEventAddress,
+      ...(stepOneCoords.latitude !== undefined ||
+      legacyStepFiveCoords.latitude !== undefined
+        ? {
+            latitude:
+              stepOneCoords.latitude ?? legacyStepFiveCoords.latitude,
+          }
+        : {}),
+      ...(stepOneCoords.longitude !== undefined ||
+      legacyStepFiveCoords.longitude !== undefined
+        ? {
+            longitude:
+              stepOneCoords.longitude ?? legacyStepFiveCoords.longitude,
+          }
+        : {}),
+      location: {
+        title: "LOCATION",
+        description: hydratedEventAddress,
+        icon: "MapPin",
+      },
       is_rooms: parseEventIsRoomsFlag(
         (eventDataAny.stepOne as { is_rooms?: boolean | number | string })
           ?.is_rooms ?? rootIsRooms,

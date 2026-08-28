@@ -15,6 +15,7 @@ import { ShoppingCart, Plus, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useCartConflictCheck } from "./cart-conflict-provider";
 import { EventInfo } from "../_lib/hooks/useCartConflict";
+import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
 
 interface AddToCartButtonProps {
   event: EventInfo;
@@ -53,7 +54,7 @@ export default function AddToCartButton({
         if (onAddToCart) {
           await onAddToCart();
         } else {
-          router.push("/vendor/checkout");
+          router.push(CUSTOMER_CHECKOUT_PATH);
         }
       };
 

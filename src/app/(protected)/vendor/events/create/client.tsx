@@ -10,6 +10,8 @@ import AIEventCreationFlow from "../_components/ai-event-creation";
 import { resolveAiDraftEventId } from "../_lib/ai-event-draft-storage";
 import { motion } from "framer-motion";
 import { Sparkles, PenTool, ArrowRight, Clock, Zap, CheckCircle2 } from "lucide-react";
+import { useLocationStore } from "@/store/location.store";
+import { resolveVenueLocationAddress, resolveVenueLocationCoords } from "@/lib/venue-location-address";
 
 type CreateMode = "selecting" | "ai" | "manual";
 
@@ -33,6 +35,21 @@ const accent = {
 export default function CreateEventClientWrapper() {
   const [mode, setMode] = useState<CreateMode>("selecting");
   const router = useRouter();
+  const selectedLocation = useLocationStore((s) => s.selectedLocation);
+  const venueCoords = resolveVenueLocationCoords(
+    selectedLocation as
+      | (NonNullable<typeof selectedLocation> & Record<string, unknown>)
+      | null,
+  );
+  const venueInfo = selectedLocation
+    ? {
+        name: selectedLocation.name,
+        city: selectedLocation.city,
+        address: resolveVenueLocationAddress(selectedLocation) || undefined,
+        latitude: venueCoords?.latitude ?? selectedLocation.latitude,
+        longitude: venueCoords?.longitude ?? selectedLocation.longitude,
+      }
+    : undefined;
 
   const handleAIComplete = (eventId: number, isRooms: boolean) => {
     writeVendorEventIsRoomsFlag(eventId, isRooms);
@@ -70,6 +87,7 @@ export default function CreateEventClientWrapper() {
         <AIEventCreationFlow
           onComplete={handleAIComplete}
           onSwitchToManual={handleSwitchToManual}
+          venueInfo={venueInfo}
         />
       </div>
     );

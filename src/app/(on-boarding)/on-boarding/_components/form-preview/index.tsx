@@ -260,16 +260,19 @@ export default function FormPreview() {
 
   const activePreviewBrochureLocation = useMemo(() => {
     const location = activePreviewBrochure?.location;
+    const eventLocation = formState.stepThree;
+    const description =
+      String(eventLocation?.event_address ?? "").trim() ||
+      location?.description ||
+      String(activePreviewBrochure?.event_address ?? "").trim();
     return {
-      title: location?.title || "",
-      description:
-        location?.description ||
-        String(activePreviewBrochure?.event_address ?? "").trim(),
-      icon: location?.icon || "",
-      latitude: activePreviewBrochure?.latitude,
-      longitude: activePreviewBrochure?.longitude,
+      title: location?.title || (description ? "LOCATION" : ""),
+      description,
+      icon: location?.icon || (description ? "MapPin" : ""),
+      latitude: eventLocation?.latitude ?? activePreviewBrochure?.latitude,
+      longitude: eventLocation?.longitude ?? activePreviewBrochure?.longitude,
     };
-  }, [activePreviewBrochure]);
+  }, [activePreviewBrochure, formState.stepThree]);
 
   const activePreviewBrochurePrice = useMemo(() => {
     const price = activePreviewBrochure?.price;
@@ -280,7 +283,7 @@ export default function FormPreview() {
       title: price?.title || "",
       description:
         price?.description ||
-        (startFrom ? `${currencySymbol}${startFrom} PP exc VAT` : ""),
+        (startFrom ? `${currencySymbol}${startFrom} per person` : ""),
       link: price?.link || "",
       icon: price?.icon || "",
       price_title: price?.price_title || "",
@@ -748,6 +751,8 @@ export default function FormPreview() {
           activeField.includes("event_category")
         ) {
           scrollToElement(aboutEventRef);
+        } else if (activeField.includes("event_address")) {
+          scrollToElement(moreInfoRef);
         }
         break;
 
@@ -783,12 +788,10 @@ export default function FormPreview() {
         }
         break;
 
-      case 7: // Brochure & location
+      case 7: // Brochure & pricing
         if (
           activeField.includes("brochure_pdf") ||
-          activeField.includes("event_address") ||
           activeField.includes("price_start_from") ||
-          activeField.includes("location") ||
           activeField.includes("downloads") ||
           activeField.includes("more_info")
         ) {
@@ -1032,7 +1035,7 @@ export default function FormPreview() {
                 jumpToEditor({ step: 5, field: "dates" });
                 return;
               }
-              jumpToEditor({ step: 7, field: "event_address" });
+              jumpToEditor({ step: 3, field: "event_address" });
             }}
             emptyMediaSlot={
               <div className="flex flex-col items-center gap-2">

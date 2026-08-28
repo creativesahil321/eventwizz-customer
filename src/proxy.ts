@@ -263,7 +263,9 @@ export async function proxy(req: NextRequest) {
     pathname === "/contact" ||
     // Allow direct access to event detail pages
     pathname.match(/^\/[^\/]+\/events\/[^\/]+\/?$/) || // Matches /{locationSlug}/events/{eventSlug} pattern
-    // Allow checkout and payment page access
+    // Allow checkout and payment page access (customer `/checkout` + legacy `/vendor/checkout`)
+    pathname === "/checkout" ||
+    pathname.startsWith("/checkout/") ||
     pathname.startsWith("/vendor/checkout") ||
     pathname.startsWith("/vendor/payment")
   ) {

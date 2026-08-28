@@ -49,7 +49,13 @@ export default function LocationNotFound() {
 
       <footer className="bg-[color:var(--color-footer,#0F172A)] text-[color:var(--color-on-footer,#FFFFFF)] py-6 text-center">
         <div className="container mx-auto">
-          <p>© {new Date().getFullYear()} EventWizz. All rights reserved.</p>
+          <p>
+            ©{" "}
+            <span suppressHydrationWarning>
+              {new Date().getFullYear()}
+            </span>{" "}
+            EventWizz. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>

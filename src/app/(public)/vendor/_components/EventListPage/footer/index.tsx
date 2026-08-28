@@ -334,7 +334,7 @@ export default function FooterSection({
   const resolvedCopyright =
     (hasPlainText(copyright) ? copyright : null) ||
     (hasPlainText(vendorTheme?.copyright) ? vendorTheme?.copyright : null) ||
-    `© ${currentYear} ${brandName}`;
+    null;
 
   return (
     <footer
@@ -444,10 +444,16 @@ export default function FooterSection({
               "sm:flex-row sm:items-center sm:px-6 sm:text-left",
           )}
         >
-          <div
-            className="break-words text-[11px] leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
-            dangerouslySetInnerHTML={{ __html: resolvedCopyright }}
-          />
+          {resolvedCopyright ? (
+            <div
+              className="break-words text-[11px] leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
+              dangerouslySetInnerHTML={{ __html: resolvedCopyright }}
+            />
+          ) : (
+            <p className="break-words text-[11px] leading-relaxed text-[var(--color-on-footer)]/70">
+              © <span suppressHydrationWarning>{currentYear}</span> {brandName}
+            </p>
+          )}
           <FooterPageLinks
             isPreviewMode={isPreviewMode}
             className={cn(

@@ -19,6 +19,7 @@ declare module "next-auth" {
       event_id?: number | string;
       on_boarding_step?: number;
       last_completed_step?: number;
+      permissions?: string[];
       /** From login/profile — true when at least one payment gateway is connected. */
       has_payment_provider?: boolean;
     } & DefaultSession["user"];
@@ -32,6 +33,7 @@ declare module "next-auth" {
     event_id?: number | string;
     on_boarding_step?: number;
     last_completed_step?: number;
+    permissions?: string[];
     has_payment_provider?: boolean;
   }
 
@@ -43,6 +45,7 @@ declare module "next-auth" {
     event_id?: number | string;
     on_boarding_step?: number;
     last_completed_step?: number;
+    permissions?: string[];
     has_payment_provider?: boolean;
   }
 }

@@ -14,6 +14,14 @@ export const initialData: EventSchemaType = {
     about_event_heading: "",
     about_event_sub_heading: "",
     about_event_description: "",
+    event_address: "",
+    latitude: undefined,
+    longitude: undefined,
+    location: {
+      title: "LOCATION",
+      description: "",
+      icon: "MapPin",
+    },
   },
 
   stepTwo: {

@@ -60,12 +60,12 @@ import {
 import { fillAiEventGeneratedDefaults } from "./fill-ai-event-content";
 
 export const AI_EVENT_APPLY_STEPS = [
-  { label: "Event details and schedule", icon: "📅" },
-  { label: "Packages", icon: "📦" },
+  { label: "Event details, location and schedule", icon: "📅" },
+  { label: "Event highlights", icon: "📦" },
   { label: "Dates, tickets and tables", icon: "🎟️" },
   { label: "Catering and menu", icon: "🍽️" },
-  { label: "Brochure", icon: "📍" },
-  { label: "Other packages", icon: "🥂" },
+  { label: "Brochure", icon: "📄" },
+  { label: "Drinks & extras", icon: "🥂" },
   { label: "FAQs", icon: "❓" },
 ] as const;
 
@@ -290,6 +290,9 @@ async function applyAIGeneratedEventToBackendInner(params: {
     about_event_heading: s.stepOne.about_event_heading,
     about_event_sub_heading: s.stepOne.about_event_sub_heading,
     about_event_description: s.stepOne.about_event_description,
+    event_address: s.stepOne.event_address || eventInput.venueAddress || "",
+    latitude: s.stepOne.latitude,
+    longitude: s.stepOne.longitude,
     event_banner_image: bannerFile,
     event_banner_video: null,
   };
@@ -645,16 +648,12 @@ async function applyAIGeneratedEventToBackendInner(params: {
   onProgress?.(4);
   if (!brochureSectionRemoved) {
     const brochureAddress = String(
-      brochureSource.event_address || eventInput.venueAddress || "",
+      s.stepOne.event_address ||
+        brochureSource.event_address ||
+        eventInput.venueAddress ||
+        eventInput.venueCity ||
+        "",
     );
-    const brochureLat =
-      typeof (brochureSource as { latitude?: number }).latitude === "number"
-        ? String((brochureSource as { latitude?: number }).latitude)
-        : "51.5074";
-    const brochureLong =
-      typeof (brochureSource as { longitude?: number }).longitude === "number"
-        ? String((brochureSource as { longitude?: number }).longitude)
-        : "-0.1278";
 
     if (useRoomSystem && createdRooms.length > 0) {
       const defaultBrochureDescription = brochureAddress;
@@ -663,14 +662,6 @@ async function applyAIGeneratedEventToBackendInner(params: {
         step: 5,
         event_id: eventId,
         is_rooms: 1,
-        event_address: brochureAddress,
-        latitude: Number(brochureLat) || undefined,
-        longitude: Number(brochureLong) || undefined,
-        location: {
-          title: "LOCATION",
-          description: brochureAddress,
-          icon: "MapPin",
-        },
         more_info:
           brochureRoomEntries && brochureRoomEntries.length > 0
             ? createdRooms.map((room) => ({
@@ -696,9 +687,6 @@ async function applyAIGeneratedEventToBackendInner(params: {
       stepFiveFD.append("step", "5");
       stepFiveFD.append("event_id", String(eventId));
       stepFiveFD.append("is_rooms", "0");
-      stepFiveFD.append("event_address", brochureAddress);
-      stepFiveFD.append("lat", brochureLat);
-      stepFiveFD.append("long", brochureLong);
       await eventsService.storeStepFiveData(stepFiveFD as unknown as never);
     }
   }

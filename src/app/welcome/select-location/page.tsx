@@ -13,6 +13,7 @@ import Link from "next/link";
 import CreateLocationDialog from "@/app/(protected)/vendor/venue-locations/_components/_location-create";
 import { appConfig } from "@/config/app";
 import { Badge } from "@/components/ui/badge";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 import {
   MapPin,
   ArrowRight,
@@ -134,18 +135,25 @@ export default function WelcomeLocationSelectionPage() {
         <div className="absolute top-1/2 -right-16 w-56 h-56 rounded-full bg-white/5" />
         <div className="absolute -bottom-12 -left-12 w-64 h-64 rounded-full bg-white/5" />
 
-        <div className="relative z-10 flex flex-col h-full px-8 pt-8 pb-6">
-          {/* Logo — bare on the gradient; white text logo reads naturally */}
-          <Link href="/" className="self-start mb-auto">
-            <img
-              src={logoSrc}
-              alt={appConfig.name}
-              className="h-8 w-auto object-contain max-w-[140px] drop-shadow-sm"
-            />
-          </Link>
+        <div className="relative z-10 flex h-full flex-col">
+          {/* Keep the original logo on a clean header surface for reliable contrast. */}
+          <header className="flex h-16 shrink-0 items-center overflow-hidden border-b border-slate-200/80 bg-white px-8 shadow-sm">
+            <Link
+              href="/"
+              aria-label="Home"
+              className="inline-flex min-w-0 max-w-full items-center"
+            >
+              <BrandLogoImage
+                src={logoSrc}
+                alt={appConfig.name}
+                className="h-10 w-auto max-w-[180px] object-contain"
+              />
+            </Link>
+          </header>
 
-          {/* Welcome copy */}
-          <div className="my-auto py-6">
+          <div className="flex min-h-0 flex-1 flex-col px-8 pt-8 pb-6">
+            {/* Welcome copy */}
+            <div className="my-auto py-6">
             <div className="inline-flex items-center gap-2 bg-white/15 rounded-full px-3 py-1.5 mb-5">
               <Sparkles className="h-3.5 w-3.5 text-white" />
               <span className="text-xs font-medium text-white/90 tracking-wide">
@@ -202,10 +210,10 @@ export default function WelcomeLocationSelectionPage() {
                 </div>
               )}
             </div>
-          </div>
+            </div>
 
-          {/* User card + logout */}
-          <div className="border-t border-white/10 pt-4">
+            {/* User card + logout */}
+            <div className="border-t border-white/10 pt-4">
             <div className="flex items-center gap-3 bg-white/10 hover:bg-white/15 transition-colors rounded-2xl p-3">
               {/* Avatar */}
               <div className="shrink-0">
@@ -253,20 +261,21 @@ export default function WelcomeLocationSelectionPage() {
             <p className="text-white/30 text-xs mt-3 text-center">
               &copy; {new Date().getFullYear()} {appConfig.name}
             </p>
+            </div>
+            {/* end user card wrapper */}
           </div>
-          {/* end user card wrapper */}
         </div>
       </div>
 
       {/* ── Right panel ────────────────────────────────────── */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100/70">
         {/* Mobile header */}
-        <header className="lg:hidden shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between gap-3">
-          <Link href="/">
-            <img
+        <header className="lg:hidden flex h-14 shrink-0 items-center justify-between gap-3 overflow-hidden border-b border-gray-100 bg-white px-4">
+          <Link href="/" className="inline-flex min-w-0 max-w-full items-center">
+            <BrandLogoImage
               src={logoSrc}
               alt={appConfig.name}
-              className="h-8 w-auto object-contain max-w-[100px]"
+              className="h-8 w-auto max-w-[120px] object-contain"
             />
           </Link>
 

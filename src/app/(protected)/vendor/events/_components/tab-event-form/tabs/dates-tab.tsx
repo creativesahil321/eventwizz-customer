@@ -44,15 +44,9 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   PlusCircle,
   Trash2,
@@ -451,85 +445,62 @@ export default function DatesTab() {
     toast.info("Date marked as cancelled. Save the form to apply.");
   }, [targetCancelDateIndex, cancelReasonText, setValue]);
 
-  // Update dates when booking type changes for a specific date
+  // Update the selected booking options without discarding the inactive option.
   const updateDate = useCallback(
     (dateIndex: number, bookingType: "tickets" | "tables" | "both") => {
       const currentDate = watch(`dates.${dateIndex}`);
+      const ticketsEnabled = bookingType === "tickets" || bookingType === "both";
+      const tablesEnabled = bookingType === "tables" || bookingType === "both";
 
-      // Update tickets/tables arrays based on the booking type
-      if (bookingType === "tickets") {
+      const currentTickets = currentDate.tickets ?? [];
+      const currentTables = currentDate.tables ?? [];
+
+      if (ticketsEnabled) {
         setValue(
           `dates.${dateIndex}.total_ticket_types`,
-          currentDate.tickets?.length || 1,
+          currentTickets.length || 1,
         );
-        setValue(`dates.${dateIndex}.total_table_types`, 0);
 
-        // Make sure we have at least one ticket
-        if (!currentDate.tickets || currentDate.tickets.length === 0) {
+        if (currentTickets.length === 0) {
           setValue(`dates.${dateIndex}.tickets`, [
             { title: "", description: "", total_capacity: "", price: "" },
           ]);
         }
-
-        // Clear tables and payment fields for tickets-only
-        setValue(`dates.${dateIndex}.tables`, []);
-        setValue(`dates.${dateIndex}.payment_type`, undefined);
-        setValue(`dates.${dateIndex}.is_deposit_enabled`, undefined);
-        setValue(`dates.${dateIndex}.deposit_type`, undefined);
-        setValue(`dates.${dateIndex}.deposit_value`, undefined);
-        setValue(`dates.${dateIndex}.deposit_due_date`, undefined);
-      } else if (bookingType === "tables") {
-        setValue(`dates.${dateIndex}.total_ticket_types`, 0);
-        setValue(
-          `dates.${dateIndex}.total_table_types`,
-          currentDate.tables?.length || 1,
-        );
-
-        // Make sure we have at least one table
-        if (!currentDate.tables || currentDate.tables.length === 0) {
-          setValue(`dates.${dateIndex}.tables`, [
-            { min_persons: "", max_persons: "", price: "", total_tables: "" },
-          ]);
-        }
-
-        // Clear tickets and set default payment fields for tables
-        setValue(`dates.${dateIndex}.tickets`, []);
-        setValue(`dates.${dateIndex}.payment_type`, "full");
-        setValue(`dates.${dateIndex}.is_deposit_enabled`, false);
-        setValue(`dates.${dateIndex}.deposit_type`, "amount");
-        setValue(`dates.${dateIndex}.deposit_value`, "");
-        setValue(`dates.${dateIndex}.deposit_due_date`, "");
       } else {
-        // both
         setValue(
           `dates.${dateIndex}.total_ticket_types`,
-          currentDate.tickets?.length || 1,
+          currentTickets.length,
         );
+      }
+
+      if (tablesEnabled) {
         setValue(
           `dates.${dateIndex}.total_table_types`,
-          currentDate.tables?.length || 1,
+          currentTables.length || 1,
         );
 
-        // Make sure we have at least one ticket
-        if (!currentDate.tickets || currentDate.tickets.length === 0) {
-          setValue(`dates.${dateIndex}.tickets`, [
-            { title: "", description: "", total_capacity: "", price: "" },
-          ]);
-        }
-
-        // Make sure we have at least one table
-        if (!currentDate.tables || currentDate.tables.length === 0) {
+        if (currentTables.length === 0) {
           setValue(`dates.${dateIndex}.tables`, [
             { min_persons: "", max_persons: "", price: "", total_tables: "" },
           ]);
         }
 
-        // Set default payment fields for both
-        setValue(`dates.${dateIndex}.payment_type`, "full");
-        setValue(`dates.${dateIndex}.is_deposit_enabled`, false);
-        setValue(`dates.${dateIndex}.deposit_type`, "amount");
-        setValue(`dates.${dateIndex}.deposit_value`, "");
-        setValue(`dates.${dateIndex}.deposit_due_date`, "");
+        if (!currentDate.payment_type) {
+          setValue(`dates.${dateIndex}.payment_type`, "full");
+          setValue(`dates.${dateIndex}.is_deposit_enabled`, false);
+          setValue(`dates.${dateIndex}.deposit_type`, "amount");
+          setValue(`dates.${dateIndex}.deposit_value`, "");
+          setValue(`dates.${dateIndex}.deposit_due_date`, "");
+        }
+      } else {
+        setValue(
+          `dates.${dateIndex}.total_ticket_types`,
+          currentTickets.length,
+        );
+        setValue(
+          `dates.${dateIndex}.total_table_types`,
+          currentTables.length,
+        );
       }
     },
     [watch, setValue],
@@ -1400,40 +1371,132 @@ export default function DatesTab() {
                   )}
                 />
 
-                {/* Booking type dropdown for each date */}
+                {/* Booking options for each date */}
                 <FormField
                   control={control}
                   name={`dates.${dateIndex}.booking_type`}
-                  render={({ field }) => (
-                    <FormItem className="w-full">
-                      <FormLabel className="text-sm sm:text-md font-medium">
-                        Is it a ticketed or seated event?
-                      </FormLabel>
-                      <FormControl>
-                        <Select
-                          value={field.value}
-                          disabled={dateLocked}
-                          onValueChange={(
-                            value: "tickets" | "tables" | "both",
-                          ) => {
-                            field.onChange(value);
-                            // Update the date structure based on the new booking type
-                            updateDate(dateIndex, value);
-                          }}
-                        >
-                          <SelectTrigger className="w-full h-10 sm:h-12 bg-[#F9FAFB] border-[#E5E7EB] text-sm sm:text-base">
-                            <SelectValue placeholder="Select booking type" />
-                          </SelectTrigger>
-                          <SelectContent className="w-full">
-                            <SelectItem value="tickets">Tickets</SelectItem>
-                            <SelectItem value="tables">Tables</SelectItem>
-                            <SelectItem value="both">Both</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const ticketsSelected =
+                      field.value === "tickets" || field.value === "both";
+                    const tablesSelected =
+                      field.value === "tables" || field.value === "both";
+                    const soldTickets = (dateRow.tickets ?? []).reduce(
+                      (total, ticket) => total + Number(ticket.sold_tickets ?? 0),
+                      0,
+                    );
+                    const soldTables = (dateRow.tables ?? []).reduce(
+                      (total, table) => total + Number(table.sold_tables ?? 0),
+                      0,
+                    );
+
+                    const toggleBookingOption = (
+                      option: "tickets" | "tables",
+                      checked: boolean,
+                    ) => {
+                      const nextTicketsSelected =
+                        option === "tickets" ? checked : ticketsSelected;
+                      const nextTablesSelected =
+                        option === "tables" ? checked : tablesSelected;
+
+                      if (!nextTicketsSelected && !nextTablesSelected) {
+                        toast.error(
+                          "Select Tickets, Tables, or both booking options.",
+                        );
+                        return;
+                      }
+
+                      const nextBookingType =
+                        nextTicketsSelected && nextTablesSelected
+                          ? "both"
+                          : nextTicketsSelected
+                            ? "tickets"
+                            : "tables";
+                      field.onChange(nextBookingType);
+                      updateDate(dateIndex, nextBookingType);
+                    };
+
+                    return (
+                      <FormItem className="w-full">
+                        <FormLabel className="text-sm sm:text-md font-medium">
+                          Booking options
+                        </FormLabel>
+                        <FormControl>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {[
+                              {
+                                id: `booking-tickets-${dateIndex}`,
+                                label: "Tickets",
+                                description: "Sell individual guest tickets",
+                                checked: ticketsSelected,
+                                soldCount: soldTickets,
+                                option: "tickets" as const,
+                              },
+                              {
+                                id: `booking-tables-${dateIndex}`,
+                                label: "Tables",
+                                description: "Sell table bookings",
+                                checked: tablesSelected,
+                                soldCount: soldTables,
+                                option: "tables" as const,
+                              },
+                            ].map((bookingOption) => (
+                              <label
+                                key={bookingOption.option}
+                                htmlFor={bookingOption.id}
+                                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                                  bookingOption.checked
+                                    ? "border-blue-500 bg-blue-50"
+                                    : "border-gray-200 bg-white hover:border-blue-300"
+                                } ${
+                                  dateLocked
+                                    ? "cursor-not-allowed opacity-70"
+                                    : ""
+                                }`}
+                              >
+                                <Checkbox
+                                  id={bookingOption.id}
+                                  checked={bookingOption.checked}
+                                  disabled={dateLocked}
+                                  onCheckedChange={(checked) =>
+                                    toggleBookingOption(
+                                      bookingOption.option,
+                                      checked === true,
+                                    )
+                                  }
+                                  aria-label={bookingOption.label}
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold text-gray-800">
+                                    {bookingOption.label}
+                                  </span>
+                                  <span className="block text-xs text-gray-500">
+                                    {bookingOption.description}
+                                  </span>
+                                  {bookingOption.soldCount > 0 && (
+                                    <span className="mt-1 block text-xs font-medium text-amber-700">
+                                      {bookingOption.soldCount} already booked
+                                    </span>
+                                  )}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </FormControl>
+                        {(soldTickets > 0 || soldTables > 0) && (
+                          <p className="text-xs text-amber-700">
+                            Existing bookings are preserved when you change
+                            visibility. Check the selected option before
+                            saving a live event.
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          Select one or both. Existing ticket and table settings
+                          are preserved when you change these options.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 

@@ -55,43 +55,35 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
   }, [isVendor, profileData?.data?.venue_name, session?.user?.name]);
 
   const headerClass =
-    "flex-none min-w-0 w-full border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-4 py-3 md:px-6 md:py-4 flex items-center justify-between shadow-[0_1px_2px_0_rgba(0,0,0,0.05)]";
+    "flex-none min-w-0 w-full border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-3 py-3 md:px-4 md:py-3 2xl:px-6 2xl:py-4 flex items-center gap-2 justify-between shadow-[0_1px_2px_0_rgba(0,0,0,0.05)]";
 
   return (
     <header className={headerClass}>
-      <div className="flex items-center gap-2 flex-1">
+      <div className="flex shrink-0 items-center gap-1.5">
         <div className="md:hidden">
           <MobileSidebar menus={menus} />
         </div>
         <div className="hidden md:block">
           <LayoutToggle />
         </div>
-
-        {/* Search Input */}
-        <div className="relative max-w-md w-full">
-          <UniversalSearch />
-        </div>
+        <UniversalSearch />
       </div>
 
-      <div className="flex items-center gap-2 ml-1">
-        {/* Vendor public site URL — copy / open live preview */}
-        <div className="hidden lg:block">
-          <VendorSiteUrl />
-        </div>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5 2xl:gap-2">
+        <VendorSiteUrl />
 
-        {/* Location Selector - Only show for vendors with multiple locations */}
         {isVendor && venueName && (
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
               <div
-                className="hidden lg:flex items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-background px-2.5 py-1.5 mr-1 max-w-[220px] min-w-0 cursor-default"
+                className="hidden min-w-[9rem] max-w-[12rem] shrink-0 cursor-default items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-background px-2 py-1.5 lg:flex xl:max-w-[14rem] 2xl:max-w-[20rem] 2xl:px-2.5"
                 aria-label={`Venue: ${venueName}`}
               >
-                <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground shrink-0">
+                <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="hidden shrink-0 text-xs text-muted-foreground 2xl:inline">
                   Venue:
                 </span>
-                <span className="text-sm font-semibold text-foreground truncate min-w-0">
+                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
                   {venueName}
                 </span>
               </div>
@@ -107,23 +99,22 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
           </Tooltip>
         )}
 
-        {/* Location Selector - Only show for vendors with multiple locations */}
         {isVendor && hasMultipleLocations && (
-          <div className="hidden md:block mr-1">
+          <div className="hidden shrink-0 md:block">
             <LocationSelector />
           </div>
         )}
 
-        {/* Help Dropdown */}
-        <div className="hidden md:block">
+        <div className="hidden shrink-0 md:block">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="event-ghost"
                 size="sm"
-                className="hidden sm:flex"
+                className="px-2 2xl:px-3"
+                aria-label="Help"
               >
-                <span className="mr-1">Help</span>
+                <span className="mr-1 hidden 2xl:inline">Help</span>
                 <HelpCircle className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -131,18 +122,18 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
               <DropdownMenuItem>
                 <Link
                   href="/documentation"
-                  className="flex items-center w-full"
+                  className="flex w-full items-center"
                 >
                   Documentation
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <Link href="/support" className="flex items-center w-full">
+                <Link href="/support" className="flex w-full items-center">
                   Support
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <Link href="/faq" className="flex items-center w-full">
+                <Link href="/faq" className="flex w-full items-center">
                   FAQs
                 </Link>
               </DropdownMenuItem>
@@ -150,30 +141,27 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
           </DropdownMenu>
         </div>
 
-        {/* Create Event — always labeled so vendors recognise the action */}
         {isVendor && (
           <PermissionGuard permissionKey="create-event">
             <Link href="/vendor/events/create" className="shrink-0">
               <Button
                 variant="event-primary"
-                className="flex h-9 items-center gap-1.5 px-2.5 text-xs font-semibold sm:h-10 sm:gap-2 sm:px-4 sm:text-sm"
+                className="flex h-9 items-center gap-1.5 px-2.5 text-xs font-semibold sm:h-10 sm:px-3 sm:text-sm 2xl:px-4"
               >
                 <PlusCircle size={16} className="shrink-0" />
                 <span className="whitespace-nowrap">
-                  <span className="sm:hidden">Create</span>
-                  <span className="hidden sm:inline">Create Event</span>
+                  <span className="2xl:hidden">Create</span>
+                  <span className="hidden 2xl:inline">Create Event</span>
                 </span>
               </Button>
             </Link>
           </PermissionGuard>
         )}
 
-        {/* Notification Bell - only when user can read notifications */}
         <PermissionGuard permissionKey="read-notification" fallback={null}>
           <NotificationBell />
         </PermissionGuard>
 
-        {/* User Dropdown */}
         <UserDropdown />
       </div>
     </header>

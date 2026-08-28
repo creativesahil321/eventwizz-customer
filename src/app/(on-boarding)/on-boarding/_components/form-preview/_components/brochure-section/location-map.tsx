@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { MapPin, Navigation } from "lucide-react";
 import { env } from "@/env";
 import { Button } from "@/components/ui";
+import { isLondonDefaultPin } from "@/lib/london-default-coords";
 
 interface LocationMapProps {
   address?: string;
@@ -193,22 +194,31 @@ export default function LocationMap({
     }, 10000);
 
     try {
-      // Default center (London, UK) - center of UK
-      const defaultCenter = { lat: 54.7024, lng: -3.2766 }; // Geographic center of UK
+      // Default center — geographic centre of the UK (not central London).
+      const defaultCenter = { lat: 54.7024, lng: -3.2766 };
       let mapCenter = defaultCenter;
       let mapAddress = "";
+      const vendorAddress = address.trim();
 
-      // Check if we have coordinates first (more accurate)
-      if (latitude && longitude) {
+      // Classic platform placeholder pin must not override a real venue address.
+      const trustStoredCoords =
+        Boolean(latitude && longitude) &&
+        !isLondonDefaultPin(latitude, longitude);
+
+      // Prefer trustworthy coords; otherwise geocode the written address.
+      if (trustStoredCoords) {
         const lat =
-          typeof latitude === "string" ? parseFloat(latitude) : latitude;
+          typeof latitude === "string" ? parseFloat(latitude) : Number(latitude);
         const lng =
-          typeof longitude === "string" ? parseFloat(longitude) : longitude;
+          typeof longitude === "string"
+            ? parseFloat(longitude)
+            : Number(longitude);
 
         if (!isNaN(lat) && !isNaN(lng)) {
           mapCenter = { lat, lng };
           mapAddress =
-            address || `Location (${lat.toFixed(6)}, ${lng.toFixed(6)})`;
+            vendorAddress ||
+            `Location (${lat.toFixed(6)}, ${lng.toFixed(6)})`;
 
           console.log("🗺️ Using coordinates:", {
             lat,
@@ -216,10 +226,13 @@ export default function LocationMap({
             address: mapAddress,
           });
 
-          // Try to get formatted address from coordinates with timeout
-          const geocoderInstance = new google.maps.Geocoder();
+          // Keep the venue's written address; reverse-geocode only fills a gap.
+          if (vendorAddress) {
+            initializeMapWithCenter(mapCenter, vendorAddress);
+            return;
+          }
 
-          // Set a timeout for geocoding to prevent hanging
+          const geocoderInstance = new google.maps.Geocoder();
           const geocodeTimeout = setTimeout(() => {
             console.log("🗺️ Geocoding timeout, using fallback address");
             initializeMapWithCenter(mapCenter, mapAddress);
@@ -229,14 +242,8 @@ export default function LocationMap({
             { location: mapCenter },
             (results, status) => {
               clearTimeout(geocodeTimeout);
-              console.log("🗺️ Geocoding result:", {
-                status,
-                results: results?.length,
-              });
-
               if (status === "OK" && results && results[0]) {
                 mapAddress = results[0].formatted_address;
-                console.log("🗺️ Geocoded address:", mapAddress);
               }
               initializeMapWithCenter(mapCenter, mapAddress);
             },
@@ -245,8 +252,8 @@ export default function LocationMap({
         }
       }
 
-      // If no coordinates or coordinates are invalid, try to geocode address
-      if (address.trim()) {
+      // No trustworthy coords (missing, invalid, or London placeholder) — geocode address
+      if (vendorAddress) {
         console.log("🗺️ Geocoding address:", address);
         const geocoderInstance = new google.maps.Geocoder();
 

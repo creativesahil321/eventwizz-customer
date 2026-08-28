@@ -21,6 +21,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isCustomerCheckoutPath } from "@/lib/customer-checkout-path";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useDomainContext } from "@/hooks/useDomainContext";
 import { useAuthStore } from "@/store/auth.store";
@@ -99,7 +100,7 @@ import {
   summarizeEventDetailForChat,
   withDateChoiceQuickActions,
   withGuaranteedDateChoiceCopy,
-  withGuaranteedRoomChoiceCopy,
+  withGuaranteedRoomChoiceCopy, 
   withRoomChoiceQuickActions,
   withVisitEventQuickAction,
   type ChatEventBookingBrief,
@@ -133,6 +134,7 @@ import {
 import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
 import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
+import { isCustomerFacingChatSurface } from "@/lib/chat-page-context";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { useLocationStore } from "@/store/location.store";
 import {
@@ -268,10 +270,12 @@ function isPaymentSuccessPath(path: string | null | undefined): boolean {
   );
 }
 
-const CHAT_CHROME =
+const CHAT_CHROME_BRANDED =
   "bg-[color:var(--color-header,#1e293b)] text-[color:var(--color-on-header,#fff)]";
-const CHAT_CHROME_HOVER =
+const CHAT_CHROME_BRANDED_HOVER =
   "hover:bg-[color:color-mix(in_srgb,var(--color-header,#1e293b)_88%,black)]";
+const CHAT_CHROME_STATIC = "bg-slate-800 text-white";
+const CHAT_CHROME_STATIC_HOVER = "hover:bg-slate-900";
 
 const CATEGORY_ACTIONS: QuickAction[] = [
   {
@@ -405,7 +409,9 @@ function publicBookingQuickActions(options: {
       if (action.id.startsWith("pay-gateway-")) return true;
       if (action.href && /^https?:\/\//i.test(action.href)) return true;
       if (!action.sendText || action.href) return false;
-      if (action.label.replace(/\s+/g, " ").toLowerCase().startsWith("visit ")) {
+      if (
+        action.label.replace(/\s+/g, " ").toLowerCase().startsWith("visit ")
+      ) {
         return false;
       }
       return true;
@@ -610,25 +616,26 @@ function ChatAvatar({
   alt,
   size = "md",
   className,
+  branded = false,
 }: {
   src: string | null;
   alt: string;
   size?: "sm" | "md" | "lg";
   className?: string;
+  branded?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(src) && !failed;
   const sizeClass =
-    size === "lg"
-      ? "h-14 w-14"
-      : size === "sm"
-        ? "h-7 w-7"
-        : "h-8 w-8";
+    size === "lg" ? "h-14 w-14" : size === "sm" ? "h-7 w-7" : "h-8 w-8";
 
   return (
     <span
       className={cn(
-        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--color-header,#1e293b)] ring-1 ring-black/5",
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-black/5",
+        branded
+          ? "bg-[color:var(--color-header,#1e293b)]"
+          : "bg-slate-800",
         sizeClass,
         className,
       )}
@@ -643,7 +650,15 @@ function ChatAvatar({
           onError={() => setFailed(true)}
         />
       ) : (
-        <MessageCircle className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+        <MessageCircle
+          className={cn(
+            "h-3.5 w-3.5",
+            branded
+              ? "text-[color:var(--color-on-header,#fff)]"
+              : "text-white",
+          )}
+          strokeWidth={2}
+        />
       )}
     </span>
   );
@@ -740,8 +755,11 @@ export function ChatBot() {
   const { data: session, status: sessionStatus } = useSession();
   const authUser = useAuthStore((s) => s.user);
   const vendorLocationId = useAuthStore((s) => s.vendor_location_id);
-  const { website_role: domainWebsiteRole, domain, settings } =
-    useDomainContext();
+  const {
+    website_role: domainWebsiteRole,
+    domain,
+    settings,
+  } = useDomainContext();
   const tenantHost = typeof domain === "string" ? domain : "";
   const createTicket = useCreateCustomerSupportTicket();
   const currencySymbol = useCurrencySymbol();
@@ -749,9 +767,7 @@ export function ChatBot() {
   const chatLocationId = useLocationStore((s) => s.getLocationId());
 
   const websiteRole =
-    domainWebsiteRole ||
-    (theme?.website_role as string | undefined) ||
-    null;
+    domainWebsiteRole || (theme?.website_role as string | undefined) || null;
   const isLoggedInCustomer =
     sessionStatus === "authenticated" &&
     session?.user?.account_type === "customer";
@@ -774,6 +790,16 @@ export function ChatBot() {
     session?.user?.name,
   ]);
   const isVendorStorefront = websiteRole === "vendor";
+  const brandedChatChrome = isCustomerFacingChatSurface(
+    pathname,
+    typeof websiteRole === "string" ? websiteRole : null,
+  );
+  const chatChrome = brandedChatChrome
+    ? CHAT_CHROME_BRANDED
+    : CHAT_CHROME_STATIC;
+  const chatChromeHover = brandedChatChrome
+    ? CHAT_CHROME_BRANDED_HOVER
+    : CHAT_CHROME_STATIC_HOVER;
   const isLoggedInVendor =
     sessionStatus === "authenticated" && accountType === "vendor";
   const { refetch: refetchCustomerCart } = useGetCartData(
@@ -822,10 +848,7 @@ export function ChatBot() {
     [theme?.live_events, theme?.locations, settings],
   );
 
-  const eventPath = useMemo(
-    () => parsePublicEventPath(pathname),
-    [pathname],
-  );
+  const eventPath = useMemo(() => parsePublicEventPath(pathname), [pathname]);
   const { data: pageEventResponse } = useEventDetail(
     eventPath?.eventSlug ?? "",
     tenantHost,
@@ -946,7 +969,14 @@ export function ChatBot() {
         },
       ];
     });
-  }, [sessionStatus, accountType, userName, isVendorStorefront, isLoggedInVendor, isLoggedInCustomer]);
+  }, [
+    sessionStatus,
+    accountType,
+    userName,
+    isVendorStorefront,
+    isLoggedInVendor,
+    isLoggedInCustomer,
+  ]);
 
   useEffect(() => {
     if (!isVendorStorefront || isLoggedInVendor) return;
@@ -965,12 +995,8 @@ export function ChatBot() {
   }, [isVendorStorefront, isLoggedInVendor, isLoggedInCustomer]);
 
   useEffect(() => {
-    const wasCheckout =
-      prevPathnameRef.current === "/vendor/checkout" ||
-      Boolean(prevPathnameRef.current?.startsWith("/vendor/checkout/"));
-    const nowCheckout =
-      pathname === "/vendor/checkout" ||
-      Boolean(pathname?.startsWith("/vendor/checkout/"));
+    const wasCheckout = isCustomerCheckoutPath(prevPathnameRef.current);
+    const nowCheckout = isCustomerCheckoutPath(pathname);
     prevPathnameRef.current = pathname;
     if (isOpen && nowCheckout && !wasCheckout) {
       keepComposerFocusRef.current = false;
@@ -1170,8 +1196,7 @@ export function ChatBot() {
       ...clearQuickActions(prev),
       {
         role: "assistant",
-        content:
-          "Thank you. What’s the best telephone number to reach you on?",
+        content: "Thank you. What’s the best telephone number to reach you on?",
       },
     ]);
   }
@@ -1202,8 +1227,7 @@ export function ChatBot() {
       ...clearQuickActions(prev),
       {
         role: "assistant",
-        content:
-          "Ready to send this enquiry to our support team?",
+        content: "Ready to send this enquiry to our support team?",
         quickActions: [
           { id: "confirm_submit", label: "Send enquiry" },
           { id: "cancel_flow", label: "Cancel" },
@@ -1283,9 +1307,7 @@ export function ChatBot() {
       })),
       ...(options?.extraMessages ?? []),
     ];
-    const choices = brief
-      ? parseChatBookingChoices(conversation, brief)
-      : null;
+    const choices = brief ? parseChatBookingChoices(conversation, brief) : null;
 
     if (brief && choices && chatChoicesHaveLineItems(choices)) {
       setIsLoading(true);
@@ -1335,9 +1357,7 @@ export function ChatBot() {
       ...clearQuickActions(prev),
       {
         role: "assistant",
-        content:
-          checkoutCopy ??
-          "Opening Checkout so you can review and pay.",
+        content: checkoutCopy ?? "Opening Checkout so you can review and pay.",
       },
     ]);
     keepComposerFocusRef.current = false;
@@ -1349,8 +1369,7 @@ export function ChatBot() {
     payMode: "full" | "deposit",
     extraMessages: Array<{ role: string; content: string }> = [],
   ) {
-    const lastUserText =
-      extraMessages[extraMessages.length - 1]?.content ?? "";
+    const lastUserText = extraMessages[extraMessages.length - 1]?.content ?? "";
     const gatewaySlug = parseChatPaymentGatewaySlug(lastUserText);
 
     if (isPaymentSuccessPath(pathname)) {
@@ -1445,8 +1464,7 @@ export function ChatBot() {
       result = {
         ok: false,
         reason: "unknown",
-        message:
-          "Payment couldn’t be started. Visit the event page to finish.",
+        message: "Payment couldn’t be started. Visit the event page to finish.",
       };
     }
     setIsLoading(false);
@@ -1586,10 +1604,7 @@ export function ChatBot() {
     }
 
     if (action.id === CHAT_PAY_FULL_ID || action.id === CHAT_PAY_DEPOSIT_ID) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: action.label },
-      ]);
+      setMessages((prev) => [...prev, { role: "user", content: action.label }]);
       await startChatPayment(
         action.id === CHAT_PAY_DEPOSIT_ID ? "deposit" : "full",
         [{ role: "user", content: action.label }],
@@ -1651,28 +1666,19 @@ export function ChatBot() {
     }
 
     if (action.id === "cancel_flow") {
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: action.label },
-      ]);
+      setMessages((prev) => [...prev, { role: "user", content: action.label }]);
       cancelGuidedSupport();
       return;
     }
 
     if (action.id === "general_support" || action.id === "technical_support") {
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: action.label },
-      ]);
+      setMessages((prev) => [...prev, { role: "user", content: action.label }]);
       askForPhone(action.id as SupportCategory);
       return;
     }
 
     if (action.id === "confirm_submit" || action.id === "retry_submit") {
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: action.label },
-      ]);
+      setMessages((prev) => [...prev, { role: "user", content: action.label }]);
       await submitGuidedSupport(supportFlow);
       return;
     }
@@ -1685,9 +1691,7 @@ export function ChatBot() {
     }
 
     if (supportFlow.step === "category") {
-      if (
-        /\b(technical|account|login|password)\b/i.test(userText)
-      ) {
+      if (/\b(technical|account|login|password)\b/i.test(userText)) {
         askForPhone("technical_support");
         return;
       }
@@ -1861,7 +1865,9 @@ export function ChatBot() {
         }
         return;
       }
-      if (!isGuestBookingConciergeText(userText, eventBookingBriefRef.current)) {
+      if (
+        !isGuestBookingConciergeText(userText, eventBookingBriefRef.current)
+      ) {
         setMessages((prev) => [
           ...prev,
           {
@@ -1885,11 +1891,7 @@ export function ChatBot() {
     }
 
     // Logged-in customer on vendor site: start professional enquiry wizard
-    if (
-      isVendorStorefront &&
-      isLoggedInCustomer &&
-      isSupportIntent(userText)
-    ) {
+    if (isVendorStorefront && isLoggedInCustomer && isSupportIntent(userText)) {
       const brief = eventBookingBriefRef.current ?? pageBookingBrief;
       const bookingInProgress = Boolean(
         brief && parseChatBookingChoices(messages, brief).slots.length > 0,
@@ -1901,11 +1903,7 @@ export function ChatBot() {
     }
 
     // Guest on vendor site: offer Register / Log in buttons
-    if (
-      isVendorStorefront &&
-      !isLoggedInCustomer &&
-      isAuthIntent(userText)
-    ) {
+    if (isVendorStorefront && !isLoggedInCustomer && isAuthIntent(userText)) {
       offerGuestAuthOptions();
       return;
     }
@@ -2206,7 +2204,7 @@ Is there anything else I can help you with?`,
               },
             }),
             isVendorEarningsIntent(statsQueryText) ||
-              isVendorCommissionIntent(statsQueryText)
+            isVendorCommissionIntent(statsQueryText)
               ? vendorDashboardService.getCommissionsStatistics({
                   from_date: dashFrom,
                   to_date: dashTo,
@@ -2230,10 +2228,7 @@ Is there anything else I can help you with?`,
           listResult.status === "fulfilled" ? listResult.value : null;
 
         if (bookingsResult.status === "rejected") {
-          console.error(
-            "Chat bookings stats failed:",
-            bookingsResult.reason,
-          );
+          console.error("Chat bookings stats failed:", bookingsResult.reason);
         }
         if (commissionsResult.status === "rejected") {
           console.error(
@@ -2256,9 +2251,7 @@ Is there anything else I can help you with?`,
             ? {
                 current_location_id: raw.current_location_id,
                 booking_period: range.label,
-                booking_period_start: range.allTime
-                  ? null
-                  : range.from_date,
+                booking_period_start: range.allTime ? null : range.from_date,
                 booking_period_end: range.allTime ? null : range.to_date,
                 summary: raw.summary ?? null,
                 bookings_stats: raw.bookings_stats ?? null,
@@ -2277,8 +2270,7 @@ Is there anything else I can help you with?`,
               deposit_amount: bookingSummary?.deposit_amount ?? "0.00",
               pending_amount: bookingSummary?.pending_amount ?? "0.00",
               refunded_amount: bookingSummary?.refunded_amount ?? "0.00",
-              total_platform_fee:
-                bookingSummary?.total_platform_fee ?? "0.00",
+              total_platform_fee: bookingSummary?.total_platform_fee ?? "0.00",
               platform_fee_settled:
                 bookingSummary?.platform_fee_settled ?? "0.00",
               platform_fee_due: bookingSummary?.platform_fee_due ?? "0.00",
@@ -2341,13 +2333,13 @@ Is there anything else I can help you with?`,
       const askedTheme = extractLiveEventTheme(userText);
       const pinnedWrongTheme = Boolean(
         pinnedBrief &&
-          askedTheme &&
-          !liveEvents.some(
-            (event) =>
-              event.slug === pinnedBrief.eventSlug &&
-              event.location_slug === pinnedBrief.locationSlug &&
-              liveEventMatchesRequestedTheme(event, userText),
-          ),
+        askedTheme &&
+        !liveEvents.some(
+          (event) =>
+            event.slug === pinnedBrief.eventSlug &&
+            event.location_slug === pinnedBrief.locationSlug &&
+            liveEventMatchesRequestedTheme(event, userText),
+        ),
       );
       const namedOtherEvent = matchLiveEvents(userText, liveEvents).some(
         (item) => {
@@ -2711,8 +2703,7 @@ Is there anything else I can help you with?`,
             {
               role: "assistant",
               content: infoTurn.content,
-              quickActions:
-                infoActions.length > 0 ? infoActions : undefined,
+              quickActions: infoActions.length > 0 ? infoActions : undefined,
             },
           ]);
           return;
@@ -2805,8 +2796,7 @@ Is there anything else I can help you with?`,
       }
 
       const data = await response.json();
-      const rawReply =
-        typeof data.message === "string" ? data.message : "";
+      const rawReply = typeof data.message === "string" ? data.message : "";
       const choices = parseChatBookingChoices(
         [...conversation, { role: "assistant", content: rawReply }],
         briefForHandoff,
@@ -2942,9 +2932,7 @@ Is there anything else I can help you with?`,
     return null;
   }
 
-  const isVendorCheckout =
-    pathname === "/vendor/checkout" ||
-    Boolean(pathname?.startsWith("/vendor/checkout/"));
+  const isVendorCheckout = isCustomerCheckoutPath(pathname);
 
   // User dismissed the launcher for this page load only (comes back on refresh).
   if (isDismissed) {
@@ -3028,6 +3016,7 @@ Is there anything else I can help you with?`,
                   src={avatarSrc}
                   alt={siteName}
                   size="lg"
+                  branded={brandedChatChrome}
                   className="h-full w-full ring-0"
                 />
               </span>
@@ -3042,10 +3031,10 @@ Is there anything else I can help you with?`,
               }}
               className={cn(
                 "absolute -right-1.5 -top-1.5 z-30",
-                "flex h-5 w-5 items-center justify-center rounded-full",
-                "bg-[color:var(--color-header,#1e293b)] text-[color:var(--color-on-header,#fff)] shadow-sm",
+                "flex h-5 w-5 items-center justify-center rounded-full shadow-sm",
+                chatChrome,
                 "ring-2 ring-white",
-                "hover:bg-slate-950",
+                brandedChatChrome ? "hover:bg-slate-950" : "hover:bg-slate-900",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
               )}
             >
@@ -3087,7 +3076,8 @@ Is there anything else I can help you with?`,
             onClick={() => setIsMinimized(false)}
             className={cn(
               "fixed right-0 z-[80] flex items-center gap-2 rounded-l-2xl rounded-r-none",
-              "bg-[color:var(--color-header,#1e293b)] py-2.5 pl-2 pr-1.5 text-[color:var(--color-on-header,#fff)] shadow-[0_8px_24px_rgba(15,23,42,0.22)]",
+              chatChrome,
+              "py-2.5 pl-2 pr-1.5 shadow-[0_8px_24px_rgba(15,23,42,0.22)]",
               "ring-1 ring-white/10",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
               isVendorCheckout
@@ -3100,9 +3090,10 @@ Is there anything else I can help you with?`,
               src={avatarSrc}
               alt={siteName}
               size="sm"
+              branded={brandedChatChrome}
               className="ring-1 ring-white/25"
             />
-            <ChevronsLeft className="h-4 w-4 text-white/80" strokeWidth={2} />
+            <ChevronsLeft className="h-4 w-4 text-current/80" strokeWidth={2} />
           </motion.button>
         )}
       </AnimatePresence>
@@ -3111,17 +3102,9 @@ Is there anything else I can help you with?`,
         {isOpen && !isMinimized && (
           <motion.div
             key="chat-panel"
-            initial={
-              motionSafe
-                ? { opacity: 0.6, x: "110%" }
-                : { opacity: 1 }
-            }
+            initial={motionSafe ? { opacity: 0.6, x: "110%" } : { opacity: 1 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={
-              motionSafe
-                ? { opacity: 0, x: "110%" }
-                : { opacity: 0 }
-            }
+            exit={motionSafe ? { opacity: 0, x: "110%" } : { opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
             className={cn(
               "fixed z-[80] flex flex-col overflow-hidden bg-white",
@@ -3136,16 +3119,16 @@ Is there anything else I can help you with?`,
             )}
             style={isVendorCheckout ? undefined : previewReviewChromeLiftStyle}
           >
-            <div className={cn(
-              "flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-end justify-between gap-2 px-3.5 pb-1.5 sm:h-14 sm:items-center sm:pb-0",
-              CHAT_CHROME,
-            )}>
+            <div
+              className={cn(
+                "flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-end justify-between gap-2 px-3.5 pb-1.5 sm:h-14 sm:items-center sm:pb-0",
+                chatChrome,
+              )}
+            >
               <div className="flex min-w-0 items-center gap-2.5">
                 <motion.div
                   animate={
-                    motionSafe
-                      ? { rotate: [0, -6, 6, -4, 0] }
-                      : undefined
+                    motionSafe ? { rotate: [0, -6, 6, -4, 0] } : undefined
                   }
                   transition={
                     motionSafe
@@ -3161,6 +3144,7 @@ Is there anything else I can help you with?`,
                     src={avatarSrc}
                     alt={siteName}
                     size="sm"
+                    branded={brandedChatChrome}
                     className="ring-1 ring-white/25"
                   />
                 </motion.div>
@@ -3168,7 +3152,7 @@ Is there anything else I can help you with?`,
                   <p className="truncate text-sm font-semibold tracking-tight">
                     {siteName}
                   </p>
-                  <p className="truncate text-[11px] font-normal text-white/75">
+                  <p className="truncate text-[11px] font-normal text-current/75">
                     Chat assistant
                   </p>
                 </div>
@@ -3178,7 +3162,7 @@ Is there anything else I can help you with?`,
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-11 w-11 text-white hover:bg-white/15 hover:text-white sm:h-8 sm:w-8"
+                  className="h-11 w-11 text-current hover:bg-[color:color-mix(in_srgb,currentColor_16%,transparent)] hover:!text-current sm:h-8 sm:w-8"
                   onClick={() => {
                     keepComposerFocusRef.current = false;
                     setIsMinimized(true);
@@ -3192,7 +3176,7 @@ Is there anything else I can help you with?`,
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-11 w-11 text-white hover:bg-white/15 hover:text-white sm:h-8 sm:w-8"
+                  className="h-11 w-11 text-current hover:bg-[color:color-mix(in_srgb,currentColor_16%,transparent)] hover:!text-current sm:h-8 sm:w-8"
                   onClick={() => {
                     keepComposerFocusRef.current = false;
                     setIsOpen(false);
@@ -3207,111 +3191,111 @@ Is there anything else I can help you with?`,
             </div>
 
             <ScrollArea className="min-h-0 flex-1 bg-slate-50 px-3.5 py-4">
-                  <div className="space-y-4 pb-1">
-                    <AnimatePresence initial={false}>
-                      {messages.map((message, index) => {
-                        const isUser = message.role === "user";
-                        const hasBody = message.content.trim().length > 0;
-                        const hasActions =
-                          !isUser &&
-                          Boolean(
-                            message.quickActions &&
-                              message.quickActions.length > 0,
-                          );
-                        const hasCta = !isUser && Boolean(message.supportCta);
-                        if (!hasBody && !hasActions && !hasCta) return null;
-                        const dateActionCount =
-                          message.quickActions?.filter(isChatGridAction)
-                            .length ?? 0;
-                        const eventPickCount =
-                          message.quickActions?.filter(isEventPickAction)
-                            .length ?? 0;
-                        const useDateGrid = dateActionCount >= 2;
-                        const useEventList = !useDateGrid && eventPickCount >= 2;
-                        return (
-                          <motion.div
-                            key={`msg-${index}-${message.role}-${message.content.slice(0, 24)}`}
-                            initial={
-                              motionSafe
-                                ? {
-                                    opacity: 0,
-                                    y: 12,
-                                    x: isUser ? 10 : -10,
-                                  }
-                                : false
-                            }
-                            animate={{ opacity: 1, y: 0, x: 0 }}
-                            transition={{
-                              type: "spring",
-                              stiffness: 380,
-                              damping: 26,
-                              delay: motionSafe ? 0.03 : 0,
-                            }}
-                            className={cn(
-                              "flex items-end gap-2 min-w-0",
-                              isUser ? "justify-end" : "justify-start",
-                            )}
-                          >
-                            {!isUser && (
-                              <ChatAvatar
-                                src={avatarSrc}
-                                alt={siteName}
-                                size="sm"
-                              />
-                            )}
+              <div className="space-y-4 pb-1">
+                <AnimatePresence initial={false}>
+                  {messages.map((message, index) => {
+                    const isUser = message.role === "user";
+                    const hasBody = message.content.trim().length > 0;
+                    const hasActions =
+                      !isUser &&
+                      Boolean(
+                        message.quickActions && message.quickActions.length > 0,
+                      );
+                    const hasCta = !isUser && Boolean(message.supportCta);
+                    if (!hasBody && !hasActions && !hasCta) return null;
+                    const dateActionCount =
+                      message.quickActions?.filter(isChatGridAction).length ??
+                      0;
+                    const eventPickCount =
+                      message.quickActions?.filter(isEventPickAction).length ??
+                      0;
+                    const useDateGrid = dateActionCount >= 2;
+                    const useEventList = !useDateGrid && eventPickCount >= 2;
+                    return (
+                      <motion.div
+                        key={`msg-${index}-${message.role}-${message.content.slice(0, 24)}`}
+                        initial={
+                          motionSafe
+                            ? {
+                                opacity: 0,
+                                y: 12,
+                                x: isUser ? 10 : -10,
+                              }
+                            : false
+                        }
+                        animate={{ opacity: 1, y: 0, x: 0 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 380,
+                          damping: 26,
+                          delay: motionSafe ? 0.03 : 0,
+                        }}
+                        className={cn(
+                          "flex items-end gap-2 min-w-0",
+                          isUser ? "justify-end" : "justify-start",
+                        )}
+                      >
+                        {!isUser && (
+                          <ChatAvatar
+                            src={avatarSrc}
+                            alt={siteName}
+                            size="sm"
+                            branded={brandedChatChrome}
+                          />
+                        )}
+                        <div
+                          className={cn(
+                            "flex min-w-0 flex-col gap-2",
+                            useDateGrid || useEventList
+                              ? "w-full"
+                              : "max-w-[85%]",
+                          )}
+                        >
+                          {hasBody && (
                             <div
                               className={cn(
-                                "flex min-w-0 flex-col gap-2",
+                                "min-w-0 px-3.5 py-2.5 text-sm leading-relaxed",
                                 useDateGrid || useEventList
-                                  ? "w-full"
-                                  : "max-w-[85%]",
+                                  ? "max-w-[85%]"
+                                  : null,
+                                isUser
+                                  ? cn(
+                                      "rounded-2xl rounded-br-md",
+                                      chatChrome,
+                                    )
+                                  : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
                               )}
                             >
-                              {hasBody && (
-                              <div
-                                className={cn(
-                                  "min-w-0 px-3.5 py-2.5 text-sm leading-relaxed",
-                                  useDateGrid || useEventList
-                                    ? "max-w-[85%]"
-                                    : null,
-                                  isUser
-                                    ? "rounded-2xl rounded-br-md bg-[color:var(--color-header,#1e293b)] text-[color:var(--color-on-header,#fff)]"
-                                    : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
-                                )}
+                              <p
+                                className="whitespace-pre-wrap break-words"
+                                style={{
+                                  wordBreak: "break-word",
+                                  overflowWrap: "anywhere",
+                                  color: "inherit",
+                                }}
                               >
-                                <p
-                                  className="whitespace-pre-wrap break-words"
-                                  style={{
-                                    wordBreak: "break-word",
-                                    overflowWrap: "anywhere",
-                                    color: "inherit",
-                                  }}
-                                >
-                                  {renderMessageContent(
-                                    message.content,
-                                    isUser,
-                                  )}
-                                </p>
-                              </div>
-                              )}
-                              {!isUser &&
-                                message.quickActions &&
-                                message.quickActions.length > 0 && (
-                                  <div
-                                    className={
-                                      useDateGrid
-                                        ? "grid w-full grid-cols-2 gap-1.5"
-                                        : useEventList
-                                          ? "flex w-full flex-col gap-1.5"
-                                          : "flex flex-col gap-1.5"
-                                    }
-                                  >
-                                    {message.quickActions.map((action, actionIndex) => {
-                                      const isDateChip =
-                                        isChatGridAction(action);
-                                      const isEventChip =
-                                        isEventPickAction(action);
-                                      return (
+                                {renderMessageContent(message.content, isUser)}
+                              </p>
+                            </div>
+                          )}
+                          {!isUser &&
+                            message.quickActions &&
+                            message.quickActions.length > 0 && (
+                              <div
+                                className={
+                                  useDateGrid
+                                    ? "grid w-full grid-cols-2 gap-1.5"
+                                    : useEventList
+                                      ? "flex w-full flex-col gap-1.5"
+                                      : "flex flex-col gap-1.5"
+                                }
+                              >
+                                {message.quickActions.map(
+                                  (action, actionIndex) => {
+                                    const isDateChip = isChatGridAction(action);
+                                    const isEventChip =
+                                      isEventPickAction(action);
+                                    return (
                                       <motion.button
                                         key={action.id}
                                         type="button"
@@ -3350,10 +3334,12 @@ Is there anything else I can help you with?`,
                                             : action.id === "open-checkout"
                                               ? cn(
                                                   "border-transparent",
-                                                  CHAT_CHROME,
-                                                  CHAT_CHROME_HOVER,
+                                                  chatChrome,
+                                                  chatChromeHover,
                                                 )
-                                              : "border-slate-300 bg-white text-slate-700 hover:bg-[color:var(--color-header,#1e293b)] hover:text-[color:var(--color-on-header,#fff)] hover:border-[color:var(--color-header,#1e293b)]",
+                                              : brandedChatChrome
+                                                ? "border-slate-300 bg-white text-slate-700 hover:bg-[color:var(--color-header,#1e293b)] hover:text-[color:var(--color-on-header,#fff)] hover:border-[color:var(--color-header,#1e293b)]"
+                                                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-800 hover:text-white hover:border-slate-800",
                                           "disabled:pointer-events-none disabled:opacity-50",
                                         )}
                                       >
@@ -3380,97 +3366,101 @@ Is there anything else I can help you with?`,
                                           </span>
                                         ) : null}
                                       </motion.button>
-                                      );
-                                    })}
-                                  </div>
+                                    );
+                                  },
                                 )}
-                              {!isUser && message.supportCta && (
-                                <motion.div
-                                  initial={
-                                    motionSafe
-                                      ? { opacity: 0, y: 6 }
-                                      : false
-                                  }
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{ delay: 0.15 }}
-                                >
-                                  <Link
-                                    href={message.supportCta.href}
-                                    className={cn(
-                                      "inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm transition",
-                                      CHAT_CHROME,
-                                      CHAT_CHROME_HOVER,
-                                    )}
-                                  >
-                                    {message.supportCta.label}
-                                    <ExternalLink
-                                      className="h-3 w-3"
-                                      strokeWidth={2.5}
-                                    />
-                                  </Link>
-                                </motion.div>
-                              )}
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-
-                    {isLoading && (
-                      <motion.div
-                        initial={motionSafe ? { opacity: 0, y: 8 } : false}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-end gap-2"
-                      >
-                        <ChatAvatar src={avatarSrc} alt={siteName} size="sm" />
-                        <div className="w-[min(100%,16rem)] space-y-1.5 rounded-2xl rounded-bl-md border border-black/6 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                          <Skeleton className="h-3.5 w-[85%] rounded-md" />
-                          <Skeleton className="h-3.5 w-[62%] rounded-md" />
+                              </div>
+                            )}
+                          {!isUser && message.supportCta && (
+                            <motion.div
+                              initial={
+                                motionSafe ? { opacity: 0, y: 6 } : false
+                              }
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.15 }}
+                            >
+                              <Link
+                                href={message.supportCta.href}
+                                className={cn(
+                                  "inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm transition",
+                                  chatChrome,
+                                  chatChromeHover,
+                                )}
+                              >
+                                {message.supportCta.label}
+                                <ExternalLink
+                                  className="h-3 w-3"
+                                  strokeWidth={2.5}
+                                />
+                              </Link>
+                            </motion.div>
+                          )}
                         </div>
                       </motion.div>
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
+                    );
+                  })}
+                </AnimatePresence>
 
-                <div className="shrink-0 border-t border-black/6 bg-white text-slate-900">
-                  <div className="flex items-center gap-2 p-3">
-                    <Input
-                      ref={composerInputRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={inputPlaceholder}
-                      disabled={supportFlow.step === "submitting"}
-                      enterKeyHint="send"
-                      autoComplete="off"
-                      className="h-10 flex-1 rounded-full border-black/10 bg-white px-4 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:ring-offset-0"
+                {isLoading && (
+                  <motion.div
+                    initial={motionSafe ? { opacity: 0, y: 8 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-end gap-2"
+                  >
+                    <ChatAvatar
+                      src={avatarSrc}
+                      alt={siteName}
+                      size="sm"
+                      branded={brandedChatChrome}
                     />
-                    <Button
-                      type="button"
-                      onClick={() => void handleSendMessage()}
-                      disabled={
-                        !input.trim() ||
-                        isLoading ||
-                        supportFlow.step === "submitting"
-                      }
-                      size="icon"
-                      className={cn(
-                        "h-10 w-10 shrink-0 rounded-full transition-transform",
-                        input.trim()
-                          ? cn(CHAT_CHROME, CHAT_CHROME_HOVER, "hover:scale-105")
-                          : "bg-black/5 text-black/35",
-                      )}
-                      aria-label="Send message"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
+                    <div className="w-[min(100%,16rem)] space-y-1.5 rounded-2xl rounded-bl-md border border-black/6 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                      <Skeleton className="h-3.5 w-[85%] rounded-md" />
+                      <Skeleton className="h-3.5 w-[62%] rounded-md" />
+                    </div>
+                  </motion.div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </ScrollArea>
+
+            <div className="shrink-0 border-t border-black/6 bg-white text-slate-900">
+              <div className="flex items-center gap-2 p-3">
+                <Input
+                  ref={composerInputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={inputPlaceholder}
+                  disabled={supportFlow.step === "submitting"}
+                  enterKeyHint="send"
+                  autoComplete="off"
+                  className="h-10 flex-1 rounded-full border-black/10 bg-white px-4 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:ring-offset-0"
+                />
+                <Button
+                  type="button"
+                  onClick={() => void handleSendMessage()}
+                  disabled={
+                    !input.trim() ||
+                    isLoading ||
+                    supportFlow.step === "submitting"
+                  }
+                  size="icon"
+                  className={cn(
+                    "h-10 w-10 shrink-0 rounded-full transition-transform",
+                    input.trim()
+                      ? cn(chatChrome, chatChromeHover, "hover:scale-105")
+                      : "bg-black/5 text-black/35",
+                  )}
+                  aria-label="Send message"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

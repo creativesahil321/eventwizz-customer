@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CHECKOUT_CONSTANTS } from "@/app/(public)/vendor/checkout/_lib/constants";
+import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
 // Professional API-only approach - no cart store needed
 import { useStoreEventBooking } from "@/services/customer/cart/query";
 import { CartRequest } from "@/services/customer/cart/type";
@@ -74,6 +75,8 @@ interface SessionUser {
 export type DatesSectionType = {
   event_date: string;
   price: number;
+  /** Active customer booking options for this date, when supplied by the API. */
+  booking_type?: "tickets" | "tables" | "both";
   sold_out?: boolean;
   /** Mapped for date cards (from API `discount` via room slices). */
   offer?: DateCardOffer | null;
@@ -148,7 +151,7 @@ function getDateCardContainerClass(
   narrowPreview: boolean,
 ): string {
   const base = cn(
-    "flex-shrink-0 overflow-hidden rounded-2xl border text-center transition-all duration-300",
+    "flex-shrink-0 overflow-hidden rounded-2xl border bg-transparent p-0 text-center transition-all duration-300",
     narrowPreview ? "w-[85px]" : "w-[85px] sm:w-[100px] md:w-[120px]",
   );
 
@@ -165,6 +168,18 @@ function getDateCardContainerClass(
     return `${base} border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30`;
   }
   return `${base} border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent`;
+}
+
+function dateCardAriaLabel(
+  dateInfo: { day: string; date: number | string; month: string; price: string },
+  visual: DateCardVisualState,
+  currencySymbol: string,
+): string {
+  const when = `${dateInfo.day} ${dateInfo.date} ${dateInfo.month}`;
+  if (visual.isSoldOut) return `${when}, sold out`;
+  if (visual.isSelecting) return `Adding ${when} to cart`;
+  if (visual.isInCart) return `${when}, already in cart`;
+  return `Book ${when}, from ${currencySymbol}${dateInfo.price}`;
 }
 
 function getDateCardFooterClass(
@@ -563,7 +578,7 @@ export default function DatesSection({
 
     // Resume checkout when the date is already in cart (with or without selections).
     if (shouldShowViewCartOnDate(dateItem.event_date)) {
-      router.push("/vendor/checkout");
+      router.push(CUSTOMER_CHECKOUT_PATH);
       return;
     }
 
@@ -583,10 +598,10 @@ export default function DatesSection({
         event_date: eventDate,
         ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
       });
-      saveAuthCallbackUrl("/vendor/checkout");
+      saveAuthCallbackUrl(CUSTOMER_CHECKOUT_PATH);
       clearDateSelection();
       router.push(
-        `/auth/login?callbackUrl=${encodeURIComponent("/vendor/checkout")}`,
+        `/auth/login?callbackUrl=${encodeURIComponent(CUSTOMER_CHECKOUT_PATH)}`,
       );
       return;
     }
@@ -658,7 +673,7 @@ export default function DatesSection({
             // Professional API-only approach - no local storage needed
 
             // Navigate directly to simple checkout page
-            router.push("/vendor/checkout");
+            router.push(CUSTOMER_CHECKOUT_PATH);
           } else {
             console.error("Failed to select event. Please try again.");
             clearDateSelection();
@@ -680,10 +695,10 @@ export default function DatesSection({
         event_date: eventData.event_date,
         ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
       });
-      saveAuthCallbackUrl("/vendor/checkout");
+      saveAuthCallbackUrl(CUSTOMER_CHECKOUT_PATH);
       clearDateSelection();
       router.push(
-        `/auth/login?callbackUrl=${encodeURIComponent("/vendor/checkout")}`,
+        `/auth/login?callbackUrl=${encodeURIComponent(CUSTOMER_CHECKOUT_PATH)}`,
       );
     }
   };
@@ -851,11 +866,14 @@ export default function DatesSection({
     );
 
     return (
-      <div
+      <button
+        type="button"
         className={getDateCardContainerClass(visual, narrowPreview)}
         key={cardKey}
         onClick={() => handleDateCardClick(dateItem, visual)}
         aria-busy={visual.isSelecting}
+        aria-label={dateCardAriaLabel(dateInfo, visual, currencySymbol)}
+        disabled={visual.isSoldOut || visual.isOtherBusy}
       >
         <div className={dateCardBodyClass}>
           <p className={dateCardDayClass}>{dateInfo.day}</p>
@@ -882,7 +900,7 @@ export default function DatesSection({
             compact={narrowPreview}
           />
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -902,7 +920,8 @@ export default function DatesSection({
     );
 
     return (
-      <motion.div
+      <motion.button
+        type="button"
         className={getDateCardContainerClass(visual, narrowPreview)}
         key={cardKey}
         initial={{ opacity: 1, y: 0 }}
@@ -936,6 +955,8 @@ export default function DatesSection({
         }}
         onClick={() => handleDateCardClick(dateItem, visual)}
         aria-busy={visual.isSelecting}
+        aria-label={dateCardAriaLabel(dateInfo, visual, currencySymbol)}
+        disabled={visual.isSoldOut || visual.isOtherBusy}
       >
         <div className={dateCardBodyClass}>
           <p className={dateCardDayClass}>{dateInfo.day}</p>
@@ -962,7 +983,7 @@ export default function DatesSection({
             compact={narrowPreview}
           />
         </div>
-      </motion.div>
+      </motion.button>
     );
   };
 
@@ -1046,6 +1067,14 @@ export default function DatesSection({
             className={headingClass}
             emphasis={headingEmphasis as HeadingEmphasis | undefined}
           />
+          <p
+            data-book-now-hint
+            hidden
+            className="mt-1 max-w-md text-sm font-medium text-white/90"
+            role="status"
+          >
+            Choose a date below to continue booking
+          </p>
           {showAlreadyBookedLoginCta && (
             <Button
               type="button"
@@ -1176,6 +1205,14 @@ export default function DatesSection({
           className={headingClass}
           emphasis={headingEmphasis as HeadingEmphasis | undefined}
         />
+        <p
+          data-book-now-hint
+          hidden
+          className="mt-1 max-w-md text-sm font-medium text-white/90"
+          role="status"
+        >
+          Choose a date below to continue booking
+        </p>
         {showAlreadyBookedLoginCta && (
           <Button
             type="button"

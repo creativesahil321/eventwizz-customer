@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -70,7 +77,11 @@ import {
   checkoutDateDomId,
   subscribeCheckoutDateFocus,
 } from "../_lib/checkout-date-focus";
-import { hasRemainingDatesToAdd } from "../_lib/remaining-dates";
+import {
+  firstRoomIdWithRemainingDates,
+  hasRemainingDatesToAdd,
+  hasRemainingDatesToAddAnywhere,
+} from "../_lib/remaining-dates";
 import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
@@ -170,35 +181,86 @@ export default function CartManager({}: CartManagerProps) {
   );
   const eventDetail = eventDetailResponse?.data ?? null;
 
-  // Add room stays unscoped; Add Dates deep-links the active checkout room.
+  // The cart API can retain both legacy option sets after a vendor changes
+  // booking_type. Use the public event detail as the source of truth for what
+  // the customer may select, while keeping old cart data available to sync.
+  const bookingTypeByDate = useMemo(() => {
+    if (!eventDetail) return new Map<string, "tickets" | "tables" | "both">();
+
+    const dates = roomMode
+      ? activeRoomId == null
+        ? undefined
+        : Object.values(eventDetail.rooms ?? {}).find(
+            (room) => Number(room.room_id) === activeRoomId,
+          )?.dates
+      : eventDetail.dates;
+
+    return new Map(
+      (dates ?? [])
+        .filter((date) => date.booking_type)
+        .map((date) => [date.event_date, date.booking_type!]),
+    );
+  }, [activeRoomId, eventDetail, roomMode]);
+
+  // Add room stays unscoped. Add Dates prefers the active room, then any
+  // other room that still has bookable dates.
   const eventDetailsUrl = useMemo(
     () => generateEventBookingUrl(locationSlug, currentEventSlug),
     [locationSlug, currentEventSlug],
   );
 
+  const lookupRemainingDate = useCallback(
+    (storeKey: string) =>
+      currentEventSlug ? getDateData(currentEventSlug, storeKey) : null,
+    [currentEventSlug, getDateData, editingData],
+  );
+
+  const addDatesRoomId = useMemo(() => {
+    if (!roomMode) return null;
+    if (
+      activeRoomId != null &&
+      hasRemainingDatesToAdd({
+        eventDetail,
+        cartEventData: currentEventApiData,
+        roomId: activeRoomId,
+        getLocalDateData: lookupRemainingDate,
+      })
+    ) {
+      return activeRoomId;
+    }
+    return firstRoomIdWithRemainingDates({
+      eventDetail,
+      cartEventData: currentEventApiData,
+      getLocalDateData: lookupRemainingDate,
+    });
+  }, [
+    roomMode,
+    activeRoomId,
+    eventDetail,
+    currentEventApiData,
+    lookupRemainingDate,
+  ]);
+
   const addDatesUrl = useMemo(
     () =>
-      generateEventBookingUrl(
-        locationSlug,
-        currentEventSlug,
-        roomMode ? activeRoomId : null,
-      ),
-    [locationSlug, currentEventSlug, roomMode, activeRoomId],
+      generateEventBookingUrl(locationSlug, currentEventSlug, addDatesRoomId),
+    [locationSlug, currentEventSlug, addDatesRoomId],
   );
 
   const showAddDates = useMemo(() => {
     if (!addDatesUrl || !currentEventSlug) return false;
-    return hasRemainingDatesToAdd({
+    if (!roomMode) {
+      return hasRemainingDatesToAdd({
+        eventDetail,
+        cartEventData: currentEventApiData,
+        roomId: null,
+        getLocalDateData: lookupRemainingDate,
+      });
+    }
+    return hasRemainingDatesToAddAnywhere({
       eventDetail,
       cartEventData: currentEventApiData,
-      roomId: roomMode ? activeRoomId : null,
-      getLocalDateData: (date) => {
-        const storeKey =
-          roomMode && activeRoomId != null
-            ? buildRoomDateKey(activeRoomId, date)
-            : date;
-        return getDateData(currentEventSlug, storeKey);
-      },
+      getLocalDateData: lookupRemainingDate,
     });
   }, [
     addDatesUrl,
@@ -206,9 +268,7 @@ export default function CartManager({}: CartManagerProps) {
     eventDetail,
     currentEventApiData,
     roomMode,
-    activeRoomId,
-    getDateData,
-    editingData,
+    lookupRemainingDate,
   ]);
 
   // Keep active room valid for the current cart event (reset after event replace).
@@ -792,6 +852,18 @@ export default function CartManager({}: CartManagerProps) {
 
         if (!dateData || !currentEventSlug) return null;
 
+        const bookingType = bookingTypeByDate.get(date);
+        const displayDateData =
+          bookingType == null
+            ? dateData
+            : {
+                ...dateData,
+                tickets:
+                  bookingType === "tables" ? [] : dateData.tickets,
+                tables:
+                  bookingType === "tickets" ? [] : dateData.tables,
+              };
+
         return (
           <div
             key={date}
@@ -801,7 +873,7 @@ export default function CartManager({}: CartManagerProps) {
             <DateAccordion
               eventSlug={currentEventSlug}
               date={date}
-              dateData={dateData}
+              dateData={displayDateData}
               isExpanded={isExpanded}
               onToggle={() => toggleDateExpansion(date)}
               onRemoveDate={handleRemoveDate}
@@ -817,8 +889,8 @@ export default function CartManager({}: CartManagerProps) {
               {...(() => {
                 if (couponReplacesDateOffers) {
                   const dateDiscountable =
-                    calculateEditableDateDiscountableTotal(dateData);
-                  const dateTotal = calculateEditableDateTotal(dateData);
+                    calculateEditableDateDiscountableTotal(displayDateData);
+                  const dateTotal = calculateEditableDateTotal(displayDateData);
                   const share =
                     couponDiscountTotal > 0 &&
                     bookingDiscountableForPromo > 0 &&
@@ -852,10 +924,11 @@ export default function CartManager({}: CartManagerProps) {
                   };
                 }
 
-                const guests = getDateGuestCount(dateData);
-                const tableTotal = calculateEditableDateTablesTotal(dateData);
+                const guests = getDateGuestCount(displayDateData);
+                const tableTotal =
+                  calculateEditableDateTablesTotal(displayDateData);
                 const discountableTotal =
-                  calculateEditableDateDiscountableTotal(dateData);
+                  calculateEditableDateDiscountableTotal(displayDateData);
                 const eligibility = {
                   guestCount: guests,
                   discountableTotal,

@@ -110,6 +110,9 @@ export interface AIGeneratedContent {
   };
   stepThree: {
     event_name: string;
+    event_address?: string;
+    latitude?: number;
+    longitude?: number;
     event_banner_heading: string;
     event_banner_sub_heading: string;
     about_event_heading: string;
@@ -160,7 +163,8 @@ export interface AIGeneratedContent {
     rooms?: AIRoomDrinks[];
   };
   stepEight: {
-    event_address: string;
+    /** Legacy brochure/location shape retained for older AI responses. */
+    event_address?: string;
     price_start_from: string;
     price_start_from_button_text: string;
     location: { title: string; description: string };

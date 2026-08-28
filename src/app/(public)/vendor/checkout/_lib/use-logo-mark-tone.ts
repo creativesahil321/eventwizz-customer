@@ -5,9 +5,23 @@ import type { CheckoutLogoMarkTone } from "./checkout-header-surface";
 
 export type LogoMarkTone = CheckoutLogoMarkTone;
 
+function isCrossOriginUrl(src: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const url = new URL(src, window.location.href);
+    return url.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Sample opaque pixels to see if a logo is a light mark (white/silver wordmark)
  * or a dark mark. Used so checkout can pick a header that keeps the logo visible.
+ *
+ * Cross-origin logos (local Laravel storage, CDN) often lack CORS headers.
+ * We attempt anonymous CORS first; on failure / tainted canvas, tone stays
+ * "unknown" so the header uses a safe default — never blocks checkout.
  */
 export function useLogoMarkTone(src: string): LogoMarkTone {
   const [tone, setTone] = useState<LogoMarkTone>("unknown");
@@ -20,17 +34,17 @@ export function useLogoMarkTone(src: string): LogoMarkTone {
     }
 
     let cancelled = false;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-
     const finish = (next: LogoMarkTone) => {
       if (!cancelled) setTone(next);
     };
 
-    img.onload = () => {
+    const sampleFromImage = (img: HTMLImageElement) => {
       try {
         const canvas = document.createElement("canvas");
-        const scale = Math.min(1, 96 / Math.max(img.naturalWidth, img.naturalHeight, 1));
+        const scale = Math.min(
+          1,
+          96 / Math.max(img.naturalWidth, img.naturalHeight, 1),
+        );
         const width = Math.max(1, Math.round(img.naturalWidth * scale));
         const height = Math.max(1, Math.round(img.naturalHeight * scale));
         canvas.width = width;
@@ -81,12 +95,31 @@ export function useLogoMarkTone(src: string): LogoMarkTone {
 
         finish(avg >= 140 ? "light" : "dark");
       } catch {
+        // Tainted canvas (no CORS) or other read failure.
         finish("unknown");
       }
     };
 
-    img.onerror = () => finish("unknown");
-    img.src = src;
+    const load = (useCors: boolean) => {
+      const img = new Image();
+      if (useCors) {
+        img.crossOrigin = "anonymous";
+      }
+
+      img.onload = () => sampleFromImage(img);
+      img.onerror = () => finish("unknown");
+      img.src = src;
+    };
+
+    // Cross-origin Laravel /storage usually has no ACAO. Skip canvas sampling
+    // entirely so we never set crossOrigin=anonymous (avoids CORS console noise).
+    // Header <img> still renders; tone stays "unknown" → safe default surface.
+    if (isCrossOriginUrl(src)) {
+      finish("unknown");
+      return;
+    }
+
+    load(true);
 
     return () => {
       cancelled = true;

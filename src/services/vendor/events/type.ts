@@ -91,6 +91,11 @@ export interface EventDetailStepOne {
   about_event_heading?: string;
   about_event_sub_heading?: string;
   about_event_description?: string;
+  event_address?: string | null;
+  lat?: string | number | null;
+  long?: string | number | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
   event_schedular_title?: string;
   event_schedular?: Array<{ time: string; title: string }>;
   event_schedular_background_image?: string | null;

@@ -25,6 +25,10 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
       : appConfig.logo;
 
   const brandName = theme?.name || "EventWizz";
+  const faviconPath =
+    typeof theme?.favicon === "string" && theme.favicon.trim()
+      ? theme.favicon
+      : appConfig.mini_logo;
 
   return (
     <nav
@@ -35,14 +39,24 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
     >
       <span className="transition-all duration-300 ease-linear">
         {collapsed ? (
-          /* Mini logo removed per product request - collapsed sidebar shows no logo */
-          <span className="h-8 w-8 block" aria-hidden />
+          <Link
+            href="/"
+            aria-label={`Go to ${brandName} home`}
+            className="flex h-8 w-8 items-center justify-center"
+          >
+            <BrandLogoImage
+              src={addCacheBusting(faviconPath, theme?.media_updated_at)}
+              alt={brandName}
+              width={32}
+              height={32}
+              className="h-8 w-8"
+            />
+          </Link>
         ) : (
           <Link href="/">
             <BrandLogoImage
               src={addCacheBusting(logoPath)}
               alt={brandName}
-              headerBackground={theme?.colors?.header}
               className="h-8 w-auto"
             />
           </Link>

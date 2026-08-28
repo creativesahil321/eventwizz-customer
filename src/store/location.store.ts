@@ -2,9 +2,22 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { VenueLocation } from "@/types/api.types";
+import { resolveVenueLocationCoords } from "@/lib/venue-location-address";
 
 // Version for data migration - increment when VenueLocation structure changes
-const LOCATION_STORAGE_VERSION = 2;
+const LOCATION_STORAGE_VERSION = 3;
+
+function withNormalizedCoords(location: VenueLocation): VenueLocation {
+  const coords = resolveVenueLocationCoords(
+    location as VenueLocation & Record<string, unknown>,
+  );
+  if (!coords) return location;
+  return {
+    ...location,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+  };
+}
 
 interface LocationState {
   selectedLocation: VenueLocation | null;
@@ -37,7 +50,7 @@ export const useLocationStore = create<LocationState>()(
         set((state) => {
           // Ensure is_default and status are boolean and preserve all fields
           const normalizedLocation = {
-            ...location,
+            ...withNormalizedCoords(location),
             is_default: Boolean(location.is_default),
             status: location.status !== undefined ? Boolean(location.status) : true,
           };
@@ -58,7 +71,7 @@ export const useLocationStore = create<LocationState>()(
         set((state) => {
           // Ensure is_default and status are boolean in all locations and preserve all fields
           const normalizedLocations = locations.map((loc) => ({
-            ...loc,
+            ...withNormalizedCoords(loc),
             is_default: Boolean(loc.is_default),
             status: loc.status !== undefined ? Boolean(loc.status) : true,
           }));
@@ -79,6 +92,14 @@ export const useLocationStore = create<LocationState>()(
                 "vendor_location_id",
                 String(defaultLocation.id)
               );
+            }
+          } else if (state.selectedLocation?.id) {
+            // Refresh selected location from latest list (picks up new lat/lng).
+            const refreshed = normalizedLocations.find(
+              (loc) => loc.id === state.selectedLocation?.id,
+            );
+            if (refreshed) {
+              state.selectedLocation = refreshed;
             }
           }
           state.isLoading = false;

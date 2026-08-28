@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/tooltip";
 import { detectAndFixStaleZustand } from "@/lib/utils/cart-sync-helper";
 import { useCartVisibility } from "@/app/(public)/vendor/checkout/_lib/hooks/useCartVisibility";
+import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
 
 interface CartButtonProps {
   className?: string;
@@ -43,7 +44,7 @@ export default function CartButton({
     }
   }, [apiCartData, isLoading]);
 
-  const checkoutUrl = "/vendor/checkout";
+  const checkoutUrl = CUSTOMER_CHECKOUT_PATH;
 
   return (
     <TooltipProvider>

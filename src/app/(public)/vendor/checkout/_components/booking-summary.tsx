@@ -755,6 +755,28 @@ export default function BookingSummary({}: BookingSummaryProps) {
     );
   }, [availableDates, currentEventSlug, editingData, getDateData]);
 
+  const unconfirmedSeatingRoomNames = useMemo(() => {
+    if (!currentEventSlug || !roomMode) return [] as string[];
+    const names = new Set<string>();
+    for (const dateKey of availableDates) {
+      if (!hasUnconfirmedTableSeating(getDateData(currentEventSlug, dateKey))) {
+        continue;
+      }
+      const { roomId } = parseRoomDateKey(dateKey);
+      if (roomId == null) continue;
+      const name = rooms.find((r) => r.room_id === roomId)?.room_name;
+      if (name) names.add(name);
+    }
+    return [...names];
+  }, [
+    availableDates,
+    currentEventSlug,
+    editingData,
+    getDateData,
+    roomMode,
+    rooms,
+  ]);
+
   const pendingUnconfirmedSeatingTotal = useMemo(() => {
     if (!currentEventSlug) return 0;
     return availableDates.reduce((sum, dateKey) => {
@@ -1202,6 +1224,13 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return rooms.find((r) => r.room_id === roomId)?.room_name ?? null;
   };
 
+  const unconfirmedSeatingWarning =
+    unconfirmedSeatingRoomNames.length === 1
+      ? `Confirm table seating for ${unconfirmedSeatingRoomNames[0]}, or remove it using the trash icon next to Table Seating.`
+      : unconfirmedSeatingRoomNames.length > 1
+        ? `Confirm table seating for ${unconfirmedSeatingRoomNames.join(", ")}, or remove it using the trash icon next to Table Seating.`
+        : "Confirm table seating below, or remove it using the trash icon next to Table Seating.";
+
   const payableNowWithPromo = finalTotalWithFee;
 
   const ctaState = resolveCheckoutCtaState({
@@ -1486,8 +1515,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <p className="text-xs leading-snug text-amber-800">
-            Confirm table seating below, or remove it using the trash icon
-            next to Table Seating.
+            {unconfirmedSeatingWarning}
           </p>
         </div>
       ) : null}
@@ -1610,76 +1638,80 @@ export default function BookingSummary({}: BookingSummaryProps) {
         </Sheet>
       ) : null}
 
-      <div className="lg:hidden">
-        <CheckoutMobileStickyBar>
-          {renderExpiredPaymentBanner("mobile-sticky")}
-          {renderPendingPaymentBanner("mobile-sticky")}
+      {/* Hide sticky chrome while Stripe modal is open — otherwise mobile shows
+          two timers / two "Complete payment" surfaces (sticky sits above dialog). */}
+      {!isStripePaymentOpen ? (
+        <div className="lg:hidden">
+          <CheckoutMobileStickyBar>
+            {renderExpiredPaymentBanner("mobile-sticky")}
+            {renderPendingPaymentBanner("mobile-sticky")}
 
-          <div className="flex flex-col gap-2.5 px-4 pt-3 pb-[max(0.75rem,var(--checkout-mobile-safe-bottom))]">
-            <button
-              type="button"
-              onClick={() => setShowMobileDrawer((open) => !open)}
-              className="flex w-full min-w-0 items-center gap-3 text-left"
-              aria-expanded={showMobileDrawer}
-              aria-label="Open order summary"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-xs font-medium text-[color:var(--checkout-muted-foreground)]">
-                    {discountedLater > 0 ? "Pay today" : "Total"}
-                  </p>
-                  <p className="text-lg font-bold tabular-nums text-[color:var(--checkout-brand-primary)]">
-                    {hasPayableTotal ? formatMoney(payableNowWithPromo) : "—"}
-                  </p>
+            <div className="flex flex-col gap-2.5 px-4 pt-3 pb-[max(0.75rem,var(--checkout-mobile-safe-bottom))]">
+              <button
+                type="button"
+                onClick={() => setShowMobileDrawer((open) => !open)}
+                className="flex w-full min-w-0 items-center gap-3 text-left"
+                aria-expanded={showMobileDrawer}
+                aria-label="Open order summary"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-xs font-medium text-[color:var(--checkout-muted-foreground)]">
+                      {discountedLater > 0 ? "Pay today" : "Total"}
+                    </p>
+                    <p className="text-lg font-bold tabular-nums text-[color:var(--checkout-brand-primary)]">
+                      {hasPayableTotal ? formatMoney(payableNowWithPromo) : "—"}
+                    </p>
+                  </div>
+                  {discountedLater > 0 && hasPayableTotal ? (
+                    <p className="mt-0.5 text-[11px] tabular-nums text-[color:var(--checkout-muted-foreground)]">
+                      Booking total {formatMoney(bookingGrandTotalWithFee)}
+                    </p>
+                  ) : summaryMetaLine ? (
+                    <p className="mt-0.5 truncate text-[11px] text-[color:var(--checkout-muted-foreground)]">
+                      {summaryMetaLine}
+                    </p>
+                  ) : null}
+                  {pendingUnconfirmedSeatingTotal > 0 ? (
+                    <p className="mt-0.5 text-[11px] leading-snug text-amber-800">
+                      +{formatMoney(pendingUnconfirmedSeatingTotal)} after you
+                      confirm seating
+                    </p>
+                  ) : null}
                 </div>
-                {discountedLater > 0 && hasPayableTotal ? (
-                  <p className="mt-0.5 text-[11px] tabular-nums text-[color:var(--checkout-muted-foreground)]">
-                    Booking total {formatMoney(bookingGrandTotalWithFee)}
-                  </p>
-                ) : summaryMetaLine ? (
-                  <p className="mt-0.5 truncate text-[11px] text-[color:var(--checkout-muted-foreground)]">
-                    {summaryMetaLine}
-                  </p>
-                ) : null}
-                {pendingUnconfirmedSeatingTotal > 0 ? (
-                  <p className="mt-0.5 text-[11px] leading-snug text-amber-800">
-                    +{formatMoney(pendingUnconfirmedSeatingTotal)} after you
-                    confirm seating
-                  </p>
-                ) : null}
-              </div>
-              {showMobileDrawer ? (
-                <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
-              ) : (
-                <ChevronUp className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
-              )}
-            </button>
+                {showMobileDrawer ? (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
+                )}
+              </button>
 
-            <Button
-              onClick={handleCheckoutCtaClick}
-              disabled={ctaState.disabled}
-              className={cn(
-                "h-12 w-full px-4 text-sm font-semibold",
-                checkoutPayButtonClass(ctaState.disabled),
-              )}
-            >
-              {ctaState.loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  <span>Processing...</span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2">
-                  {!ctaState.disabled && !ctaState.needsGatewaySelection && (
-                    <Lock className="h-3.5 w-3.5 shrink-0" />
-                  )}
-                  <span>{ctaState.mobileLabel}</span>
-                </div>
-              )}
-            </Button>
-          </div>
-        </CheckoutMobileStickyBar>
-      </div>
+              <Button
+                onClick={handleCheckoutCtaClick}
+                disabled={ctaState.disabled}
+                className={cn(
+                  "h-12 w-full px-4 text-sm font-semibold",
+                  checkoutPayButtonClass(ctaState.disabled),
+                )}
+              >
+                {ctaState.loading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    {!ctaState.disabled && !ctaState.needsGatewaySelection && (
+                      <Lock className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                    <span>{ctaState.mobileLabel}</span>
+                  </div>
+                )}
+              </Button>
+            </div>
+          </CheckoutMobileStickyBar>
+        </div>
+      ) : null}
 
       {stripePaymentModal}
     </>

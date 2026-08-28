@@ -31,6 +31,10 @@ export function mapGlobalStepOneToLocal(
     about_event_heading: stepOne.about_event_heading || "",
     about_event_sub_heading: stepOne.about_event_sub_heading || "",
     about_event_description: stepOne.about_event_description || "",
+    event_address: stepOne.event_address || "",
+    latitude: stepOne.latitude,
+    longitude: stepOne.longitude,
+    location: stepOne.location,
     remove_event_banner_image: stepOne.remove_event_banner_image ?? false,
     remove_event_banner_video: stepOne.remove_event_banner_video ?? false,
   };

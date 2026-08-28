@@ -10,6 +10,7 @@ import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useSession } from "next-auth/react";
 import { logout } from "@/lib/auth/logout";
 import { cn } from "@/lib/utils";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 import { useIsPreviewModeFromProvider } from "@/contexts/preview-context";
 import {
   usePreviewDeviceFramesEnabled,
@@ -118,7 +119,7 @@ export default function LocationSelectionHeader({
 
   const brandMark = logoSrc ? (
     <div className="flex h-11 items-center lg:h-12">
-      <img
+      <BrandLogoImage
         key={logoSrc}
         src={logoSrc}
         width={200}

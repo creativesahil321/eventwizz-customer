@@ -238,9 +238,12 @@ export function LocationSearchBar({
   }, [availabilityQuery.data?.days, catalogQuery.data?.results]);
 
   const today = startOfDay(new Date());
+  // Only lock the calendar when we actually have bookable days.
+  // Success + empty set used to disable every day → date stayed "Any date".
   const restrictToAvailability =
     availabilityEnabled &&
-    (availabilityQuery.isSuccess || availableDateSet.size > 0);
+    availabilityQuery.isSuccess &&
+    availableDateSet.size > 0;
 
   const fieldBtnClass = cn(
     "flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2.5 py-2 text-left text-sm transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-text)_4%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:min-w-[9rem] sm:gap-2 sm:px-3 sm:py-2",
@@ -462,6 +465,8 @@ export function LocationSearchBar({
                     onSelect={(next) => {
                       patch({ date: next ?? null });
                       setDateOpen(false);
+                      // Date alone is enough to enter search mode — scroll to results.
+                      if (next) onSearch();
                     }}
                     disabled={(date) => {
                       if (isBefore(startOfDay(date), today)) return true;
@@ -475,10 +480,10 @@ export function LocationSearchBar({
                 {availabilityEnabled ? (
                   <p className="border-t border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] px-3 py-2 text-[11px] text-[var(--color-text-dimmed)]">
                     {availabilityQuery.isError
-                      ? "Couldn’t load available dates."
+                      ? "Couldn’t load available dates — any future day is selectable."
                       : availableDateSet.size === 0 &&
                           !availabilityQuery.isFetching
-                        ? "No available dates in this range."
+                        ? "No booked-out calendar data in this range — pick any future day to search."
                         : "Only dates with available events are selectable."}
                   </p>
                 ) : null}

@@ -37,6 +37,9 @@ export interface VenueLocation {
   slug: string;
   city?: string;
   address?: string;
+  /** Venue pin — preferred for map bias / event location defaults when present */
+  latitude?: number | string;
+  longitude?: number | string;
   contact_number?: string;
   email?: string;
   is_default: boolean;

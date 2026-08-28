@@ -6,6 +6,8 @@ type FormWithLocationFields = {
   address?: string;
   city?: string;
   contact_number?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 export const fetchLocationDetails = <T extends FormWithLocationFields>(
@@ -30,6 +32,7 @@ export const fetchLocationDetails = <T extends FormWithLocationFields>(
         "formatted_phone_number",
         "international_phone_number",
         "address_components",
+        "geometry",
       ],
     },
     (place, status) => {
@@ -65,6 +68,21 @@ export const fetchLocationDetails = <T extends FormWithLocationFields>(
             { shouldValidate: true }
           );
         }
+      }
+
+      // Pin for venue location create/update payloads
+      const loc = place.geometry?.location;
+      if (loc) {
+        form.setValue(
+          "latitude" as Path<T>,
+          loc.lat() as unknown as PathValue<T, Path<T>>,
+          { shouldValidate: true, shouldDirty: true },
+        );
+        form.setValue(
+          "longitude" as Path<T>,
+          loc.lng() as unknown as PathValue<T, Path<T>>,
+          { shouldValidate: true, shouldDirty: true },
+        );
       }
 
       // Set contact number if available

@@ -6,7 +6,7 @@ export type EventRoomChooserItem = {
   index: number;
   /** Best available room preview image. */
   thumbnail: string | null;
-  /** Lowest positive package/drink price for the room, if any. */
+  /** Lowest bookable date price, else lowest drink/package price. */
   fromPrice: number | null;
   /** Number of priced packages available in the room. */
   packageCount: number;
@@ -45,6 +45,17 @@ export function lowestPositivePrice(
     .map((price) => parseFloat(String(price)))
     .filter((value) => Number.isFinite(value) && value > 0);
   return values.length > 0 ? Math.min(...values) : null;
+}
+
+/** Prefer date/ticket prices for “from” labels; drinks are optional add-ons. */
+export function lowestBookableFromPrice(options: {
+  datePrices?: Array<string | number | null | undefined>;
+  packagePrices?: Array<string | number | null | undefined>;
+}): number | null {
+  return (
+    lowestPositivePrice(options.datePrices ?? []) ??
+    lowestPositivePrice(options.packagePrices ?? [])
+  );
 }
 
 export function resolveRoomThumbnailUrl(

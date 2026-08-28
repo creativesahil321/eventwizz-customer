@@ -31,6 +31,8 @@ export interface Location {
   slug: string;
   is_default: boolean;
   is_headquarters?: boolean;
+  latitude?: number | string;
+  longitude?: number | string;
   /** Live/active events currently tied to this location */
   active_events_count?: number;
   created_at?: string;
@@ -55,6 +57,10 @@ export interface LocationCreatePayload {
   email?: string;
   contact_number?: string;
   is_default?: boolean;
+  latitude?: number;
+  longitude?: number;
+  lat?: number;
+  long?: number;
 }
 
 /**
@@ -68,6 +74,10 @@ export interface LocationUpdatePayload {
   contact_number?: string;
   slug?: string;
   is_default?: boolean;
+  latitude?: number;
+  longitude?: number;
+  lat?: number;
+  long?: number;
 }
 
 /**

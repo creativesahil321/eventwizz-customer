@@ -5,6 +5,8 @@ import { env } from "@/env";
 
 interface EventLocationMapProps {
   initialAddress?: string;
+  initialLatitude?: number | null;
+  initialLongitude?: number | null;
   onLocationChange: (location: {
     address: string;
     latitude: number;
@@ -20,8 +22,14 @@ interface MapLocation {
   longitude: number;
 }
 
+function isFiniteCoord(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 export default function EventLocationMap({
   initialAddress = "",
+  initialLatitude,
+  initialLongitude,
   onLocationChange,
   onAddressSearch,
   className = "",
@@ -84,8 +92,13 @@ export default function EventLocationMap({
   }, [onAddressSearch, handleAddressSearch]);
 
   const initializeMapWithCenter = useCallback(
-    (center: { lat: number; lng: number }, address: string) => {
+    (
+      center: { lat: number; lng: number },
+      address: string,
+      options?: { commit?: boolean },
+    ) => {
       if (!mapRef.current || !window.google) return;
+      const shouldCommit = options?.commit !== false;
 
       try {
         // Initialize geocoder
@@ -171,14 +184,16 @@ export default function EventLocationMap({
 
         markerRef.current = markerInstance;
 
-        // Set initial location
+        // Set initial location — don't save UK overview centre as event coords.
         const initialLocation: MapLocation = {
           address: address || "Selected Location",
           latitude: center.lat,
           longitude: center.lng,
         };
-        setCurrentLocation(initialLocation);
-        onLocationChange(initialLocation);
+        setCurrentLocation(shouldCommit ? initialLocation : null);
+        if (shouldCommit) {
+          onLocationChange(initialLocation);
+        }
 
         // Handle marker drag events
         markerInstance.addListener("dragend", () => {
@@ -290,37 +305,59 @@ export default function EventLocationMap({
     setError(null);
 
     try {
-      // Default center (London, UK) - center of UK
-      const defaultCenter = { lat: 54.7024, lng: -3.2766 }; // Geographic center of UK
-      let mapCenter = defaultCenter;
+      const ukOverviewCenter = { lat: 54.7024, lng: -3.2766 };
+      const hasStoredCoords =
+        isFiniteCoord(initialLatitude) && isFiniteCoord(initialLongitude);
+      const address = initialAddress.trim();
 
-      // If we have an initial address, try to geocode it
-      if (initialAddress.trim()) {
+      if (hasStoredCoords) {
+        initializeMapWithCenter(
+          { lat: initialLatitude, lng: initialLongitude },
+          address || "Selected Location",
+          { commit: true },
+        );
+        return;
+      }
+
+      if (address) {
         const geocoderInstance = new (window.google.maps as any).Geocoder();
         geocoderInstance.geocode(
-          { address: initialAddress },
+          { address, componentRestrictions: { country: "GB" } },
           (results: any, status: any) => {
             if (status === "OK" && results && results[0]) {
               const location = results[0].geometry.location;
-              mapCenter = { lat: location.lat(), lng: location.lng() };
-              initializeMapWithCenter(mapCenter, results[0].formatted_address);
+              initializeMapWithCenter(
+                { lat: location.lat(), lng: location.lng() },
+                results[0].formatted_address,
+                { commit: true },
+              );
             } else {
-              // If geocoding fails, use default center
-              initializeMapWithCenter(mapCenter, initialAddress);
+              initializeMapWithCenter(ukOverviewCenter, address, {
+                commit: false,
+              });
+              setError(
+                "Couldn’t place that address on the map. Search again or drag the pin.",
+              );
+              setIsLoading(false);
             }
-          }
+          },
         );
       } else {
-        initializeMapWithCenter(mapCenter, "");
+        initializeMapWithCenter(ukOverviewCenter, "", { commit: false });
       }
     } catch (err) {
       console.error("Error initializing map:", err);
       setError(
-        "Failed to initialise map. Please check your internet connection."
+        "Failed to initialise map. Please check your internet connection.",
       );
       setIsLoading(false);
     }
-  }, [initialAddress, initializeMapWithCenter]);
+  }, [
+    initialAddress,
+    initialLatitude,
+    initialLongitude,
+    initializeMapWithCenter,
+  ]);
 
   // Initialize map when component mounts
   useEffect(() => {

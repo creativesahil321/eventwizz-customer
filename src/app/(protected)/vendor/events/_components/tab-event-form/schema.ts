@@ -127,6 +127,21 @@ export const stepOneSchema = z
       .min(1, "About event description is required"),
     /** Sent on step 1 create/update so persistence returns `is_rooms` on GET. */
     is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
+    event_address: z
+      .string()
+      .min(1, "Event address is required")
+      .refine((value) => value.trim().length > 0, {
+        message: "Event address is required",
+      }),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+    location: z
+      .object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        icon: z.string().optional(),
+      })
+      .optional(),
 
   })
   .superRefine((data, ctx) => {
@@ -922,12 +937,8 @@ export const stepFiveSchema = z
     brochure_pdf_2: z
       .union([z.instanceof(File), z.string().url(), z.null()])
       .optional(),
-    event_address: z
-      .string()
-      .min(1, "Event address is required")
-      .refine((val) => val.trim().length > 0, {
-        message: "Event address is required",
-      }),
+    // Legacy location fields remain readable for old persisted events.
+    event_address: z.string().optional(),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
     location: z.object({
@@ -940,7 +951,7 @@ export const stepFiveSchema = z
         .max(160, "Location description must not exceed 160 characters")
         .optional(),
       icon: z.string().optional(),
-    }),
+    }).optional(),
     price: z
       .object({
         title: z
@@ -1121,6 +1132,8 @@ export const stepEightSchema = z
     city: z.string().optional(),
     address: z.string().optional(),
     contact_number: z.string().optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.is_duplicate !== true) {

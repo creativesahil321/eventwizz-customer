@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { slugToShortLabel } from "@/lib/slug-short-label";
+import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
   formatEventHeroDateRange,
   formatEventHeroTimeRange,
@@ -258,6 +259,15 @@ export default function EventDetailClient({
         price: parseFloat(pkg.price) || 0,
       })),
     [slices.packages],
+  );
+
+  const brochureFromPrice = useMemo(
+    () =>
+      lowestBookableFromPrice({
+        datePrices: (slices.dates ?? []).map((date) => date.price),
+        packagePrices: drinkPackages.map((pkg) => pkg.price),
+      }),
+    [slices.dates, drinkPackages],
   );
 
   const galleryItems = useMemo(
@@ -543,6 +553,7 @@ export default function EventDetailClient({
           <LazyBrochureSection
             showMapImmediately
             headingEmphasis={headingEmphasisFromSite}
+            bookNowScrollOffsetPx={headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX}
             location={{
               title: "EVENT LOCATION",
               description:
@@ -553,9 +564,10 @@ export default function EventDetailClient({
             }}
             price={{
               title: "PRICES FROM",
-              description: `${formatPriceUnit(
-                Number(slices.packages?.[0]?.price) || 45,
-              )} PP exc VAT`,
+              description:
+                brochureFromPrice != null
+                  ? `${formatPriceUnit(brochureFromPrice)} per person`
+                  : "See dates below",
               link: "#booking",
               price_title: "Book Now",
             }}

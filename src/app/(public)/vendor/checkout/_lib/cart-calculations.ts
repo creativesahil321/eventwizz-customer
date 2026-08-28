@@ -744,7 +744,11 @@ export function calculateRoomSubtotal(
     if (eventSlug && getDateData) {
       const editable = getDateData(eventSlug, dateKey);
       if (editable) {
-        return sum + calculateEditableDateTotal(editable);
+        return (
+          sum +
+          calculateEditableDateTotal(editable) +
+          calculateUnconfirmedTablesTotal(editable)
+        );
       }
     }
     return sum + calculateDateTotal(eventData, dateKey);

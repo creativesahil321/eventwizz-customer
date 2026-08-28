@@ -16,6 +16,7 @@ import {
 } from "@/services/vendor/locations/type";
 import { useSession } from "next-auth/react";
 import { useLocationStore } from "@/store/location.store";
+import { toLocationCoordsPayload } from "@/lib/to-location-coords-payload";
 
 // Constants
 const LOCATIONS_STALE_TIME = 10 * 60 * 1000; // 10 minutes
@@ -110,6 +111,22 @@ function isLocationArray(value: unknown): value is ApiVenueLocation[] {
 const normalizeLocation = (location: unknown): ApiVenueLocation => {
   const loc = location as Record<string, unknown>;
   const activeEventsCount = Number(loc.active_events_count);
+
+  const latRaw = loc.latitude ?? loc.lat;
+  const lngRaw = loc.longitude ?? loc.long ?? loc.lng;
+  const latitude =
+    latRaw == null || latRaw === ""
+      ? undefined
+      : Number.isFinite(Number(latRaw))
+        ? Number(latRaw)
+        : undefined;
+  const longitude =
+    lngRaw == null || lngRaw === ""
+      ? undefined
+      : Number.isFinite(Number(lngRaw))
+        ? Number(lngRaw)
+        : undefined;
+
   return {
     ...loc,
     is_default: Boolean(loc.is_default),
@@ -119,6 +136,8 @@ const normalizeLocation = (location: unknown): ApiVenueLocation => {
       ? activeEventsCount
       : 0,
     deleted_at: loc.deleted_at || undefined,
+    ...(latitude != null ? { latitude } : {}),
+    ...(longitude != null ? { longitude } : {}),
   } as unknown as ApiVenueLocation;
 };
 
@@ -209,6 +228,10 @@ export const useLocations = (
       const normalizedLocations = locations.map((location) => normalizeLocation(location));
       const meta = response?.meta;
 
+      if (normalizedLocations.length > 0) {
+        useLocationStore.getState().setLocations(normalizedLocations);
+      }
+
       return { data: normalizedLocations, meta };
     },
     staleTime: LOCATIONS_STALE_TIME,
@@ -259,6 +282,7 @@ export const useCreateLocation = () => {
         );
       }
 
+      const coords = toLocationCoordsPayload(data.latitude, data.longitude);
       const payload: LocationCreatePayload = {
         name: data.name || "",
         city: data.city || "",
@@ -267,6 +291,7 @@ export const useCreateLocation = () => {
         email: data.email,
         contact_number: data.contact_number,
         is_default: data.is_default === true,
+        ...(coords ?? {}),
       };
       return locationService.createLocation(payload);
     },
@@ -282,6 +307,7 @@ export const useUpdateLocation = (id: number | string) => {
 
   return useMutation({
     mutationFn: (data: LocationFormValues) => {
+      const coords = toLocationCoordsPayload(data.latitude, data.longitude);
       const payload: LocationUpdatePayload = {
         city: data.city,
         address: data.address,
@@ -289,6 +315,7 @@ export const useUpdateLocation = (id: number | string) => {
         is_default: data.is_default === true,
         contact_number: data.contact_number,
         email: data.email,
+        ...(coords ?? {}),
       };
       return locationService.updateLocation(id, payload);
     },

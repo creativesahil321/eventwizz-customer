@@ -34,6 +34,7 @@ import {
   mapVendorDrinkPackagesForApi,
   type VendorStepSixRoomEntry,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import { toLocationCoordsPayload } from "@/lib/to-location-coords-payload";
 import {
   EventsQueryParams,
   EventItem,
@@ -344,6 +345,17 @@ export const eventsService = {
     formData.append("about_event_heading", data.about_event_heading);
     formData.append("about_event_sub_heading", data.about_event_sub_heading);
     formData.append("about_event_description", data.about_event_description);
+    formData.append("event_address", data.event_address || "");
+    const locationCoords = toLocationCoordsPayload(
+      data.latitude,
+      data.longitude,
+    );
+    if (locationCoords) {
+      formData.append("latitude", String(locationCoords.latitude));
+      formData.append("longitude", String(locationCoords.longitude));
+      formData.append("lat", String(locationCoords.lat));
+      formData.append("long", String(locationCoords.long));
+    }
 
     // Add header banner if it exists - handle both File and Blob (cropped images)
     if (data.event_banner_image) {
@@ -418,6 +430,17 @@ export const eventsService = {
     formData.append("about_event_heading", data.about_event_heading);
     formData.append("about_event_sub_heading", data.about_event_sub_heading);
     formData.append("about_event_description", data.about_event_description);
+    formData.append("event_address", data.event_address || "");
+    const locationCoords = toLocationCoordsPayload(
+      data.latitude,
+      data.longitude,
+    );
+    if (locationCoords) {
+      formData.append("latitude", String(locationCoords.latitude));
+      formData.append("longitude", String(locationCoords.longitude));
+      formData.append("lat", String(locationCoords.lat));
+      formData.append("long", String(locationCoords.long));
+    }
 
     // Add header banner if it exists - handle both File and Blob (cropped images)
     if (data.event_banner_image) {
@@ -876,7 +899,7 @@ export const eventsService = {
   },
 
   /**
-   * Store step 5 data (Brochure Info / Location & Pricing)
+   * Store step 5 brochure data
    * @param data Step 5 data to be stored or FormData instance
    * @returns API response with status and message
    */
@@ -898,15 +921,6 @@ export const eventsService = {
 
       if (roomPayload) {
         formData.append("is_rooms", "1");
-        if (data.event_address) {
-          formData.append("event_address", data.event_address);
-        }
-        if (data.latitude !== undefined && data.latitude !== null) {
-          formData.append("lat", data.latitude.toString());
-        }
-        if (data.longitude !== undefined && data.longitude !== null) {
-          formData.append("long", data.longitude.toString());
-        }
         data.rooms!.forEach((room, roomIndex) => {
           appendVendorStepFiveRoomToFormData(formData, roomIndex, room);
         });
@@ -924,15 +938,6 @@ export const eventsService = {
         }
         if (data.remove_brochure_pdf_2) {
           formData.append("remove_brochure_pdf_2", "true");
-        }
-        if (data.event_address) {
-          formData.append("event_address", data.event_address);
-        }
-        if (data.latitude !== undefined && data.latitude !== null) {
-          formData.append("lat", data.latitude.toString());
-        }
-        if (data.longitude !== undefined && data.longitude !== null) {
-          formData.append("long", data.longitude.toString());
         }
       }
     } else {
@@ -1108,6 +1113,17 @@ export const eventsService = {
     }
     if (data.contact_number) {
       formData.append("contact_number", data.contact_number);
+    }
+
+    const coords = toLocationCoordsPayload(
+      (data as { latitude?: number }).latitude,
+      (data as { longitude?: number }).longitude,
+    );
+    if (coords) {
+      formData.append("latitude", String(coords.latitude));
+      formData.append("longitude", String(coords.longitude));
+      formData.append("lat", String(coords.lat));
+      formData.append("long", String(coords.long));
     }
 
     if (

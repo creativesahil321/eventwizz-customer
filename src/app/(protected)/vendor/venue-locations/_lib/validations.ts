@@ -30,6 +30,8 @@ export const locationSchema = z.object({
   contact_number: z.string().min(1, "Contact number is required"),
   slug: z.string().optional(),
   is_default: z.boolean().default(false),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 export type LocationFormValues = z.infer<typeof locationSchema>;

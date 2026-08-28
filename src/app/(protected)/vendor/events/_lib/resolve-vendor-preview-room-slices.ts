@@ -11,7 +11,7 @@ import type {
   EventDetailStepThree,
 } from "@/services/vendor/events/type";
 import {
-  lowestPositivePrice,
+  lowestBookableFromPrice,
   pickRoomHighlights,
   resolveRoomThumbnailUrl,
   type EventRoomChooserItem,
@@ -158,6 +158,29 @@ export function listVendorPreviewRoomSummaries(
             3,
           );
 
+    const datesPayload = pickRoomPayload(
+      data.stepThree as RoomKeyedStep,
+      room,
+    );
+    const datePrices: Array<string | number | null | undefined> = [];
+    if (Array.isArray(datesPayload?.dates)) {
+      for (const row of datesPayload.dates) {
+        if (!row || typeof row !== "object") continue;
+        const date = row as {
+          price?: string | number;
+          tickets?: Array<{ price?: string | number }>;
+          tables?: Array<{ price?: string | number }>;
+        };
+        if (date.price != null) datePrices.push(date.price);
+        for (const ticket of date.tickets ?? []) {
+          if (ticket?.price != null) datePrices.push(ticket.price);
+        }
+        for (const table of date.tables ?? []) {
+          if (table?.price != null) datePrices.push(table.price);
+        }
+      }
+    }
+
     return {
       room_id: room.room_id,
       name: room.name,
@@ -166,7 +189,10 @@ export function listVendorPreviewRoomSummaries(
         resolveRoomThumbnailUrl(pkg?.package_image) ||
         galleryUrl ||
         bannerFallback,
-      fromPrice: lowestPositivePrice(drinkPackages.map((drink) => drink.price)),
+      fromPrice: lowestBookableFromPrice({
+        datePrices,
+        packagePrices: drinkPackages.map((drink) => drink.price),
+      }),
       packageCount: drinkPackages.length,
       highlights,
       disabled: room.disabled,
@@ -235,7 +261,8 @@ export function resolveVendorPreviewActiveSlices(
   if (!roomMode || !activeRoom) {
     const s3 = data.stepThree;
     const s4 = data.stepFour;
-    // Vendor form + API: step 5 = location/brochure, step 6 = drinks.
+    // Vendor form + API: step 1 = location, step 5 = brochures, step 6 = drinks.
+    const s1 = data.stepOne;
     const s5 = data.stepFive;
     const s6 = data.stepSix;
     return {
@@ -264,10 +291,10 @@ export function resolveVendorPreviewActiveSlices(
         ? {
             brochure_pdf: s5.brochure_pdf,
             brochure_pdf_2: s5.brochure_pdf_2,
-            event_address: s5.event_address,
+            event_address: s1?.event_address || s5.event_address,
           }
         : null,
-      eventAddress: String(s5?.event_address ?? "").trim(),
+      eventAddress: String(s1?.event_address || s5?.event_address || "").trim(),
     };
   }
 
@@ -282,6 +309,9 @@ export function resolveVendorPreviewActiveSlices(
   );
   const drinksPayload = pickRoomPayload(data.stepSix as RoomKeyedStep, activeRoom);
 
+  const stepOneRoot = data.stepOne as
+    | { event_address?: string }
+    | undefined;
   const stepFiveRoot = data.stepFive as { event_address?: string } | undefined;
 
   return {
@@ -338,9 +368,13 @@ export function resolveVendorPreviewActiveSlices(
             typeof brochurePayload.brochure_pdf_2 === "string"
               ? brochurePayload.brochure_pdf_2
               : null,
-          event_address: String(stepFiveRoot?.event_address ?? "").trim(),
+          event_address: String(
+            stepOneRoot?.event_address || stepFiveRoot?.event_address || "",
+          ).trim(),
         }
       : null,
-    eventAddress: String(stepFiveRoot?.event_address ?? "").trim(),
+    eventAddress: String(
+      stepOneRoot?.event_address || stepFiveRoot?.event_address || "",
+    ).trim(),
   };
 }

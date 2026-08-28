@@ -14,7 +14,10 @@ import LocationSelectionHeader from "./location-selection-header";
 import LocationGrid from "./location-grid";
 import GoogleLocationMap from "./location-map-google";
 import { LocationSearchBar } from "./location-search-bar";
-import { PublicSearchResults } from "./public-search-results";
+import {
+  PublicSearchResults,
+  isPublicSearchEmpty,
+} from "./public-search-results";
 import {
   filterLocations,
   resolveLocationSlugForCity,
@@ -190,6 +193,21 @@ export function VendorMainLandingView({
     enabled: useApi && isSearchMode,
   });
 
+  // Near Me selected but coords not ready yet — don't hang on "searching".
+  const waitingForNearMeCoords =
+    filters.nearMe &&
+    !(
+      typeof filters.nearMeCoords?.lat === "number" &&
+      typeof filters.nearMeCoords?.lng === "number"
+    );
+
+  /** Initial fetch only — never keep skeleton after a settled empty response. */
+  const isSearchLoading =
+    !waitingForNearMeCoords &&
+    searchQuery.isFetching &&
+    !searchQuery.isFetched &&
+    searchQuery.data === undefined;
+
   /** Preview / browse: location cards. Live search: API event/date results. */
   const filteredLocations = useMemo(
     () =>
@@ -200,6 +218,10 @@ export function VendorMainLandingView({
   );
 
   const showApiResults = useApi && isSearchMode;
+  const searchEmpty = isPublicSearchEmpty(searchQuery.data, {
+    isLoading: isSearchLoading || waitingForNearMeCoords,
+    isError: searchQuery.isError,
+  });
   const showEmptySearchState =
     !showApiResults && isSearchMode && filteredLocations.length === 0;
 
@@ -539,15 +561,36 @@ export function VendorMainLandingView({
           ) : null}
 
           {showApiResults ? (
-            <PublicSearchResults
-              filters={filters}
-              data={searchQuery.data}
-              isLoading={searchQuery.isFetching}
-              isError={searchQuery.isError}
-              onClear={clearSearchFilters}
-              sectionId={`${exploreCitiesSectionId}-results`}
-              className="!px-0 !pt-0"
-            />
+            <>
+              <PublicSearchResults
+                filters={filters}
+                data={searchQuery.data}
+                isLoading={isSearchLoading || waitingForNearMeCoords}
+                isError={searchQuery.isError}
+                onClear={clearSearchFilters}
+                sectionId={`${exploreCitiesSectionId}-results`}
+                className="!px-0 !pt-0"
+                emptyHint="Browse cities below to find events another way."
+              />
+              {searchEmpty && locations.length > 0 ? (
+                <div className="mt-10">
+                  <div className="mx-auto mb-5 max-w-2xl text-center">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--color-primary)]">
+                      Browse cities
+                    </span>
+                    <p className="text-sm text-[var(--color-text-dimmed)]">
+                      Search did not match an event name. Pick a city to see
+                      what is on.
+                    </p>
+                  </div>
+                  <LocationGrid
+                    locations={locations}
+                    isLoading={locationsLoading}
+                    onSelect={onSelectLocation}
+                  />
+                </div>
+              ) : null}
+            </>
           ) : showEmptySearchState ? (
             <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-6 py-10 text-center">
               <p className="text-base font-semibold text-[var(--color-text)]">

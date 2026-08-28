@@ -50,6 +50,9 @@ export interface AIEventInput {
   venueName?: string;
   venueCity?: string;
   venueAddress?: string;
+  /** Parent venue location pin when API provides it */
+  venueLatitude?: number | string;
+  venueLongitude?: number | string;
   has_room_system?: boolean;
   room_names?: string[];
   /** Existing venue room ids when user picked rooms in AI create (multiselect). */
@@ -109,6 +112,9 @@ export interface AIEventGeneratedContent {
     about_event_heading: string;
     about_event_sub_heading: string;
     about_event_description: string;
+    event_address?: string;
+    latitude?: number;
+    longitude?: number;
   };
   stepTwo: {
     package_title: string;
@@ -145,7 +151,7 @@ export interface AIEventGeneratedContent {
     rooms?: AIRoomDrinks[];
   };
   stepSix: {
-    event_address: string;
+    event_address?: string;
     price_start_from: string;
     price_start_from_button_text: string;
     rooms?: AIEventRoomBrochure[];

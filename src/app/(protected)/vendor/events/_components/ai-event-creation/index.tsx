@@ -19,7 +19,13 @@ import {
 interface AIEventCreationFlowProps {
   onComplete: (eventId: number, isRooms: boolean) => void;
   onSwitchToManual: (draftEventId?: number) => void;
-  venueInfo?: { name?: string; city?: string; address?: string };
+  venueInfo?: {
+    name?: string;
+    city?: string;
+    address?: string;
+    latitude?: number | string;
+    longitude?: number | string;
+  };
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

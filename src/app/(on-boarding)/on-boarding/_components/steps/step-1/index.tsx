@@ -122,6 +122,8 @@ export default function StepOne() {
       domain: globalForm.getValues("stepOne.domain") || "",
       description: globalForm.getValues("stepOne.description") || "",
       city: globalForm.getValues("stepOne.city") || "",
+      latitude: globalForm.getValues("stepOne.latitude"),
+      longitude: globalForm.getValues("stepOne.longitude"),
     },
     mode: "onChange",
   });
@@ -155,6 +157,8 @@ export default function StepOne() {
       domain: g.domain ?? "",
       description: g.description ?? "",
       city: g.city ?? "",
+      latitude: g.latitude,
+      longitude: g.longitude,
     });
   }, [globalHasMultiple, globalForm, form]);
 
@@ -573,7 +577,7 @@ export default function StepOne() {
                                   variant="dark"
                                   value={field.value}
                                   onChange={field.onChange}
-                                  onResolved={({ address, city }) => {
+                                  onResolved={({ address, city, latitude, longitude }) => {
                                     field.onChange(address);
                                     const nextCity =
                                       city ||
@@ -581,6 +585,19 @@ export default function StepOne() {
                                     if (nextCity) {
                                       form.setValue("city", nextCity, {
                                         shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                    }
+                                    if (
+                                      latitude != null &&
+                                      longitude != null &&
+                                      Number.isFinite(latitude) &&
+                                      Number.isFinite(longitude)
+                                    ) {
+                                      form.setValue("latitude", latitude, {
+                                        shouldDirty: true,
+                                      });
+                                      form.setValue("longitude", longitude, {
                                         shouldDirty: true,
                                       });
                                     }

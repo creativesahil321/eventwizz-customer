@@ -145,11 +145,11 @@ function minPriceStartFrom(
 export const AI_ONBOARDING_APPLY_STEPS = [
   { label: "Venue info", icon: "🏛️" },
   { label: "Landing page", icon: "🎨" },
-  { label: "Event details", icon: "📅" },
+  { label: "Event details & location", icon: "📍" },
   { label: "Packages, timeline & gallery", icon: "📦" },
   { label: "Dates, tickets & tables", icon: "🎟️" },
   { label: "Catering & menu", icon: "🍽️" },
-  { label: "Brochure, location & pricing", icon: "📍" },
+  { label: "Brochure & pricing", icon: "📄" },
   { label: "Drink packages", icon: "🥂" },
   { label: "FAQs", icon: "❓" },
 ] as const;
@@ -476,6 +476,22 @@ async function applyAIGeneratedOnboardingContentInner({
     about_event_heading: editedContent.stepThree.about_event_heading,
     about_event_sub_heading: editedContent.stepThree.about_event_sub_heading,
     about_event_description: editedContent.stepThree.about_event_description,
+    event_address:
+      editedContent.stepThree.event_address ||
+      brochureSource.event_address ||
+      venueInput.address ||
+      venueInput.city,
+    latitude: editedContent.stepThree.latitude ?? brochureSource.latitude,
+    longitude: editedContent.stepThree.longitude ?? brochureSource.longitude,
+    location: {
+      title: "LOCATION",
+      description:
+        editedContent.stepThree.event_address ||
+        brochureSource.event_address ||
+        venueInput.address ||
+        venueInput.city,
+      icon: "MapPin",
+    },
     isApproved: true,
     ...(existingEventId ? { event_id: existingEventId } : {}),
   };
@@ -856,12 +872,8 @@ async function applyAIGeneratedOnboardingContentInner({
   }
   await updateSession({ on_boarding_step: 7 });
 
-  // --- Step 7: Brochure, location & pricing ---
+  // --- Step 7: Brochure & pricing ---
   setStep(6);
-  const brochureEventAddress =
-    String(brochureSource.event_address ?? "").trim() ||
-    venueInput.address ||
-    venueInput.city;
   const brochurePriceStartFrom = minPriceStartFrom(
     formattedDates as Array<{
       tickets?: Array<{ price?: unknown }>;
@@ -869,29 +881,10 @@ async function applyAIGeneratedOnboardingContentInner({
     }>,
     brochureSource.price_start_from ?? "",
   );
-  const brochureLatitude =
-    typeof brochureSource.latitude === "number"
-      ? brochureSource.latitude
-      : typeof brochureSource.lat === "number"
-        ? brochureSource.lat
-        : undefined;
-  const brochureLongitude =
-    typeof brochureSource.longitude === "number"
-      ? brochureSource.longitude
-      : typeof brochureSource.long === "number"
-        ? brochureSource.long
-        : undefined;
   const stepSevenData = {
     step: 7,
     event_id: eventId,
-    event_address: brochureEventAddress,
-    latitude: brochureLatitude,
-    longitude: brochureLongitude,
     price_start_from: brochurePriceStartFrom,
-    location: brochureSource.location ?? {
-      title: "LOCATION",
-      description: brochureEventAddress,
-    },
     brochure_pdf: null,
     brochure_pdf_2: null,
     faq_pdf: null,
@@ -907,9 +900,6 @@ async function applyAIGeneratedOnboardingContentInner({
         isApprovedBrochure: true,
         brochure: {
           ...(room as { brochure?: Record<string, unknown> }).brochure,
-          event_address: stepSevenData.event_address,
-          latitude: stepSevenData.latitude,
-          longitude: stepSevenData.longitude,
           price_start_from: stepSevenData.price_start_from,
           brochure_pdf: null,
           brochure_pdf_2: null,
@@ -920,9 +910,6 @@ async function applyAIGeneratedOnboardingContentInner({
   const step7Response = useRoomSystem
     ? await onboardingService.storeStepSevenRoomsData({
         event_id: eventId,
-        event_address: stepSevenData.event_address,
-        latitude: stepSevenData.latitude,
-        longitude: stepSevenData.longitude,
         rooms: step7RoomsPayload,
         isApproved: true,
       })
@@ -932,7 +919,7 @@ async function applyAIGeneratedOnboardingContentInner({
       });
   if (!step7Response.status) {
     throw new Error(
-      step7Response.message || "Failed to save brochure, location & pricing",
+      step7Response.message || "Failed to save brochure & pricing",
     );
   }
   if (useRoomSystem) {

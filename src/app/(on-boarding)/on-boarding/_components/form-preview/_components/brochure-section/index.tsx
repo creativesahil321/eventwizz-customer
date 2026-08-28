@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
+import { EVENT_SECTION_NAV_HEIGHT_PX } from "@/components/public/event-section-nav";
 
 type LucideIconName = keyof typeof Icons;
 
@@ -44,6 +46,8 @@ type BrochureSectionProps = {
   omitPricePanel?: boolean;
   /** Site Essentials `typography.headingEmphasis` — required on platform-host previews. */
   headingEmphasis?: HeadingEmphasis | string | null;
+  /** Sticky header + section nav offset for in-page Book Now. */
+  bookNowScrollOffsetPx?: number;
 };
 
 export default function BrochureSection({
@@ -52,6 +56,7 @@ export default function BrochureSection({
   showMapImmediately = false,
   omitPricePanel = false,
   headingEmphasis,
+  bookNowScrollOffsetPx = 72 + EVENT_SECTION_NAV_HEIGHT_PX,
 }: BrochureSectionProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const narrowPreview = usePreviewNarrowLayout();
@@ -99,7 +104,7 @@ export default function BrochureSection({
 
   const defaultPrice = {
     title: price?.title || "PRICES FROM",
-    description: price?.description || `${formatMoney(45)} PP exc VAT`,
+    description: price?.description || `${formatMoney(45)} per person`,
     link: price?.link || "#",
     price_title: price?.price_title || "",
     icon: price?.icon || "Tag",
@@ -172,10 +177,25 @@ export default function BrochureSection({
                       onClick={() => {
                         const id = defaultPrice.link!.slice(1);
                         const el = id ? document.getElementById(id) : null;
-                        el?.scrollIntoView({
-                          behavior: "smooth",
-                          block: "start",
+                        scrollToElementIfNeeded(el, {
+                          headerOffsetPx: bookNowScrollOffsetPx,
                         });
+                        // Primary CTA scrolls to dates — make the next step obvious.
+                        if (el) {
+                          el.setAttribute("data-book-now-focus", "true");
+                          window.setTimeout(() => {
+                            el.removeAttribute("data-book-now-focus");
+                          }, 2500);
+                          const hint = el.querySelector(
+                            "[data-book-now-hint]",
+                          ) as HTMLElement | null;
+                          if (hint) {
+                            hint.hidden = false;
+                            window.setTimeout(() => {
+                              hint.hidden = true;
+                            }, 4000);
+                          }
+                        }
                       }}
                     >
                       {defaultPrice.price_title}

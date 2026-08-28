@@ -36,7 +36,7 @@ export default function ExperienceSection({
   return (
     <section
       className={cn(
-        "w-full bg-[color:var(--color-background)] px-4",
+        "w-full scroll-mt-28 bg-[color:var(--color-background)] px-4",
         narrowPreview ? "py-16" : "py-20 md:py-28",
       )}
     >

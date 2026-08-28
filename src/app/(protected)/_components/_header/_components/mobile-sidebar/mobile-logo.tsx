@@ -26,7 +26,6 @@ const MobileLogo: React.FC = memo(() => {
       <BrandLogoImage
         src={addCacheBusting(logoPath)}
         alt={brandName}
-        headerBackground={theme?.colors?.header}
         width={110}
         height={30}
         className="h-8 w-auto"

@@ -335,7 +335,7 @@ function PaymentSuccessContent() {
             transition={{ delay: 0.4 }}
             className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3"
           >
-            Payment Successful! 🎉
+            Payment Successful
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}

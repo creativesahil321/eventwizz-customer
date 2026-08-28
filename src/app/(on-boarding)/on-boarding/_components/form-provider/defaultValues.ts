@@ -23,6 +23,8 @@ export const defaultValues: OnboardingFormData = {
     domain: "",
     description: "",
     city: "",
+    latitude: undefined,
+    longitude: undefined,
   },
   stepTwo: {
     isApproved: false,
@@ -48,6 +50,14 @@ export const defaultValues: OnboardingFormData = {
     about_event_heading: "",
     about_event_sub_heading: "",
     about_event_description: "",
+    event_address: "",
+    latitude: undefined,
+    longitude: undefined,
+    location: {
+      title: "LOCATION",
+      description: "",
+      icon: "MapPin",
+    },
 
     // gallery: [],
   },

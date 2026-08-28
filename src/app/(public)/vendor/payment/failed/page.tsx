@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
 
 interface PaymentFailureData {
   booking_id?: string;
@@ -64,7 +65,7 @@ function PaymentFailedContent() {
       router.push(`/customer/bookings/${failureData.booking_id}`);
     } else {
       // Go back to checkout
-      router.push("/vendor/checkout");
+      router.push(CUSTOMER_CHECKOUT_PATH);
     }
   };
 
@@ -86,7 +87,7 @@ function PaymentFailedContent() {
   };
 
   const handleViewCart = () => {
-    router.push("/vendor/checkout");
+    router.push(CUSTOMER_CHECKOUT_PATH);
   };
 
   if (isLoading) {

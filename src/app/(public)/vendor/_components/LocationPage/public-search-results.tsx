@@ -12,6 +12,7 @@ import { resolveCurrencySymbol } from "@/lib/currency-format";
 import { cn } from "@/lib/utils";
 import { savePendingBooking } from "@/lib/booking/pending-booking";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
+import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
 import { useStoreEventBooking } from "@/services/customer/cart/query";
 import type { CartRequest } from "@/services/customer/cart/type";
 import type { ThemeSchema } from "@/types/theme.types";
@@ -61,6 +62,21 @@ function filtersSummary(filters: LocationSearchFilters): string {
   return `Results for ${parts.join(" · ")}`;
 }
 
+export function isPublicSearchEmpty(
+  data: PublicSearchData | undefined,
+  options: { isLoading?: boolean; isError?: boolean } = {},
+): boolean {
+  if (options.isError) return false;
+  // Settled empty payload wins over a transient loading flag.
+  if (data != null) {
+    const total = data.meta?.total ?? data.results?.length ?? 0;
+    if (total === 0) return true;
+  }
+  if (options.isLoading) return false;
+  const total = data?.meta?.total ?? data?.results?.length ?? 0;
+  return total === 0;
+}
+
 type PublicSearchResultsProps = {
   filters: LocationSearchFilters;
   data?: PublicSearchData;
@@ -70,6 +86,8 @@ type PublicSearchResultsProps = {
   /** Anchor id for scroll-into-view from the search bar. */
   sectionId?: string;
   className?: string;
+  /** Extra empty-state copy (e.g. browse cities below). */
+  emptyHint?: string;
 };
 
 export function PublicSearchResults({
@@ -80,6 +98,7 @@ export function PublicSearchResults({
   onClear,
   sectionId = LOCATION_EVENTS_ANCHOR_ID,
   className,
+  emptyHint,
 }: PublicSearchResultsProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -137,9 +156,9 @@ export function PublicSearchResults({
 
       if (!isCustomer) {
         savePendingBooking(booking);
-        saveAuthCallbackUrl("/vendor/checkout");
+        saveAuthCallbackUrl(CUSTOMER_CHECKOUT_PATH);
         router.push(
-          `/auth/login?callbackUrl=${encodeURIComponent("/vendor/checkout")}`,
+          `/auth/login?callbackUrl=${encodeURIComponent(CUSTOMER_CHECKOUT_PATH)}`,
         );
         return;
       }
@@ -156,7 +175,7 @@ export function PublicSearchResults({
       try {
         const response = await storeEventBooking({ data: cartData });
         if (response?.status === true) {
-          router.push("/vendor/checkout");
+          router.push(CUSTOMER_CHECKOUT_PATH);
           return;
         }
         setPendingKey(null);
@@ -176,7 +195,11 @@ export function PublicSearchResults({
 
   const resultType = meta?.result_type ?? (dateResults.length ? "dates" : "events");
   const total = meta?.total ?? results.length;
-  const empty = !isLoading && !isError && total === 0;
+  // Prefer settled API payload over transient isFetching so total=0 never hangs.
+  const settledEmpty =
+    data != null && !isError && (meta?.total ?? results.length) === 0;
+  const empty = settledEmpty || (!isLoading && !isError && total === 0);
+  const showSkeleton = isLoading && results.length === 0 && !settledEmpty;
 
   return (
     <section
@@ -200,13 +223,15 @@ export function PublicSearchResults({
               align="left"
               className="!text-[1.25rem] !font-black !leading-tight break-words sm:!text-3xl"
             />
-            <p className="mt-0.5 text-xs text-[var(--color-text-dimmed)] sm:mt-1 sm:text-sm">
-              {isLoading
-                ? "Searching…"
-                : empty
+            {isLoading && !settledEmpty ? (
+              <Skeleton className="mt-1 h-4 w-48 sm:w-64" />
+            ) : (
+              <p className="mt-0.5 text-xs text-[var(--color-text-dimmed)] sm:mt-1 sm:text-sm">
+                {empty
                   ? "No matches"
                   : `${total} result${total === 1 ? "" : "s"} · ${filtersSummary(filters)}`}
-            </p>
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -230,7 +255,7 @@ export function PublicSearchResults({
               Please try again in a moment.
             </p>
           </div>
-        ) : isLoading && results.length === 0 ? (
+        ) : showSkeleton ? (
           <SearchResultsSkeleton variant={resultType} />
         ) : empty ? (
           <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-5 py-10 text-center sm:px-6 sm:py-12">
@@ -246,7 +271,7 @@ export function PublicSearchResults({
             <p className="text-sm text-[var(--color-text-dimmed)]">
               {filters.nearMe
                 ? "No bookable events with a map pin were found within range. Try another date, or browse by city."
-                : "Try another keyword, city, or date."}
+                : emptyHint ?? "Try another keyword, city, or date."}
             </p>
             <button
               type="button"

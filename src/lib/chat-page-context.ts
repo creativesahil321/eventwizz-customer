@@ -95,7 +95,9 @@ const PUBLIC_VENDOR_PAGES: Array<{
   label: string;
   hints?: string;
 }> = [
+  { prefix: "/checkout", label: "Checkout" },
   { prefix: "/vendor/checkout", label: "Checkout" },
+  { prefix: "/vendor/payment", label: "Payment" },
   { prefix: "/contact", label: "Contact" },
   { prefix: "/auth/login", label: "Log in" },
   { prefix: "/auth/register", label: "Register" },
@@ -116,7 +118,11 @@ export function resolvePageContext(
     };
   }
 
-  if (path.startsWith("/on-boarding") || path.startsWith("/onboarding")) {
+  if (
+    path.startsWith("/on-boarding") ||
+    path.startsWith("/onboarding") ||
+    path.startsWith("/preview")
+  ) {
     return {
       pathname: path,
       pageLabel: "Onboarding",
@@ -182,6 +188,20 @@ export function resolvePageContext(
     area: "other",
     hints: "",
   };
+}
+
+/**
+ * Venue branding (`--color-header`) only on the public storefront.
+ * Dashboard, admin, onboarding, and the main EventWizz app use static chrome
+ * so white headers cannot hide close / minimise controls.
+ */
+export function isCustomerFacingChatSurface(
+  pathname: string | null | undefined,
+  websiteRole: string | null | undefined,
+): boolean {
+  if (websiteRole !== "vendor") return false;
+  const area = resolvePageContext(pathname).area;
+  return area === "public" || area === "auth";
 }
 
 /** System-prompt block so the AI guides based on the open page. */

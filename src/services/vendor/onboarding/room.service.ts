@@ -288,7 +288,7 @@ export const roomService = {
   },
 
   /**
-   * Persist a room's Brochure / Location / Price data (mirrors `storeStepSevenData`).
+   * Persist a room's brochure and price data.
    */
   storeRoomBrochureData: async (
     roomId: number,
@@ -318,15 +318,6 @@ export const roomService = {
       formData.append("remove_faq_pdf", "true");
     }
 
-    if (payload.event_address) {
-      formData.append("event_address", payload.event_address);
-    }
-    if (typeof payload.latitude === "number") {
-      formData.append("lat", payload.latitude.toString());
-    }
-    if (typeof payload.longitude === "number") {
-      formData.append("long", payload.longitude.toString());
-    }
     if (payload.price_start_from) {
       formData.append("price_start_from", payload.price_start_from);
     }

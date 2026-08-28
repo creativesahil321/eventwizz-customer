@@ -19,7 +19,7 @@ export default async function IndexPage({ params }: PageProps) {
       fallbackPath="/vendor/events"
     >
       <section className="page text-black">
-        <Shell className="gap-2">
+        <Shell className="gap-2 px-0 md:px-0">
           <div className={pageCardClassName("mb-4 space-y-4 sm:mb-6 min-w-0")}>
             <div className="flex flex-1 flex-col items-start justify-start relative text-black">
               <h1 className="title-header mb-1 text-xl font-bold sm:text-2xl">

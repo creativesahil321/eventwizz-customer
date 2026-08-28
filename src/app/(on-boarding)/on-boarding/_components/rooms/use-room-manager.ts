@@ -140,8 +140,8 @@ export const isRoomSectionComplete = (
   const brochure = room.brochure;
   if (!brochure) return false;
 
-  // Brochure PDF is optional (see stepSevenSchema). Only event address is required.
-  return String(brochure.event_address ?? "").trim().length > 0;
+  // Brochure files and pricing are optional; event location is shared in Step 3.
+  return true;
 };
 
 const blankRoom = (name: string): RoomType => ({

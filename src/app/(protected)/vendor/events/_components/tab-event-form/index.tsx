@@ -9,7 +9,13 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { ArrowLeft, CheckCircle2, Eye, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Circle,
+  Eye,
+  Loader2,
+} from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +72,7 @@ import {
 } from "../../_lib/vendor-step-four-rooms";
 import {
   findStepFiveBrochureForRoom,
+  isVendorRoomBrochureStepComplete,
   normalizeVendorStepFiveRooms,
 } from "../../_lib/vendor-step-five-rooms";
 import {
@@ -81,7 +88,7 @@ import {
   CalendarDays,
   Utensils,
   Wine,
-  Info,
+  FileText,
   HelpCircle,
   UploadCloud,
 } from "lucide-react";
@@ -96,7 +103,7 @@ const steps = [
   },
   {
     id: 2,
-    label: "Package",
+    label: "Event highlights",
     icon: <Package size={16} />,
     value: "package",
   },
@@ -105,10 +112,10 @@ const steps = [
   {
     id: 5,
     label: "Brochure",
-    icon: <Info size={16} />,
+    icon: <FileText size={16} />,
     value: "more-info",
   },
-  { id: 6, label: "Other packages", icon: <Wine size={16} />, value: "drinks" },
+  { id: 6, label: "Drinks & extras", icon: <Wine size={16} />, value: "drinks" },
 
   { id: 7, label: "FAQs", icon: <HelpCircle size={16} />, value: "faqs" },
   {
@@ -193,7 +200,7 @@ const ROOM_ENABLED_TABS = new Set([
   "more-info",
   "drinks",
 ]);
-/** Venue room multiselect is only editable on step 2 (Package). */
+/** Venue room multiselect is only editable on step 2 (Event highlights). */
 const ROOM_SELECTION_TAB = "package";
 
 const isMeaningfulValue = (value: unknown): boolean => {
@@ -209,6 +216,19 @@ const isMeaningfulValue = (value: unknown): boolean => {
   }
   return false;
 };
+
+type TabStatus = "complete" | "current" | "upcoming";
+
+function getTabStatus(
+  stepId: number,
+  stepValue: string,
+  activeTab: string,
+  currentStep: number,
+): TabStatus {
+  if (activeTab === stepValue) return "current";
+  if (stepId <= currentStep) return "complete";
+  return "upcoming";
+}
 
 const getStepRoomsForTab = (data: EventDataLike, tab: string) => {
   const sources: Record<string, Array<Record<string, unknown> | undefined>> = {
@@ -451,11 +471,20 @@ export default function TabEventForm() {
                     Number(room?.room_id),
                   ),
                 )
-              : activeTab === "more-info"
+              : activeTab === "event-name"
                 ? String(
-                    formContext.getValues("stepFive.event_address") ?? "",
+                    formContext.getValues("stepOne.event_address") ?? "",
                   ).trim().length > 0
-                : activeTab === "drinks"
+                : activeTab === "more-info"
+                  ? isVendorRoomBrochureStepComplete(
+                      findStepFiveBrochureForRoom(
+                        normalizeVendorStepFiveRooms(
+                          formContext.getValues("stepFive.rooms"),
+                        ),
+                        Number(room?.room_id),
+                      ),
+                    )
+                  : activeTab === "drinks"
                   ? isVendorRoomDrinksStepComplete(
                       findStepSixDrinksForRoom(
                         stepSixRoomsNormalized,
@@ -738,7 +767,7 @@ export default function TabEventForm() {
 
   return (
     <>
-      <div className="flex flex-col space-y-6 w-full max-w-full px-2 sm:px-4 md:px-6 relative mx-auto pb-24 overflow-x-hidden">
+      <div className="flex flex-col space-y-6 w-full max-w-full px-0 relative mx-auto pb-24 overflow-x-hidden">
         {readOnly && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50 px-4 py-2 text-sm text-amber-800 dark:text-amber-200">
             View only — you can review all event details but cannot save
@@ -754,21 +783,33 @@ export default function TabEventForm() {
           >
             <Card className="shadow-sm overflow-hidden gap-0 py-0">
               <div className="border-b bg-card px-2 sm:px-3 md:px-4 pt-3 pb-3">
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <div className="min-w-0 flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-500 md:overflow-x-visible">
-                    <TabsList className="inline-flex md:flex w-max md:w-full bg-muted/60 p-1 h-auto rounded-lg gap-1.5 md:gap-2">
+                <div className="flex min-w-0 items-start gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-500">
+                    <TabsList className="flex min-w-max w-full bg-muted/60 p-1 h-auto rounded-lg gap-1.5 sm:gap-2">
                       {steps.map((step) => {
                         // Disable tabs that are beyond the current step
                         const isDisabled = currentStep
                           ? step.id > currentStep
                           : false;
+                        const tabStatus = getTabStatus(
+                          step.id,
+                          step.value,
+                          activeTab,
+                          currentStep ?? 1,
+                        );
+                        const statusLabel =
+                          tabStatus === "complete"
+                            ? "Complete"
+                            : tabStatus === "current"
+                              ? "Current step"
+                              : "Not completed";
 
                         return (
                           <TabsTrigger
                             key={step.id}
                             value={step.value}
                             disabled={isDisabled}
-                            className={`px-2 sm:px-3 md:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-shrink-0 md:flex-1 md:min-w-0 transition-all duration-300 ease-in-out ${
+                            className={`flex-1 min-w-max px-3 sm:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm items-center justify-center gap-1 sm:gap-1.5 transition-all duration-300 ease-in-out ${
                               isDisabled ? "opacity-50 cursor-not-allowed" : ""
                             } ${
                               currentStep && step.id === currentStep
@@ -777,8 +818,30 @@ export default function TabEventForm() {
                             }`}
                           >
                             {step.icon}
-                            <span className="whitespace-nowrap truncate">
+                            <span className="whitespace-nowrap">
                               {step.label}
+                            </span>
+                            <span
+                              title={statusLabel}
+                              aria-label={`${step.label}: ${statusLabel}`}
+                              className="inline-flex shrink-0 items-center"
+                            >
+                              {tabStatus === "complete" ? (
+                                <CheckCircle2
+                                  aria-hidden="true"
+                                  className="h-3.5 w-3.5 text-emerald-600"
+                                />
+                              ) : tabStatus === "current" ? (
+                                <span
+                                  aria-hidden="true"
+                                  className="h-2 w-2 rounded-full bg-current"
+                                />
+                              ) : (
+                                <Circle
+                                  aria-hidden="true"
+                                  className="h-3.5 w-3.5 text-slate-400"
+                                />
+                              )}
                             </span>
                             {currentStep &&
                               step.id === currentStep &&
@@ -885,7 +948,7 @@ export default function TabEventForm() {
                           </p>
                           <p className="text-[11px] mt-1 text-muted-foreground">
                             {localIsRooms === 1
-                              ? `Choose ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} venue rooms on the Package tab, or use the room picker above when fewer than ${EVENT_ROOM_MAX_COUNT} are selected.`
+                              ? `Choose ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} venue rooms on the Event highlights tab, or use the room picker above when fewer than ${EVENT_ROOM_MAX_COUNT} are selected.`
                               : "Enable room system and select venue rooms to start."}
                           </p>
                         </div>
@@ -894,9 +957,9 @@ export default function TabEventForm() {
                     <p className="mt-4 rounded-lg bg-[#EAF7F8] px-3 py-2 text-[11px] text-[#0B6A75]">
                       {localIsRooms === 1
                         ? selectedRoomIds.length < EVENT_ROOM_MAX_COUNT
-                          ? `Each room has its own package, dates, menu, and brochure (${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} per event). Select from your venue rooms — new rooms can only be created if you have fewer than ${EVENT_ROOM_MAX_COUNT} in total.`
-                          : `Each room has its own package, dates, menu, other packages, and brochure. Use ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} rooms per event.`
-                        : "Click a room below to edit its details for this step. Change room selection on the Package tab."}
+                          ? `Each room has its own event highlights, dates, menu, and brochure (${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} per event). Select from your venue rooms — new rooms can only be created if you have fewer than ${EVENT_ROOM_MAX_COUNT} in total.`
+                          : `Each room has its own event highlights, dates, menu, drinks and extras, and brochure. Use ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} rooms per event.`
+                        : "Click a room below to edit its details for this step. Change room selection on the Event highlights tab."}
                     </p>
                   </aside>
                 )}

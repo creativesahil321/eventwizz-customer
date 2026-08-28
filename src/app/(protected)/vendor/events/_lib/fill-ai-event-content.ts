@@ -30,10 +30,11 @@ export function fillAiEventGeneratedDefaults(
 ): AIEventGeneratedContent {
   const src = content ?? {};
   const address =
+    str(src.stepOne?.event_address) ||
     str(src.stepSix?.event_address) ||
     str(input.venueAddress) ||
     str(input.venueCity) ||
-    "United Kingdom";
+    "";
   const roomNames = (input.room_names ?? [])
     .map((name) => String(name || "").trim())
     .filter((name) => name.length > 0);
@@ -190,6 +191,13 @@ export function fillAiEventGeneratedDefaults(
     stepOne: {
       ...stepOne,
       event_name: str(stepOne.event_name, str(input.eventName, "Event")),
+      event_address: address,
+      latitude: Number.isFinite(Number(input.venueLatitude))
+        ? Number(input.venueLatitude)
+        : undefined,
+      longitude: Number.isFinite(Number(input.venueLongitude))
+        ? Number(input.venueLongitude)
+        : undefined,
     },
     stepTwo,
     stepThree,

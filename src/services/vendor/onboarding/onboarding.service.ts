@@ -23,6 +23,7 @@ import {
   parseCheckEventNameResponse,
   type CheckEventNameAvailability,
 } from "@/lib/parse-check-event-name";
+import { toLocationCoordsPayload } from "@/lib/to-location-coords-payload";
 // import { OnBoardingPreviewType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 
 /** Reads the persisted onboarding mode from sessionStorage (client-only, safe). */
@@ -294,7 +295,7 @@ export const onboardingService = {
       (await fetchOnce(false).catch(() => null));
     if (!payload || typeof payload !== "object") return undefined;
 
-    const root = payload as Record<string, unknown>;
+    const root = payload as unknown as Record<string, unknown>;
     const nested =
       root.data && typeof root.data === "object"
         ? (root.data as Record<string, unknown>)
@@ -374,6 +375,11 @@ export const onboardingService = {
         has_multiple_locations: data.has_multiple_locations,
       }),
     };
+
+    const coords = toLocationCoordsPayload(data.latitude, data.longitude);
+    if (coords) {
+      Object.assign(payload, coords);
+    }
 
     const response = await api.post<ApiResponse>(
       API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
@@ -518,6 +524,17 @@ export const onboardingService = {
     }
     formData.append("event_category_id", data.event_category_id.toString());
     formData.append("event_name", data.event_name || "");
+    formData.append("event_address", data.event_address || "");
+    const eventCoords = toLocationCoordsPayload(
+      data.latitude,
+      data.longitude,
+    );
+    if (eventCoords) {
+      formData.append("latitude", eventCoords.latitude.toString());
+      formData.append("longitude", eventCoords.longitude.toString());
+      formData.append("lat", eventCoords.lat.toString());
+      formData.append("long", eventCoords.long.toString());
+    }
 
     // Add video if it exists - handle both File and Blob
     if (data.event_banner_video) {
@@ -1094,20 +1111,6 @@ export const onboardingService = {
         formData.append("remove_brochure_pdf_2", "true");
       }
 
-      // Add text fields
-      if (data.event_address) {
-        formData.append("event_address", data.event_address);
-      }
-
-      // Add latitude and longitude coordinates
-      if (data.latitude !== undefined) {
-        formData.append("lat", data.latitude.toString());
-      }
-
-      if (data.longitude !== undefined) {
-        formData.append("long", data.longitude.toString());
-      }
-
       if (data.price_start_from) {
         formData.append("price_start_from", data.price_start_from);
       }
@@ -1138,13 +1141,10 @@ export const onboardingService = {
 
   /**
    * Store step 7 data in multi-room mode.
-   * Backend expects shared `event_address` and per-room brochure files/removal flags.
+   * Backend expects per-room brochure files/removal flags; location is stored in Step 3.
    */
   storeStepSevenRoomsData: async (payload: {
     event_id: number;
-    event_address: string;
-    latitude?: number;
-    longitude?: number;
     rooms: RoomType[];
     isApproved?: boolean;
   }): Promise<ApiResponse> => {
@@ -1152,13 +1152,6 @@ export const onboardingService = {
     formData.append("step", "7");
     formData.append("event_id", payload.event_id.toString());
     formData.append("is_rooms", "1");
-    formData.append("event_address", payload.event_address ?? "");
-    if (typeof payload.latitude === "number") {
-      formData.append("lat", payload.latitude.toString());
-    }
-    if (typeof payload.longitude === "number") {
-      formData.append("long", payload.longitude.toString());
-    }
 
     payload.rooms.forEach((room, roomIndex) => {
       const roomId = Number(room.id);
@@ -1467,6 +1460,17 @@ export const onboardingService = {
     }
     if (data.contact_number) {
       formData.append("contact_number", data.contact_number);
+    }
+
+    const coords = toLocationCoordsPayload(
+      (data as { latitude?: number }).latitude,
+      (data as { longitude?: number }).longitude,
+    );
+    if (coords) {
+      formData.append("latitude", String(coords.latitude));
+      formData.append("longitude", String(coords.longitude));
+      formData.append("lat", String(coords.lat));
+      formData.append("long", String(coords.long));
     }
 
     if (data.reminder_email_before_days) {

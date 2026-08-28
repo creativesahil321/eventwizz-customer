@@ -78,6 +78,8 @@ export default function CreateLocationDialog() {
       email: "",
       contact_number: "",
       is_default: false,
+      latitude: undefined,
+      longitude: undefined,
     },
   });
 
@@ -85,6 +87,8 @@ export default function CreateLocationDialog() {
     form.setValue("address", "");
     form.setValue("city", "");
     form.setValue("contact_number", "");
+    form.setValue("latitude", undefined);
+    form.setValue("longitude", undefined);
     addressPlaceIdRef.current = null;
     setIsAddressValid(false);
   }, [form]);
@@ -107,6 +111,8 @@ export default function CreateLocationDialog() {
           email: "",
           contact_number: "",
           is_default: false,
+          latitude: undefined,
+          longitude: undefined,
         });
       }
     },
@@ -126,6 +132,20 @@ export default function CreateLocationDialog() {
       toast.error("Please select a location from the suggestions", {
         description:
           "Google didn't find that location. Type to search and choose a suggested UK address.",
+        duration: 5000,
+      });
+      return;
+    }
+
+    if (
+      data.latitude == null ||
+      data.longitude == null ||
+      !Number.isFinite(Number(data.latitude)) ||
+      !Number.isFinite(Number(data.longitude))
+    ) {
+      toast.error("Missing map coordinates for this address", {
+        description:
+          "Select the address from Google suggestions again so we can save latitude and longitude.",
         duration: 5000,
       });
       return;

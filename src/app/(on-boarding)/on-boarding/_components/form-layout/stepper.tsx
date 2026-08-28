@@ -19,6 +19,7 @@ import Link from "next/link";
 import { ServerContext } from "@/lib/server-context";
 import { useContext, useMemo } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 import {
   Tooltip,
   TooltipContent,
@@ -47,7 +48,7 @@ const stepTooltips: Record<number, string> = {
   4: "Timeline setup, package content, image, details, and gallery.",
   5: "Dates, tickets, tables, and payment rules.",
   6: "Catering and menu information.",
-  7: "Brochure and location for collateral.",
+  7: "Brochure and pricing for collateral.",
   8: "Drinks and add-on packages.",
   9: "Frequently asked questions.",
   10: "Payment provider connections.",
@@ -92,12 +93,12 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
       <div className="relative">
         <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-4 md:pl-6 z-10 pr-4 md:pr-6">
           <Link href="/" aria-label="Home">
-            <img
+            <BrandLogoImage
               src={addCacheBusting(logoPath as string)}
               alt={theme?.name || "EventWizz"}
               width={110}
               height={30}
-              className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] cursor-pointer hover:opacity-80 transition-opacity [filter:drop-shadow(0_0_1px_white)_drop-shadow(0_0_5px_rgba(255,255,255,0.6))_drop-shadow(0_0_12px_rgba(255,255,255,0.3))]"
+              className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] cursor-pointer hover:opacity-80 transition-opacity drop-shadow-sm"
             />
           </Link>
         </div>
