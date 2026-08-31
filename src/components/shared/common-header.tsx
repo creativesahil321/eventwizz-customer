@@ -508,8 +508,7 @@ export default function CommonHeader({
     useNonInteractiveChrome ||
     isPreviewPath ||
     isPreviewFromProvider ||
-    variant === "preview" ||
-    variant === "onboarding";
+    variant !== "default";
 
   const sessionPending = status === "loading";
   const commerceSlotLoading = !useNonInteractiveChrome && sessionPending;
@@ -657,7 +656,7 @@ export default function CommonHeader({
     : "max-h-11 max-w-[min(100%,9.5rem)] w-auto object-contain xl:max-h-12 xl:max-w-[min(100%,11rem)]";
   const desktopActionsRowClass = usePreviewContainerQueries
     ? previewDesktopActionsRowClass
-    : "relative z-0 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 overflow-hidden text-xs xl:gap-1.5 xl:text-sm";
+    : "relative z-0 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 overflow-visible text-xs xl:gap-1.5 xl:text-sm";
 
   return (
     <section

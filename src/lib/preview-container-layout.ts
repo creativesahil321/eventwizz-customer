@@ -51,7 +51,7 @@ export const previewBrowseIconVisibility =
 export const previewLogoSizeClass =
   "max-h-11 max-w-[min(100%,9.5rem)] w-auto object-contain @7xl/preview:max-h-12 @7xl/preview:max-w-[min(100%,11rem)]";
 export const previewDesktopActionsRowClass =
-  "relative z-0 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 overflow-hidden text-xs @7xl/preview:gap-1.5 @7xl/preview:text-sm";
+  "relative z-0 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 overflow-visible text-xs @7xl/preview:gap-1.5 @7xl/preview:text-sm";
 
 /** Match live mobile gallery (2 cols below md) inside narrow preview frames. */
 export const previewGalleryUntilMd = "@max-md/preview:!grid-cols-2";

@@ -425,6 +425,7 @@ export function VendorPublicLocationBookNow({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align={align}
+          collisionPadding={12}
           style={previewThemeStyle}
           className={cn(dropdownContentClass, menuContentClassName)}
         >

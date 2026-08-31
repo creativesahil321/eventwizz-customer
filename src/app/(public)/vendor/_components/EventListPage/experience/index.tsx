@@ -38,34 +38,38 @@ export default function ExperienceSection({
       className={cn(
         "w-full scroll-mt-28 bg-[color:var(--color-background)] px-4",
         narrowPreview
-          ? "py-16"
-          : "py-16 md:py-28 @max-5xl/preview:!py-16",
+          ? "py-10 sm:py-12"
+          : "py-12 md:py-20 @max-5xl/preview:!py-12",
       )}
     >
       <div className="mx-auto min-w-0 max-w-7xl">
         <div
           className={cn(
-            "grid grid-cols-1 items-start gap-8 text-[var(--color-text)]",
+            "grid grid-cols-1 items-start gap-8 text-[var(--color-text)] md:gap-10",
             !narrowPreview &&
-              "lg:grid-cols-2 lg:gap-16 @max-5xl/preview:!grid-cols-1 @max-5xl/preview:!gap-8",
+              "lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16 @max-5xl/preview:!grid-cols-1 @max-5xl/preview:!gap-8",
           )}
         >
-          <div className="w-full min-w-0">
+          <div className="relative w-full min-w-0 lg:pr-8">
+            <div
+              className="mb-5 h-1 w-12 rounded-full bg-[var(--color-primary)] sm:mb-6"
+              aria-hidden="true"
+            />
             <SiteHeading
               level={2}
               title={titleText}
               variant="onSurface"
               className={cn(
-                "!mt-2 !leading-tight break-words !text-3xl !font-black tracking-tight",
+                "!mt-0 !leading-[1.08] break-words !text-3xl !font-black tracking-tight sm:!text-4xl",
                 !narrowPreview &&
                   "lg:!text-5xl @max-5xl/preview:!text-3xl",
               )}
             />
           </div>
-          <div className="flex w-full min-w-0 flex-col gap-6">
+          <div className="flex w-full min-w-0 flex-col lg:border-l lg:border-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] lg:pl-10">
             <div
               className={cn(
-                "break-words text-base text-[var(--color-text-dimmed)]",
+                "max-w-[60ch] break-words text-base leading-8 text-[var(--color-text-dimmed)] [&_p+p]:mt-4",
                 !narrowPreview && "lg:text-lg @max-5xl/preview:!text-base",
               )}
               dangerouslySetInnerHTML={{ __html: descriptionHtml }}
