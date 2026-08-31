@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import GoogleLocationSearch from "./google-location-search";
-import { fetchLocationDetails } from "./_lib/actions";
+import { fetchLocationDetails, geocodeLocation } from "./_lib/actions";
 import { env } from "@/env";
 import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
 import { Loader2, Globe, Mail, MapPin } from "lucide-react";
@@ -39,6 +39,7 @@ import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import { slugify } from "@/lib/utils";
+import { toast } from "sonner";
 
 /** Public-link / input: subdomain label only (a-z, 0-9, hyphens, max 63). */
 function normalizeSubdomainLabel(
@@ -189,6 +190,8 @@ export default function StepEleven() {
       address: globalForm.getValues().stepEleven?.address || "",
       city: globalForm.getValues().stepEleven?.city || "",
       contact_number: globalForm.getValues().stepEleven?.contact_number || "",
+      latitude: globalForm.getValues().stepEleven?.latitude,
+      longitude: globalForm.getValues().stepEleven?.longitude,
       domain: globalForm.getValues().stepEleven?.domain || "",
       domain_suffix:
         globalForm.getValues().stepEleven?.domain_suffix || "eventwizz.com",
@@ -291,12 +294,41 @@ export default function StepEleven() {
         return;
       }
 
+      let latitude = values.latitude;
+      let longitude = values.longitude;
+      if (values.submit_type === "duplicate") {
+        const hasCoordinates =
+          Number.isFinite(latitude) && Number.isFinite(longitude);
+        if (!hasCoordinates) {
+          const resolved = await geocodeLocation(
+            values.address || "",
+            values.city,
+          );
+          if (!resolved) {
+            form.setError("address", {
+              message:
+                "Please select the exact venue address from Google suggestions so its map coordinates can be saved.",
+            });
+            toast.error(
+              "Select the exact venue address from Google suggestions before continuing.",
+            );
+            return;
+          }
+          latitude = resolved.latitude;
+          longitude = resolved.longitude;
+          form.setValue("latitude", latitude, { shouldValidate: true });
+          form.setValue("longitude", longitude, { shouldValidate: true });
+        }
+      }
+
       const nextValues: StepElevenType = {
         ...values,
         domain,
         domain_suffix: domainSuffix,
         confirm_domain: true,
         isApproved: true,
+        latitude,
+        longitude,
       };
       globalForm.setValue("stepEleven", nextValues);
 
@@ -307,6 +339,8 @@ export default function StepEleven() {
         address?: string;
         city?: string;
         contact_number?: string;
+        latitude?: number;
+        longitude?: number;
         reminder_email_before_days?: number;
         domain: string;
         confirm_domain: boolean;
@@ -320,6 +354,8 @@ export default function StepEleven() {
         domain,
         confirm_domain: true,
         isApproved: true,
+        latitude,
+        longitude,
       };
 
       if (values.submit_type === "duplicate") {

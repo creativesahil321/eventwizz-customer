@@ -225,12 +225,32 @@ function finalisePlainCopy(raw: string, contentType: ContentType): string {
 function finaliseFooterBlurb(raw: string): string {
   let clean = finalisePlainCopy(raw, "footer");
   if (!clean) {
-    clean = toUserFacingMarketingCopy(raw);
+    clean = toPlainText(raw);
   }
-  if (!clean || looksLikeAiInstructionLeak(clean)) return "";
+  clean = clean
+    .replace(/^["'“”`]+|["'“”`]+$/g, "")
+    .replace(/^(footer(?: brand)? description|footer blurb|blurb)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (
+    !clean ||
+    clean.toUpperCase() === "REGENERATE" ||
+    looksLikeAiInstructionLeak(clean)
+  ) {
+    return "";
+  }
   const clipped = clipFooterBrandDescription(clean);
   if (!clipped || looksLikeAiInstructionLeak(clipped)) return "";
   return clipped;
+}
+
+function buildFallbackFooterBlurb(venueName: string, city?: string): string {
+  const name = venueName.trim() || "Our venue";
+  const location = typeof city === "string" ? city.trim() : "";
+  const copy = location
+    ? `${name} is a welcoming venue in ${location} for memorable events and celebrations.`
+    : `${name} is a welcoming venue for memorable events and celebrations.`;
+  return clipFooterBrandDescription(copy);
 }
 
 export async function POST(req: Request) {
@@ -430,6 +450,15 @@ export async function POST(req: Request) {
           retry.data.choices?.[0]?.message?.content ?? "",
         );
       }
+    }
+
+    // Keep the optional footer field usable even when every model response is
+    // rejected by the safety/length filters.
+    if (contentType === "footer" && !cleanSummary) {
+      cleanSummary = buildFallbackFooterBlurb(
+        venueName,
+        typeof city === "string" ? city : undefined,
+      );
     }
 
     if (!cleanSummary) {

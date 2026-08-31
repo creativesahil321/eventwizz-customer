@@ -20,6 +20,7 @@ import { ServerContext } from "@/lib/server-context";
 import { useContext, useMemo } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { BrandLogoImage } from "@/components/shared/brand-logo-image";
+import { appConfig } from "@/config/app";
 import {
   Tooltip,
   TooltipContent,
@@ -31,11 +32,11 @@ const steps = [
   { id: 1, label: "Venue", icon: <MapPin size={16} /> },
   { id: 2, label: "Site", icon: <FaSitemap size={16} /> },
   { id: 3, label: "Event", icon: <PartyPopper size={16} /> },
-  { id: 4, label: "Timeline & Package", icon: <Package size={16} /> },
+  { id: 4, label: "Event highlights", icon: <Package size={16} /> },
   { id: 5, label: "Dates", icon: <CalendarDays size={16} /> },
   { id: 6, label: "Catering", icon: <Utensils size={16} /> },
   { id: 7, label: "Brochure info", icon: <Info size={16} /> },
-  { id: 8, label: "Other Packages", icon: <Wine size={16} /> },
+  { id: 8, label: "Drinks & extras", icon: <Wine size={16} /> },
   { id: 9, label: "FAQs", icon: <HelpCircle size={16} /> },
   { id: 10, label: "Payment", icon: <CreditCard size={16} /> },
   { id: 11, label: "Domain", icon: <Globe size={16} /> },
@@ -45,11 +46,11 @@ const stepTooltips: Record<number, string> = {
   1: "Core venue details and contact information.",
   2: "Site branding, hero banner, and about section.",
   3: "Event identity, banner media, and story.",
-  4: "Timeline setup, package content, image, details, and gallery.",
+  4: "Timeline, event highlights, image, details, and gallery.",
   5: "Dates, tickets, tables, and payment rules.",
   6: "Catering and menu information.",
   7: "Brochure and pricing for collateral.",
-  8: "Drinks and add-on packages.",
+  8: "Drinks and extras.",
   9: "Frequently asked questions.",
   10: "Payment provider connections.",
   11: "Choose your booking website subdomain and reminders.",
@@ -72,14 +73,10 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
     [activeStep],
   );
 
-  const logoPath =
-    theme?.logo?.startsWith("/") ||
-    theme?.logo?.startsWith("data:") ||
-    theme?.logo?.startsWith("http") ||
-    theme?.logo?.startsWith("https") ||
-    theme?.logo?.startsWith("blob")
-      ? theme.logo
-      : "/assets/images/logos/eventwizz-logo.png";
+  const faviconPath =
+    typeof theme?.favicon === "string" && theme.favicon.trim()
+      ? theme.favicon
+      : appConfig.mini_logo;
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -91,14 +88,18 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
         }}
       />
       <div className="relative">
-        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-4 md:pl-6 z-10 pr-4 md:pr-6">
-          <Link href="/" aria-label="Home">
+        <div className="absolute left-0 top-1/2 z-10 flex -translate-y-1/2 items-center pl-4 pr-4 md:pl-6 md:pr-6">
+          <Link
+            href="/"
+            aria-label="Home"
+            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5 p-0.5 shadow-[0_2px_10px_rgba(0,0,0,0.2)] transition-[transform,box-shadow] duration-200 hover:scale-105 hover:shadow-[0_4px_14px_rgba(0,0,0,0.3)]"
+          >
             <BrandLogoImage
-              src={addCacheBusting(logoPath as string)}
+              src={addCacheBusting(faviconPath, theme?.media_updated_at)}
               alt={theme?.name || "EventWizz"}
-              width={110}
-              height={30}
-              className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] cursor-pointer hover:opacity-80 transition-opacity drop-shadow-sm"
+              width={32}
+              height={32}
+              className="h-8 w-8 scale-[1.15] rounded-md object-contain"
             />
           </Link>
         </div>

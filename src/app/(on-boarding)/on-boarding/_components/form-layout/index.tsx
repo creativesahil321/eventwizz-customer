@@ -10,6 +10,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import Stepper from "./stepper";
 import { Button } from "@/components/ui/button";
 import { ChevronsLeftRight } from "lucide-react";
+import { useWatch } from "react-hook-form";
 
 function StepTransition({
   stepKey,
@@ -220,21 +221,35 @@ const FullLayout = React.memo(
     activeStep: number;
   }) => {
     const isFullScreenCentered = fullScreenCenteredSteps.has(activeStep || 0);
-    const usesNaturalScroll = naturalScrollCenteredSteps.has(activeStep || 0);
+    const { form } = useFormContext();
+    const hasMultipleLocations = useWatch({
+      control: form.control,
+      name: "stepOne.has_multiple_locations",
+    });
+    const isLocationChoiceStep =
+      activeStep === 1 && hasMultipleLocations === undefined;
+    const usesNaturalScroll =
+      naturalScrollCenteredSteps.has(activeStep || 0) &&
+      !isLocationChoiceStep;
+    const isCenteredLocationChoice = centered && isLocationChoiceStep;
     const scrollAreaClasses = isFullScreenCentered
       ? "h-[calc(100vh-40px)] flex flex-col justify-center items-center"
-      : centered && usesNaturalScroll
-        ? "flex justify-center"
-        : centered
-          ? "h-[calc(100vh-40px)] flex justify-center"
-          : "h-full";
+      : isCenteredLocationChoice
+        ? "h-[calc(100vh-5rem)] flex justify-center"
+        : centered && usesNaturalScroll
+          ? "flex justify-center"
+          : centered
+            ? "h-[calc(100vh-40px)] flex justify-center"
+            : "h-full";
 
     const containerClasses =
-      isFullScreenCentered || centered
-        ? usesNaturalScroll
-          ? "flex flex-col items-center w-full pb-8"
-          : "flex flex-col justify-center items-center min-h-screen"
-        : "w-full";
+      isCenteredLocationChoice
+        ? "flex min-h-[calc(100vh-5rem)] w-full flex-col items-center justify-center pb-8"
+        : isFullScreenCentered || centered
+          ? usesNaturalScroll
+            ? "flex flex-col items-center w-full pb-8"
+            : "flex flex-col justify-center items-center min-h-screen"
+          : "w-full";
 
     return (
       <section

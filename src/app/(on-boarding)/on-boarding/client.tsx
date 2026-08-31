@@ -211,7 +211,11 @@ export default function OnboardingClientWrapper() {
   }
 
   return (
-    <FormProvider serverData={safeData} mode={mode as "ai" | "manual"}>
+    <FormProvider
+      serverData={safeData}
+      mode={mode as "ai" | "manual"}
+      onBackToMode={handleBackToMode}
+    >
       {mode === "ai" ? (
         <AIOnboardingFlow
           onComplete={handleAIComplete}

@@ -140,7 +140,9 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
   const [approvedSections, setApprovedSections] = useState<Set<string>>(
     () => new Set(),
   );
-  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(() =>
+    persistedStepApproved ? -1 : 0,
+  );
 
   const sectionIdsKey = useMemo(
     () => sectionFlow.map((s) => s.id).join("\0"),
@@ -151,7 +153,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     if (!persistenceHydrated || !persistedStepApproved) return;
     if (sectionFlow.length === 0) return;
     setApprovedSections(new Set(sectionFlow.map((s) => s.id)));
-    setCurrentSectionIndex(Math.max(0, sectionFlow.length - 1));
+    setCurrentSectionIndex(-1);
   }, [
     persistenceHydrated,
     persistedStepApproved,
@@ -247,6 +249,8 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     setApprovedSections((prev) => new Set(prev).add(currentSection.id));
     if (currentSectionIndex < sectionFlow.length - 1) {
       setCurrentSectionIndex((i) => i + 1);
+    } else {
+      setCurrentSectionIndex(-1);
     }
   }, [
     validateCurrentSection,
@@ -257,7 +261,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
 
   const handleApproveAllSections = useCallback(async (): Promise<boolean> => {
     const goToLastSection = () => {
-      setCurrentSectionIndex(Math.max(0, sectionFlow.length - 1));
+      setCurrentSectionIndex(-1);
     };
 
     if (skipFullFormTriggerOnApproveAll) {
@@ -330,6 +334,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     async (index: number) => {
       const section = sectionFlow[index];
       if (!section) return;
+      if (allSectionsApproved && currentSectionIndex === -1) return;
 
       const approved = approvedSections.has(section.id);
       const reachable = canNavigateToIndex(index);
@@ -345,6 +350,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     },
     [
       sectionFlow,
+      allSectionsApproved,
       approvedSections,
       canNavigateToIndex,
       currentSectionIndex,
@@ -361,11 +367,18 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     (index: number) => {
       const section = sectionFlow[index];
       if (!section) return false;
+      if (allSectionsApproved && currentSectionIndex === -1) return false;
       if (approvedSections.has(section.id)) return true;
       if (index === currentSectionIndex) return true;
       return canNavigateToIndex(index);
     },
-    [sectionFlow, approvedSections, currentSectionIndex, canNavigateToIndex],
+    [
+      sectionFlow,
+      allSectionsApproved,
+      approvedSections,
+      currentSectionIndex,
+      canNavigateToIndex,
+    ],
   );
 
   const resetToFirstSection = useCallback(() => {

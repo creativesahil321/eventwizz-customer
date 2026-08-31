@@ -42,14 +42,14 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
           <Link
             href="/"
             aria-label={`Go to ${brandName} home`}
-            className="flex h-8 w-8 items-center justify-center"
+            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5 p-0.5 shadow-[0_2px_10px_rgba(0,0,0,0.2)] transition-[transform,box-shadow] duration-200 hover:scale-105 hover:shadow-[0_4px_14px_rgba(0,0,0,0.3)]"
           >
             <BrandLogoImage
               src={addCacheBusting(faviconPath, theme?.media_updated_at)}
               alt={brandName}
               width={32}
               height={32}
-              className="h-8 w-8"
+              className="h-8 w-8 scale-[1.15] rounded-md object-contain"
             />
           </Link>
         ) : (

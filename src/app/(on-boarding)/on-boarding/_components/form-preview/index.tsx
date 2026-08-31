@@ -756,7 +756,7 @@ export default function FormPreview() {
         }
         break;
 
-      case 4: // Package details
+      case 4: // Event highlights and timeline
         if (activeField.includes("event_schedular")) {
           scrollToElement(timelineRef);
         } else if (activeField.includes("gallery")) {
@@ -799,7 +799,7 @@ export default function FormPreview() {
         }
         break;
 
-      case 8: // Other Packages
+      case 8: // Drinks and extras
         if (
           activeField.includes("drink_") ||
           activeField.includes("packages")
@@ -874,10 +874,7 @@ export default function FormPreview() {
       >
         <div ref={heroRef} className="contents" />
         <div ref={aboutRef} className="contents" />
-        <SitePreview
-          formValues={tv}
-          scrollContainerRef={previewContainerRef}
-        />
+        <SitePreview formValues={tv} scrollContainerRef={previewContainerRef} />
       </div>
     );
   };
@@ -958,8 +955,7 @@ export default function FormPreview() {
     const roomSelectorStickyTop = showSectionNav
       ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
       : ONBOARDING_PREVIEW_HEADER_OFFSET;
-    const sectionAnchorClass =
-      "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
+    const sectionAnchorClass = "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
     const heroCityLabel = formState.stepOne?.city?.trim() || "";
     const heroEventLabel =
       formState.stepThree?.event_name?.trim() ||
@@ -972,8 +968,9 @@ export default function FormPreview() {
       timelineRows.map((row) => row.time),
     );
 
-    const menuBackgroundImage =
-      resolvePreviewMenuBackground(activePreviewCatering);
+    const menuBackgroundImage = resolvePreviewMenuBackground(
+      activePreviewCatering,
+    );
 
     return (
       <div
@@ -1076,25 +1073,25 @@ export default function FormPreview() {
             label="About"
             onEdit={jumpToEditor}
           >
-          <Suspense fallback={<SectionLoader />}>
-            <AboutEventSec
-              about_event_sub_heading={
-                formState.stepThree?.about_event_sub_heading || ""
-              }
-              about_event_heading={
-                formState.stepThree?.about_event_heading || ""
-              }
-              about_event_description={
-                formState.stepThree?.about_event_description || ""
-              }
-              headingEmphasis={
-                tryHeroPreviewProps?.headingEmphasis ?? undefined
-              }
-              aboutHeadingAccentHint={
-                tryHeroPreviewProps?.bannerHeadingAccent ?? null
-              }
-            />
-          </Suspense>
+            <Suspense fallback={<SectionLoader />}>
+              <AboutEventSec
+                about_event_sub_heading={
+                  formState.stepThree?.about_event_sub_heading || ""
+                }
+                about_event_heading={
+                  formState.stepThree?.about_event_heading || ""
+                }
+                about_event_description={
+                  formState.stepThree?.about_event_description || ""
+                }
+                headingEmphasis={
+                  tryHeroPreviewProps?.headingEmphasis ?? undefined
+                }
+                aboutHeadingAccentHint={
+                  tryHeroPreviewProps?.bannerHeadingAccent ?? null
+                }
+              />
+            </Suspense>
           </PreviewEditHit>
         </div>
 
@@ -1111,14 +1108,14 @@ export default function FormPreview() {
               onEdit={jumpToEditor}
               skipButtons
             >
-            <EventRoomChooser
-              rooms={roomSummaries}
-              currentRoomIndex={currentRoomIndex}
-              onRoomChange={handleRoomChange}
-              headingEmphasis={
-                tryHeroPreviewProps?.headingEmphasis ?? undefined
-              }
-            />
+              <EventRoomChooser
+                rooms={roomSummaries}
+                currentRoomIndex={currentRoomIndex}
+                onRoomChange={handleRoomChange}
+                headingEmphasis={
+                  tryHeroPreviewProps?.headingEmphasis ?? undefined
+                }
+              />
             </PreviewEditHit>
           </div>
         ) : null}
@@ -1139,31 +1136,31 @@ export default function FormPreview() {
               label="Schedule"
               onEdit={jumpToEditor}
             >
-            <Suspense fallback={<SectionLoader />}>
-              <RoomContentTransition roomKey={roomContentKey}>
-                <Timeline
-                  eventSchedularTitle={
-                    activePreviewPackage?.event_schedular_title || ""
-                  }
-                  eventSchedularCopy={
-                    activePreviewPackage?.event_schedule_subtitle ||
-                    activePreviewPackageLegacy?.event_schedular_custom_copy ||
-                    ""
-                  }
-                  eventSchedular={
-                    timelineRows as Array<{
-                      title: string;
-                      time: string;
-                    }>
-                  }
-                />
-              </RoomContentTransition>
-            </Suspense>
+              <Suspense fallback={<SectionLoader />}>
+                <RoomContentTransition roomKey={roomContentKey}>
+                  <Timeline
+                    eventSchedularTitle={
+                      activePreviewPackage?.event_schedular_title || ""
+                    }
+                    eventSchedularCopy={
+                      activePreviewPackage?.event_schedule_subtitle ||
+                      activePreviewPackageLegacy?.event_schedular_custom_copy ||
+                      ""
+                    }
+                    eventSchedular={
+                      timelineRows as Array<{
+                        title: string;
+                        time: string;
+                      }>
+                    }
+                  />
+                </RoomContentTransition>
+              </Suspense>
             </PreviewEditHit>
           </div>
         )}
 
-        {/* Package — hide empty shell (matches live: only real package content) */}
+        {/* Event highlights — hide empty shell (matches live: only real content) */}
         {hasPackagePreview ? (
           <div
             id={EVENT_SECTION_IDS.packages}
@@ -1176,35 +1173,35 @@ export default function FormPreview() {
             <PreviewEditHit
               step={4}
               field="package_title"
-              label="Package"
+              label="Event highlights"
               onEdit={jumpToEditor}
             >
-            <Suspense fallback={<SectionLoader />}>
-              <RoomContentTransition roomKey={roomContentKey}>
-                <PackageSection
-                  heading={activePreviewPackage?.package_title || ""}
-                  image={
-                    typeof activePreviewPackage?.package_image === "string"
-                      ? {
-                          path: activePreviewPackage.package_image,
-                          relativePath: activePreviewPackage.package_image,
-                          preview: activePreviewPackage.package_image,
-                        }
-                      : activePreviewPackage?.package_image || null
-                  }
-                  subHeading={activePreviewPackage?.package_description || ""}
-                  packageDetails={
-                    activePreviewPackage?.package_details?.map((detail) => ({
-                      title: detail.title || "",
-                      description: detail.title || "",
-                    })) || []
-                  }
-                  headingEmphasis={
-                    tryHeroPreviewProps?.headingEmphasis ?? undefined
-                  }
-                />
-              </RoomContentTransition>
-            </Suspense>
+              <Suspense fallback={<SectionLoader />}>
+                <RoomContentTransition roomKey={roomContentKey}>
+                  <PackageSection
+                    heading={activePreviewPackage?.package_title || ""}
+                    image={
+                      typeof activePreviewPackage?.package_image === "string"
+                        ? {
+                            path: activePreviewPackage.package_image,
+                            relativePath: activePreviewPackage.package_image,
+                            preview: activePreviewPackage.package_image,
+                          }
+                        : activePreviewPackage?.package_image || null
+                    }
+                    subHeading={activePreviewPackage?.package_description || ""}
+                    packageDetails={
+                      activePreviewPackage?.package_details?.map((detail) => ({
+                        title: detail.title || "",
+                        description: detail.title || "",
+                      })) || []
+                    }
+                    headingEmphasis={
+                      tryHeroPreviewProps?.headingEmphasis ?? undefined
+                    }
+                  />
+                </RoomContentTransition>
+              </Suspense>
             </PreviewEditHit>
           </div>
         ) : (
@@ -1227,18 +1224,18 @@ export default function FormPreview() {
               label="Dates"
               onEdit={jumpToEditor}
             >
-            <Suspense fallback={<SectionLoader />}>
-              <RoomContentTransition roomKey={roomContentKey}>
-                <DatesSection
-                  dates={datesPreviewItems}
-                  eventSlug={previewEventSlug}
-                  eventName={formState.stepThree?.event_name || undefined}
-                  eventImage={datesEventImage}
-                  roomId={activePreviewRoomScope.roomId}
-                  roomIndex={activePreviewRoomScope.roomIndex}
-                />
-              </RoomContentTransition>
-            </Suspense>
+              <Suspense fallback={<SectionLoader />}>
+                <RoomContentTransition roomKey={roomContentKey}>
+                  <DatesSection
+                    dates={datesPreviewItems}
+                    eventSlug={previewEventSlug}
+                    eventName={formState.stepThree?.event_name || undefined}
+                    eventImage={datesEventImage}
+                    roomId={activePreviewRoomScope.roomId}
+                    roomIndex={activePreviewRoomScope.roomIndex}
+                  />
+                </RoomContentTransition>
+              </Suspense>
             </PreviewEditHit>
           </div>
         ) : (
@@ -1261,9 +1258,9 @@ export default function FormPreview() {
               label="Gallery"
               onEdit={jumpToEditor}
             >
-            <Suspense fallback={<SectionLoader />}>
-              <EventGallery gallery={galleryPreviewItems} />
-            </Suspense>
+              <Suspense fallback={<SectionLoader />}>
+                <EventGallery gallery={galleryPreviewItems} />
+              </Suspense>
             </PreviewEditHit>
           )}
         </div>
@@ -1281,15 +1278,17 @@ export default function FormPreview() {
               label="Menu"
               onEdit={jumpToEditor}
             >
-            <Suspense fallback={<SectionLoader />}>
-              <MenuSection
-                menu_title={activePreviewCatering?.menu_title || ""}
-                menu_description={activePreviewCatering?.menu_description || ""}
-                catering_option={activePreviewCatering?.catering_option ?? 1}
-                menus={activePreviewCatering?.menus || []}
-                menu_background_image={menuBackgroundImage}
-              />
-            </Suspense>
+              <Suspense fallback={<SectionLoader />}>
+                <MenuSection
+                  menu_title={activePreviewCatering?.menu_title || ""}
+                  menu_description={
+                    activePreviewCatering?.menu_description || ""
+                  }
+                  catering_option={activePreviewCatering?.catering_option ?? 1}
+                  menus={activePreviewCatering?.menus || []}
+                  menu_background_image={menuBackgroundImage}
+                />
+              </Suspense>
             </PreviewEditHit>
           )}
         </div>
@@ -1310,23 +1309,23 @@ export default function FormPreview() {
               label="Drinks"
               onEdit={jumpToEditor}
             >
-            <Suspense fallback={<SectionLoader />}>
-              <DrinkSection
-                title={activePreviewDrinks?.drink_title || ""}
-                description={activePreviewDrinks?.drink_description || ""}
-                packages={
-                  activePreviewDrinks?.packages?.map((pkg) => ({
-                    title: pkg.title,
-                    description: pkg.description,
-                    price: Number(pkg.price),
-                  })) || []
-                }
-                eventSlug={previewEventSlug}
-                roomId={activePreviewRoomScope.roomId}
-                roomIndex={activePreviewRoomScope.roomIndex}
-                defaultExpanded
-              />
-            </Suspense>
+              <Suspense fallback={<SectionLoader />}>
+                <DrinkSection
+                  title={activePreviewDrinks?.drink_title || ""}
+                  description={activePreviewDrinks?.drink_description || ""}
+                  packages={
+                    activePreviewDrinks?.packages?.map((pkg) => ({
+                      title: pkg.title,
+                      description: pkg.description,
+                      price: Number(pkg.price),
+                    })) || []
+                  }
+                  eventSlug={previewEventSlug}
+                  roomId={activePreviewRoomScope.roomId}
+                  roomIndex={activePreviewRoomScope.roomIndex}
+                  defaultExpanded
+                />
+              </Suspense>
             </PreviewEditHit>
           )}
         </div>
@@ -1345,10 +1344,10 @@ export default function FormPreview() {
             label="Location"
             onEdit={jumpToEditor}
           >
-          <BrochureSection
-            location={activePreviewBrochureLocation}
-            price={activePreviewBrochurePrice}
-          />
+            <BrochureSection
+              location={activePreviewBrochureLocation}
+              price={activePreviewBrochurePrice}
+            />
           </PreviewEditHit>
         </div>
 
@@ -1368,12 +1367,12 @@ export default function FormPreview() {
               label="FAQs"
               onEdit={jumpToEditor}
             >
-            <Suspense fallback={<SectionLoader />}>
-              <FaqSection
-                faqs={formState.stepNine?.faqs || []}
-                defaultExpanded
-              />
-            </Suspense>
+              <Suspense fallback={<SectionLoader />}>
+                <FaqSection
+                  faqs={formState.stepNine?.faqs || []}
+                  defaultExpanded
+                />
+              </Suspense>
             </PreviewEditHit>
           )}
         </div>
@@ -1383,13 +1382,11 @@ export default function FormPreview() {
           copyright={tryThemePreviewValues?.copyright ?? undefined}
           contactOverride={onboardingFooterContact}
           socialLinksOverride={onboardingFooterSocialLinks}
-          brandDescription={
-            firstFooterBrandDescription(
-              formState.stepTwo?.footer_brand_description,
-              formState.stepTwo?.about_description,
-              formState.stepOne?.description,
-            )
-          }
+          brandDescription={firstFooterBrandDescription(
+            formState.stepTwo?.footer_brand_description,
+            formState.stepTwo?.about_description,
+            formState.stepOne?.description,
+          )}
         />
       </div>
     );

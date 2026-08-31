@@ -220,17 +220,17 @@ export const stepFourSchema = z
       .optional(),
     package_title: z
       .string()
-      .min(1, "Event package main heading is required")
+      .min(1, "Main event heading is required")
       .max(
         EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
-        `Event package main heading must not exceed ${EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS} characters`
+        `Main event heading must not exceed ${EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS} characters`
       ),
     package_description: z
       .string()
-      .min(1, "Event package sub-heading is required")
+      .min(1, "Event highlights subheading is required")
       .max(
         EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
-        `Event package sub-heading must not exceed ${EVENT_PACKAGE_SUB_HEADING_MAX_CHARS} characters`
+        `Event highlights subheading must not exceed ${EVENT_PACKAGE_SUB_HEADING_MAX_CHARS} characters`
       ),
     package_button_name: z
       .string()
@@ -247,11 +247,11 @@ export const stepFourSchema = z
             .min(1, "Title is required")
             .max(
               PACKAGE_DETAIL_LINE_MAX_CHARS,
-              `Package detail title must not exceed ${PACKAGE_DETAIL_LINE_MAX_CHARS} characters`
+              `Highlight title must not exceed ${PACKAGE_DETAIL_LINE_MAX_CHARS} characters`
             ),
         })
       )
-      .min(1, "At least one package detail is required"),
+      .min(1, "At least one highlight is required"),
     event_schedular_title: z
       .string()
       .max(40, "Event schedular title must not exceed 40 characters"),
@@ -308,7 +308,7 @@ export const stepFourSchema = z
       return hasImage;
     },
     {
-      message: "Package image is required",
+      message: "Highlights image is required",
       path: ["package_image"],
     }
   );
@@ -925,19 +925,19 @@ export const stepEightSchema = z.object({
         id: z.number().optional(), // Optional for backward compatibility (required when from API)
         title: z
           .string()
-          .min(1, "Package title is required")
+          .min(1, "Extra option title is required")
           .max(
             DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
-            `Package title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`
+            `Extra option title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`
           ),
         description: z
           .string()
-          .min(1, "Package description is required")
+          .min(1, "Extra option description is required")
           .refine(
             (val) =>
               plainTextCharCount(val) <= RICH_DESCRIPTION_MAX_CHARS,
             {
-              message: `Package description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
+              message: `Extra option description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
             }
           ),
         price: z.union([z.number(), z.string()]).refine(
@@ -952,7 +952,7 @@ export const stepEightSchema = z.object({
             );
           },
           {
-            message: `Package price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
+            message: `Extra price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
           }
         ),
         available_quantity: z.preprocess(

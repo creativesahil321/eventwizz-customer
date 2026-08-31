@@ -332,6 +332,23 @@ export default function EventDetailClient({
     (slices.event_schedular ?? []).map((row) => row.time),
   );
 
+  const aboutHighlights = [
+    heroCategoryLabel
+      ? { label: "Occasion", value: heroCategoryLabel }
+      : null,
+    heroDateLabel ? { label: "Dates", value: heroDateLabel } : null,
+    heroTimeLabel ? { label: "Time", value: heroTimeLabel } : null,
+    cityLabel ? { label: "Location", value: cityLabel } : null,
+    brochureFromPrice != null
+      ? {
+          label: "From",
+          value: `${formatPriceUnit(brochureFromPrice)} per person`,
+        }
+      : null,
+  ].filter((highlight): highlight is { label: string; value: string } =>
+    Boolean(highlight),
+  );
+
   const activeRoomId = slices.activeRoom?.room_id;
   const roomContentKey = activeRoomId ?? `room-${currentRoomIndex}`;
 
@@ -420,6 +437,13 @@ export default function EventDetailClient({
             about_event_heading={eventData.about_event_heading}
             about_event_sub_heading={eventData.about_event_sub_heading}
             about_event_description={eventData.about_event_description}
+            eventImage={eventData.event_banner_image || null}
+            imageAlt={
+              eventData.event_name
+                ? `${eventData.event_name} event`
+                : "Event image"
+            }
+            highlights={aboutHighlights}
             headingEmphasis={headingEmphasisFromSite}
             aboutHeadingAccentHint={heroAccentHint}
           />

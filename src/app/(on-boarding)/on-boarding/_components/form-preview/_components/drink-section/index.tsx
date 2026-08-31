@@ -104,7 +104,7 @@ export default function DrinkSection({
         <div className="space-y-3 px-2">
           <SiteHeading
             level={2}
-            title={title || "Other Packages"}
+            title={title || "Drinks & extras"}
             emphasis={headingEmphasis as HeadingEmphasis}
             variant="onSurface"
             align="center"

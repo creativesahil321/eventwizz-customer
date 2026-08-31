@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useContext, useState } from "react";
+import React, { useState } from "react";
 
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,8 +14,6 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { ServerContext } from "@/lib/server-context";
-import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 
 interface ModeSelectionProps {
   onSelectMode: (mode: "ai" | "manual") => void;
@@ -45,16 +43,7 @@ const accent = {
 };
 
 export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
-  const { theme } = useContext(ServerContext);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const logoPath =
-    theme?.logo?.startsWith("/") ||
-    theme?.logo?.startsWith("data:") ||
-    theme?.logo?.startsWith("http") ||
-    theme?.logo?.startsWith("https") ||
-    theme?.logo?.startsWith("blob")
-      ? theme.logo
-      : "/assets/images/logos/eventwizz-logo.png";
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Ambient background effects - uses theme colors */}
@@ -83,22 +72,12 @@ export default function ModeSelection({ onSelectMode }: ModeSelectionProps) {
       />
 
       <div className="relative z-10 w-full max-w-5xl px-6">
-        {/* Header with Logo */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          {/* EventWizz Logo — use logoPath as-is to avoid hydration mismatch (addCacheBusting uses Date.now()) */}
-          <div className="flex justify-center mb-6">
-            <BrandLogoImage
-              src={logoPath}
-              alt="EventWizz"
-              className="h-10 w-auto object-contain drop-shadow-sm"
-            />
-          </div>
-
           <div
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full backdrop-blur-sm border mb-6"
             style={accent.badgeBg}

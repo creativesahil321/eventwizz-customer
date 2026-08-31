@@ -438,8 +438,7 @@ export default function StepTwo() {
                 data-guided-section="branding"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 0,
+                  guided.currentSectionIndex === 0,
                   "space-y-6",
                 )}
               >
@@ -450,14 +449,10 @@ export default function StepTwo() {
                   title="Branding"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 0
-                  }
+                  disabled={guided.currentSectionIndex !== 0}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 0 &&
+                    guided.currentSectionIndex !== 0 &&
                       "pointer-events-none",
                   )}
                 >
@@ -688,8 +683,7 @@ export default function StepTwo() {
                 data-guided-section="banner"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 1,
+                  guided.currentSectionIndex === 1,
                   "space-y-6",
                 )}
               >
@@ -700,14 +694,10 @@ export default function StepTwo() {
                   title="Banner text"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 1
-                  }
+                  disabled={guided.currentSectionIndex !== 1}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 1 &&
+                    guided.currentSectionIndex !== 1 &&
                       "pointer-events-none",
                   )}
                 >
@@ -809,8 +799,7 @@ export default function StepTwo() {
                 data-guided-section="about"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 2,
+                  guided.currentSectionIndex === 2,
                   "space-y-6",
                 )}
               >
@@ -821,14 +810,10 @@ export default function StepTwo() {
                   title="About section"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 2
-                  }
+                  disabled={guided.currentSectionIndex !== 2}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 2 &&
+                    guided.currentSectionIndex !== 2 &&
                       "pointer-events-none",
                   )}
                 >

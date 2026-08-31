@@ -90,7 +90,16 @@ export function WholeStepGuidedShell<T extends FieldValues>({
             guided={guided}
             title={chipLabel}
           />
-          {children(guided)}
+          <fieldset
+            disabled={guided.currentSectionIndex !== 0}
+            className={
+              guided.currentSectionIndex !== 0
+                ? "min-w-0 border-0 p-0 pointer-events-none"
+                : "min-w-0 border-0 p-0"
+            }
+          >
+            {children(guided)}
+          </fieldset>
           <GuidedSectionActionFooter
             isActive
             sectionLabel={chipLabel}

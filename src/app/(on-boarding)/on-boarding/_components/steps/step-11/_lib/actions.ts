@@ -10,6 +10,35 @@ type FormWithLocationFields = {
   longitude?: number;
 };
 
+export type LocationCoordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+export const geocodeLocation = async (
+  address: string,
+  city?: string,
+): Promise<LocationCoordinates | null> => {
+  if (!window.google?.maps?.Geocoder || !address.trim()) return null;
+
+  const query = [address.trim(), city?.trim()].filter(Boolean).join(", ");
+  try {
+    const { results } = await new window.google.maps.Geocoder().geocode({
+      address: query,
+      region: "uk",
+    });
+    const location = results[0]?.geometry?.location;
+    if (!location) return null;
+
+    return {
+      latitude: location.lat(),
+      longitude: location.lng(),
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const fetchLocationDetails = <T extends FormWithLocationFields>(
   form: UseFormReturn<T>,
   placeId: string

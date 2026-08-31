@@ -759,8 +759,7 @@ export default function StepThree() {
                 data-guided-section="event-hero"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 0,
+                  guided.currentSectionIndex === 0,
                   "space-y-6 order-1",
                 )}
               >
@@ -771,14 +770,10 @@ export default function StepThree() {
                   title="Banner"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 0
-                  }
+                  disabled={guided.currentSectionIndex !== 0}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 0 &&
+                    guided.currentSectionIndex !== 0 &&
                       "pointer-events-none",
                   )}
                 >
@@ -1081,8 +1076,7 @@ export default function StepThree() {
                 data-guided-section="about-event"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 1,
+                  guided.currentSectionIndex === 1,
                   "space-y-4 order-2",
                 )}
               >
@@ -1093,14 +1087,10 @@ export default function StepThree() {
                   title="About the event"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 1
-                  }
+                  disabled={guided.currentSectionIndex !== 1}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-4",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 1 &&
+                    guided.currentSectionIndex !== 1 &&
                       "pointer-events-none",
                   )}
                 >
@@ -1266,8 +1256,7 @@ export default function StepThree() {
                 data-guided-section="event-details"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 2,
+                  guided.currentSectionIndex === 2,
                   "mb-6 order-3 border border-white/10 bg-white/[0.03] rounded-lg p-4",
                 )}
               >
@@ -1278,14 +1267,10 @@ export default function StepThree() {
                   title="How shall we categorise this event for you?"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 2
-                  }
+                  disabled={guided.currentSectionIndex !== 2}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 2 &&
+                    guided.currentSectionIndex !== 2 &&
                       "pointer-events-none",
                   )}
                 >
@@ -1385,8 +1370,7 @@ export default function StepThree() {
                 data-guided-section="event-location"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 3,
+                  guided.currentSectionIndex === 3,
                   "mb-6 order-4 border border-white/10 bg-white/[0.03] rounded-lg p-4",
                 )}
               >
@@ -1397,14 +1381,10 @@ export default function StepThree() {
                   title="Where will this event take place?"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 3
-                  }
+                  disabled={guided.currentSectionIndex !== 3}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-4",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 3 &&
+                    guided.currentSectionIndex !== 3 &&
                       "pointer-events-none",
                   )}
                 >

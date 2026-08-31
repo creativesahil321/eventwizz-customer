@@ -51,6 +51,7 @@ interface FormContextType {
   next: () => Promise<void>;
   back: () => Promise<void>;
   isLoading: boolean;
+  onBackToMode?: () => void;
 }
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
@@ -103,10 +104,12 @@ export function FormProvider({
   children,
   serverData,
   mode,
+  onBackToMode,
 }: {
   children: ReactNode;
   serverData: ApiResponse | null;
   mode?: "ai" | "manual";
+  onBackToMode?: () => void;
 }) {
   // Get session data and update function
   const { data: session, update: updateSession } = useSession();
@@ -403,6 +406,7 @@ export function FormProvider({
       next,
       back,
       isLoading,
+      onBackToMode,
     }),
     [
       form,
@@ -419,6 +423,7 @@ export function FormProvider({
       save,
       next,
       back,
+      onBackToMode,
     ],
   );
 

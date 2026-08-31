@@ -1,6 +1,6 @@
 "use client";
 
-import { CardContent, CardHeader } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -25,12 +25,9 @@ import AddressAutocomplete, {
 import { env } from "@/env";
 import { fetchPlaceDetails } from "./_lib/actions";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Settings2 } from "lucide-react";
 import { OnboardingCard } from "@/components/ui/card";
-import {
-  OnboardingTitle,
-  OnboardingFieldGroupTitle,
-} from "@/components/ui/typography";
+import { OnboardingFieldGroupTitle } from "@/components/ui/typography";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
@@ -44,7 +41,10 @@ import { guidedSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 import { cn } from "@/lib/utils";
 import { useBrandNameAvailability } from "@/hooks/use-brand-name-availability";
-import { AIChoicePair } from "../../ai-onboarding/ai-choice-pair";
+import {
+  AIChoicePair,
+  AIFlowProgress,
+} from "../../ai-onboarding/ai-choice-pair";
 import { toast } from "sonner";
 
 const RESOLVE_STEP_ONE_ERROR_INDEX = (keys: string[]) =>
@@ -60,6 +60,7 @@ export default function StepOne() {
     setActiveStep,
     lastCompletedStep,
     persistedProgressHydrated,
+    onBackToMode,
   } = useFormContext();
 
   const stepOnePersistedApproved = useWatch({
@@ -350,19 +351,33 @@ export default function StepOne() {
 
   return (
     <div className="flex w-full flex-col items-center py-6 px-4">
-      <OnboardingCard className="w-full max-w-2xl">
-        <CardHeader className="pb-2 pt-4">
-          <OnboardingTitle>Tell us about your business</OnboardingTitle>
-          {showLocationGate ? (
-            <p className="mt-2 text-sm font-normal text-slate-400">
-              First, tell us if you run more than one venue under the same
-              brand.
-            </p>
-          ) : null}
-        </CardHeader>
-        <CardContent>
+      <div className="mb-8 w-full max-w-2xl text-center">
+        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-400/20 bg-indigo-400/5 px-4 py-1.5 backdrop-blur-sm">
+          <Settings2 className="h-3.5 w-3.5 text-indigo-400" />
+          <span className="text-xs font-medium uppercase tracking-wide text-indigo-400">
+            Manual setup
+          </span>
+        </div>
+        <h1 className="mb-3 text-3xl font-bold text-white">
+          Tell us about your business
+        </h1>
+        {showLocationGate ? (
+          <p className="mx-auto max-w-md text-sm text-slate-400">
+            First, tell us if you run more than one venue under the same brand.
+          </p>
+        ) : null}
+      </div>
+      <OnboardingCard
+        className={cn(
+          "w-full max-w-2xl",
+          showLocationGate &&
+            "border border-white/10 bg-slate-900/60 p-8 backdrop-blur-xl",
+        )}
+      >
+        <CardContent className={showLocationGate ? "p-0" : undefined}>
           {showLocationGate ? (
             <div className="space-y-6">
+              <AIFlowProgress current={1} total={11} label="Venue" />
               <h2 className="text-lg font-semibold text-white text-center">
                 Do you have multiple locations?
               </h2>
@@ -378,6 +393,18 @@ export default function StepOne() {
                   { value: false, label: "No, single location" },
                 ]}
               />
+              {onBackToMode ? (
+                <div className="flex justify-center pt-1">
+                  <button
+                    type="button"
+                    onClick={onBackToMode}
+                    className="flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-300"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to setup options
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <>
@@ -412,8 +439,7 @@ export default function StepOne() {
                     data-guided-section="venue-search"
                     tabIndex={-1}
                     className={guidedSectionSurfaceClass(
-                      guided.allSectionsApproved ||
-                        guided.currentSectionIndex === 0,
+                      guided.currentSectionIndex === 0,
                     )}
                   >
                     <GuidedSectionTitleBar
@@ -425,14 +451,10 @@ export default function StepOne() {
                       }
                     />
                     <fieldset
-                      disabled={
-                        !guided.allSectionsApproved &&
-                        guided.currentSectionIndex !== 0
-                      }
+                      disabled={guided.currentSectionIndex !== 0}
                       className={cn(
                         "min-w-0 border-0 p-0 m-0",
-                        !guided.allSectionsApproved &&
-                          guided.currentSectionIndex !== 0 &&
+                        guided.currentSectionIndex !== 0 &&
                           "pointer-events-none",
                       )}
                     >
@@ -511,8 +533,7 @@ export default function StepOne() {
                     data-guided-section="contact-details"
                     tabIndex={-1}
                     className={guidedSectionSurfaceClass(
-                      guided.allSectionsApproved ||
-                        guided.currentSectionIndex === 1,
+                      guided.currentSectionIndex === 1,
                     )}
                   >
                     <GuidedSectionTitleBar
@@ -522,14 +543,10 @@ export default function StepOne() {
                       title="Contact details"
                     />
                     <fieldset
-                      disabled={
-                        !guided.allSectionsApproved &&
-                        guided.currentSectionIndex !== 1
-                      }
+                      disabled={guided.currentSectionIndex !== 1}
                       className={cn(
                         "min-w-0 border-0 p-0 m-0",
-                        !guided.allSectionsApproved &&
-                          guided.currentSectionIndex !== 1 &&
+                        guided.currentSectionIndex !== 1 &&
                           "pointer-events-none",
                       )}
                     >

@@ -484,9 +484,9 @@ export function EventPreview({
   const heroCityLabel = (() => {
     const slug = footerLocationSlug?.trim();
     if (!slug) return null;
-    const fromLocations = siteEssentials?.locations?.find(
-      (loc) => loc.slug?.trim() === slug,
-    )?.city?.trim();
+    const fromLocations = siteEssentials?.locations
+      ?.find((loc) => loc.slug?.trim() === slug)
+      ?.city?.trim();
     return fromLocations || slugToShortLabel(slug);
   })();
   const heroCategoryLabel = readEventCategoryLabel({
@@ -503,9 +503,9 @@ export function EventPreview({
   const showGallery = (galleryImages?.length ?? 0) > 0;
   const showPackages = Boolean(
     String(activePackage?.package_title ?? "").trim() ||
-      String(activePackage?.package_description ?? "").trim() ||
-      activePackage?.package_image ||
-      (activePackage?.package_details?.length ?? 0) > 0,
+    String(activePackage?.package_description ?? "").trim() ||
+    activePackage?.package_image ||
+    (activePackage?.package_details?.length ?? 0) > 0,
   );
   const sectionNavItems = useMemo(
     () =>
@@ -537,8 +537,7 @@ export function EventPreview({
   const roomSelectorStickyTop = showSectionNav
     ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
     : ONBOARDING_PREVIEW_HEADER_OFFSET;
-  const sectionAnchorClass =
-    "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
+  const sectionAnchorClass = "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
 
   const brochureAddress =
     s1?.event_address ||
@@ -682,7 +681,11 @@ export function EventPreview({
         </div>
 
         {showRoomSelector ? (
-          <div ref={chooserRef} id={EVENT_SECTION_IDS.rooms} className={sectionAnchorClass}>
+          <div
+            ref={chooserRef}
+            id={EVENT_SECTION_IDS.rooms}
+            className={sectionAnchorClass}
+          >
             <EventRoomChooser
               rooms={roomSummaries}
               currentRoomIndex={currentRoomIndex}
@@ -698,7 +701,9 @@ export function EventPreview({
               <Timeline
                 eventSchedular={timelineRows}
                 eventSchedularTitle={activePackage?.event_schedular_title || ""}
-                eventSchedularCopy={activePackage?.event_schedule_subtitle || ""}
+                eventSchedularCopy={
+                  activePackage?.event_schedule_subtitle || ""
+                }
                 eventSchedularBackgroundImage={
                   typeof activePackage?.event_schedular_background_image ===
                   "string"
@@ -826,15 +831,13 @@ export function EventPreview({
           locationSlug={footerLocationSlug}
           contactTheme={footerContactTheme}
           socialLinksOverride={siteEssentials?.socialLinks}
-          brandDescription={
-            firstFooterBrandDescription(
-              siteEssentials?.footer_brand_description,
-              data.footer_brand_description,
-              siteEssentials?.about_description,
-              data.about_description,
-              siteEssentials?.seo?.description,
-            )
-          }
+          brandDescription={firstFooterBrandDescription(
+            siteEssentials?.footer_brand_description,
+            data.footer_brand_description,
+            siteEssentials?.about_description,
+            data.about_description,
+            siteEssentials?.seo?.description,
+          )}
         />
       </div>
     </CartConflictProvider>
