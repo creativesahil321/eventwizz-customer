@@ -37,14 +37,17 @@ export default function ExperienceSection({
     <section
       className={cn(
         "w-full scroll-mt-28 bg-[color:var(--color-background)] px-4",
-        narrowPreview ? "py-16" : "py-20 md:py-28",
+        narrowPreview
+          ? "py-16"
+          : "py-16 md:py-28 @max-5xl/preview:!py-16",
       )}
     >
       <div className="mx-auto min-w-0 max-w-7xl">
         <div
           className={cn(
             "grid grid-cols-1 items-start gap-8 text-[var(--color-text)]",
-            !narrowPreview && "lg:grid-cols-2 lg:gap-16",
+            !narrowPreview &&
+              "lg:grid-cols-2 lg:gap-16 @max-5xl/preview:!grid-cols-1 @max-5xl/preview:!gap-8",
           )}
         >
           <div className="w-full min-w-0">
@@ -54,7 +57,8 @@ export default function ExperienceSection({
               variant="onSurface"
               className={cn(
                 "!mt-2 !leading-tight break-words !text-3xl !font-black tracking-tight",
-                !narrowPreview && "lg:!text-5xl",
+                !narrowPreview &&
+                  "lg:!text-5xl @max-5xl/preview:!text-3xl",
               )}
             />
           </div>
@@ -62,7 +66,7 @@ export default function ExperienceSection({
             <div
               className={cn(
                 "break-words text-base text-[var(--color-text-dimmed)]",
-                !narrowPreview && "lg:text-lg",
+                !narrowPreview && "lg:text-lg @max-5xl/preview:!text-base",
               )}
               dangerouslySetInnerHTML={{ __html: descriptionHtml }}
             />

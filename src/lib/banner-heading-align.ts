@@ -160,11 +160,11 @@ export function heroBannerVenueContactClass(
     scope?.fromMd && align === "right" && "md:items-center md:justify-end",
     "@max-md/preview:!items-center",
     scope?.fromMd &&
-      align === "left" &&
-      "@min-md/preview:!items-center @min-md/preview:!justify-start",
+    align === "left" &&
+    "@min-md/preview:!items-center @min-md/preview:!justify-start",
     scope?.fromMd &&
-      align === "right" &&
-      "@min-md/preview:!items-center @min-md/preview:!justify-end",
+    align === "right" &&
+    "@min-md/preview:!items-center @min-md/preview:!justify-end",
   );
 }
 
@@ -253,21 +253,13 @@ const heroHeadingWrapClass =
  */
 export const heroBannerHeadingTypeClass = cn(
   heroHeadingWrapClass,
-  "!leading-[1.28] sm:!leading-[1.24] lg:!leading-[1.22]",
-  "!text-[clamp(1.3rem,0.45rem+6.2cqi,1.7rem)]",
-  "sm:!text-[clamp(1.5rem,0.5rem+5.2cqi,2.35rem)]",
-  "lg:!text-[clamp(1.85rem,0.4rem+4.4cqi,3.25rem)]",
-  "@max-lg/preview:!text-[1.65rem] @max-lg/preview:!leading-[1.28]",
+  "!text-[clamp(1.3rem,0.675rem+2.85cqi,3.25rem)] !leading-[1.24]",
 );
 
 /** Multi-location home hero — slightly smaller cap than the location banner. */
 export const heroHomeHeadingTypeClass = cn(
   heroHeadingWrapClass,
-  "!leading-[1.28] sm:!leading-[1.24] lg:!leading-[1.22]",
-  "!text-[clamp(1.3rem,0.45rem+6cqi,1.65rem)]",
-  "sm:!text-[clamp(1.5rem,0.5rem+4.8cqi,2.15rem)]",
-  "lg:!text-[clamp(1.75rem,0.4rem+4cqi,3rem)]",
-  "@max-lg/preview:!text-[1.65rem] @max-lg/preview:!leading-[1.28]",
+  "!text-[clamp(1.3rem,0.65rem+2.7cqi,3rem)] !leading-[1.24]",
 );
 
 /* ---- Hero band height (location page + multi-location home) ---- */
@@ -349,18 +341,30 @@ export function normalizeBannerHeadingValign(v: unknown): BannerHeadingValign {
   return isBannerHeadingValign(v) ? v : "center";
 }
 
+type HeroBandCopyPlacementStyle = {
+  top: number | string;
+  bottom: number | string;
+  transform: string;
+};
+
 /**
- * Pin hero copy to the chosen edge. Long titles on a short (phone) band must
- * clip — not grow past the band. Flex `justify-end` on an overflowing child
- * previously showed the heading at the opposite edge (Top/Bottom looked swapped).
+ * Inline placement keeps the three vertical states independent from
+ * responsive utility ordering in narrow preview canvases.
  */
-export function heroBandCopyPlacementClass(v: BannerHeadingValign): string {
-  return cn(
-    "absolute inset-x-0 z-10 mx-auto w-full max-h-full overflow-hidden",
-    v === "top" && "top-0 flex flex-col justify-start",
-    v === "center" && "inset-y-0 flex flex-col justify-center",
-    v === "bottom" && "bottom-0 flex flex-col justify-end",
-  );
+export function heroBandCopyPlacementStyle(
+  v: BannerHeadingValign,
+): HeroBandCopyPlacementStyle {
+  if (v === "top") {
+    return { top: 0, bottom: "auto", transform: "none" };
+  }
+  if (v === "bottom") {
+    return { top: "auto", bottom: 0, transform: "none" };
+  }
+  return { top: "50%", bottom: "auto", transform: "translateY(-50%)" };
+}
+
+export function heroBandCopyPlacementClass(_v: BannerHeadingValign): string {
+  return "absolute inset-x-0 z-10 mx-auto w-full max-w-full overflow-visible";
 }
 
 /**
@@ -375,12 +379,7 @@ export function heroBandVerticalClass(v: BannerHeadingValign): string {
   );
 }
 
-/**
- * Padding for the INNER content wrapper inside any hero section.
- * Always clears the fixed header (~72 px, "pt-[4.5rem]") and adds
- * appropriate breathing room per valign position.
- * Apply this alongside "relative z-* max-w-7xl mx-auto w-full px-4".
- */
+/** Balanced hero padding keeps the chosen vertical anchor visually honest. */
 export function heroBandContentPadClass(
   v: BannerHeadingValign,
   options?: { withBottomChrome?: boolean },
@@ -388,21 +387,19 @@ export function heroBandContentPadClass(
   const withBottomChrome = Boolean(options?.withBottomChrome);
 
   return cn(
-    v === "top" &&
-    (withBottomChrome
-      ? "pt-16 pb-36 sm:pt-24 sm:pb-40 md:pt-28 md:pb-44"
-      : "pt-16 pb-8 sm:pt-24 sm:pb-12 md:pt-28 md:pb-14"),
-    v === "center" &&
-    (withBottomChrome
-      ? "pt-16 pb-40 sm:pt-24 sm:pb-36 md:pb-40"
-      : "pt-16 pb-8 sm:pt-24 sm:pb-10"),
-    v === "bottom" &&
-    (withBottomChrome
-      ? "pt-16 pb-40 sm:pt-[4.5rem] sm:pb-44 md:pb-48"
-      : "pt-16 pb-12 sm:pt-[4.5rem] sm:pb-20 md:pb-24"),
+    !withBottomChrome && "py-16 sm:py-20 md:py-24",
     withBottomChrome &&
-      "@max-md/preview:!pt-[4.25rem] @max-md/preview:!pb-[11.5rem]",
-    !withBottomChrome && "@max-md/preview:!pt-[4.25rem] @max-md/preview:!pb-8",
+      v === "top" &&
+      "pt-16 pb-36 sm:pt-24 sm:pb-40 md:pt-28 md:pb-44",
+    withBottomChrome &&
+      v === "center" &&
+      "pt-16 pb-40 sm:pt-24 sm:pb-36 md:pb-40",
+    withBottomChrome &&
+      v === "bottom" &&
+      "pt-16 pb-40 sm:pt-[4.5rem] sm:pb-44 md:pb-48",
+    withBottomChrome &&
+    "@max-md/preview:!pt-[4.25rem] @max-md/preview:!pb-[11.5rem]",
+    !withBottomChrome && "@max-md/preview:!py-8",
   );
 }
 

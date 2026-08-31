@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePreviewReviewChromeHeight } from "@/hooks/use-preview-review-chrome-height";
+import { usePreviewDeviceStore } from "@/store/preview-device.store";
 import type { SitePreviewReviewStep } from "@/store/site-preview.store";
 import type { PreviewLocationItem } from "../_lib/preview-locations";
 
@@ -79,6 +80,8 @@ export function SitePreviewReviewChrome({
     : false;
   const isLastLocation =
     currentLocationIndex >= previewLocations.length - 1;
+  const previewDevice = usePreviewDeviceStore((state) => state.device);
+  const isNarrowDevicePreview = previewDevice !== "desktop";
   const totalSteps = hasMultipleLocations
     ? 1 + previewLocations.length
     : Math.max(1, previewLocations.length);
@@ -120,13 +123,26 @@ export function SitePreviewReviewChrome({
   return (
     <div
       ref={chromeRef}
-      className="fixed inset-x-0 bottom-0 z-[120] isolate border-t border-slate-200 bg-white text-slate-900 shadow-[0_-2px_16px_rgba(15,23,42,0.1)] pointer-events-auto"
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-[120] isolate border-t border-slate-200 bg-white text-slate-900 shadow-[0_-2px_16px_rgba(15,23,42,0.1)] pointer-events-auto",
+        isNarrowDevicePreview && "max-h-[min(42dvh,15rem)] overflow-y-auto",
+      )}
       role="region"
       aria-label="Preview review actions"
     >
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-3 py-2.5 sm:gap-2.5 sm:px-4 sm:py-3">
+      <div
+        className={cn(
+          "mx-auto flex w-full max-w-6xl flex-col gap-2 px-3 py-2.5 sm:gap-2.5 sm:px-4 sm:py-3",
+          isNarrowDevicePreview && "gap-1 px-2 py-1.5",
+        )}
+      >
         {/* Row 1: step label */}
-        <p className="min-w-0 truncate text-xs font-medium text-slate-600 sm:text-sm">
+        <p
+          className={cn(
+            "min-w-0 truncate text-xs font-medium text-slate-600 sm:text-sm",
+            isNarrowDevicePreview && "text-[11px]",
+          )}
+        >
           <span className="text-slate-500">Preview</span>
           <span className="mx-1.5 text-slate-300">·</span>
           <span className="font-semibold text-slate-900">
@@ -173,13 +189,21 @@ export function SitePreviewReviewChrome({
         ) : null}
 
         {/* Row 3: Edit + primary CTA */}
-        <div className="flex min-w-0 items-center justify-between gap-2">
+        <div
+          className={cn(
+            "flex min-w-0 items-center justify-between gap-2",
+            isNarrowDevicePreview && "gap-1",
+          )}
+        >
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={onEdit}
-            className={chromeGhostBtn}
+            className={cn(
+              chromeGhostBtn,
+              isNarrowDevicePreview && "!h-8 !px-2 !text-xs",
+            )}
           >
             <PencilLine className="h-3.5 w-3.5" />
             Edit
@@ -192,7 +216,11 @@ export function SitePreviewReviewChrome({
                 size="sm"
                 onClick={handleMainPrimary}
                 disabled={!previewLocations.length}
-                className={cn(chromePrimaryBtn, "min-w-0 max-w-full gap-1.5 px-3 sm:px-4")}
+                className={cn(
+                  chromePrimaryBtn,
+                  "min-w-0 max-w-full gap-1.5 px-3 sm:px-4",
+                  isNarrowDevicePreview && "!h-8 !px-2 !text-xs",
+                )}
               >
                 {viewOnly || mainPageApproved ? (
                   <>
@@ -222,7 +250,11 @@ export function SitePreviewReviewChrome({
                 size="sm"
                 onClick={handleLocationPrimary}
                 disabled={isLoadingLocation || (!viewOnly && !currentSlug)}
-                className={cn(chromePrimaryBtn, "min-w-0 max-w-full gap-1.5 px-3 sm:px-4")}
+                className={cn(
+                  chromePrimaryBtn,
+                  "min-w-0 max-w-full gap-1.5 px-3 sm:px-4",
+                  isNarrowDevicePreview && "!h-8 !px-2 !text-xs",
+                )}
               >
                 {isLoadingLocation ? (
                   <>
@@ -254,7 +286,11 @@ export function SitePreviewReviewChrome({
                 type="button"
                 size="sm"
                 onClick={() => onClosePreview?.()}
-                className={cn(chromePrimaryBtn, "gap-1.5 px-3 sm:px-4")}
+                className={cn(
+                  chromePrimaryBtn,
+                  "gap-1.5 px-3 sm:px-4",
+                  isNarrowDevicePreview && "!h-8 !px-2 !text-xs",
+                )}
               >
                 <X className="h-3.5 w-3.5 shrink-0" />
                 <span className="sm:hidden">Close</span>
@@ -275,6 +311,7 @@ export function SitePreviewReviewChrome({
                 className={cn(
                   chromePrimaryBtn,
                   "gap-1.5 px-3 sm:px-4 pointer-events-auto relative z-[1]",
+                  isNarrowDevicePreview && "!h-8 !px-2 !text-xs",
                 )}
               >
                 {isSaving ? (
@@ -307,7 +344,11 @@ export function SitePreviewReviewChrome({
                   size="sm"
                   variant="outline"
                   onClick={() => onClosePreview?.()}
-                  className={cn(chromeOutlineBtn, "gap-1.5 px-3 sm:px-4")}
+                  className={cn(
+                    chromeOutlineBtn,
+                    "gap-1.5 px-3 sm:px-4",
+                    isNarrowDevicePreview && "!h-8 !px-2 !text-xs",
+                  )}
                 >
                   <X className="h-3.5 w-3.5 shrink-0" />
                   <span className="sm:hidden">Close</span>

@@ -769,8 +769,8 @@ const StepFour = () => {
               {isMultiSpaceWithoutRooms
                 ? "Set up your event spaces"
                 : isMultiRoom
-                ? `Configure timeline & event highlights for ${rooms[currentRoomIndex]?.name || "this room"}`
-                : "Timeline & event highlights"}
+                ? `Configure timeline & packages for ${rooms[currentRoomIndex]?.name || "this room"}`
+                : "Timeline & packages"}
             </OnboardingTitle>
           </CardHeader>
 
@@ -791,8 +791,8 @@ const StepFour = () => {
                     Add a room to continue
                   </h3>
                   <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-                    Create at least one event space above. Timeline and event
-                    highlights will appear here once a room is available.
+                    Create at least one event space above. Timeline and package
+                    details will appear here once a room is available.
                   </p>
                 </div>
               )
@@ -828,8 +828,8 @@ const StepFour = () => {
                 <WholeStepGuidedShell
                   form={form}
                   sectionId="step-four-timeline-package"
-                  chipLabel="Event highlights & timeline"
-                  chipDescription="Schedule, event highlights copy, image, details, and gallery."
+                  chipLabel="Packages & timeline"
+                  chipDescription="Schedule, package copy, image, details, and gallery."
                   persistenceHydrated={persistedProgressHydrated}
                   persistedStepApproved={stepFourPersistedApproved === true}
                   renderFooter={({ guided }) => (
@@ -1084,7 +1084,7 @@ const StepFour = () => {
                   )}
                 >
                   <OnboardingFieldGroupTitle>
-                    Event highlights
+                    Packages & Gallery
                   </OnboardingFieldGroupTitle>
                   <div className="mt-4 space-y-6 min-w-0">
                     <FormField

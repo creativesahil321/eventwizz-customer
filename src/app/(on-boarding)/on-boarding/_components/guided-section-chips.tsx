@@ -5,7 +5,10 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { guidedOnboardingSaveNextButtonClass } from "./guided-sticky-approval-bar";
+import {
+  guidedOnboardingApproveStepButtonClass,
+  guidedOnboardingSaveNextButtonClass,
+} from "./guided-sticky-approval-bar";
 import {
   Tooltip,
   TooltipContent,
@@ -161,6 +164,7 @@ export function GuidedMultiSectionBottomActions({
   loading = false,
   continueDisabled = false,
   hasInput = true,
+  onEditAll,
   labelWhenReady,
   extraActions,
   className,
@@ -172,6 +176,8 @@ export function GuidedMultiSectionBottomActions({
   continueDisabled?: boolean;
   /** Hide approve/continue until the current section has user-entered content. */
   hasInput?: boolean;
+  /** Re-open the first section when AI or persistence has approved the whole step. */
+  onEditAll?: () => void;
   labelWhenReady?: string;
   extraActions?: ReactNode;
   className?: string;
@@ -217,6 +223,17 @@ export function GuidedMultiSectionBottomActions({
         />
       ) : null}
       <div className="flex w-full min-w-0 flex-row flex-wrap items-center justify-center gap-3">
+        {allSectionsApproved && onEditAll ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || continueDisabled}
+            className={guidedOnboardingApproveStepButtonClass}
+            onClick={onEditAll}
+          >
+            Edit sections
+          </Button>
+        ) : null}
         {showPrimary ? (
           <Button
             type="button"

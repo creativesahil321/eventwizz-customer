@@ -49,13 +49,14 @@ import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { cn } from "@/lib/utils";
 import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
-import { slugToShortLabel } from "@/lib/slug-short-label";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
   formatEventHeroDateRange,
   formatEventHeroTimeRange,
   readEventCategoryLabel,
 } from "@/lib/event-hero-meta";
+import { formatEventLocationLabel } from "@/lib/event-location";
+import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
 import {
   firstBookablePublicRoomIndex,
   isPublicEventRoomMode,
@@ -323,7 +324,9 @@ export default function EventDetailClient({
     : roomBarStickyTop;
   const sectionAnchorClass = "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
 
-  const cityLabel = slugToShortLabel(locationSlug);
+  const eventLocationLabel = formatEventLocationLabel(
+    slices.event_address ?? "",
+  );
   const heroCategoryLabel = readEventCategoryLabel(eventData);
   const heroDateLabel = formatEventHeroDateRange(
     (slices.dates ?? []).map((d) => d.event_date),
@@ -332,22 +335,14 @@ export default function EventDetailClient({
     (slices.event_schedular ?? []).map((row) => row.time),
   );
 
-  const aboutHighlights = [
-    heroCategoryLabel
-      ? { label: "Occasion", value: heroCategoryLabel }
-      : null,
-    heroDateLabel ? { label: "Dates", value: heroDateLabel } : null,
-    heroTimeLabel ? { label: "Time", value: heroTimeLabel } : null,
-    cityLabel ? { label: "Location", value: cityLabel } : null,
-    brochureFromPrice != null
-      ? {
-          label: "From",
-          value: `${formatPriceUnit(brochureFromPrice)} per person`,
-        }
-      : null,
-  ].filter((highlight): highlight is { label: string; value: string } =>
-    Boolean(highlight),
-  );
+  const aboutHighlights = buildEventAboutHighlights({
+    occasion: heroCategoryLabel,
+    dates: heroDateLabel,
+    time: heroTimeLabel,
+    location: eventLocationLabel || null,
+    fromPrice: brochureFromPrice,
+    formatPrice: formatPriceUnit,
+  });
 
   const activeRoomId = slices.activeRoom?.room_id;
   const roomContentKey = activeRoomId ?? `room-${currentRoomIndex}`;
@@ -403,7 +398,9 @@ export default function EventDetailClient({
             imageAlt={eventData.event_name || "Event banner"}
             breadcrumbs={[
               { label: "Home", href: "/" },
-              { label: cityLabel, href: `/${locationSlug}` },
+              ...(eventLocationLabel
+                ? [{ label: eventLocationLabel }]
+                : []),
               {
                 label:
                   eventData.event_name?.trim() ||
@@ -415,7 +412,7 @@ export default function EventDetailClient({
             meta={{
               date: heroDateLabel,
               time: heroTimeLabel,
-              location: cityLabel,
+              location: eventLocationLabel,
             }}
           />
         </div>

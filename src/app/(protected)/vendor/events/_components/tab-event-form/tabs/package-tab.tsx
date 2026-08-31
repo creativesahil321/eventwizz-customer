@@ -1106,11 +1106,11 @@ export default function PackageTab() {
           noValidate
           autoComplete="off"
         >
-          {/* Event Highlights Section */}
+          {/* Packages and Gallery Section */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold title-header">
-                Event highlights
+                Packages &amp; Gallery
               </h2>
             </div>
 
@@ -1120,7 +1120,7 @@ export default function PackageTab() {
               render={() => (
                 <FormItem className="rounded-lg border border-[#E5E7EB] p-4 bg-[#FAFCFC]">
                   <FormLabel className="text-sm font-semibold">
-                    Do you have a room system?
+                    Does your event use multiple rooms or areas?
                   </FormLabel>
                   <FormControl>
                     <RadioGroup
@@ -1147,9 +1147,10 @@ export default function PackageTab() {
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enable this if event highlights, dates, menu, and brochure
-                    details differ by room.
+                  <p className="text-xs leading-relaxed text-muted-foreground mt-1">
+                    Choose Yes when rooms have different packages, dates,
+                    menus, drinks, or brochures. Choose No for one shared setup
+                    across the venue.
                   </p>
                 </FormItem>
               )}
@@ -1324,7 +1325,7 @@ export default function PackageTab() {
             />
           </div>
 
-          {/* Event Highlights Details Section */}
+          {/* Package Details Section */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold title-header">

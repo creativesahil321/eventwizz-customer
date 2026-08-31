@@ -2,6 +2,10 @@ import type {
   AIEventGeneratedContent,
   AIEventInput,
 } from "@/app/api/ai/generate-event/route";
+import type {
+  EventImportAssets,
+  EventImportSectionId,
+} from "@/app/api/ai/import-event/types";
 import { api, withSuppressedSuccessToasts } from "@/services/core/api-client";
 import type { ApiResponse } from "@/services/core/api-client";
 import { buildVendorEventGetUrl } from "@/services/vendor/events/build-vendor-event-get-url";
@@ -58,10 +62,11 @@ import {
   hasUsableOnboardingDates,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import { fillAiEventGeneratedDefaults } from "./fill-ai-event-content";
+import { downloadImportedEventAssets } from "./imported-event-assets";
 
 export const AI_EVENT_APPLY_STEPS = [
   { label: "Event details, location and schedule", icon: "📅" },
-  { label: "Event highlights", icon: "📦" },
+  { label: "Packages & Gallery", icon: "📦" },
   { label: "Dates, tickets and tables", icon: "🎟️" },
   { label: "Catering and menu", icon: "🍽️" },
   { label: "Brochure", icon: "📄" },
@@ -230,6 +235,9 @@ export async function applyAIGeneratedEventToBackend(params: {
   eventInput: AIEventInput;
   categoryId: number;
   removedSections?: Set<string>;
+  sourceAssets?: EventImportAssets;
+  missingSections?: EventImportSectionId[];
+  preserveMissingSections?: boolean;
   onProgress?: ApplyAIEventProgress;
   /** Fired after step 1 succeeds so UI can open the draft in manual editor if later steps fail. */
   onEventCreated?: (eventId: number) => void;
@@ -245,6 +253,9 @@ async function applyAIGeneratedEventToBackendInner(params: {
   eventInput: AIEventInput;
   categoryId: number;
   removedSections?: Set<string>;
+  sourceAssets?: EventImportAssets;
+  missingSections?: EventImportSectionId[];
+  preserveMissingSections?: boolean;
   onProgress?: ApplyAIEventProgress;
   onEventCreated?: (eventId: number) => void;
 }): Promise<ApplyAIGeneratedEventResult> {
@@ -257,6 +268,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
   const removedSections = new Set([
     ...(params.removedSections ?? []),
     ...inferAiEventRemovedSections(vendorIntent),
+    ...(params.preserveMissingSections ? (params.missingSections ?? []) : []),
   ]);
 
   const eventType = eventInput.eventType || "other";
@@ -265,15 +277,21 @@ async function applyAIGeneratedEventToBackendInner(params: {
 
   onProgress?.(0);
 
+  const importedAssetFiles = params.sourceAssets
+    ? await downloadImportedEventAssets(params.sourceAssets)
+    : null;
   const bannerFile =
+    importedAssetFiles?.bannerFile ??
     (await urlToImageFile(dummyImages.banner, "event-banner")) ??
     (await createPlaceholderEventBanner(s.stepOne.event_name));
 
   const schedulerBgUrl = (dummyImages as { scheduler_background?: string }).scheduler_background;
-  const schedulerBgFile = schedulerBgUrl
-    ? (await urlToImageFile(schedulerBgUrl, "event-scheduler-background")) ??
-    (await createPlaceholderEventBanner(`${s.stepOne.event_name} · schedule`))
-    : null;
+  const schedulerBgFile =
+    importedAssetFiles?.schedulerBackgroundFile ??
+    (schedulerBgUrl
+      ? (await urlToImageFile(schedulerBgUrl, "event-scheduler-background")) ??
+        (await createPlaceholderEventBanner(`${s.stepOne.event_name} · schedule`))
+      : null);
 
   const normalizedRoomNames = normalizeAiEventRoomNames(eventInput.room_names);
   const useRoomSystem =
@@ -294,7 +312,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
     latitude: s.stepOne.latitude,
     longitude: s.stepOne.longitude,
     event_banner_image: bannerFile,
-    event_banner_video: null,
+    event_banner_video: importedAssetFiles?.bannerVideoFile ?? null,
   };
 
   const step1Res = await eventsService.storeStepOneData(stepOneData);
@@ -321,24 +339,33 @@ async function applyAIGeneratedEventToBackendInner(params: {
 
   onProgress?.(1);
   const packageImage =
+    importedAssetFiles?.packageFile ??
     (await urlToImageFile(dummyImages.package, "package-image")) ??
     (await createPlaceholderPackageImage(
       removedSections.has("stepTwo") ? "Package" : s.stepTwo.package_title
     ));
 
   let galleryFiles: File[] = [];
-  try {
-    const galleryUrls = dummyImages.gallery ?? [];
-    if (galleryUrls.length > 0) {
-      galleryFiles = (
-        await fetchGalleryFiles(galleryUrls)
-      ).slice(0, EVENT_GALLERY_MAX_IMAGES);
+  if (importedAssetFiles?.galleryFiles.length) {
+    galleryFiles = importedAssetFiles.galleryFiles.slice(0, EVENT_GALLERY_MAX_IMAGES);
+  } else {
+    try {
+      const galleryUrls = dummyImages.gallery ?? [];
+      if (galleryUrls.length > 0) {
+        galleryFiles = (
+          await fetchGalleryFiles(galleryUrls)
+        ).slice(0, EVENT_GALLERY_MAX_IMAGES);
+      }
+    } catch {
+      console.warn("Failed to fetch gallery images for AI event, skipping");
     }
-  } catch {
-    console.warn("Failed to fetch gallery images for AI event, skipping");
   }
 
-  const createdRooms: Array<{ id: number; name: string }> = [];
+  const createdRooms: Array<{
+    id: number;
+    name: string;
+    sourceName?: string;
+  }> = [];
 
   if (useRoomSystem) {
     const selectedIds = (eventInput.selected_room_ids ?? []).filter(
@@ -363,6 +390,12 @@ async function applyAIGeneratedEventToBackendInner(params: {
           )
           .slice(0, AI_EVENT_MAX_ROOMS),
       );
+      const sourceNames = (eventInput.room_mappings ?? [])
+        .map((mapping) => String(mapping.source_name ?? "").trim())
+        .filter(Boolean);
+      createdRooms.forEach((room, index) => {
+        room.sourceName = sourceNames[index] || room.name;
+      });
       if (createdRooms.length < AI_EVENT_MIN_ROOMS) {
         throw new Error(
           "Selected venue rooms could not be loaded. Refresh and try again.",
@@ -397,7 +430,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
     rooms: useRoomSystem
       ? createdRooms.map((room) => {
           const resolved = resolveRoomPackageFields(
-            room.name,
+            room.sourceName ?? room.name,
             {
               package_title: stepTwoPackage.package_title,
               package_description: stepTwoPackage.package_description,
@@ -443,7 +476,10 @@ async function applyAIGeneratedEventToBackendInner(params: {
         vendor_location_id: vendorLocationId,
         is_rooms: 1,
         rooms: createdRooms.map((room) => {
-          const aiRoom = matchAiRoomName(perRoomDates, room.name);
+          const aiRoom = matchAiRoomName(
+            perRoomDates,
+            room.sourceName ?? room.name,
+          );
           const roomRawDates = hasUsableOnboardingDates(aiRoom?.dates as AIDate[])
             ? (aiRoom!.dates as AIDate[])
             : rawDates;
@@ -496,7 +532,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
     if (useRoomSystem && createdRooms.length > 0) {
       for (const room of createdRooms) {
         const resolved = resolveRoomMenuFields(
-          room.name,
+          room.sourceName ?? room.name,
           {
             catering_option: cateringOption,
             menu_title: s.stepFour.menu_title,
@@ -542,10 +578,12 @@ async function applyAIGeneratedEventToBackendInner(params: {
   const menuBgUrl = hasCatering
     ? (dummyImages as { menu_background?: string }).menu_background
     : null;
-  const menuBgFile = menuBgUrl
-    ? (await urlToImageFile(menuBgUrl, "menu-background")) ??
-    (await createPlaceholderPackageImage(s.stepFour.menu_title || "Menu"))
-    : null;
+  const menuBgFile =
+    importedAssetFiles?.menuBackgroundFile ??
+    (menuBgUrl
+      ? (await urlToImageFile(menuBgUrl, "menu-background")) ??
+        (await createPlaceholderPackageImage(s.stepFour.menu_title || "Menu"))
+      : null);
 
   const buildStepFourRoomEntry = (roomId: number, roomName: string): VendorStepFourRoomEntry => {
     const resolved = resolveRoomMenuFields(
@@ -583,7 +621,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
 
   if (useRoomSystem && createdRooms.length > 0) {
     const roomMenus = createdRooms.map((room) =>
-      buildStepFourRoomEntry(room.id, room.name),
+      buildStepFourRoomEntry(room.id, room.sourceName ?? room.name),
     );
     const activeMenu = roomMenus[0];
     await eventsService.storeStepFourData({
@@ -667,7 +705,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
             ? createdRooms.map((room) => ({
                 title: room.name.slice(0, 40),
                 description: resolveRoomBrochureDescription(
-                  room.name,
+                  room.sourceName ?? room.name,
                   defaultBrochureDescription,
                   brochureRoomEntries,
                 ).slice(0, 160),
@@ -742,7 +780,10 @@ async function applyAIGeneratedEventToBackendInner(params: {
             event_id: eventId,
             is_rooms: 1,
             rooms: createdRooms.map((room) => {
-              const aiDrink = matchAiRoomName(perRoomDrinks, room.name);
+              const aiDrink = matchAiRoomName(
+                perRoomDrinks,
+                room.sourceName ?? room.name,
+              );
               const roomPackages = mapRoomPackages(aiDrink?.packages);
               const packages =
                 roomPackages.length > 0 ? roomPackages : packagesForSave;

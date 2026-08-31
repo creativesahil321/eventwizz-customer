@@ -38,7 +38,7 @@ export default function LocationGrid({
     return (
       <div
         className={cn(
-          "mx-auto grid max-w-[920px] grid-cols-1 gap-2.5",
+          "mx-auto grid max-w-[920px] grid-cols-1 gap-4",
           !narrowPreview && "md:grid-cols-3 md:gap-6",
         )}
       >
@@ -88,7 +88,7 @@ export default function LocationGrid({
   return (
     <div
       className={cn(
-        "mx-auto grid max-w-[920px] gap-2.5 md:gap-6",
+        "mx-auto grid max-w-[920px] gap-4 md:gap-6",
         locations.length === 1 && "max-w-sm grid-cols-1 justify-items-center",
         locations.length === 2 &&
           cn(

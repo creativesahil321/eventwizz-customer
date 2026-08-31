@@ -911,6 +911,7 @@ export default function StepTwo() {
                 allSectionsApproved={guided.allSectionsApproved}
                 hasInput={guided.currentSectionHasInput}
                 loading={loading}
+                onEditAll={() => guided.handleUnlockSection(0)}
                 onContinue={() => void handleContinue()}
               />
             </form>

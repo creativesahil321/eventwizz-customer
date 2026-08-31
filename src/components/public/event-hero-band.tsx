@@ -7,13 +7,11 @@ import { SiteHeading } from "@/components/public/site-heading";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
-import type {
-  EventHeroBreadcrumb,
-  EventHeroMeta,
-} from "@/lib/event-hero-meta";
+import type { EventHeroBreadcrumb, EventHeroMeta } from "@/lib/event-hero-meta";
 import {
   heroBandContentPadClass,
   heroBandCopyPlacementClass,
+  heroBandCopyPlacementStyle,
   heroBandMediaOverlayClass,
   heroBannerContactRowClass,
   heroBannerHeadingTypeClass,
@@ -171,12 +169,12 @@ export function EventHeroBand({
     return undefined;
   }, [bannerVideo]);
 
-  const bgImage =
-    bannerImage instanceof File ? blobImageUrl : syncBgUrl;
-  const videoUrl =
-    bannerVideo instanceof File ? blobVideoUrl : syncVideoUrl;
+  const bgImage = bannerImage instanceof File ? blobImageUrl : syncBgUrl;
+  const videoUrl = bannerVideo instanceof File ? blobVideoUrl : syncVideoUrl;
 
-  const bannerAlign = normalizeBannerHeadingAlign(bannerHeadingAlign ?? "center");
+  const bannerAlign = normalizeBannerHeadingAlign(
+    bannerHeadingAlign ?? "center",
+  );
   const bannerValign = normalizeBannerHeadingValign(
     bannerHeadingValign ?? "center",
   );
@@ -208,7 +206,7 @@ export function EventHeroBand({
       ref={sectionRef}
       className={cn(
         "relative mx-auto w-full overflow-hidden",
-        "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
+        "h-[min(64dvh,700px)] min-h-[360px] max-h-[760px] md:h-[min(68dvh,720px)] md:min-h-[380px]",
         onEditHero && "group/preview-edit cursor-pointer",
         className,
       )}
@@ -256,11 +254,7 @@ export function EventHeroBand({
             />
           </>
         ) : bgImage && !bgImage.startsWith("blob:") && priorityHeroImage ? (
-          <HeroCoverImage
-            src={bgImage}
-            alt={imageAlt}
-            className="scale-105"
-          />
+          <HeroCoverImage src={bgImage} alt={imageAlt} className="scale-105" />
         ) : bgImage ? (
           // File blob / non-priority embeds — keep native <img> (next/image can't optimize blobs)
           // eslint-disable-next-line @next/next/no-img-element
@@ -296,6 +290,7 @@ export function EventHeroBand({
           heroHeadingMeasureClass,
           heroBandContentPadClass(bannerValign),
         )}
+        style={heroBandCopyPlacementStyle(bannerValign)}
       >
         <div
           className={cn(
@@ -322,7 +317,10 @@ export function EventHeroBand({
                 {crumbs.map((crumb, index) => {
                   const isLast = index === crumbs.length - 1;
                   return (
-                    <li key={`${crumb.label}-${index}`} className="inline-flex items-center gap-x-1.5">
+                    <li
+                      key={`${crumb.label}-${index}`}
+                      className="inline-flex items-center gap-x-1.5"
+                    >
                       {index > 0 ? (
                         <span className="text-white/45" aria-hidden>
                           /
@@ -384,7 +382,11 @@ export function EventHeroBand({
             </p>
           ) : null}
           {hasMeta ? (
-            <div className={heroBannerContactRowClass(bannerAlign, { fromMd: true })}>
+            <div
+              className={heroBannerContactRowClass(bannerAlign, {
+                fromMd: true,
+              })}
+            >
               {metaDate ? (
                 <HeroMetaItem
                   icon={Calendar}
@@ -433,9 +435,14 @@ function HeroMetaItem({
 }) {
   if (!editable) {
     return (
-      <span className="inline-flex items-center gap-2">
+      <span className="inline-flex min-w-0 max-w-full items-center gap-2">
         <Icon className="h-4 w-4 shrink-0" aria-hidden />
-        <span>{label}</span>
+        <span
+          className="min-w-0 max-w-[min(70vw,24rem)] truncate"
+          title={label}
+        >
+          {label}
+        </span>
       </span>
     );
   }
@@ -449,10 +456,12 @@ function HeroMetaItem({
         event.stopPropagation();
         onEdit();
       }}
-      className="group/meta inline-flex items-center gap-2 rounded-full px-1.5 py-0.5 text-left transition-colors hover:bg-white/15"
+      className="group/meta inline-flex min-w-0 max-w-full items-center gap-2 rounded-full px-1.5 py-0.5 text-left transition-colors hover:bg-white/15"
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
-      <span>{label}</span>
+      <span className="min-w-0 max-w-[min(70vw,24rem)] truncate" title={label}>
+        {label}
+      </span>
       <Pencil className="h-3 w-3 shrink-0 opacity-70 transition-opacity group-hover/meta:opacity-100" />
     </button>
   );

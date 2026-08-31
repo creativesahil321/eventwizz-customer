@@ -227,10 +227,10 @@ export const stepFourSchema = z
       ),
     package_description: z
       .string()
-      .min(1, "Event highlights subheading is required")
+      .min(1, "Package subheading is required")
       .max(
         EVENT_PACKAGE_SUB_HEADING_MAX_CHARS,
-        `Event highlights subheading must not exceed ${EVENT_PACKAGE_SUB_HEADING_MAX_CHARS} characters`
+        `Package subheading must not exceed ${EVENT_PACKAGE_SUB_HEADING_MAX_CHARS} characters`
       ),
     package_button_name: z
       .string()

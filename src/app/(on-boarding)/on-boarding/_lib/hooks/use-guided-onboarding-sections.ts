@@ -140,9 +140,10 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
   const [approvedSections, setApprovedSections] = useState<Set<string>>(
     () => new Set(),
   );
-  const [currentSectionIndex, setCurrentSectionIndex] = useState(() =>
-    persistedStepApproved ? -1 : 0,
-  );
+  // Start with the first section enabled while persistence is hydrating.
+  // Initialising to -1 when an AI-approved step is loaded can leave the whole
+  // form disabled before `approvedSections` has been populated.
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
 
   const sectionIdsKey = useMemo(
     () => sectionFlow.map((s) => s.id).join("\0"),
@@ -150,10 +151,19 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
   );
 
   useEffect(() => {
-    if (!persistenceHydrated || !persistedStepApproved) return;
+    if (!persistenceHydrated) return;
     if (sectionFlow.length === 0) return;
-    setApprovedSections(new Set(sectionFlow.map((s) => s.id)));
-    setCurrentSectionIndex(-1);
+
+    if (persistedStepApproved) {
+      setApprovedSections(new Set(sectionFlow.map((s) => s.id)));
+      setCurrentSectionIndex(-1);
+      return;
+    }
+
+    // If a previously approved step is reopened and persistence says it is
+    // no longer approved, make the first section editable again.
+    setApprovedSections(new Set());
+    setCurrentSectionIndex(0);
   }, [
     persistenceHydrated,
     persistedStepApproved,

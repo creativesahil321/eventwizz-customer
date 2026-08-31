@@ -1,14 +1,39 @@
 import { LOGO_PROCESS_MAX_BYTES } from "./constants";
 
-const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
+const BLOCKED_HOSTS = new Set([
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0",
+  "::1",
+  "::",
+]);
 
 function isPrivateOrLocalHost(hostname: string): boolean {
-  const lower = hostname.toLowerCase();
+  const lower = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (BLOCKED_HOSTS.has(lower)) return true;
   if (lower.endsWith(".local")) return true;
+  if (lower.startsWith("::ffff:")) {
+    return isPrivateOrLocalHost(lower.slice("::ffff:".length));
+  }
+  if (lower.includes(":")) {
+    return (
+      lower === "::1" ||
+      lower.startsWith("fc") ||
+      lower.startsWith("fd") ||
+      lower.startsWith("fe8") ||
+      lower.startsWith("fe9") ||
+      lower.startsWith("fea") ||
+      lower.startsWith("feb")
+    );
+  }
+  if (/^(0|127)\./.test(lower)) return true;
   if (/^10\./.test(lower)) return true;
   if (/^192\.168\./.test(lower)) return true;
   if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(lower)) return true;
+  if (/^169\.254\./.test(lower)) return true;
+  if (/^100\.(6[4-9]|[7-9]\d)\./.test(lower)) return true;
+  if (/^198\.(18|19)\./.test(lower)) return true;
+  if (/^(22[4-9]|23\d|24\d|25[0-5])\./.test(lower)) return true;
   return false;
 }
 
@@ -22,6 +47,10 @@ export function assertSafeLogoUrl(rawUrl: string): URL {
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new Error("Logo URL must use http or https.");
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new Error("Logo URL credentials are not allowed.");
   }
 
   if (isPrivateOrLocalHost(parsed.hostname)) {

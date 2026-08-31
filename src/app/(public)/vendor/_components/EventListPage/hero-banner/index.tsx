@@ -18,6 +18,7 @@ import {
 import {
   heroBandContentPadClass,
   heroBandCopyPlacementClass,
+  heroBandCopyPlacementStyle,
   heroBandHeightClass,
   heroBandMediaOverlayClass,
   heroBannerBodyClass,
@@ -36,7 +37,6 @@ import {
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
 import {
-  previewFlexFromMd,
   previewFlexOnlyUntilMd,
 } from "@/lib/preview-container-layout";
 // Default fallback media
@@ -171,29 +171,18 @@ export default function HeroBanner({
   );
   const hasContact = Boolean(
     heroContact?.address?.trim() ||
-      heroContact?.email?.trim() ||
-      heroContact?.phone?.trim(),
+    heroContact?.email?.trim() ||
+    heroContact?.phone?.trim(),
   );
   /**
-   * Contact is painted twice (heading stack + search dock) and toggled with
-   * `md:` + `@max-md/preview`. On a wide monitor the viewport is still `md+`,
-   * so both copies can show in the 390px Mobile frame and stack on the same
-   * pixels. Skip the heading copy in that frame.
-   *
-   * The 390px frame is also wider than `@sm` (384px), so `@max-sm/preview`
-   * compact height/padding never apply. Laptop `sm:`/`md:` padding then
-   * vertically centers the subtitle on top of the docked contact + search.
+   * Keep the search dock independent from hero copy placement. This prevents
+   * mobile and short-desktop previews from moving the search bar with the copy.
    */
   const isPreviewMobile = usePreviewMobileLayout();
   const isPreview = useIsPreviewMode();
   const previewFrames = usePreviewDeviceFramesEnabled();
-  /**
-   * Onboarding device frames sit in a wide monitor, so viewport `md:` still
-   * thinks the page is desktop. Stack address then email/phone so the hero
-   * column stays as tight as the live location page.
-   */
-  const stackHeroContact =
-    isPreviewMobile || (isPreview && previewFrames);
+  /** Stack contact details in narrow device frames. */
+  const stackHeroContact = isPreviewMobile || (isPreview && previewFrames);
   const showHeadingContact = hasContact && !isPreviewMobile;
   const showDockContact = hasContact && Boolean(heroFooter);
   const previewAlign: BannerHeadingAlign = isPreviewMobile
@@ -254,6 +243,7 @@ export default function HeroBanner({
           }),
           isPreviewMobile && heroFooter && previewMobileHeroPadClass,
         )}
+        style={heroBandCopyPlacementStyle(copyValign)}
       >
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -265,8 +255,14 @@ export default function HeroBanner({
           )}
         >
           {eyebrow?.trim() &&
-          eyebrow.trim().toLowerCase() !== bannerHeading.trim().toLowerCase() ? (
-            <p className={heroBannerEyebrowClass(previewAlign, previewAlignScope)}>
+          eyebrow.trim().toLowerCase() !==
+            bannerHeading.trim().toLowerCase() ? (
+            <p
+              className={heroBannerEyebrowClass(
+                previewAlign,
+                previewAlignScope,
+              )}
+            >
               {eyebrow.trim()}
             </p>
           ) : null}
@@ -282,9 +278,7 @@ export default function HeroBanner({
             className={cn(
               "font-black tracking-tight",
               heroBannerHeadingTypeClass,
-              previewAlign === "left"
-                ? "max-w-4xl md:max-w-3xl"
-                : "max-w-4xl",
+              previewAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
             )}
           />
 
@@ -295,7 +289,7 @@ export default function HeroBanner({
           ) : null}
 
           {showHeadingContact ? (
-            <div className={heroFooter ? previewFlexFromMd : undefined}>
+            <div>
               <HeroBannerContactMeta
                 contact={heroContact}
                 align={previewAlign}
@@ -306,8 +300,6 @@ export default function HeroBanner({
           ) : null}
         </motion.div>
       </div>
-
-      {/* Independent of heading align/valign — always bottom-centered */}
       {heroFooter ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
           <div
@@ -392,7 +384,11 @@ function HeroBannerContactMeta({
           )}
         >
           {email ? (
-            <HeroContactLine href={`mailto:${email}`} icon={Mail} label={email} />
+            <HeroContactLine
+              href={`mailto:${email}`}
+              icon={Mail}
+              label={email}
+            />
           ) : null}
           {phone ? (
             <HeroContactLine href={`tel:${phone}`} icon={Phone} label={phone} />
@@ -419,9 +415,7 @@ function HeroContactLine({
   return (
     <a
       href={href}
-      {...(external
-        ? { target: "_blank", rel: "noopener noreferrer" }
-        : {})}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       className={cn(
         "inline-flex min-w-0 items-start gap-2 text-[13px] leading-snug text-white/90 transition-colors hover:text-white sm:text-sm @max-md/preview:!text-[13px]",
         block
@@ -430,7 +424,9 @@ function HeroContactLine({
       )}
     >
       <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
-      <span className="min-w-0 text-pretty [overflow-wrap:anywhere]">{label}</span>
+      <span className="min-w-0 text-pretty [overflow-wrap:anywhere]">
+        {label}
+      </span>
     </a>
   );
 }

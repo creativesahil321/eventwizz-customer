@@ -64,7 +64,7 @@ export default function FaqSection({
     <section
       className={cn(
         "w-full scroll-mt-20 bg-[var(--color-background)] px-4 text-center text-[var(--color-text)]",
-        narrowPreview ? "py-16" : "py-20 sm:scroll-mt-24 md:py-28",
+        narrowPreview ? "py-16" : "py-16 sm:scroll-mt-24 md:py-24",
       )}
       aria-labelledby="faq-section-heading"
     >

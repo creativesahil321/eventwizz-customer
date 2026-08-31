@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewDeviceStore } from "@/store/preview-device.store";
 
@@ -17,13 +18,50 @@ export function usePreviewDeviceFramesEnabled(): boolean {
 }
 
 /**
- * True when a Tablet/Mobile device frame is active (hamburger / narrow chrome).
+ * True when the preview content should use narrow responsive layout rules.
  */
 export function usePreviewNarrowLayout(): boolean {
   const isPreview = useIsPreviewMode();
   const device = usePreviewDeviceStore((s) => s.device);
   const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
-  return isPreview && deviceFramesEnabled && device !== "desktop";
+  const [previewFrameWidth, setPreviewFrameWidth] = useState<number | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!isPreview || !deviceFramesEnabled) {
+      setPreviewFrameWidth(null);
+      return;
+    }
+
+    const frame = document.querySelector<HTMLElement>(
+      "[data-preview-device]",
+    );
+    if (!frame) return;
+
+    const updateFrameWidth = () => {
+      setPreviewFrameWidth(frame.getBoundingClientRect().width);
+    };
+
+    updateFrameWidth();
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateFrameWidth);
+    observer.observe(frame);
+
+    return () => observer.disconnect();
+  }, [device, deviceFramesEnabled, isPreview]);
+
+  // A Desktop preset can still be rendered inside a narrow editor panel.
+  // Use the actual frame width so it does not inherit desktop layout rules.
+  const frameIsNarrow =
+    previewFrameWidth !== null && previewFrameWidth < 1024;
+
+  return (
+    isPreview &&
+    deviceFramesEnabled &&
+    (device !== "desktop" || frameIsNarrow)
+  );
 }
 
 /** True only for the 390px Mobile device frame (not tablet). */

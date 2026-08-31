@@ -103,7 +103,7 @@ const steps = [
   },
   {
     id: 2,
-    label: "Event highlights",
+    label: "Packages & Gallery",
     icon: <Package size={16} />,
     value: "package",
   },
@@ -200,7 +200,7 @@ const ROOM_ENABLED_TABS = new Set([
   "more-info",
   "drinks",
 ]);
-/** Venue room multiselect is only editable on step 2 (Event highlights). */
+/** Venue room multiselect is only editable on step 2 (Packages & Gallery). */
 const ROOM_SELECTION_TAB = "package";
 
 const isMeaningfulValue = (value: unknown): boolean => {
@@ -298,6 +298,7 @@ export default function TabEventForm() {
   const [activeTab, setActiveTab] = useState("event-name");
   const [vendorRooms, setVendorRooms] = useState<VendorRoomOption[]>([]);
   const [vendorRoomsLoading, setVendorRoomsLoading] = useState(false);
+  const displayedStep = TAB_TO_STEP[activeTab] ?? currentStep ?? 1;
   const localIsRooms = useWatch({
     control: formContext.control,
     name: "stepTwo.is_rooms",
@@ -782,8 +783,8 @@ export default function TabEventForm() {
             className="w-full gap-0"
           >
             <Card className="shadow-sm overflow-hidden gap-0 py-0">
-              <div className="border-b bg-card px-2 sm:px-3 md:px-4 pt-3 pb-3">
-                <div className="flex min-w-0 items-start gap-2 sm:gap-3">
+              <div className="sticky top-0 z-20 border-b bg-card/95 px-2 pt-3 pb-3 backdrop-blur-sm sm:px-3 md:px-4">
+                <div className="flex min-w-0 flex-wrap items-start gap-2 sm:flex-nowrap sm:gap-3">
                   <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-500">
                     <TabsList className="flex min-w-max w-full bg-muted/60 p-1 h-auto rounded-lg gap-1.5 sm:gap-2">
                       {steps.map((step) => {
@@ -854,6 +855,27 @@ export default function TabEventForm() {
                         );
                       })}
                     </TabsList>
+                  </div>
+                  <div
+                    className="order-3 flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:order-none sm:w-auto sm:shrink-0"
+                    aria-label={`Step ${displayedStep} of 8`}
+                  >
+                    <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-slate-700">
+                      Step {displayedStep} of 8
+                    </span>
+                    <div
+                      role="progressbar"
+                      aria-valuemin={1}
+                      aria-valuemax={8}
+                      aria-valuenow={displayedStep}
+                      aria-label={`Event setup progress: step ${displayedStep} of 8`}
+                      className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200"
+                    >
+                      <div
+                        className="h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-300"
+                        style={{ width: `${(displayedStep / 8) * 100}%` }}
+                      />
+                    </div>
                   </div>
                   <Badge
                     variant="outline"
@@ -948,7 +970,7 @@ export default function TabEventForm() {
                           </p>
                           <p className="text-[11px] mt-1 text-muted-foreground">
                             {localIsRooms === 1
-                              ? `Choose ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} venue rooms on the Event highlights tab, or use the room picker above when fewer than ${EVENT_ROOM_MAX_COUNT} are selected.`
+                              ? `Choose ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} venue rooms on the Packages & Gallery tab, or use the room picker above when fewer than ${EVENT_ROOM_MAX_COUNT} are selected.`
                               : "Enable room system and select venue rooms to start."}
                           </p>
                         </div>
@@ -957,9 +979,9 @@ export default function TabEventForm() {
                     <p className="mt-4 rounded-lg bg-[#EAF7F8] px-3 py-2 text-[11px] text-[#0B6A75]">
                       {localIsRooms === 1
                         ? selectedRoomIds.length < EVENT_ROOM_MAX_COUNT
-                          ? `Each room has its own event highlights, dates, menu, and brochure (${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} per event). Select from your venue rooms — new rooms can only be created if you have fewer than ${EVENT_ROOM_MAX_COUNT} in total.`
-                          : `Each room has its own event highlights, dates, menu, drinks and extras, and brochure. Use ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} rooms per event.`
-                        : "Click a room below to edit its details for this step. Change room selection on the Event highlights tab."}
+                          ? `Each room has its own packages, dates, menu, and brochure (${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} per event). Select from your venue rooms — new rooms can only be created if you have fewer than ${EVENT_ROOM_MAX_COUNT} in total.`
+                          : `Each room has its own packages, dates, menu, drinks and extras, and brochure. Use ${EVENT_ROOM_MIN_COUNT}–${EVENT_ROOM_MAX_COUNT} rooms per event.`
+                        : "Click a room below to edit its details for this step. Change room selection on the Packages & Gallery tab."}
                     </p>
                   </aside>
                 )}

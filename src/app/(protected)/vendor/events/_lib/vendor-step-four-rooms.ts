@@ -249,51 +249,58 @@ export function appendVendorStepFourRoomToFormData(
   roomIndex: number,
   room: VendorStepFourRoomEntry,
 ): void {
+  const prefix = `rooms[${roomIndex}]`;
   formData.append(`rooms[${roomIndex}][room_id]`, String(room.room_id));
   formData.append(
     `rooms[${roomIndex}][catering_option]`,
     String(room.catering_option),
   );
 
+  appendVendorStepFourMenuFields(formData, prefix, room);
+}
+
+/** Serialize the backend's supported flat payload for a single room update. */
+export function appendVendorStepFourSingleRoomToFormData(
+  formData: FormData,
+  room: VendorStepFourRoomEntry,
+): void {
+  formData.append("room_id", String(room.room_id));
+  formData.append("catering_option", String(room.catering_option));
+  appendVendorStepFourMenuFields(formData, "", room);
+}
+
+function appendVendorStepFourMenuFields(
+  formData: FormData,
+  prefix: string,
+  room: VendorStepFourRoomEntry,
+): void {
   if (room.catering_option !== 1) return;
 
+  const field = (name: string) => (prefix ? `${prefix}[${name}]` : name);
+  const menusField = field("menus");
+
   if (room.menu_title) {
-    formData.append(`rooms[${roomIndex}][menu_title]`, room.menu_title);
+    formData.append(field("menu_title"), room.menu_title);
   }
   if (room.menu_description) {
-    formData.append(
-      `rooms[${roomIndex}][menu_description]`,
-      room.menu_description,
-    );
-  }
-  if (Number(room.event_menu_category_id) > 0) {
-    formData.append(
-      `rooms[${roomIndex}][event_menu_category_id]`,
-      String(room.event_menu_category_id),
-    );
+    formData.append(field("menu_description"), room.menu_description);
   }
 
   normalizeMenus(room.menus).forEach((menu, menuIndex) => {
-    formData.append(
-      `rooms[${roomIndex}][menus][${menuIndex}][name]`,
-      menu.name,
-    );
+    formData.append(`${menusField}[${menuIndex}][name]`, menu.name);
     (menu.items ?? []).forEach((item, itemIndex) => {
       formData.append(
-        `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][title]`,
+        `${menusField}[${menuIndex}][items][${itemIndex}][title]`,
         item.title ?? "",
       );
       formData.append(
-        `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][description]`,
+        `${menusField}[${menuIndex}][items][${itemIndex}][description]`,
         item.description || "",
       );
     });
   });
 
   if (room.menu_background_image instanceof File) {
-    formData.append(
-      `rooms[${roomIndex}][menu_background_image]`,
-      room.menu_background_image,
-    );
+    formData.append(field("menu_background_image"), room.menu_background_image);
   }
 }

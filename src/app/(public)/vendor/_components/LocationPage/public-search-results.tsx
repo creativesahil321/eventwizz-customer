@@ -348,7 +348,7 @@ export function PublicSearchResults({
             })}
           </ul>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 md:gap-5 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
             {eventResults.map((item) => {
               const event = item.event;
               const price = formatEventListingPrice(
@@ -405,7 +405,7 @@ function SearchResultsSkeleton({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 md:gap-5 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="min-w-0 space-y-2">
           <Skeleton className="aspect-[4/3] w-full rounded-xl" />

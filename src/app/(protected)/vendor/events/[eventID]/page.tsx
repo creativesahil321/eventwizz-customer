@@ -26,8 +26,8 @@ export default async function IndexPage({ params }: PageProps) {
                 Edit Event
               </h1>
               <p className="text-muted-foreground">
-                Update event details below. Use Discounts to add promotions for
-                this event.
+                Update the event details below. Add discounts or coupon codes
+                from the Promotions panel for this event.
               </p>
             </div>
             <EventDiscountsCard eventId={eventID} variant="compact" />

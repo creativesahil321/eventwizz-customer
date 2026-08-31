@@ -258,7 +258,8 @@ export default function CateringTab() {
     if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
 
     return isVendorRoomMenuStepComplete({
-      catering_option: watchedCateringOption,
+      room_id: activeRoomId,
+      catering_option: normalizeCateringOptionFlag(watchedCateringOption),
       menu_title: watchedMenuTitle,
       menu_description: watchedMenuDescription,
       event_menu_category_id: watchedMenuCategoryId,
@@ -267,6 +268,7 @@ export default function CateringTab() {
   }, [
     isRoomsEnabled,
     stepTwoRooms.length,
+    activeRoomId,
     watchedCateringOption,
     watchedMenuTitle,
     watchedMenuDescription,
@@ -608,27 +610,21 @@ export default function CateringTab() {
               : entry,
           );
 
-          const activeRoomIdForSave = Number(
-            stepTwoRoomsForSave[resolvedRoomIndex]?.room_id,
-          );
-          const roomsForApi = applyToAllRooms
-            ? mergedRoomsGlobal
-            : mergedRoomsGlobal.filter(
-                (entry) => entry.room_id === activeRoomIdForSave,
-              );
-
-          cleanedData = {
-            step: 4,
-            event_id: data.event_id,
-            is_rooms: 1,
-            rooms: roomsForApi,
-            catering_option: data.catering_option,
-            menu_title: data.menu_title,
-            menu_description: data.menu_description,
-            event_menu_category_id: data.event_menu_category_id,
-            menus: data.menus,
-            menu_background_image: data.menu_background_image,
-          };
+          cleanedData = applyToAllRooms
+            ? {
+                step: 4,
+                event_id: data.event_id,
+                is_rooms: 1,
+                rooms: mergedRoomsGlobal,
+                ...roomEntryToStepFourFields(activeSnapshot),
+              }
+            : {
+                step: 4,
+                event_id: data.event_id,
+                is_rooms: 1,
+                room_id: activeSnapshot.room_id,
+                ...roomEntryToStepFourFields(activeSnapshot),
+              };
         } else {
           const { rooms: _rooms, ...flatMenu } = data;
           cleanedData = {

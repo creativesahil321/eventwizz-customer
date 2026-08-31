@@ -643,7 +643,7 @@ export default function EventNameTab() {
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="Enter banner heading"
+                          placeholder="Enter a banner heading (max 30 words)"
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                           onFocus={() =>
                             handleFieldFocus("event_banner_heading")
@@ -662,6 +662,10 @@ export default function EventNameTab() {
                           onBlur={field.onBlur}
                         />
                       </FormControl>
+                      <FormDescription>
+                        Shown on the hero banner. Keep it to 30 words or fewer
+                        and no more than 500 characters.
+                      </FormDescription>
                       <p className="text-xs text-muted-foreground mt-1">
                         <span>
                           {wc}/{BANNER_HEADING_MAX_WORDS} words
@@ -684,7 +688,7 @@ export default function EventNameTab() {
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="Enter banner subheading"
+                        placeholder="Enter a short banner supporting line"
                         className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                         onFocus={() =>
                           handleFieldFocus("event_banner_sub_heading")
@@ -699,6 +703,10 @@ export default function EventNameTab() {
                         onBlur={field.onBlur}
                       />
                     </FormControl>
+                    <FormDescription>
+                      Appears over the banner beneath the main heading. Use a
+                      short line that supports the hero message.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -915,7 +923,7 @@ export default function EventNameTab() {
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="Enter your event name"
+                          placeholder="Enter your event name (max 40 characters)"
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB] w-full"
                           onFocus={() => handleFieldFocus("event_name")}
                           onChange={(e) => {
@@ -928,6 +936,10 @@ export default function EventNameTab() {
                           onBlur={field.onBlur} // Important for onBlur validation
                         />
                       </FormControl>
+                      <FormDescription>
+                        This is the event title customers will see throughout
+                        the booking journey. Maximum 40 characters.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1089,6 +1101,10 @@ export default function EventNameTab() {
                   Tell guests what it&apos;s about
                 </h2>
               </div>
+              <p className="text-sm text-gray-500">
+                This content appears below the banner in the event details
+                section. It is separate from the short banner subheading.
+              </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormField

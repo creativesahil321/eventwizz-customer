@@ -24,6 +24,8 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
 import {
   appendVendorStepFourRoomToFormData,
+  appendVendorStepFourSingleRoomToFormData,
+  normalizeCateringOptionFlag,
   type VendorStepFourRoomEntry,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
 import {
@@ -60,6 +62,7 @@ export type StepThreeSavePayload = StepThreeType & {
 
 export type StepFourSavePayload = StepFourType & {
   is_rooms?: 0 | 1;
+  room_id?: number;
   rooms?: VendorStepFourRoomEntry[];
 };
 
@@ -828,14 +831,28 @@ export const eventsService = {
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
 
-    const roomPayload =
-      data.is_rooms === 1 && Array.isArray(data.rooms) && data.rooms.length > 0;
-
-    if (roomPayload) {
+    if (data.is_rooms === 1) {
       formData.append("is_rooms", "1");
-      data.rooms!.forEach((room, roomIndex) => {
-        appendVendorStepFourRoomToFormData(formData, roomIndex, room as VendorStepFourRoomEntry);
-      });
+      if (Array.isArray(data.rooms) && data.rooms.length > 0) {
+        data.rooms.forEach((room, roomIndex) => {
+          appendVendorStepFourRoomToFormData(
+            formData,
+            roomIndex,
+            room as VendorStepFourRoomEntry,
+          );
+        });
+      } else if (Number(data.room_id) > 0) {
+        appendVendorStepFourSingleRoomToFormData(formData, {
+          room_id: Number(data.room_id),
+          catering_option: normalizeCateringOptionFlag(data.catering_option),
+          menu_title: data.menu_title,
+          menu_description: data.menu_description,
+          menus: data.menus,
+          menu_background_image: data.menu_background_image,
+        });
+      } else {
+        throw new Error("A room_id is required for a room catering update.");
+      }
     } else {
       formData.append("is_rooms", "0");
       formData.append("catering_option", data.catering_option.toString());
@@ -846,13 +863,6 @@ export const eventsService = {
       if (data.menu_description) {
         formData.append("menu_description", data.menu_description);
       }
-      if (Number(data.event_menu_category_id) > 0) {
-        formData.append(
-          "event_menu_category_id",
-          String(data.event_menu_category_id),
-        );
-      }
-
       if (data.menus) {
         data.menus.forEach((menu, menuIndex) => {
           formData.append(`menus[${menuIndex}][name]`, menu.name ?? "");

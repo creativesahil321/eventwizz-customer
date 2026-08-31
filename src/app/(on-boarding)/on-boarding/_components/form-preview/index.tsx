@@ -38,8 +38,14 @@ import {
   formatEventHeroDateRange,
   formatEventHeroTimeRange,
 } from "@/lib/event-hero-meta";
+import {
+  formatEventLocationLabel,
+  resolveEventLocation,
+} from "@/lib/event-location";
+import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
+import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import { Image as ImageIcon } from "lucide-react";
-import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { useEventCategories } from "@/services/vendor/events/query";
 import { normalizeSlug } from "@/lib/utils";
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
@@ -102,22 +108,21 @@ function buildDatesPreviewFromStepFive(
   }));
 }
 
-/** String URL for vendor footer override (matches CommonHeader logo resolution). */
-function resolveOnboardingLogoUrl(
-  logo: string | File | null | undefined,
-): string | null {
-  if (logo == null) return null;
-  if (typeof logo === "string") return logo;
-  if (logo instanceof File) {
-    const preview = (logo as File & { preview?: string }).preview;
+/** Resolve a string URL or local preview object for onboarding media. */
+function resolvePreviewAssetUrl(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (value instanceof File) {
+    const preview = (value as File & { preview?: string }).preview;
     return preview ?? null;
   }
   if (
-    typeof logo === "object" &&
-    "preview" in logo &&
-    typeof (logo as { preview?: string }).preview === "string"
+    typeof value === "object" &&
+    value !== null &&
+    "preview" in value &&
+    typeof (value as { preview?: string }).preview === "string"
   ) {
-    return (logo as { preview: string }).preview;
+    return (value as { preview: string }).preview;
   }
   return null;
 }
@@ -172,7 +177,8 @@ export default function FormPreview() {
     setActiveField,
     requestFormFieldFocus,
   } = useFormContext();
-  const currencySymbol = useCurrencySymbol();
+  const { symbol: currencySymbol, formatCompact: formatPriceUnit } =
+    useCurrencyFormat();
   const { data: categoriesResponse } = useEventCategories();
   const eventCategories = categoriesResponse?.data ?? [];
   const [formState, setFormState] = useState<OnboardingFormData>(
@@ -260,17 +266,16 @@ export default function FormPreview() {
 
   const activePreviewBrochureLocation = useMemo(() => {
     const location = activePreviewBrochure?.location;
-    const eventLocation = formState.stepThree;
-    const description =
-      String(eventLocation?.event_address ?? "").trim() ||
-      location?.description ||
-      String(activePreviewBrochure?.event_address ?? "").trim();
+    const eventLocation = resolveEventLocation(
+      formState.stepThree,
+      activePreviewBrochure,
+    );
     return {
-      title: location?.title || (description ? "LOCATION" : ""),
-      description,
-      icon: location?.icon || (description ? "MapPin" : ""),
-      latitude: eventLocation?.latitude ?? activePreviewBrochure?.latitude,
-      longitude: eventLocation?.longitude ?? activePreviewBrochure?.longitude,
+      title: location?.title || (eventLocation.address ? "LOCATION" : ""),
+      description: eventLocation.address,
+      icon: location?.icon || (eventLocation.address ? "MapPin" : ""),
+      latitude: eventLocation.latitude,
+      longitude: eventLocation.longitude,
     };
   }, [activePreviewBrochure, formState.stepThree]);
 
@@ -756,7 +761,7 @@ export default function FormPreview() {
         }
         break;
 
-      case 4: // Event highlights and timeline
+      case 4: // Packages and timeline
         if (activeField.includes("event_schedular")) {
           scrollToElement(timelineRef);
         } else if (activeField.includes("gallery")) {
@@ -956,7 +961,9 @@ export default function FormPreview() {
       ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
       : ONBOARDING_PREVIEW_HEADER_OFFSET;
     const sectionAnchorClass = "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
-    const heroCityLabel = formState.stepOne?.city?.trim() || "";
+    const heroLocationLabel = formatEventLocationLabel(
+      activePreviewBrochureLocation.description,
+    );
     const heroEventLabel =
       formState.stepThree?.event_name?.trim() ||
       formState.stepThree?.event_banner_heading?.trim() ||
@@ -967,6 +974,28 @@ export default function FormPreview() {
     const heroTimeLabel = formatEventHeroTimeRange(
       timelineRows.map((row) => row.time),
     );
+    const heroCategoryLabel =
+      eventCategories
+        .find(
+          (category) =>
+            Number(category.id) ===
+            Number(formState.stepThree?.event_category_id),
+        )
+        ?.name?.trim() || "";
+    const brochureFromPrice = lowestBookableFromPrice({
+      datePrices: datesPreviewItems.map((date) => date.price),
+      packagePrices: (activePreviewDrinks?.packages ?? []).map(
+        (pkg) => pkg.price,
+      ),
+    });
+    const aboutHighlights = buildEventAboutHighlights({
+      occasion: heroCategoryLabel,
+      dates: heroDateLabel,
+      time: heroTimeLabel,
+      location: heroLocationLabel || null,
+      fromPrice: brochureFromPrice,
+      formatPrice: formatPriceUnit,
+    });
 
     const menuBackgroundImage = resolvePreviewMenuBackground(
       activePreviewCatering,
@@ -1016,13 +1045,15 @@ export default function FormPreview() {
             headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
             breadcrumbs={[
               { label: "Home" },
-              ...(heroCityLabel ? [{ label: heroCityLabel }] : []),
+              ...(heroLocationLabel
+                ? [{ label: heroLocationLabel }]
+                : []),
               { label: heroEventLabel },
             ]}
             meta={{
               date: heroDateLabel,
               time: heroTimeLabel,
-              location: heroCityLabel || null,
+              location: heroLocationLabel || null,
             }}
             onEditHero={() =>
               jumpToEditor({ step: 3, field: "event_banner_heading" })
@@ -1084,6 +1115,13 @@ export default function FormPreview() {
                 about_event_description={
                   formState.stepThree?.about_event_description || ""
                 }
+                eventImage={resolvePreviewAssetUrl(
+                  formState.stepThree?.event_banner_image,
+                )}
+                imageAlt={
+                  heroEventLabel ? `${heroEventLabel} event` : "Event image"
+                }
+                highlights={aboutHighlights}
                 headingEmphasis={
                   tryHeroPreviewProps?.headingEmphasis ?? undefined
                 }
@@ -1160,7 +1198,7 @@ export default function FormPreview() {
           </div>
         )}
 
-        {/* Event highlights — hide empty shell (matches live: only real content) */}
+        {/* Packages — hide empty shell (matches live: only real content) */}
         {hasPackagePreview ? (
           <div
             id={EVENT_SECTION_IDS.packages}
@@ -1173,7 +1211,7 @@ export default function FormPreview() {
             <PreviewEditHit
               step={4}
               field="package_title"
-              label="Event highlights"
+              label="Packages & Gallery"
               onEdit={jumpToEditor}
             >
               <Suspense fallback={<SectionLoader />}>
@@ -1378,7 +1416,7 @@ export default function FormPreview() {
         </div>
 
         <FooterSection
-          logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
+          logo={resolvePreviewAssetUrl(formState.stepTwo?.logo)}
           copyright={tryThemePreviewValues?.copyright ?? undefined}
           contactOverride={onboardingFooterContact}
           socialLinksOverride={onboardingFooterSocialLinks}

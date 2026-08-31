@@ -7,13 +7,22 @@ import { writeVendorEventIsRoomsFlag } from "../_lib/vendor-event-is-rooms";
 import { FormProvider } from "../_components/events-form-provider";
 import TabEventForm from "../_components/tab-event-form";
 import AIEventCreationFlow from "../_components/ai-event-creation";
+import EventUrlImportFlow from "../_components/event-url-import/index";
 import { resolveAiDraftEventId } from "../_lib/ai-event-draft-storage";
 import { motion } from "framer-motion";
-import { Sparkles, PenTool, ArrowRight, Clock, Zap, CheckCircle2 } from "lucide-react";
+import {
+  Sparkles,
+  PenTool,
+  Globe,
+  ArrowRight,
+  Clock,
+  Zap,
+  CheckCircle2,
+} from "lucide-react";
 import { useLocationStore } from "@/store/location.store";
 import { resolveVenueLocationAddress, resolveVenueLocationCoords } from "@/lib/venue-location-address";
 
-type CreateMode = "selecting" | "ai" | "manual";
+type CreateMode = "selecting" | "ai" | "manual" | "import";
 
 const accent = {
   text: { color: "var(--color-primary, #3b82f6)" } as React.CSSProperties,
@@ -70,7 +79,16 @@ export default function CreateEventClientWrapper() {
   if (mode === "manual") {
     return (
       <FormProvider serverData={null}>
-        <TabEventForm />
+        <div className="space-y-4">
+          <div className="rounded-lg border border-[#D6ECEF] bg-[#F7FCFC] px-4 py-3 text-sm text-[#0B6A75]">
+            <p className="font-semibold">Planning a promotion?</p>
+            <p className="mt-1 text-xs leading-relaxed">
+              Save the event first, then add discounts or coupon codes from the
+              Promotions panel in the event editor.
+            </p>
+          </div>
+          <TabEventForm />
+        </div>
       </FormProvider>
     );
   }
@@ -87,6 +105,17 @@ export default function CreateEventClientWrapper() {
         <AIEventCreationFlow
           onComplete={handleAIComplete}
           onSwitchToManual={handleSwitchToManual}
+          venueInfo={venueInfo}
+        />
+      </div>
+    );
+  }
+
+  if (mode === "import") {
+    return (
+      <div className={fullBleedClass}>
+        <EventUrlImportFlow
+          onComplete={handleAIComplete}
           venueInfo={venueInfo}
         />
       </div>
@@ -112,15 +141,16 @@ function ModeSelection({ onSelect }: { onSelect: (mode: CreateMode) => void }) {
           </div>
 
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 sm:mb-3 tracking-tight px-1">
-            How would you like to <span style={accent.gradient}>create your event?</span>
+            Choose how to <span style={accent.gradient}>start your event</span>
           </h1>
           <p className="text-slate-400 text-sm max-w-md mx-auto px-1">
-            Choose AI to auto-generate all content in seconds, or manual for full control.
+            Start with AI assistance or build everything yourself. You can
+            import an existing event below.
           </p>
         </motion.div>
 
         {/* Cards — extra bottom space so FABs don't cover CTAs on mobile */}
-        <div className="mb-8 grid grid-cols-1 gap-3 sm:mb-0 sm:gap-4 md:grid-cols-2">
+        <div className="mx-auto mb-6 grid max-w-2xl grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           {/* AI Card */}
           <motion.button
             initial={{ opacity: 0, y: 20 }}
@@ -199,6 +229,22 @@ function ModeSelection({ onSelect }: { onSelect: (mode: CreateMode) => void }) {
               </span>
             </div>
           </motion.button>
+        </div>
+
+        <div className="flex flex-col items-center justify-center gap-2 text-center">
+          <button
+            type="button"
+            onClick={() => onSelect("import")}
+            className="group inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-white/25 hover:bg-white/[0.06] hover:text-white"
+          >
+            <Globe className="h-4 w-4 text-sky-300" />
+            Import an existing event from URL
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
+          <p className="max-w-md text-xs text-slate-500">
+            Paste one public event page, review the extracted details, then
+            continue editing it in the normal event editor.
+          </p>
         </div>
     </div>
   );

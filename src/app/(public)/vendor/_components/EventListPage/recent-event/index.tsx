@@ -75,7 +75,7 @@ export default function RecentEventsGlimpse({
   };
 
   return (
-    <section className="py-20 md:py-28 px-4 bg-transparent">
+    <section className="bg-transparent px-4 py-16 md:py-28">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">

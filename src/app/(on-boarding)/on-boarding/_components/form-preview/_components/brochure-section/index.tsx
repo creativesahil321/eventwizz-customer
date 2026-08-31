@@ -96,7 +96,7 @@ export default function BrochureSection({
     title: location?.title || "LOCATION",
     description:
       location?.description ||
-      "Enter your venue address in the form to display here",
+      "Enter your event address in the form to display here",
     icon: location?.icon || "MapPin",
     latitude: location?.latitude || null,
     longitude: location?.longitude || null,
@@ -137,8 +137,8 @@ export default function BrochureSection({
           <section className="w-full overflow-hidden rounded-md">
             <LocationMap
               address={defaultLocation.description}
-              latitude={location.latitude}
-              longitude={location.longitude}
+              latitude={defaultLocation.latitude}
+              longitude={defaultLocation.longitude}
               className="h-full w-full"
               showMapImmediately={showMapImmediately}
             />

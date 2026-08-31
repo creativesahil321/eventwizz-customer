@@ -5,6 +5,7 @@ import { MapPin, Navigation } from "lucide-react";
 import { env } from "@/env";
 import { Button } from "@/components/ui";
 import { isLondonDefaultPin } from "@/lib/london-default-coords";
+import { buildEventDirectionsUrl } from "@/lib/event-location";
 
 interface LocationMapProps {
   address?: string;
@@ -19,6 +20,13 @@ interface MapLocation {
   address: string;
   latitude: number;
   longitude: number;
+}
+
+function parseCoordinate(value: number | string | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  const coordinate =
+    typeof value === "number" ? value : Number.parseFloat(String(value));
+  return Number.isFinite(coordinate) ? coordinate : null;
 }
 
 export default function LocationMap({
@@ -41,6 +49,14 @@ export default function LocationMap({
   const globalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef<number>(0);
   const maxRetries = 3;
+  const parsedLatitude = parseCoordinate(latitude);
+  const parsedLongitude = parseCoordinate(longitude);
+  const hasEventLocationTarget = Boolean(
+    address.trim() ||
+      (parsedLatitude != null &&
+        parsedLongitude != null &&
+        !isLondonDefaultPin(latitude, longitude)),
+  );
 
   const initializeMapWithCenter = useCallback(
     (center: { lat: number; lng: number }, address: string) => {
@@ -198,26 +214,32 @@ export default function LocationMap({
       const defaultCenter = { lat: 54.7024, lng: -3.2766 };
       let mapCenter = defaultCenter;
       let mapAddress = "";
-      const vendorAddress = address.trim();
+      const eventAddress = address.trim();
+      const parsedLatitude = parseCoordinate(latitude);
+      const parsedLongitude = parseCoordinate(longitude);
+      const hasStoredCoordinates =
+        parsedLatitude != null && parsedLongitude != null;
 
       // Classic platform placeholder pin must not override a real venue address.
       const trustStoredCoords =
-        Boolean(latitude && longitude) &&
+        hasStoredCoordinates &&
         !isLondonDefaultPin(latitude, longitude);
+
+      if (!trustStoredCoords && !eventAddress) {
+        setCurrentLocation(null);
+        setError("Event location is not available yet.");
+        setIsLoading(false);
+        return;
+      }
 
       // Prefer trustworthy coords; otherwise geocode the written address.
       if (trustStoredCoords) {
-        const lat =
-          typeof latitude === "string" ? parseFloat(latitude) : Number(latitude);
-        const lng =
-          typeof longitude === "string"
-            ? parseFloat(longitude)
-            : Number(longitude);
-
-        if (!isNaN(lat) && !isNaN(lng)) {
+        if (parsedLatitude != null && parsedLongitude != null) {
+          const lat = parsedLatitude;
+          const lng = parsedLongitude;
           mapCenter = { lat, lng };
           mapAddress =
-            vendorAddress ||
+            eventAddress ||
             `Location (${lat.toFixed(6)}, ${lng.toFixed(6)})`;
 
           console.log("🗺️ Using coordinates:", {
@@ -226,9 +248,9 @@ export default function LocationMap({
             address: mapAddress,
           });
 
-          // Keep the venue's written address; reverse-geocode only fills a gap.
-          if (vendorAddress) {
-            initializeMapWithCenter(mapCenter, vendorAddress);
+          // Keep the event's written address; reverse-geocode only fills a gap.
+          if (eventAddress) {
+            initializeMapWithCenter(mapCenter, eventAddress);
             return;
           }
 
@@ -253,40 +275,48 @@ export default function LocationMap({
       }
 
       // No trustworthy coords (missing, invalid, or London placeholder) — geocode address
-      if (vendorAddress) {
-        console.log("🗺️ Geocoding address:", address);
+      if (eventAddress) {
+        console.log("🗺️ Geocoding event address:", eventAddress);
         const geocoderInstance = new google.maps.Geocoder();
 
         // Add timeout for address geocoding too
         const addressTimeout = setTimeout(() => {
-          console.log("🗺️ Address geocoding timeout, using default center");
-          initializeMapWithCenter(mapCenter, address);
+          console.log("🗺️ Address geocoding timed out");
+          setCurrentLocation(null);
+          setError("This event address could not be located on the map.");
+          setIsLoading(false);
         }, 3000);
 
-        geocoderInstance.geocode({ address: address }, (results, status) => {
-          clearTimeout(addressTimeout);
-          console.log("🗺️ Address geocoding result:", {
-            status,
-            results: results?.length,
-          });
+        geocoderInstance.geocode(
+          { address: eventAddress },
+          (results, status) => {
+            clearTimeout(addressTimeout);
+            console.log("🗺️ Address geocoding result:", {
+              status,
+              results: results?.length,
+            });
 
-          if (status === "OK" && results && results[0]) {
-            const location = results[0].geometry.location;
-            mapCenter = { lat: location.lat(), lng: location.lng() };
-            console.log(
-              "🗺️ Address geocoded successfully:",
-              results[0].formatted_address,
-            );
-            initializeMapWithCenter(mapCenter, results[0].formatted_address);
-          } else {
-            console.log("🗺️ Address geocoding failed, using default center");
-            // If geocoding fails, use default center
-            initializeMapWithCenter(mapCenter, address);
-          }
-        });
+            if (status === "OK" && results && results[0]) {
+              const location = results[0].geometry.location;
+              mapCenter = { lat: location.lat(), lng: location.lng() };
+              console.log(
+                "🗺️ Address geocoded successfully:",
+                results[0].formatted_address,
+              );
+              initializeMapWithCenter(mapCenter, results[0].formatted_address);
+            } else {
+              console.log("🗺️ Address geocoding failed");
+              setCurrentLocation(null);
+              setError("This event address could not be located on the map.");
+              setIsLoading(false);
+            }
+          },
+        );
       } else {
-        console.log("🗺️ No address provided, using default center");
-        initializeMapWithCenter(mapCenter, "");
+        console.log("🗺️ No event location provided");
+        setCurrentLocation(null);
+        setError("Event location is not available yet.");
+        setIsLoading(false);
       }
     } catch (err) {
       console.error("🗺️ Error initializing map:", err);
@@ -390,10 +420,22 @@ export default function LocationMap({
 
   // Re-initialize map when address or coordinates change
   useEffect(() => {
-    if (mapInstanceRef.current && (address.trim() || latitude || longitude)) {
+    if (!hasEventLocationTarget) {
+      setCurrentLocation(null);
+      setError("Event location is not available yet.");
+      setIsLoading(false);
+      return;
+    }
+    if (mapInstanceRef.current) {
       initializeMap();
     }
-  }, [address, latitude, longitude, initializeMap]);
+  }, [
+    address,
+    latitude,
+    longitude,
+    hasEventLocationTarget,
+    initializeMap,
+  ]);
 
   return (
     <div
@@ -402,14 +444,19 @@ export default function LocationMap({
       {/* Event Location Header */}
       {/* Address Overlay - Only show when map is loaded and location exists */}
       {mapLoaded && currentLocation && !isLoading && !error && (
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-red-600 flex-shrink-0" />
-          <p className="text-xs text-[var(--color-text-dimmed)] mt-1">
-            Event location
-          </p>
-          <p className="text-xs text-[var(--color-text-primary)] font-medium truncate">
-            {currentLocation?.address}
-          </p>
+        <div className="flex min-w-0 items-start gap-2 pb-2">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+          <div className="min-w-0">
+            <p className="text-xs text-[var(--color-text-dimmed)]">
+              Event location
+            </p>
+            <p
+              className="max-w-full break-words text-xs font-medium leading-relaxed text-[var(--color-text-primary)] [overflow-wrap:anywhere]"
+              title={currentLocation.address}
+            >
+              {currentLocation.address}
+            </p>
+          </div>
         </div>
       )}
       {/* Map Container */}
@@ -424,14 +471,20 @@ export default function LocationMap({
               <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase text-[var(--color-primary-foreground)]">
                 EVENT LOCATION
               </h2>
-              <p className="text-sm pb-2 text-[var(--color-primary-foreground)]">{address}</p>
+              <p
+                className="max-w-full break-words px-4 pb-2 text-sm leading-relaxed text-[var(--color-primary-foreground)] [overflow-wrap:anywhere]"
+                title={address || undefined}
+              >
+                {address || "Add an event address to enable directions"}
+              </p>
 
               <Button
                 variant="event-outline"
                 type="button"
                 onClick={() => setMapLoaded(true)}
+                disabled={!hasEventLocationTarget}
               >
-                Get directions
+                {hasEventLocationTarget ? "View map & directions" : "Directions unavailable"}
               </Button>
             </div>
           </div>
@@ -459,8 +512,8 @@ export default function LocationMap({
             <div className="flex flex-col items-center gap-2 text-center p-4">
               <MapPin className="h-8 w-8 text-[var(--color-primary-foreground)]" />
               <p className="text-[var(--color-primary-foreground)] text-sm">{error}</p>
-              <p className="text-[var(--color-primary-foreground)] text-xs">
-                {address || "No address provided"}
+              <p className="max-w-full break-words text-[var(--color-primary-foreground)] text-xs [overflow-wrap:anywhere]">
+                {address || "No event location has been provided"}
               </p>
             </div>
           </div>
@@ -473,12 +526,14 @@ export default function LocationMap({
             <button
               type="button"
               onClick={() => {
-                const lat = currentLocation.latitude;
-                const lng = currentLocation.longitude;
-
-                // Open Google Maps with directions
-                const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=&travelmode=driving`;
-                window.open(directionsUrl, "_blank", "noopener,noreferrer");
+                const directionsUrl = buildEventDirectionsUrl({
+                  address: currentLocation.address,
+                  latitude: currentLocation.latitude,
+                  longitude: currentLocation.longitude,
+                });
+                if (directionsUrl) {
+                  window.open(directionsUrl, "_blank", "noopener,noreferrer");
+                }
               }}
               className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md shadow-lg text-xs font-medium transition-colors"
               title="Get directions to this location"
@@ -535,7 +590,7 @@ export default function LocationMap({
               <p className="text-sm font-medium text-[var(--color-primary-foreground)]">
                 EVENT LOCATION
               </p>
-              <p className="text-xs text-center px-4 text-[var(--color-primary-foreground)]">
+              <p className="max-w-full break-words px-4 text-center text-xs text-[var(--color-primary-foreground)] [overflow-wrap:anywhere]">
                 {address ||
                   "Enter your event address in the form to display here"}
               </p>

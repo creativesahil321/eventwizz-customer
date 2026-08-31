@@ -146,7 +146,7 @@ export const AI_ONBOARDING_APPLY_STEPS = [
   { label: "Venue info", icon: "🏛️" },
   { label: "Landing page", icon: "🎨" },
   { label: "Event details & location", icon: "📍" },
-  { label: "Event highlights, timeline & gallery", icon: "📦" },
+  { label: "Packages, timeline & gallery", icon: "📦" },
   { label: "Dates, tickets & tables", icon: "🎟️" },
   { label: "Catering & menu", icon: "🍽️" },
   { label: "Brochure & pricing", icon: "📄" },

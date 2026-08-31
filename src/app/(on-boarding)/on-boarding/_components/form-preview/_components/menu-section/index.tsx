@@ -52,7 +52,7 @@ function menuGridClass(
     case 3:
       return cn(
         "grid-cols-1 lg:grid-cols-3",
-        "@max-lg/preview:!grid-cols-1",
+        "@max-5xl/preview:!grid-cols-1",
       );
     case 4:
     default:

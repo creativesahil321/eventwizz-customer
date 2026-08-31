@@ -57,6 +57,12 @@ export interface AIEventInput {
   room_names?: string[];
   /** Existing venue room ids when user picked rooms in AI create (multiselect). */
   selected_room_ids?: number[];
+  /** Optional source-to-venue room mapping used by URL imports. */
+  room_mappings?: Array<{
+    source_name: string;
+    room_id?: number;
+    target_name?: string;
+  }>;
 }
 
 export type { AIEventRoomPackage, AIEventRoomMenu, AIEventRoomBrochure };

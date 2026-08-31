@@ -107,7 +107,7 @@ export function LocationEventCard({
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col px-3.5 py-3.5">
+      <div className="flex flex-1 flex-col p-4 md:p-5">
         <h3
           className="line-clamp-2 text-left text-sm font-bold leading-snug text-[var(--color-text)] transition-colors duration-300 group-hover:text-[color:var(--color-primary)] md:text-[15px]"
           style={{ fontFamily: "var(--font-heading)" }}
@@ -139,7 +139,7 @@ export function LocationEventCard({
           </p>
         ) : null}
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+        <div className="mt-auto flex items-center justify-between gap-2 pt-4">
           {fromPrice ? (
             <span className="text-[13px] font-medium text-[var(--color-text)]">
               {fromPrice}

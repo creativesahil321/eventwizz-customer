@@ -16,6 +16,7 @@ import {
   resolveRoomThumbnailUrl,
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
+import { resolveEventLocation } from "@/lib/event-location";
 
 export type VendorPreviewRoomRef = {
   room_id: number;
@@ -229,6 +230,8 @@ export type VendorPreviewActiveSlices = {
   drinks: PreviewDrinksSlice | null;
   brochure: PreviewBrochureSlice | null;
   eventAddress: string;
+  eventLatitude: number | null;
+  eventLongitude: number | null;
 };
 
 export function resolveVendorPreviewActiveSlices(
@@ -265,6 +268,7 @@ export function resolveVendorPreviewActiveSlices(
     const s1 = data.stepOne;
     const s5 = data.stepFive;
     const s6 = data.stepSix;
+    const eventLocation = resolveEventLocation(s1, s5, data.stepEight);
     return {
       roomMode: false,
       rooms: [],
@@ -291,10 +295,12 @@ export function resolveVendorPreviewActiveSlices(
         ? {
             brochure_pdf: s5.brochure_pdf,
             brochure_pdf_2: s5.brochure_pdf_2,
-            event_address: s1?.event_address || s5.event_address,
+            event_address: eventLocation.address,
           }
         : null,
-      eventAddress: String(s1?.event_address || s5?.event_address || "").trim(),
+      eventAddress: eventLocation.address,
+      eventLatitude: eventLocation.latitude,
+      eventLongitude: eventLocation.longitude,
     };
   }
 
@@ -310,9 +316,21 @@ export function resolveVendorPreviewActiveSlices(
   const drinksPayload = pickRoomPayload(data.stepSix as RoomKeyedStep, activeRoom);
 
   const stepOneRoot = data.stepOne as
-    | { event_address?: string }
+    | {
+        event_address?: string;
+        latitude?: number | string | null;
+        longitude?: number | string | null;
+        lat?: number | string | null;
+        long?: number | string | null;
+      }
     | undefined;
   const stepFiveRoot = data.stepFive as { event_address?: string } | undefined;
+  const eventLocation = resolveEventLocation(
+    stepOneRoot,
+    brochurePayload,
+    stepFiveRoot,
+    data.stepEight,
+  );
 
   return {
     roomMode: true,
@@ -368,13 +386,11 @@ export function resolveVendorPreviewActiveSlices(
             typeof brochurePayload.brochure_pdf_2 === "string"
               ? brochurePayload.brochure_pdf_2
               : null,
-          event_address: String(
-            stepOneRoot?.event_address || stepFiveRoot?.event_address || "",
-          ).trim(),
+          event_address: eventLocation.address,
         }
       : null,
-    eventAddress: String(
-      stepOneRoot?.event_address || stepFiveRoot?.event_address || "",
-    ).trim(),
+    eventAddress: eventLocation.address,
+    eventLatitude: eventLocation.latitude,
+    eventLongitude: eventLocation.longitude,
   };
 }

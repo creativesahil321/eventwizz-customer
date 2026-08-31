@@ -32,13 +32,8 @@ import {
   type HeadingEmphasis,
 } from "@/lib/heading-emphasis";
 import {
-  heroBandContentPadClass,
-  heroBandCopyPlacementClass,
   heroBandHeightClass,
   heroBandMediaOverlayClass,
-  heroBannerBodyClass,
-  heroBannerEyebrowClass,
-  heroBannerStackClass,
   heroHeadingMeasureClass,
   heroHomeHeadingTypeClass,
 } from "@/lib/banner-heading-align";
@@ -271,9 +266,6 @@ export function VendorMainLandingView({
     clearFilters();
   };
 
-  const heroAlign = "center" as const;
-  const heroValign = "center" as const;
-
   /**
    * Single emphasis source for every heading on this page (hero + section titles
    * + newsletter). Section headings previously read `useTheme()` independently,
@@ -316,25 +308,21 @@ export function VendorMainLandingView({
           <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
         </div>
 
-        <div
-          className={cn(
-            heroBandCopyPlacementClass(heroValign),
-            "min-w-0 max-w-[1180px] px-3 sm:px-6",
-            heroHeadingMeasureClass,
-            heroBandContentPadClass(heroValign, { withBottomChrome: true }),
-          )}
-        >
+        <div className="absolute inset-0 z-10 mx-auto flex min-w-0 w-full max-w-[1180px] flex-col items-center justify-center px-3 py-16 text-center sm:px-6 sm:py-20">
           <motion.div
             initial={{ y: 28, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
-              heroBannerStackClass(heroAlign),
-              "min-h-0 w-full max-h-full min-w-0",
+              "flex w-full min-w-0 max-w-full flex-col items-center gap-2.5 text-center sm:gap-4",
+              "@max-md/preview:!gap-2.5",
+              heroHeadingMeasureClass,
             )}
           >
             {citiesEyebrow ? (
-              <p className={heroBannerEyebrowClass(heroAlign)}>{citiesEyebrow}</p>
+              <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70 sm:text-xs">
+                {citiesEyebrow}
+              </p>
             ) : null}
 
             <SiteHeading
@@ -343,14 +331,16 @@ export function VendorMainLandingView({
               accentHint={heroAccentHint}
               emphasis={resolvedHeadingEmphasis}
               variant="onDark"
-              align={heroAlign}
+              align="center"
               className={cn(
                 "w-full max-w-5xl font-bold",
                 heroHomeHeadingTypeClass,
               )}
             />
 
-            <p className={heroBannerBodyClass(heroAlign)}>{heroSubheading}</p>
+            <p className="mx-auto w-full max-w-2xl text-center text-sm leading-relaxed text-white/85 sm:text-base">
+              {heroSubheading}
+            </p>
           </motion.div>
         </div>
 

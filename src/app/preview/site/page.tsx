@@ -1100,8 +1100,8 @@ export default function SitePreviewPage() {
         </div>
 
         <div
-          className={cn(
-            "min-h-screen w-full min-w-0 transition-opacity duration-200 ease-out",
+            className={cn(
+              "min-h-screen w-full min-w-0 transition-opacity duration-200 ease-out",
             isLocationSwapPending && "opacity-80",
           )}
         >

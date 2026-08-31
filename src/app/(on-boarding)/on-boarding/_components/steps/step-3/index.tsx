@@ -9,6 +9,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -793,7 +794,7 @@ export default function StepThree() {
                           <FormControl>
                             <Input
                               className="h-11 bg-white/5 border-white/10"
-                              placeholder="Enter banner heading"
+                              placeholder="Enter a banner heading (max 30 words)"
                               {...field}
                               value={
                                 typeof field.value === "string"
@@ -816,6 +817,10 @@ export default function StepThree() {
                               }}
                             />
                           </FormControl>
+                          <FormDescription>
+                            Shown on the hero banner. Keep it to 30 words or
+                            fewer and no more than 500 characters.
+                          </FormDescription>
                           <div className="text-xs text-muted-foreground mt-1">
                             <span>
                               {headingWordCount}/{BANNER_HEADING_MAX_WORDS}{" "}
@@ -842,7 +847,7 @@ export default function StepThree() {
                           <FormControl>
                             <Input
                               className="h-11 bg-white/5 border-white/10"
-                              placeholder="Enter banner subheading"
+                              placeholder="Enter a short banner supporting line"
                               {...field}
                               value={
                                 typeof field.value === "string"
@@ -862,6 +867,10 @@ export default function StepThree() {
                               }}
                             />
                           </FormControl>
+                          <FormDescription>
+                            Appears over the banner beneath the main heading.
+                            Use a short line that supports the hero message.
+                          </FormDescription>
                           <div className="text-xs text-muted-foreground mt-1">
                             <span
                               className={
@@ -1095,7 +1104,8 @@ export default function StepThree() {
                   )}
                 >
                   <p className="-mt-2 mb-4 text-sm text-muted-foreground">
-                    Tell guests what your event is about.
+                    This content appears below the banner in the event details
+                    section. It is separate from the short banner subheading.
                   </p>
 
                   {/* Title */}
@@ -1289,7 +1299,7 @@ export default function StepThree() {
                             </FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="e.g. Christmas Events 2026"
+                                placeholder="Enter your event name (max 40 characters)"
                                 {...field}
                                 value={
                                   typeof field.value === "string"
@@ -1309,7 +1319,8 @@ export default function StepThree() {
                             </FormControl>
                             <div className="text-xs text-muted-foreground mt-1">
                               <p className="mb-1">
-                                e.g. Christmas Events 2026
+                                This is the event title customers will see
+                                throughout the booking journey.
                               </p>
                               <span
                                 className={
@@ -1507,6 +1518,7 @@ export default function StepThree() {
                 allSectionsApproved={guided.allSectionsApproved}
                 hasInput={guided.currentSectionHasInput}
                 loading={loading}
+                onEditAll={() => guided.handleUnlockSection(0)}
                 onContinue={() => void handleContinue()}
                 className="order-5"
               />

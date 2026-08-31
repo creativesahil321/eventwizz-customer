@@ -58,13 +58,14 @@ import {
   getNearestScrollContainer,
 } from "@/components/public/event-section-nav";
 import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
-import { slugToShortLabel } from "@/lib/slug-short-label";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
   formatEventHeroDateRange,
   formatEventHeroTimeRange,
   readEventCategoryLabel,
 } from "@/lib/event-hero-meta";
+import { formatEventLocationLabel } from "@/lib/event-location";
+import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
@@ -353,7 +354,6 @@ export function EventPreview({
   const s1 = data.stepOne;
   const s2 = data.stepTwo;
   const s7 = data.stepSeven;
-  const s8 = data.stepEight;
 
   const activePackage = slices.roomMode ? slices.package : s2;
   const activeMenu = slices.roomMode ? slices.menu : data.stepFour;
@@ -481,14 +481,7 @@ export function EventPreview({
     String(activePackage?.event_schedular_title ?? "").trim().length > 0 ||
     timelineRows.length > 0;
 
-  const heroCityLabel = (() => {
-    const slug = footerLocationSlug?.trim();
-    if (!slug) return null;
-    const fromLocations = siteEssentials?.locations
-      ?.find((loc) => loc.slug?.trim() === slug)
-      ?.city?.trim();
-    return fromLocations || slugToShortLabel(slug);
-  })();
+  const eventLocationLabel = formatEventLocationLabel(slices.eventAddress);
   const heroCategoryLabel = readEventCategoryLabel({
     ...s1,
     category_name: s1?.category_name,
@@ -499,6 +492,14 @@ export function EventPreview({
   const heroTimeLabel = formatEventHeroTimeRange(
     timelineRows.map((row) => row.time),
   );
+  const aboutHighlights = buildEventAboutHighlights({
+    occasion: heroCategoryLabel,
+    dates: heroDateLabel,
+    time: heroTimeLabel,
+    location: eventLocationLabel || null,
+    fromPrice: brochureAmount,
+    formatPrice: formatMoney,
+  });
 
   const showGallery = (galleryImages?.length ?? 0) > 0;
   const showPackages = Boolean(
@@ -539,29 +540,9 @@ export function EventPreview({
     : ONBOARDING_PREVIEW_HEADER_OFFSET;
   const sectionAnchorClass = "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
 
-  const brochureAddress =
-    s1?.event_address ||
-    slices.eventAddress ||
-    activeBrochure?.event_address ||
-    data.stepFive?.event_address ||
-    "";
-
-  const brochureLat =
-    s1?.lat ??
-    s1?.latitude ??
-    data.lat ??
-    data.stepFive?.lat ??
-    data.stepFive?.latitude ??
-    s8?.latitude ??
-    null;
-  const brochureLng =
-    s1?.long ??
-    s1?.longitude ??
-    data.long ??
-    data.stepFive?.long ??
-    data.stepFive?.longitude ??
-    s8?.longitude ??
-    null;
+  const brochureAddress = slices.eventAddress;
+  const brochureLat = slices.eventLatitude;
+  const brochureLng = slices.eventLongitude;
 
   return (
     <CartConflictProvider>
@@ -649,14 +630,16 @@ export function EventPreview({
             imageAlt={eventName}
             breadcrumbs={[
               { label: "Home" },
-              ...(heroCityLabel ? [{ label: heroCityLabel }] : []),
+              ...(eventLocationLabel
+                ? [{ label: eventLocationLabel }]
+                : []),
               { label: eventName },
             ]}
             categoryLabel={heroCategoryLabel}
             meta={{
               date: heroDateLabel,
               time: heroTimeLabel,
-              location: heroCityLabel,
+              location: eventLocationLabel,
             }}
           />
         </div>
@@ -675,6 +658,9 @@ export function EventPreview({
             about_event_heading={s1?.about_event_heading || ""}
             about_event_sub_heading={s1?.about_event_sub_heading || ""}
             about_event_description={s1?.about_event_description || ""}
+            eventImage={bannerImage || null}
+            imageAlt={eventName ? `${eventName} event` : "Event image"}
+            highlights={aboutHighlights}
             headingEmphasis={headingEmphasisForHero}
             aboutHeadingAccentHint={heroAccentHint}
           />

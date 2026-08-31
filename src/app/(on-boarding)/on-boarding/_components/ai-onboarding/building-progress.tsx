@@ -35,7 +35,7 @@ const WRITING_ACTIVITIES = [
   "Writing your venue story",
   "Drafting landing page copy",
   "Shaping event details",
-  "Building event highlights and timeline",
+  "Building packages and timeline",
   "Preparing menus and tickets",
   "Writing brochure copy and FAQs",
 ] as const;

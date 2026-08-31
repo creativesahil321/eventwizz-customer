@@ -857,9 +857,14 @@ export default function AICollectInfo({
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
                 <Building2 className="w-4 h-4" style={themeAccent.text} />
-                Do you have multiple event spaces (room system)?{" "}
+                Does your venue use multiple rooms or areas?{" "}
                 <span className="text-red-400">*</span>
               </label>
+              <p className="mb-3 text-xs leading-relaxed text-slate-500">
+                Choose Yes when rooms need different packages, dates, menus,
+                drinks, or brochures. Choose No for one shared setup across
+                the venue.
+              </p>
               {roomSystemLocked ? (
                 <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300">
                   Using your saved room system preference:{" "}

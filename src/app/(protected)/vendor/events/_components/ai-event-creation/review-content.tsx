@@ -40,6 +40,11 @@ import {
 } from "../../_lib/ai-event-vendor-intent";
 import { AIEventApplyOverlay } from "./ai-event-apply-overlay";
 import { toast } from "sonner";
+import type {
+  EventImportAssets,
+  EventImportSectionId,
+} from "@/app/api/ai/import-event/types";
+import EventImportAssetPicker from "../event-url-import/import-asset-picker";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
@@ -78,6 +83,11 @@ interface ReviewContentProps {
   onComplete: (eventId: number, isRooms: boolean) => void;
   onRegenerate: () => void;
   onBack: () => void;
+  sourceAssets?: EventImportAssets;
+  onSourceAssetsChange?: (assets: EventImportAssets) => void;
+  initialRemovedSections?: EventImportSectionId[];
+  preserveMissingSections?: boolean;
+  canApply?: boolean;
 }
 
 export default function AIEventReviewContent({
@@ -87,18 +97,26 @@ export default function AIEventReviewContent({
   onComplete,
   onRegenerate,
   onBack,
+  sourceAssets,
+  onSourceAssetsChange,
+  initialRemovedSections,
+  preserveMissingSections = false,
+  canApply = true,
 }: ReviewContentProps) {
   const [editedContent, setEditedContent] = useState<AIEventGeneratedContent>(
     () => fillAiEventGeneratedDefaults(content, eventInput),
   );
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["stepOne"]));
   const [removedSections, setRemovedSections] = useState<Set<string>>(() =>
-    inferAiEventRemovedSections(
-      parseAiEventVendorIntent(
-        eventInput.eventDescription,
-        eventInput.room_names,
+    new Set([
+      ...inferAiEventRemovedSections(
+        parseAiEventVendorIntent(
+          eventInput.eventDescription,
+          eventInput.room_names,
+        ),
       ),
-    ),
+      ...(initialRemovedSections ?? []),
+    ]),
   );
   const [isApplying, setIsApplying] = useState(false);
   const [applyStep, setApplyStep] = useState(-1);
@@ -164,6 +182,8 @@ export default function AIEventReviewContent({
         eventInput,
         categoryId,
         removedSections,
+        sourceAssets,
+        preserveMissingSections,
         onProgress: setApplyStep,
       });
 
@@ -196,6 +216,13 @@ export default function AIEventReviewContent({
             are ready.
           </p>
         </div>
+
+        {sourceAssets && onSourceAssetsChange ? (
+          <EventImportAssetPicker
+            assets={sourceAssets}
+            onChange={onSourceAssetsChange}
+          />
+        ) : null}
 
         {/* Sections */}
         <div className="space-y-2 sm:space-y-3 mb-6 sm:mb-8">
@@ -346,6 +373,7 @@ export default function AIEventReviewContent({
 
           <Button
             onClick={applyToEvent}
+            disabled={!canApply}
             className="min-h-[44px] h-11 px-6 sm:px-8 rounded-xl text-white font-medium touch-manipulation w-full sm:w-auto"
             style={{ background: "var(--color-primary, #3b82f6)" }}
           >

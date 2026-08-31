@@ -3,7 +3,12 @@
  * TanStack Query hooks for vendor booking management
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useEffect } from "react";
 import { vendorBookingsService } from "./bookings.service";
 import type {
   MenuItemsResponse,
@@ -51,6 +56,25 @@ export const useVendorMenuItems = (
   tableId?: number,
   enabled = true
 ) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Step 4 event saves broadcast this event. Refresh menu definitions when
+    // the vendor returns to an already-open booking menu choices view.
+    const handleEventDataChanged = () => {
+      void queryClient.invalidateQueries({
+        queryKey: vendorBookingsKeys.menuItems(),
+      });
+    };
+
+    window.addEventListener("event-data-changed", handleEventDataChanged);
+    return () => {
+      window.removeEventListener("event-data-changed", handleEventDataChanged);
+    };
+  }, [queryClient]);
+
   return useQuery<MenuItemsResponse>({
     queryKey: vendorBookingsKeys.menuItem(bookingId, date, tableId),
     queryFn: () => {
@@ -60,8 +84,12 @@ export const useVendorMenuItems = (
       return vendorBookingsService.getMenuItems(bookingId, date, tableId);
     },
     enabled: enabled && !!bookingId && !!date && !!tableId,
-    staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh, prevents duplicate calls
+    // Menu definitions can change from the event editor. Do not reuse a
+    // previously fetched definition when the vendor reopens this screen.
+    staleTime: 0,
     gcTime: 10 * 60 * 1000, // 10 minutes - cache persists for switching back
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 };
 

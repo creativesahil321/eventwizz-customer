@@ -678,8 +678,8 @@ export function PreviewThemeCustomizer({
           className={cn(
             "z-[200] flex flex-col gap-0 overflow-hidden bg-white p-0 shadow-xl",
             isCompactViewport
-              ? "!inset-x-0 !top-auto !bottom-36 !h-auto max-h-[min(52dvh,26rem)] w-full max-w-none rounded-t-2xl border-t border-slate-200"
-              : "!inset-y-auto !top-0 !bottom-36 !h-auto !max-h-none w-full max-w-[380px] border-l border-slate-200 sm:max-w-[380px]",
+              ? "!inset-x-0 !top-auto !bottom-[var(--preview-review-chrome-height,9rem)] !h-[min(70dvh,34rem)] !max-h-[calc(100dvh-var(--preview-review-chrome-height,9rem)-env(safe-area-inset-top))] w-full max-w-none rounded-t-2xl border-t border-slate-200"
+              : "!inset-y-auto !top-0 !bottom-[var(--preview-review-chrome-height,9rem)] !h-auto !max-h-none w-full max-w-[380px] border-l border-slate-200 sm:max-w-[380px]",
           )}
           onPointerDownOutside={(e) => e.preventDefault()}
         >
@@ -733,7 +733,7 @@ export function PreviewThemeCustomizer({
             </section>
           ) : null}
 
-          <ScrollArea className="min-h-0 flex-1">
+          <ScrollArea className="min-h-0 flex-1 overflow-hidden">
             <div className="space-y-5 px-4 py-4 pb-8">
               {onSaveTheme || importSlot || (showDiscardChanges && onDiscardChanges) ? (
                 <div className="space-y-3">

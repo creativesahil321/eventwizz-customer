@@ -7,6 +7,7 @@ import {
   pickRoomHighlights,
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
+import { resolveEventLocation } from "@/lib/event-location";
 
 function mapPublicDates(
   dates: DatesSectionType | undefined,
@@ -189,6 +190,8 @@ function roomPayloadAtIndex(
 }
 
 function flatSlicesFromEvent(event: EventDetail): PublicEventActiveSlices {
+  const eventLocation = resolveEventLocation(event);
+
   return {
     roomMode: false,
     rooms: [],
@@ -216,9 +219,9 @@ function flatSlicesFromEvent(event: EventDetail): PublicEventActiveSlices {
     packages: event.packages ?? [],
     brochure_pdf: event.brochure_pdf ?? null,
     brochure_pdf_2: event.brochure_pdf_2 ?? null,
-    event_address: event.event_address ?? null,
-    lat: event.lat ?? null,
-    long: event.long ?? null,
+    event_address: eventLocation.address || null,
+    lat: eventLocation.latitude,
+    long: eventLocation.longitude,
   };
 }
 
@@ -227,6 +230,8 @@ function roomSlicesFromPayload(
   room: PublicEventRoomRef,
   payload: PublicRoomPayload,
 ): PublicEventActiveSlices {
+  const eventLocation = resolveEventLocation(payload, event);
+
   return {
     roomMode: true,
     rooms: listPublicEventRooms(event),
@@ -251,9 +256,9 @@ function roomSlicesFromPayload(
     packages: payload.packages ?? [],
     brochure_pdf: payload.brochure_pdf ?? null,
     brochure_pdf_2: payload.brochure_pdf_2 ?? null,
-    event_address: payload.event_address ?? event.event_address ?? null,
-    lat: payload.lat ?? event.lat ?? null,
-    long: payload.long ?? event.long ?? null,
+    event_address: eventLocation.address || null,
+    lat: eventLocation.latitude,
+    long: eventLocation.longitude,
   };
 }
 

@@ -330,13 +330,40 @@ export default function StepOne() {
       setLocationGateReopened(true);
       return;
     }
+
+    // The AI flow and persistence hydration update the global form first.
+    // Keep the local RHF form in sync before guided/full-step validation so a
+    // hidden location-choice field cannot invalidate an otherwise complete step.
+    if (
+      form.getValues("has_multiple_locations") !== hasMultipleLocations
+    ) {
+      form.setValue("has_multiple_locations", hasMultipleLocations, {
+        shouldValidate: false,
+      });
+    }
+
     if (!guided.allSectionsApproved) {
       const ok = await guided.handleApproveAllSections();
       if (!ok) return;
     }
-    const valid = await form.trigger();
+    const valid = await form.trigger(undefined, { shouldFocus: true });
     if (!valid) {
-      toast.error("Please check the highlighted fields.");
+      const fieldLabels: Record<string, string> = {
+        has_multiple_locations: "location setup choice",
+        name: "venue or brand name",
+        contact_number: "contact number",
+        email: "email",
+        address: "address",
+        city: "city",
+      };
+      const invalidFields = Object.keys(form.formState.errors)
+        .map((field) => fieldLabels[field] ?? field)
+        .join(", ");
+      toast.error(
+        invalidFields
+          ? `Please check: ${invalidFields}.`
+          : "Please check the highlighted fields.",
+      );
       return;
     }
     await persistStepOne(form.getValues());
@@ -697,6 +724,7 @@ export default function StepOne() {
                     allSectionsApproved={guided.allSectionsApproved}
                     hasInput={guided.currentSectionHasInput}
                     loading={loading}
+                    onEditAll={() => guided.handleUnlockSection(0)}
                     onContinue={handleContinue}
                     continueDisabled={brandNameTaken}
                   />

@@ -228,6 +228,8 @@ export interface EventDetailRoom {
   event_address?: string | null;
   lat?: string | number | null;
   long?: string | number | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
   brochure_pdf: string | null;
   brochure_pdf_2: string | null;
 }
@@ -314,6 +316,8 @@ export interface EventDetail {
   event_address?: string | null;
   lat?: string | number | null;
   long?: string | number | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
   faqs: Array<{
     question: string;
     answer: string;
