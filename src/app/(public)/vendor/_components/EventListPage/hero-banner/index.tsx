@@ -183,7 +183,7 @@ export default function HeroBanner({
   const previewFrames = usePreviewDeviceFramesEnabled();
   /** Stack contact details in narrow device frames. */
   const stackHeroContact = isPreviewMobile || (isPreview && previewFrames);
-  const showHeadingContact = hasContact && !isPreviewMobile;
+  const showHeadingContact = hasContact && !heroFooter;
   const showDockContact = hasContact && Boolean(heroFooter);
   const previewAlign: BannerHeadingAlign = isPreviewMobile
     ? "center"
