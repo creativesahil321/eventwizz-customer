@@ -53,11 +53,15 @@ import {
   EventSectionNav,
   EVENT_SECTION_IDS,
   EVENT_SECTION_NAV_HEIGHT,
-  EVENT_SECTION_NAV_HEIGHT_PX,
   buildEventSectionNavItems,
   getNearestScrollContainer,
 } from "@/components/public/event-section-nav";
 import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
+import {
+  buildEventStickyOffsetCssVar,
+  EVENT_STICKY_SCROLL_MT_FALLBACK,
+  resolveBookNowScrollOffsetPx,
+} from "@/lib/event-sticky-scroll-offset";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
   formatEventHeroDateRange,
@@ -179,7 +183,9 @@ export function EventPreview({
         requestAnimationFrame(() => {
           const local = previewContainerRef.current;
           scrollToElementIfNeeded(bookingRef.current, {
-            headerOffsetPx: HEADER_OFFSET_PX + EVENT_SECTION_NAV_HEIGHT_PX,
+            headerOffsetPx: resolveBookNowScrollOffsetPx({
+              headerOffsetPx: HEADER_OFFSET_PX,
+            }),
             scrollContainer:
               local && local.scrollHeight > local.clientHeight + 1
                 ? local
@@ -538,7 +544,7 @@ export function EventPreview({
   const roomSelectorStickyTop = showSectionNav
     ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
     : ONBOARDING_PREVIEW_HEADER_OFFSET;
-  const sectionAnchorClass = "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
+  const sectionAnchorClass = `scroll-mt-[var(--event-sticky-offset,${EVENT_STICKY_SCROLL_MT_FALLBACK})]`;
 
   const brochureAddress = slices.eventAddress;
   const brochureLat = slices.eventLatitude;
@@ -563,16 +569,18 @@ export function EventPreview({
                 ...previewStyles,
                 background: themeColors.background,
                 fontFamily: "var(--font-body)",
-                ["--event-sticky-offset" as string]: showSectionNav
-                  ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
-                  : ONBOARDING_PREVIEW_HEADER_OFFSET,
+                ["--event-sticky-offset" as string]: buildEventStickyOffsetCssVar({
+                  headerOffset: ONBOARDING_PREVIEW_HEADER_OFFSET,
+                  showSectionNav,
+                }),
               }
             : {
                 ...previewStyles,
                 fontFamily: "var(--font-body)",
-                ["--event-sticky-offset" as string]: showSectionNav
-                  ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
-                  : ONBOARDING_PREVIEW_HEADER_OFFSET,
+                ["--event-sticky-offset" as string]: buildEventStickyOffsetCssVar({
+                  headerOffset: ONBOARDING_PREVIEW_HEADER_OFFSET,
+                  showSectionNav,
+                }),
               }
         }
       >
@@ -785,7 +793,9 @@ export function EventPreview({
         <LazyBrochureSection
           showMapImmediately
           headingEmphasis={headingEmphasisForHero}
-          bookNowScrollOffsetPx={HEADER_OFFSET_PX + EVENT_SECTION_NAV_HEIGHT_PX}
+          bookNowScrollOffsetPx={resolveBookNowScrollOffsetPx({
+            headerOffsetPx: HEADER_OFFSET_PX,
+          })}
           location={{
             title: "EVENT LOCATION",
             description:

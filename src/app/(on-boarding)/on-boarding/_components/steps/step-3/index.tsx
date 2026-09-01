@@ -40,6 +40,7 @@ import {
 } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import { useOnboardingPreviewFieldFocus } from "../../../_lib/onboarding-preview-field-focus";
 import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
 import {
   GuidedSectionActionFooter,
@@ -375,6 +376,8 @@ export default function StepThree() {
     persistenceHydrated: persistedProgressHydrated,
     persistedStepApproved: stepThreePersistedApproved === true,
   });
+
+  useOnboardingPreviewFieldFocus(3, guided.focusGuidedSection);
 
   // Handle banner image change
   const handleHeaderBannerFileChange = useCallback(

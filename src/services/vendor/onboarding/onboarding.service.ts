@@ -23,7 +23,10 @@ import {
   parseCheckEventNameResponse,
   type CheckEventNameAvailability,
 } from "@/lib/parse-check-event-name";
-import { toLocationCoordsPayload } from "@/lib/to-location-coords-payload";
+import {
+  toLocationCoordsPayload,
+  LOCATION_COORDINATES_REQUIRED_MESSAGE,
+} from "@/lib/to-location-coords-payload";
 // import { OnBoardingPreviewType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 
 /** Reads the persisted onboarding mode from sessionStorage (client-only, safe). */
@@ -377,6 +380,12 @@ export const onboardingService = {
     };
 
     const coords = toLocationCoordsPayload(data.latitude, data.longitude);
+    if (addressTrimmed && !coords) {
+      return {
+        status: false,
+        message: LOCATION_COORDINATES_REQUIRED_MESSAGE,
+      };
+    }
     if (coords) {
       Object.assign(payload, coords);
     }

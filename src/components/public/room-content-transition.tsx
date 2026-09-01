@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type RoomContentTransitionProps = {
@@ -25,6 +25,12 @@ export function RoomContentTransition({
   children,
   className,
 }: RoomContentTransitionProps) {
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) {
+    return <div className={cn(className)}>{children}</div>;
+  }
+
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div

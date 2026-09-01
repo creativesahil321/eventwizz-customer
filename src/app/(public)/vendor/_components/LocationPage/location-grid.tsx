@@ -11,6 +11,11 @@ import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import {
+  PUBLIC_CARD_HOVER_LIFT_CLASS,
+  PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
+  PUBLIC_LOADING_OVERLAY_CLASS,
+} from "@/lib/public-rhythm";
 
 interface LocationGridProps {
   locations: (VenueLocation | LocationData)[];
@@ -171,11 +176,15 @@ export default function LocationGrid({
                   }
                 }}
                 className={cn(
-                  "group relative cursor-pointer border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-background)] motion-reduce:transition-none",
+                  "group relative cursor-pointer border border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-background)]",
+                  PUBLIC_CARD_HOVER_LIFT_CLASS,
                   // Compact list — min-height (not fixed) so heading glyphs aren't clipped
                   narrowPreview
                     ? "flex min-h-[5.75rem] items-stretch overflow-hidden rounded-xl bg-[var(--color-surface)] shadow-sm"
-                    : "flex min-h-[5.75rem] items-stretch overflow-hidden rounded-xl bg-[var(--color-surface)] shadow-sm md:block md:aspect-[5/6] md:h-auto md:min-h-0 md:rounded-[20px] md:shadow-[0_16px_40px_-28px_rgba(0,0,0,0.55)] md:hover:-translate-y-1.5 md:hover:shadow-[0_22px_48px_-24px_rgba(0,0,0,0.55)] motion-reduce:md:hover:translate-y-0",
+                    : cn(
+                        "flex min-h-[5.75rem] items-stretch overflow-hidden rounded-xl bg-[var(--color-surface)] shadow-sm md:block md:aspect-[5/6] md:h-auto md:min-h-0 md:rounded-[20px] md:shadow-[0_16px_40px_-28px_rgba(0,0,0,0.55)]",
+                        "[@media(hover:hover)_and_(pointer:fine)]:md:hover:-translate-y-1.5 [@media(hover:hover)_and_(pointer:fine)]:md:hover:shadow-[0_22px_48px_-24px_rgba(0,0,0,0.55)]",
+                      ),
                 )}
                 onClick={handleCardClick}
               >
@@ -192,7 +201,10 @@ export default function LocationGrid({
                       fill
                       priority={idx < 2}
                       sizes="(max-width: 768px) 96px, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                      className={cn(
+                        "object-cover",
+                        PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
+                      )}
                       unoptimized={!shouldUseNextImageOptimization(coverImage)}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
@@ -329,13 +341,14 @@ export default function LocationGrid({
                     {isPending ? (
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1.5 text-[11px] text-[var(--color-text-dimmed)]",
+                          "inline-flex items-center gap-1.5 text-[11px] text-[var(--color-text-dimmed)] opacity-100",
+                          PUBLIC_LOADING_OVERLAY_CLASS,
                           !narrowPreview && "md:gap-2 md:text-sm md:text-white/80",
                         )}
                       >
                         <Loader2
                           className={cn(
-                            "h-3.5 w-3.5 shrink-0 animate-spin",
+                            "h-3.5 w-3.5 shrink-0 animate-spin motion-reduce:animate-none",
                             !narrowPreview && "md:h-4 md:w-4",
                           )}
                           aria-hidden

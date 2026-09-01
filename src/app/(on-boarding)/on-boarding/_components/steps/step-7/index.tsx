@@ -493,7 +493,8 @@ export default function StepSeven() {
                 <WholeStepGuidedShell
                   form={form}
                   sectionId="step-seven-brochure-location"
-                  chipLabel="Brochure & pricing"
+                  previewFocusStep={7}
+                  chipLabel="Brochure info"
                   chipDescription="Brochure files and pricing."
                   persistenceHydrated={persistedProgressHydrated}
                   persistedStepApproved={stepSevenPersistedApproved}

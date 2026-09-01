@@ -149,7 +149,7 @@ export const AI_ONBOARDING_APPLY_STEPS = [
   { label: "Packages, timeline & gallery", icon: "📦" },
   { label: "Dates, tickets & tables", icon: "🎟️" },
   { label: "Catering & menu", icon: "🍽️" },
-  { label: "Brochure & pricing", icon: "📄" },
+  { label: "Brochure info", icon: "📄" },
   { label: "Drinks & extras", icon: "🥂" },
   { label: "FAQs", icon: "❓" },
 ] as const;
@@ -872,7 +872,7 @@ async function applyAIGeneratedOnboardingContentInner({
   }
   await updateSession({ on_boarding_step: 7 });
 
-  // --- Step 7: Brochure & pricing ---
+  // --- Step 7: Brochure info ---
   setStep(6);
   const brochurePriceStartFrom = minPriceStartFrom(
     formattedDates as Array<{
@@ -919,7 +919,7 @@ async function applyAIGeneratedOnboardingContentInner({
       });
   if (!step7Response.status) {
     throw new Error(
-      step7Response.message || "Failed to save brochure & pricing",
+      step7Response.message || "Failed to save brochure info",
     );
   }
   if (useRoomSystem) {

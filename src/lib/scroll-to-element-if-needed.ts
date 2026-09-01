@@ -10,6 +10,8 @@ export function scrollToElementIfNeeded(
   options?: {
     headerOffsetPx?: number;
     scrollContainer?: HTMLElement | null;
+    /** Framed onboarding / vendor previews — scroll the panel even before overflow is measurable. */
+    trustEmbeddedScrollContainer?: boolean;
   },
 ): void {
   if (!el) return;
@@ -17,7 +19,9 @@ export function scrollToElementIfNeeded(
   const headerOffsetPx = options?.headerOffsetPx ?? 72;
   const container = options?.scrollContainer;
   const useContainer =
-    !!container && container.scrollHeight > container.clientHeight + 1;
+    !!container &&
+    (options?.trustEmbeddedScrollContainer ||
+      container.scrollHeight > container.clientHeight + 1);
 
   if (useContainer && container) {
     const elRect = el.getBoundingClientRect();

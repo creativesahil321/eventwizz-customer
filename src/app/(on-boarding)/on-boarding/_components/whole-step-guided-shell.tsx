@@ -8,6 +8,7 @@ import {
 } from "./guided-sticky-approval-bar";
 import { useGuidedOnboardingSections } from "../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../_lib/hooks/use-guided-onboarding-sections";
+import { useOnboardingPreviewFieldFocus } from "../_lib/onboarding-preview-field-focus";
 import { guidedSectionSurfaceClass } from "./guided-section-surface";
 import { GuidedSectionTitleBar } from "./guided-section-title-bar";
 
@@ -37,6 +38,8 @@ type Props<T extends FieldValues> = {
   persistenceHydrated?: boolean;
   /** From global `stepN.isApproved` when API already marked this step approved. */
   persistedStepApproved?: boolean;
+  /** When set, preview clicks unlock this whole-step guided shell. */
+  previewFocusStep?: number;
 };
 
 /**
@@ -52,6 +55,7 @@ export function WholeStepGuidedShell<T extends FieldValues>({
   lenientApproval = false,
   persistenceHydrated = false,
   persistedStepApproved = false,
+  previewFocusStep,
 }: Props<T>) {
   const sectionConfigs = useMemo((): GuidedSectionConfig<T>[] => {
     return [
@@ -75,6 +79,11 @@ export function WholeStepGuidedShell<T extends FieldValues>({
     persistenceHydrated,
     persistedStepApproved,
   });
+
+  useOnboardingPreviewFieldFocus(
+    previewFocusStep ?? -1,
+    guided.focusGuidedSection,
+  );
 
   return (
     <>

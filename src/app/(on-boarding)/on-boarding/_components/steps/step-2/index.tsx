@@ -31,6 +31,7 @@ import {
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import { useOnboardingPreviewFieldFocus } from "../../../_lib/onboarding-preview-field-focus";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
 import {
@@ -238,6 +239,8 @@ export default function StepTwo() {
     persistenceHydrated: persistedProgressHydrated,
     persistedStepApproved: stepTwoPersistedApproved === true,
   });
+
+  useOnboardingPreviewFieldFocus(2, guided.focusGuidedSection);
 
   const handleLogoFileChange = async (
     files: File[],

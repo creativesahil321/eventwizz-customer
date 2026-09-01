@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { format, isValid, parseISO } from "date-fns";
 import { CalendarDays, Loader2, MapPin, SearchX } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { SiteHeading } from "@/components/public/site-heading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ServerContext } from "@/lib/server-context";
 import { resolveCurrencySymbol } from "@/lib/currency-format";
 import { cn } from "@/lib/utils";
+import { PUBLIC_FILTER_RESULTS_MOTION } from "@/lib/public-rhythm";
 import { savePendingBooking } from "@/lib/booking/pending-booking";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
@@ -109,6 +111,7 @@ export function PublicSearchResults({
     (theme as ThemeSchema | null)?.currency_symbol,
   );
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   const meta = data?.meta;
   const results = data?.results ?? [];
@@ -201,6 +204,172 @@ export function PublicSearchResults({
   const empty = settledEmpty || (!isLoading && !isError && total === 0);
   const showSkeleton = isLoading && results.length === 0 && !settledEmpty;
 
+  const resultsMotionKey = useMemo(() => {
+    const dateKey = filters.date ? format(filters.date, "yyyy-MM-dd") : "";
+    return [
+      filters.query.trim(),
+      filters.nearMe ? "near" : filters.city ?? "",
+      dateKey,
+      resultType,
+      empty ? "empty" : showSkeleton ? "loading" : String(total),
+    ].join("|");
+  }, [
+    filters.query,
+    filters.nearMe,
+    filters.city,
+    filters.date,
+    resultType,
+    empty,
+    showSkeleton,
+    total,
+  ]);
+
+  const resultsBody = isError ? (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-5 py-10 text-center">
+      <SearchX
+        className="h-8 w-8 text-[var(--color-text-dimmed)]"
+        aria-hidden
+      />
+      <p className="text-base font-semibold text-[var(--color-text)]">
+        Search unavailable
+      </p>
+      <p className="text-sm text-[var(--color-text-dimmed)]">
+        Please try again in a moment.
+      </p>
+    </div>
+  ) : showSkeleton ? (
+    <SearchResultsSkeleton variant={resultType} />
+  ) : empty ? (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-5 py-10 text-center sm:px-6 sm:py-12">
+      <SearchX
+        className="h-8 w-8 text-[var(--color-text-dimmed)]"
+        aria-hidden
+      />
+      <p className="text-base font-semibold text-[var(--color-text)]">
+        {filters.nearMe
+          ? "No events near you yet"
+          : "No results match your search"}
+      </p>
+      <p className="text-sm text-[var(--color-text-dimmed)]">
+        {filters.nearMe
+          ? "No bookable events with a map pin were found within range. Try another date, or browse by city."
+          : emptyHint ?? "Try another keyword, city, or date."}
+      </p>
+      <button
+        type="button"
+        onClick={onClear}
+        className="mt-1 inline-flex h-11 w-full items-center justify-center rounded-full bg-[var(--color-primary)] px-5 text-sm font-semibold text-[var(--color-primary-foreground)] transition-opacity hover:opacity-95 sm:h-10 sm:w-auto"
+      >
+        Clear search
+      </button>
+    </div>
+  ) : resultType === "dates" ? (
+    <ul className="mx-auto flex max-w-3xl flex-col gap-2.5 sm:gap-3">
+      {dateResults.map((slot) => {
+        const key = [
+          slot.location.slug,
+          slot.event.slug,
+          slot.date,
+          slot.room?.room_id ?? "na",
+        ].join(":");
+        const price = formatEventListingPrice(slot.price, currencySym);
+        const isBusy = pendingKey === key;
+
+        return (
+          <li key={key}>
+            <button
+              type="button"
+              disabled={slot.sold_out || Boolean(pendingKey)}
+              aria-busy={isBusy}
+              className={cn(
+                "flex w-full items-start gap-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-3.5 py-3 text-left transition-colors sm:gap-4 sm:px-4 sm:py-3.5",
+                slot.sold_out
+                  ? "cursor-not-allowed opacity-60"
+                  : "hover:border-[color:var(--color-primary)]",
+                isBusy && "opacity-80",
+              )}
+              onClick={() => void handleDateSlotClick(slot, key)}
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--color-primary)_12%,transparent)] text-[var(--color-primary)]">
+                {isBusy ? (
+                  <Loader2
+                    className="h-5 w-5 animate-spin motion-reduce:animate-none"
+                    aria-hidden
+                  />
+                ) : (
+                  <CalendarDays className="h-5 w-5" aria-hidden />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-[var(--color-text)] sm:text-base">
+                  {formatSlotDate(slot.date)}
+                  {slot.sold_out ? (
+                    <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-red-600">
+                      Sold out
+                    </span>
+                  ) : null}
+                </p>
+                <p className="mt-0.5 truncate text-sm text-[var(--color-text)]">
+                  {slot.event.name}
+                </p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--color-text-dimmed)]">
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+                    {slot.location.city}
+                  </span>
+                  {slot.room?.room_name ? (
+                    <span>· {slot.room.room_name}</span>
+                  ) : null}
+                </p>
+              </div>
+              {price ? (
+                <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--color-primary)]">
+                  {price}
+                </span>
+              ) : null}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  ) : (
+    <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4">
+      {eventResults.map((item) => {
+        const event = item.event;
+        const price = formatEventListingPrice(
+          event.lowest_price,
+          currencySym,
+        );
+        const dateLabel = getEventCardDateLabel(event);
+        const cardKey = `${item.location.slug}:${event.slug}`;
+
+        return (
+          <div key={cardKey} className="min-w-0">
+            <LocationEventCard
+              event={{
+                title: event.name || "",
+                price,
+                dateLabel,
+                timeLabel: getEventCardTimeLabel(event),
+                category: event.category?.name ?? null,
+                image: event.banner_image || FALLBACK_IMAGE,
+                slug: event.slug || "",
+                distanceKm: item.distance_km,
+              }}
+              locationSlug={item.location.slug.replace(/^\/+/, "")}
+              locationLabel={item.location.city}
+              eventAddress={item.location.event_address}
+              showLocationChip
+              isPending={pendingKey === cardKey}
+              onNavigateStart={() => setPendingKey(cardKey)}
+              imageFallback={FALLBACK_IMAGE}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <section
       id={sectionId}
@@ -242,147 +411,17 @@ export function PublicSearchResults({
           </button>
         </div>
 
-        {isError ? (
-          <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-5 py-10 text-center">
-            <SearchX
-              className="h-8 w-8 text-[var(--color-text-dimmed)]"
-              aria-hidden
-            />
-            <p className="text-base font-semibold text-[var(--color-text)]">
-              Search unavailable
-            </p>
-            <p className="text-sm text-[var(--color-text-dimmed)]">
-              Please try again in a moment.
-            </p>
-          </div>
-        ) : showSkeleton ? (
-          <SearchResultsSkeleton variant={resultType} />
-        ) : empty ? (
-          <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-5 py-10 text-center sm:px-6 sm:py-12">
-            <SearchX
-              className="h-8 w-8 text-[var(--color-text-dimmed)]"
-              aria-hidden
-            />
-            <p className="text-base font-semibold text-[var(--color-text)]">
-              {filters.nearMe
-                ? "No events near you yet"
-                : "No results match your search"}
-            </p>
-            <p className="text-sm text-[var(--color-text-dimmed)]">
-              {filters.nearMe
-                ? "No bookable events with a map pin were found within range. Try another date, or browse by city."
-                : emptyHint ?? "Try another keyword, city, or date."}
-            </p>
-            <button
-              type="button"
-              onClick={onClear}
-              className="mt-1 inline-flex h-11 w-full items-center justify-center rounded-full bg-[var(--color-primary)] px-5 text-sm font-semibold text-[var(--color-primary-foreground)] transition-opacity hover:opacity-95 sm:h-10 sm:w-auto"
-            >
-              Clear search
-            </button>
-          </div>
-        ) : resultType === "dates" ? (
-          <ul className="mx-auto flex max-w-3xl flex-col gap-2.5 sm:gap-3">
-            {dateResults.map((slot) => {
-              const key = [
-                slot.location.slug,
-                slot.event.slug,
-                slot.date,
-                slot.room?.room_id ?? "na",
-              ].join(":");
-              const price = formatEventListingPrice(slot.price, currencySym);
-              const isBusy = pendingKey === key;
-
-              return (
-                <li key={key}>
-                  <button
-                    type="button"
-                    disabled={slot.sold_out || Boolean(pendingKey)}
-                    aria-busy={isBusy}
-                    className={cn(
-                      "flex w-full items-start gap-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-3.5 py-3 text-left transition-colors sm:gap-4 sm:px-4 sm:py-3.5",
-                      slot.sold_out
-                        ? "cursor-not-allowed opacity-60"
-                        : "hover:border-[color:var(--color-primary)]",
-                      isBusy && "opacity-80",
-                    )}
-                    onClick={() => void handleDateSlotClick(slot, key)}
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--color-primary)_12%,transparent)] text-[var(--color-primary)]">
-                      {isBusy ? (
-                        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                      ) : (
-                        <CalendarDays className="h-5 w-5" aria-hidden />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-[var(--color-text)] sm:text-base">
-                        {formatSlotDate(slot.date)}
-                        {slot.sold_out ? (
-                          <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-red-600">
-                            Sold out
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="mt-0.5 truncate text-sm text-[var(--color-text)]">
-                        {slot.event.name}
-                      </p>
-                      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--color-text-dimmed)]">
-                        <span className="inline-flex items-center gap-1">
-                          <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-                          {slot.location.city}
-                        </span>
-                        {slot.room?.room_name ? (
-                          <span>· {slot.room.room_name}</span>
-                        ) : null}
-                      </p>
-                    </div>
-                    {price ? (
-                      <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--color-primary)]">
-                        {price}
-                      </span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+        {prefersReducedMotion ? (
+          resultsBody
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4">
-            {eventResults.map((item) => {
-              const event = item.event;
-              const price = formatEventListingPrice(
-                event.lowest_price,
-                currencySym,
-              );
-              const dateLabel = getEventCardDateLabel(event);
-              const cardKey = `${item.location.slug}:${event.slug}`;
-
-              return (
-                <div key={cardKey} className="min-w-0">
-                  <LocationEventCard
-                    event={{
-                      title: event.name || "",
-                      price,
-                      dateLabel,
-                      timeLabel: getEventCardTimeLabel(event),
-                      category: event.category?.name ?? null,
-                      image: event.banner_image || FALLBACK_IMAGE,
-                      slug: event.slug || "",
-                      distanceKm: item.distance_km,
-                    }}
-                    locationSlug={item.location.slug.replace(/^\/+/, "")}
-                    locationLabel={item.location.city}
-                    eventAddress={item.location.event_address}
-                    showLocationChip
-                    isPending={pendingKey === cardKey}
-                    onNavigateStart={() => setPendingKey(cardKey)}
-                    imageFallback={FALLBACK_IMAGE}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={resultsMotionKey}
+              {...PUBLIC_FILTER_RESULTS_MOTION}
+            >
+              {resultsBody}
+            </motion.div>
+          </AnimatePresence>
         )}
       </div>
     </section>

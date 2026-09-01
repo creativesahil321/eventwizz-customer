@@ -19,6 +19,10 @@ import {
   countWords,
 } from "@/lib/word-count";
 import { FOOTER_BRAND_DESCRIPTION_MAX_CHARS } from "@/lib/footer-brand-description";
+import { parseOptionalCoordinate } from "@/lib/to-location-coords-payload";
+
+/** API / form state may send null, strings, or numbers — normalize at runtime via parseOptionalCoordinate. */
+export const optionalCoordinateSchema = z.number().optional();
 
 //#===step-1===#
 export const stepOneSchema = z
@@ -41,8 +45,8 @@ export const stepOneSchema = z
     domain: z.string().optional(),
     description: z.string().optional(),
     city: z.string().min(1, "City is required"),
-    latitude: z.number().optional(),
-    longitude: z.number().optional(),
+    latitude: optionalCoordinateSchema,
+    longitude: optionalCoordinateSchema,
   })
   .superRefine((data, ctx) => {
     if (data.has_multiple_locations === undefined) {
@@ -72,6 +76,20 @@ export const stepOneSchema = z
         code: z.ZodIssueCode.custom,
         message: "Please select a venue from Google Places suggestions",
         path: ["name"],
+      });
+    }
+
+    const address = data.address?.trim() ?? "";
+    if (!address) return;
+
+    const latitude = parseOptionalCoordinate(data.latitude);
+    const longitude = parseOptionalCoordinate(data.longitude);
+    if (latitude == null || longitude == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Select the address from Google suggestions so map coordinates can be saved.",
+        path: ["address"],
       });
     }
   });
@@ -119,10 +137,17 @@ export function normalizeStepOneFromApi(
     readHasMultipleLocationsField(rest),
   );
 
+  const latitude = parseOptionalCoordinate(rest.latitude ?? rest.lat);
+  const longitude = parseOptionalCoordinate(
+    rest.longitude ?? rest.long,
+  );
+
   return {
     ...rest,
     name,
     has_multiple_locations,
+    latitude,
+    longitude,
   } as Partial<StepOneType> & Record<string, unknown>;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
 
 const GUIDED_INPUT_META_KEYS = new Set([
@@ -177,14 +177,31 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     approvedSections.size === sectionFlow.length;
 
   const formValues = form.watch();
+  const approvedSectionCount = approvedSections.size;
   const currentSectionHasInput = useMemo(() => {
     if (allSectionsApproved) return true;
     if (!currentSection) return false;
     if (currentSection.fields.length === 0) return true;
-    return currentSection.fields.some((path) =>
+
+    const sectionHasInput = currentSection.fields.some((path) =>
       fieldHasUserInput(getPathValue(formValues, String(path))),
     );
-  }, [allSectionsApproved, currentSection, formValues]);
+    if (sectionHasInput) return true;
+
+    // Keep approve / save controls visible while re-editing a saved step, or
+    // when the user has already approved earlier sections in this visit (e.g.
+    // contact details after brand name — fields may still be empty until filled).
+    const isReEditingFlow =
+      persistedStepApproved || approvedSectionCount > 0;
+    return currentSectionIndex >= 0 && isReEditingFlow;
+  }, [
+    allSectionsApproved,
+    approvedSectionCount,
+    currentSection,
+    currentSectionIndex,
+    formValues,
+    persistedStepApproved,
+  ]);
 
   const canNavigateToIndex = useCallback(
     (index: number) => {
@@ -340,6 +357,41 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     [sectionFlow],
   );
 
+  const sectionFieldSnapshotRef = useRef("");
+
+  useEffect(() => {
+    sectionFieldSnapshotRef.current = "";
+  }, [currentSection?.id]);
+
+  useEffect(() => {
+    if (!currentSection || currentSectionIndex < 0) return;
+
+    const snapshot = JSON.stringify(
+      currentSection.fields.map((path) =>
+        getPathValue(formValues, String(path)),
+      ),
+    );
+    const wasApproved = approvedSections.has(currentSection.id);
+    const previousSnapshot = sectionFieldSnapshotRef.current;
+    sectionFieldSnapshotRef.current = snapshot;
+
+    if (
+      !wasApproved ||
+      !previousSnapshot ||
+      previousSnapshot === snapshot
+    ) {
+      return;
+    }
+
+    handleUnlockSection(currentSectionIndex);
+  }, [
+    approvedSections,
+    currentSection,
+    currentSectionIndex,
+    formValues,
+    handleUnlockSection,
+  ]);
+
   const handleChipClick = useCallback(
     async (index: number) => {
       const section = sectionFlow[index];
@@ -416,6 +468,15 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     [persistedStepApproved, sectionFlow],
   );
 
+  const focusGuidedSection = useCallback(
+    (sectionId: string) => {
+      const index = sectionFlow.findIndex((section) => section.id === sectionId);
+      if (index < 0) return;
+      handleUnlockSection(index);
+    },
+    [sectionFlow, handleUnlockSection],
+  );
+
   return {
     sectionFlow,
     currentSectionIndex,
@@ -429,6 +490,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     handleApproveAllSections,
     handleChipClick,
     handleUnlockSection,
+    focusGuidedSection,
     resetToFirstSection,
     resetSectionProgress,
   };

@@ -24,6 +24,12 @@ import AddressAutocomplete, {
 } from "../step-7/address-autocomplete";
 import { env } from "@/env";
 import { fetchPlaceDetails } from "./_lib/actions";
+import { geocodeLocation } from "../step-11/_lib/actions";
+import {
+  hasValidLocationCoordinates,
+  LOCATION_COORDINATES_REQUIRED_MESSAGE,
+  parseOptionalCoordinate,
+} from "@/lib/to-location-coords-payload";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Settings2 } from "lucide-react";
 import { OnboardingCard } from "@/components/ui/card";
@@ -32,6 +38,7 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { useSession } from "next-auth/react";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import { useOnboardingPreviewFieldFocus } from "../../../_lib/onboarding-preview-field-focus";
 import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
 import {
   GuidedSectionActionFooter,
@@ -123,8 +130,12 @@ export default function StepOne() {
       domain: globalForm.getValues("stepOne.domain") || "",
       description: globalForm.getValues("stepOne.description") || "",
       city: globalForm.getValues("stepOne.city") || "",
-      latitude: globalForm.getValues("stepOne.latitude"),
-      longitude: globalForm.getValues("stepOne.longitude"),
+      latitude: parseOptionalCoordinate(
+        globalForm.getValues("stepOne.latitude"),
+      ),
+      longitude: parseOptionalCoordinate(
+        globalForm.getValues("stepOne.longitude"),
+      ),
     },
     mode: "onChange",
   });
@@ -158,8 +169,8 @@ export default function StepOne() {
       domain: g.domain ?? "",
       description: g.description ?? "",
       city: g.city ?? "",
-      latitude: g.latitude,
-      longitude: g.longitude,
+      latitude: parseOptionalCoordinate(g.latitude),
+      longitude: parseOptionalCoordinate(g.longitude),
     });
   }, [globalHasMultiple, globalForm, form]);
 
@@ -239,6 +250,8 @@ export default function StepOne() {
     persistedStepApproved: stepOnePersistedApproved === true,
   });
 
+  useOnboardingPreviewFieldFocus(1, guided.focusGuidedSection);
+
   const persistLocationChoice = (value: boolean) => {
     setLocationGateReopened(false);
     form.clearErrors();
@@ -264,6 +277,8 @@ export default function StepOne() {
       city: "",
       domain: "",
       description: "",
+      latitude: undefined,
+      longitude: undefined,
     };
     form.reset(cleared);
     const prev = globalForm.getValues("stepOne");
@@ -308,6 +323,55 @@ export default function StepOne() {
     }
   };
 
+  const sanitizeStepOneCoordinates = () => {
+    const latitude = parseOptionalCoordinate(form.getValues("latitude"));
+    const longitude = parseOptionalCoordinate(form.getValues("longitude"));
+    form.setValue("latitude", latitude, { shouldValidate: false });
+    form.setValue("longitude", longitude, { shouldValidate: false });
+    return { latitude, longitude };
+  };
+
+  const resolveStepOneCoordinates = async (): Promise<{
+    latitude: number;
+    longitude: number;
+  } | null> => {
+    let { latitude, longitude } = sanitizeStepOneCoordinates();
+    if (latitude != null && longitude != null) {
+      return { latitude, longitude };
+    }
+
+    const address = form.getValues("address")?.trim() ?? "";
+    const city = form.getValues("city")?.trim() ?? "";
+    if (!address) return null;
+
+    const resolved = await geocodeLocation(address, city);
+    if (!resolved) return null;
+
+    form.setValue("latitude", resolved.latitude, { shouldValidate: true });
+    form.setValue("longitude", resolved.longitude, { shouldValidate: true });
+    return resolved;
+  };
+
+  const ensureStepOneCoordinates = async (): Promise<boolean> => {
+    const resolved = await resolveStepOneCoordinates();
+    if (
+      resolved &&
+      hasValidLocationCoordinates(resolved.latitude, resolved.longitude)
+    ) {
+      return true;
+    }
+
+    form.setError("address", {
+      type: "manual",
+      message: LOCATION_COORDINATES_REQUIRED_MESSAGE,
+    });
+    toast.error("Missing map coordinates for this address", {
+      description: LOCATION_COORDINATES_REQUIRED_MESSAGE,
+      duration: 5000,
+    });
+    return false;
+  };
+
   const handleContinue = async () => {
     if (brandNameTaken) {
       toast.error(
@@ -346,6 +410,9 @@ export default function StepOne() {
       const ok = await guided.handleApproveAllSections();
       if (!ok) return;
     }
+
+    if (!(await ensureStepOneCoordinates())) return;
+
     const valid = await form.trigger(undefined, { shouldFocus: true });
     if (!valid) {
       const fieldLabels: Record<string, string> = {
@@ -353,8 +420,10 @@ export default function StepOne() {
         name: "venue or brand name",
         contact_number: "contact number",
         email: "email",
-        address: "address",
+        address: "address (pick from Google suggestions)",
         city: "city",
+        latitude: "map location",
+        longitude: "map location",
       };
       const invalidFields = Object.keys(form.formState.errors)
         .map((field) => fieldLabels[field] ?? field)
@@ -366,6 +435,7 @@ export default function StepOne() {
       );
       return;
     }
+
     await persistStepOne(form.getValues());
   };
 
@@ -620,7 +690,15 @@ export default function StepOne() {
                                 <AddressAutocomplete
                                   variant="dark"
                                   value={field.value}
-                                  onChange={field.onChange}
+                                  onChange={(value) => {
+                                    field.onChange(value);
+                                    form.setValue("latitude", undefined, {
+                                      shouldDirty: true,
+                                    });
+                                    form.setValue("longitude", undefined, {
+                                      shouldDirty: true,
+                                    });
+                                  }}
                                   onResolved={({ address, city, latitude, longitude }) => {
                                     field.onChange(address);
                                     const nextCity =
@@ -642,6 +720,13 @@ export default function StepOne() {
                                         shouldDirty: true,
                                       });
                                       form.setValue("longitude", longitude, {
+                                        shouldDirty: true,
+                                      });
+                                    } else {
+                                      form.setValue("latitude", undefined, {
+                                        shouldDirty: true,
+                                      });
+                                      form.setValue("longitude", undefined, {
                                         shouldDirty: true,
                                       });
                                     }

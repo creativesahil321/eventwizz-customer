@@ -11,6 +11,10 @@ import {
 import type { LocationEventCardModel } from "./location-event-card";
 import { formatEventCardFromPrice } from "./event-card-utils";
 import { SiteHeading } from "@/components/public/site-heading";
+import {
+  PUBLIC_CARD_HOVER_LIFT_CLASS,
+  PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
+} from "@/lib/public-rhythm";
 
 type LocationEventHeroCardProps = {
   event: LocationEventCardModel;
@@ -41,11 +45,12 @@ export function LocationEventHeroCard({
   // preview matches the live site. Only the loading state blocks pointer events.
   const cardClassName = cn(
     "group relative block w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 outline-none md:rounded-3xl",
-    "shadow-md transition-all duration-300 ease-out",
+    "shadow-md",
+    PUBLIC_CARD_HOVER_LIFT_CLASS,
     !isPending &&
-      "hover:-translate-y-0.5 hover:border-[color:var(--color-primary)] hover:shadow-xl hover:shadow-black/30",
+      "[@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:border-[color:var(--color-primary)] [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-xl [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-black/30",
     !isPending &&
-      "hover:ring-2 hover:ring-[color:var(--color-primary)] hover:ring-offset-0",
+      "[@media(hover:hover)_and_(pointer:fine)]:hover:ring-2 [@media(hover:hover)_and_(pointer:fine)]:hover:ring-[color:var(--color-primary)] [@media(hover:hover)_and_(pointer:fine)]:hover:ring-offset-0",
     (!isPreview || isInteractivePreview) &&
       "focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]",
     isPending && "pointer-events-none",
@@ -56,7 +61,7 @@ export function LocationEventHeroCard({
       <img
         src={addCacheBusting(event.image)}
         alt={event.title}
-        className="h-full w-full object-cover transition-transform duration-500 ease-out will-change-transform group-hover:scale-[1.03]"
+        className={cn("h-full w-full object-cover", PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS)}
         onError={(e) => {
           const target = e.currentTarget;
           if (target.dataset.fallbackApplied === "true") return;

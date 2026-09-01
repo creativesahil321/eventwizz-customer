@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { formatBlogDate, blogPublicPaths, type BlogPost } from "@/lib/blogs";
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
+import { PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS } from "@/lib/public-rhythm";
+import { cn } from "@/lib/utils";
 
 function Cover({
   post,
@@ -26,7 +28,7 @@ function Cover({
       src={post.cover_image}
       alt={post.title}
       fill
-      className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+      className={cn("object-cover", PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS)}
       sizes={sizes}
       unoptimized={!shouldUseNextImageOptimization(post.cover_image)}
     />

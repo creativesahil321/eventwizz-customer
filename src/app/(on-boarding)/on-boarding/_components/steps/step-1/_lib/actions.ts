@@ -28,6 +28,7 @@ export const fetchPlaceDetails = (
         "url",
         "business_status",
         "address_components",
+        "geometry",
       ],
     },
     (place, status) => {
@@ -62,6 +63,21 @@ export const fetchPlaceDetails = (
         form.setValue("city", city, {
           shouldValidate: true,
         });
+      }
+
+      const loc = place.geometry?.location;
+      if (loc) {
+        form.setValue("latitude", loc.lat(), {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+        form.setValue("longitude", loc.lng(), {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+      } else {
+        form.setValue("latitude", undefined, { shouldValidate: true });
+        form.setValue("longitude", undefined, { shouldValidate: true });
       }
 
       // Set a generic description if business is operational

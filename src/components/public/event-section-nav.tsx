@@ -13,6 +13,7 @@ import {
   PUBLIC_EVENT_NAV_TAB_BASE_CLASS,
   PUBLIC_EVENT_NAV_TAB_INACTIVE_CLASS,
 } from "@/lib/public-rhythm";
+import { measureLiveStickyScrollOffsetPx } from "@/lib/event-sticky-scroll-offset";
 
 export const EVENT_SECTION_NAV_HEIGHT = "3.5rem";
 export const EVENT_SECTION_NAV_HEIGHT_PX = 56;
@@ -113,13 +114,15 @@ export function getNearestScrollContainer(
 function resolveScrollContainer(
   preferred: HTMLElement | null | undefined,
   fallbackFrom: HTMLElement | null | undefined,
+  options?: { trustEmbedded?: boolean },
 ): HTMLElement | null {
-  if (
-    preferred &&
-    hasExplicitScrollY(preferred) &&
-    preferred.scrollHeight > preferred.clientHeight + 1
-  ) {
-    return preferred;
+  if (preferred && hasExplicitScrollY(preferred)) {
+    if (
+      options?.trustEmbedded ||
+      preferred.scrollHeight > preferred.clientHeight + 1
+    ) {
+      return preferred;
+    }
   }
   return getNearestScrollContainer(fallbackFrom ?? preferred);
 }
@@ -201,11 +204,14 @@ function scrollToSection(
   id: string,
   offsetPx: number,
   preferredContainer: HTMLElement | null,
+  trustEmbedded = false,
 ) {
   const el = document.getElementById(id);
   if (!el) return;
 
-  const container = resolveScrollContainer(preferredContainer, el);
+  const container = resolveScrollContainer(preferredContainer, el, {
+    trustEmbedded,
+  });
 
   if (container) {
     const elRect = el.getBoundingClientRect();
@@ -239,16 +245,22 @@ export function EventSectionNav({
 
   itemsRef.current = items;
 
+  const usesEmbeddedScroll = Boolean(scrollContainerRef);
+
   useEffect(() => {
     if (items.length === 0) return;
 
     const offsetPx = headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX;
+    const embeddedScrollOpts = usesEmbeddedScroll
+      ? { trustEmbedded: true as const }
+      : undefined;
 
     const syncActive = () => {
       if (clickLockRef.current) return;
       const container = resolveScrollContainer(
         scrollContainerRef?.current,
         navRef.current,
+        embeddedScrollOpts,
       );
       const spyLine = getSpyLinePx(navRef.current, offsetPx, container);
       const nextId = pickActiveEventSectionId(
@@ -279,6 +291,11 @@ export function EventSectionNav({
     window.addEventListener("scroll", scheduleSync, { passive: true });
     window.addEventListener("resize", scheduleSync);
 
+    const embeddedScroller = scrollContainerRef?.current;
+    embeddedScroller?.addEventListener("scroll", scheduleSync, {
+      passive: true,
+    });
+
     const resizeObserver = new ResizeObserver(scheduleSync);
     resizeObserver.observe(document.documentElement);
     const preferred = scrollContainerRef?.current;
@@ -297,9 +314,10 @@ export function EventSectionNav({
       document.removeEventListener("scroll", scheduleSync, { capture: true });
       window.removeEventListener("scroll", scheduleSync);
       window.removeEventListener("resize", scheduleSync);
+      embeddedScroller?.removeEventListener("scroll", scheduleSync);
       resizeObserver.disconnect();
     };
-  }, [itemKey, headerOffsetPx, scrollContainerRef]);
+  }, [itemKey, headerOffsetPx, scrollContainerRef, usesEmbeddedScroll]);
 
   useEffect(() => {
     const btn = buttonRefs.current.get(activeId);
@@ -319,8 +337,6 @@ export function EventSectionNav({
   }, [activeId]);
 
   if (items.length === 0) return null;
-
-  const jumpOffsetPx = headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX;
 
   return (
     <nav
@@ -355,10 +371,20 @@ export function EventSectionNav({
                   const preferred =
                     scrollContainerRef?.current ??
                     getNearestScrollContainer(navRef.current);
-                  scrollToSection(item.id, jumpOffsetPx, preferred);
+                  const liveOffset = measureLiveStickyScrollOffsetPx({
+                    navEl: navRef.current,
+                    fallbackHeaderOffsetPx: headerOffsetPx,
+                  });
+                  scrollToSection(
+                    item.id,
+                    liveOffset,
+                    preferred,
+                    usesEmbeddedScroll,
+                  );
                   const container = resolveScrollContainer(
                     preferred,
                     navRef.current,
+                    usesEmbeddedScroll ? { trustEmbedded: true } : undefined,
                   );
                   const unlock = () => {
                     clickLockRef.current = false;

@@ -4,8 +4,14 @@ import { useMemo, useState } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { GalleryLightbox } from "@/components/public/gallery-lightbox";
 import { SiteHeading } from "@/components/public/site-heading";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
+import {
+  PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
+  PUBLIC_MOTION_DURATION_SHORT,
+  PUBLIC_MOTION_EASE,
+  PUBLIC_SECTION_PY_CLASS,
+} from "@/lib/public-rhythm";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
@@ -62,6 +68,70 @@ function galleryGridClass(count: number, narrowPreview: boolean): string {
   );
 }
 
+function GalleryImageTile({
+  src,
+  index,
+  title,
+  onOpen,
+}: {
+  src: string;
+  index: number;
+  title: string;
+  onOpen: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`View ${title} image ${index + 1}`}
+      className={cn(
+        "group relative block w-full overflow-hidden rounded-xl aspect-[4/3] shadow-md",
+        "cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2",
+      )}
+    >
+      <Skeleton
+        aria-hidden
+        className={cn(
+          "absolute inset-0 h-full w-full rounded-none",
+          loaded && "opacity-0",
+          PUBLIC_MOTION_DURATION_SHORT,
+          PUBLIC_MOTION_EASE,
+          "transition-opacity motion-reduce:transition-none",
+        )}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={addCacheBusting(src)}
+        alt={`${title} image ${index + 1}`}
+        className={cn(
+          "h-full w-full object-cover",
+          PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
+          PUBLIC_MOTION_DURATION_SHORT,
+          PUBLIC_MOTION_EASE,
+          "transition-opacity motion-reduce:transition-none",
+          loaded ? "opacity-100" : "opacity-0",
+        )}
+        decoding="async"
+        fetchPriority={index < 2 ? "high" : "low"}
+        loading={index < 2 ? "eager" : "lazy"}
+        onLoad={() => setLoaded(true)}
+      />
+      <span
+        className={cn(
+          "pointer-events-none absolute inset-0 bg-black/0 transition-colors",
+          PUBLIC_MOTION_DURATION_SHORT,
+          PUBLIC_MOTION_EASE,
+          "motion-reduce:transition-none",
+          "[@media(hover:hover)_and_(pointer:fine)]:group-hover:bg-black/15",
+        )}
+        aria-hidden
+      />
+    </button>
+  );
+}
+
 export default function EventGallery({
   gallery,
   galleryTitle,
@@ -93,30 +163,13 @@ export default function EventGallery({
   };
 
   const renderTile = (src: string, index: number) => (
-    <button
+    <GalleryImageTile
       key={`${src}-${index}`}
-      type="button"
-      onClick={() => openAt(index)}
-      aria-label={`View ${title} image ${index + 1}`}
-      className={cn(
-        "group relative block w-full overflow-hidden rounded-xl aspect-[4/3] shadow-md",
-        "cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2",
-      )}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={addCacheBusting(src)}
-        alt={`${title} image ${index + 1}`}
-        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-        decoding="async"
-        fetchPriority={index < 2 ? "high" : "low"}
-        loading={index < 2 ? "eager" : "lazy"}
-      />
-      <span
-        className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/15"
-        aria-hidden
-      />
-    </button>
+      src={src}
+      index={index}
+      title={title}
+      onOpen={() => openAt(index)}
+    />
   );
 
   return (

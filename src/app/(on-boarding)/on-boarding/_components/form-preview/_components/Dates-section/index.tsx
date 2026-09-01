@@ -10,7 +10,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CHECKOUT_CONSTANTS } from "@/app/(public)/vendor/checkout/_lib/constants";
@@ -246,8 +246,18 @@ function DateCardFooterContent({
   offer?: DateCardOffer | null;
   compact?: boolean;
 }) {
+  const prefersReducedMotion = useReducedMotion();
+  const footerKey = visual.isSelecting
+    ? "selecting"
+    : visual.isInCart
+      ? "cart"
+      : visual.isSoldOut
+        ? "soldout"
+        : "price";
+
+  let content: ReactNode;
   if (visual.isSoldOut) {
-    return (
+    content = (
       <DateCardPriceFooter
         currencySymbol={currencySymbol}
         listPrice={listPrice}
@@ -255,10 +265,10 @@ function DateCardFooterContent({
         compact={compact}
       />
     );
-  }
-  if (visual.isSelecting) return <DateCardSelectingIndicator />;
-  if (visual.isInCart) {
-    return (
+  } else if (visual.isSelecting) {
+    content = <DateCardSelectingIndicator />;
+  } else if (visual.isInCart) {
+    content = (
       <DateCardPriceFooter
         currencySymbol={currencySymbol}
         listPrice={listPrice}
@@ -266,9 +276,8 @@ function DateCardFooterContent({
         compact={compact}
       />
     );
-  }
-  if (dateInfo.isPlaceholder && dateInfo.price === "—") {
-    return (
+  } else if (dateInfo.isPlaceholder && dateInfo.price === "—") {
+    content = (
       <DateCardPriceFooter
         currencySymbol={currencySymbol}
         listPrice={listPrice}
@@ -276,14 +285,34 @@ function DateCardFooterContent({
         compact={compact}
       />
     );
+  } else {
+    content = (
+      <DateCardPriceFooter
+        currencySymbol={currencySymbol}
+        listPrice={listPrice}
+        offer={offer}
+        compact={compact}
+      />
+    );
   }
+
+  if (prefersReducedMotion) {
+    return content;
+  }
+
   return (
-    <DateCardPriceFooter
-      currencySymbol={currencySymbol}
-      listPrice={listPrice}
-      offer={offer}
-      compact={compact}
-    />
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={footerKey}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
+        className="flex w-full justify-center"
+      >
+        {content}
+      </motion.div>
+    </AnimatePresence>
   );
 }
 

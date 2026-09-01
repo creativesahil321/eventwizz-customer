@@ -44,6 +44,10 @@ import {
 } from "@/lib/event-location";
 import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
+import {
+  formatOnboardingPreviewBrochurePriceDescription,
+  resolveOnboardingPreviewPriceEditTarget,
+} from "../../_lib/resolve-onboarding-preview-price-edit-target";
 import { Image as ImageIcon } from "lucide-react";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { useEventCategories } from "@/services/vendor/events/query";
@@ -55,12 +59,21 @@ import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolba
 import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
 import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "./preview-layout-constants";
 import {
+  buildEventStickyOffsetCssVar,
+  EVENT_STICKY_SCROLL_MT_FALLBACK,
+  resolveBookNowScrollOffsetPx,
+} from "@/lib/event-sticky-scroll-offset";
+import {
   PreviewEditHit,
   PREVIEW_SECTION_EDITOR,
   type PreviewEditorTarget,
+  ONBOARDING_PREVIEW_EDITOR_TARGETS,
 } from "./preview-edit-hit";
 
 const HEADER_OFFSET_PX = 72;
+const PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX = resolveBookNowScrollOffsetPx({
+  headerOffsetPx: HEADER_OFFSET_PX,
+});
 
 // Lazy load components - only import what's actually used
 const BrochureSection = lazy(() => import("./_components/brochure-section"));
@@ -177,8 +190,7 @@ export default function FormPreview() {
     setActiveField,
     requestFormFieldFocus,
   } = useFormContext();
-  const { symbol: currencySymbol, formatCompact: formatPriceUnit } =
-    useCurrencyFormat();
+  const { formatCompact: formatPriceUnit } = useCurrencyFormat();
   const { data: categoriesResponse } = useEventCategories();
   const eventCategories = categoriesResponse?.data ?? [];
   const [formState, setFormState] = useState<OnboardingFormData>(
@@ -278,22 +290,6 @@ export default function FormPreview() {
       longitude: eventLocation.longitude,
     };
   }, [activePreviewBrochure, formState.stepThree]);
-
-  const activePreviewBrochurePrice = useMemo(() => {
-    const price = activePreviewBrochure?.price;
-    const startFrom = String(
-      activePreviewBrochure?.price_start_from ?? "",
-    ).trim();
-    return {
-      title: price?.title || "",
-      description:
-        price?.description ||
-        (startFrom ? `${currencySymbol}${startFrom} per person` : ""),
-      link: price?.link || "",
-      icon: price?.icon || "",
-      price_title: price?.price_title || "",
-    };
-  }, [activePreviewBrochure, currencySymbol]);
 
   // Brochure downloads — drives `CommonHeader` only (section DOWNLOADS tile removed).
   const downloadsArray = useMemo(() => {
@@ -430,7 +426,9 @@ export default function FormPreview() {
         // The delay lets a step switch mount the target step's form first.
         window.setTimeout(() => {
           setActiveField(target.field);
-          requestFormFieldFocus(target.field);
+          requestFormFieldFocus(target.field, {
+            guidedSectionId: target.guidedSectionId,
+          });
         }, 80);
       };
       void go();
@@ -479,8 +477,9 @@ export default function FormPreview() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           scrollToElementIfNeeded(datesRef.current, {
-            headerOffsetPx: HEADER_OFFSET_PX,
+            headerOffsetPx: PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX,
             scrollContainer: previewContainerRef.current,
+            trustEmbeddedScrollContainer: true,
           });
         });
       });
@@ -695,13 +694,14 @@ export default function FormPreview() {
   useEffect(() => {
     if (!activeField || !previewContainerRef.current) return;
 
+    const previewScrollOffsetPx = PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX;
+
     const scrollToElement = (ref: React.RefObject<HTMLDivElement | null>) => {
-      if (ref?.current && previewContainerRef?.current) {
-        previewContainerRef.current.scrollTo({
-          top: ref.current.offsetTop - 20,
-          behavior: "smooth",
-        });
-      }
+      scrollToElementIfNeeded(ref.current, {
+        headerOffsetPx: previewScrollOffsetPx,
+        scrollContainer: previewContainerRef.current,
+        trustEmbeddedScrollContainer: true,
+      });
     };
 
     // Map active fields to their respective sections based on step number
@@ -722,14 +722,15 @@ export default function FormPreview() {
         } else if (activeField.includes("footer_brand_description")) {
           const container = previewContainerRef.current;
           const footer = container.querySelector("[data-preview-footer]");
-          if (footer instanceof HTMLElement) {
-            const top =
-              footer.getBoundingClientRect().top -
-              container.getBoundingClientRect().top +
-              container.scrollTop -
-              16;
-            container.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-          } else {
+          scrollToElementIfNeeded(
+            footer instanceof HTMLElement ? footer : null,
+            {
+              headerOffsetPx: previewScrollOffsetPx,
+              scrollContainer: container,
+              trustEmbeddedScrollContainer: true,
+            },
+          );
+          if (!(footer instanceof HTMLElement)) {
             container.scrollTo({
               top: container.scrollHeight,
               behavior: "smooth",
@@ -793,10 +794,9 @@ export default function FormPreview() {
         }
         break;
 
-      case 7: // Brochure & pricing
+      case 7: // Brochure PDFs
         if (
           activeField.includes("brochure_pdf") ||
-          activeField.includes("price_start_from") ||
           activeField.includes("downloads") ||
           activeField.includes("more_info")
         ) {
@@ -832,12 +832,10 @@ export default function FormPreview() {
   useEffect(() => {
     if (activeStep !== 5) return;
     const id = window.requestAnimationFrame(() => {
-      const container = previewContainerRef.current;
-      const target = datesRef.current;
-      if (!container || !target) return;
-      container.scrollTo({
-        top: Math.max(0, target.offsetTop - 24),
-        behavior: "smooth",
+      scrollToElementIfNeeded(datesRef.current, {
+        headerOffsetPx: PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX,
+        scrollContainer: previewContainerRef.current,
+        trustEmbeddedScrollContainer: true,
       });
     });
     return () => cancelAnimationFrame(id);
@@ -960,7 +958,7 @@ export default function FormPreview() {
     const roomSelectorStickyTop = showSectionNav
       ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
       : ONBOARDING_PREVIEW_HEADER_OFFSET;
-    const sectionAnchorClass = "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
+    const sectionAnchorClass = `scroll-mt-[var(--event-sticky-offset,${EVENT_STICKY_SCROLL_MT_FALLBACK})]`;
     const heroLocationLabel = formatEventLocationLabel(
       activePreviewBrochureLocation.description,
     );
@@ -988,6 +986,22 @@ export default function FormPreview() {
         (pkg) => pkg.price,
       ),
     });
+    const previewBrochurePricePanel = {
+      title: activePreviewBrochure?.price?.title || "PRICES FROM",
+      description: formatOnboardingPreviewBrochurePriceDescription(
+        brochureFromPrice,
+        formatPriceUnit,
+      ),
+      link: "#booking",
+      icon: activePreviewBrochure?.price?.icon || "Tag",
+      price_title: brochureFromPrice != null ? "Book Now" : "",
+    };
+    const previewPriceEditTarget = resolveOnboardingPreviewPriceEditTarget({
+      datePrices: datesPreviewItems.map((date) => date.price),
+      packagePrices: (activePreviewDrinks?.packages ?? []).map(
+        (pkg) => pkg.price,
+      ),
+    });
     const aboutHighlights = buildEventAboutHighlights({
       occasion: heroCategoryLabel,
       dates: heroDateLabel,
@@ -1005,9 +1019,10 @@ export default function FormPreview() {
       <div
         className="event-detail-page"
         style={{
-          ["--event-sticky-offset" as string]: showSectionNav
-            ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
-            : ONBOARDING_PREVIEW_HEADER_OFFSET,
+          ["--event-sticky-offset" as string]: buildEventStickyOffsetCssVar({
+            headerOffset: ONBOARDING_PREVIEW_HEADER_OFFSET,
+            showSectionNav,
+          }),
         }}
       >
         {/* Same header chrome as live event detail (`EventDetailClient`); non-interactive when inside PreviewProvider. */}
@@ -1056,14 +1071,14 @@ export default function FormPreview() {
               location: heroLocationLabel || null,
             }}
             onEditHero={() =>
-              jumpToEditor({ step: 3, field: "event_banner_heading" })
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.eventBanner)
             }
             onEditMeta={(key) => {
               if (key === "date" || key === "time") {
-                jumpToEditor({ step: 5, field: "dates" });
+                jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.dates);
                 return;
               }
-              jumpToEditor({ step: 3, field: "event_address" });
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.eventLocation);
             }}
             emptyMediaSlot={
               <div className="flex flex-col items-center gap-2">
@@ -1084,7 +1099,9 @@ export default function FormPreview() {
             scrollContainerRef={previewContainerRef}
             onItemClick={(id) => {
               const target = PREVIEW_SECTION_EDITOR[id];
-              if (target) jumpToEditor(target);
+              if (!target) return;
+              // Let section-nav scroll finish inside the device frame before switching the form step.
+              window.setTimeout(() => jumpToEditor(target), 400);
             }}
           />
         ) : null}
@@ -1099,8 +1116,7 @@ export default function FormPreview() {
           )}`}
         >
           <PreviewEditHit
-            step={3}
-            field="about_event_heading"
+            {...ONBOARDING_PREVIEW_EDITOR_TARGETS.eventAbout}
             label="About"
             onEdit={jumpToEditor}
           >
@@ -1368,25 +1384,29 @@ export default function FormPreview() {
           )}
         </div>
 
-        {/* Location / prices — downloads live in the header only */}
+        {/* Location / prices — event location edits Step 3; pricing edits dates/packages */}
         <div
           ref={moreInfoRef}
-          className={`transition-all duration-300 ${getHighlightClass(
-            7,
-            "more_info",
-          )}`}
+          className={`transition-all duration-300 ${
+            activeStep === 3 &&
+            activeField?.includes("event_address")
+              ? "ring-2 ring-primary ring-opacity-50 scroll-mt-20"
+              : activeStep === 7 &&
+                  activeField &&
+                  (activeField.includes("brochure_pdf") ||
+                    activeField.includes("downloads"))
+                ? "ring-2 ring-primary ring-opacity-50 scroll-mt-20"
+                : ""
+          }`}
         >
-          <PreviewEditHit
-            step={7}
-            field="event_address"
-            label="Location"
-            onEdit={jumpToEditor}
-          >
-            <BrochureSection
-              location={activePreviewBrochureLocation}
-              price={activePreviewBrochurePrice}
-            />
-          </PreviewEditHit>
+          <BrochureSection
+            location={activePreviewBrochureLocation}
+            price={previewBrochurePricePanel}
+            bookNowScrollOffsetPx={PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX}
+            onEditLocation={jumpToEditor}
+            onEditPrice={jumpToEditor}
+            priceEditTarget={previewPriceEditTarget}
+          />
         </div>
 
         {/* FAQs — same visibility rule as live event page */}

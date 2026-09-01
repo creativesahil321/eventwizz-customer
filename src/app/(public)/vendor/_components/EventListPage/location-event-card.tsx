@@ -10,6 +10,9 @@ import {
 } from "@/contexts/preview-context";
 import { formatEventCardFromPrice } from "./event-card-utils";
 import {
+  PUBLIC_CARD_HOVER_LIFT_CLASS,
+  PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
+  PUBLIC_LOADING_OVERLAY_CLASS,
   PUBLIC_CARD_TITLE_CLASS,
   PUBLIC_METADATA_TEXT_CLASS,
   PUBLIC_PRICE_TEXT_CLASS,
@@ -70,9 +73,10 @@ export function LocationEventCard({
 
   const cardClassName = cn(
     "group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] text-left outline-none",
-    "shadow-[0_12px_28px_-24px_rgba(0,0,0,0.4)] transition-all duration-300 ease-out",
+    "shadow-[0_12px_28px_-24px_rgba(0,0,0,0.4)]",
+    PUBLIC_CARD_HOVER_LIFT_CLASS,
     !isPending &&
-      "hover:-translate-y-1 hover:border-[color:color-mix(in_srgb,var(--color-primary)_45%,transparent)] hover:shadow-[0_22px_40px_-24px_rgba(0,0,0,0.35)]",
+      "[@media(hover:hover)_and_(pointer:fine)]:hover:border-[color:color-mix(in_srgb,var(--color-primary)_45%,transparent)] [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-[0_22px_40px_-24px_rgba(0,0,0,0.35)]",
     (!isPreview || isInteractivePreview) &&
       "focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]",
     isPending && "pointer-events-none",
@@ -84,7 +88,7 @@ export function LocationEventCard({
         <img
           src={addCacheBusting(event.image)}
           alt={event.title}
-          className="h-full w-full object-cover transition-transform duration-500 ease-out will-change-transform group-hover:scale-105"
+          className={cn("h-full w-full object-cover", PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS)}
           onError={(e) => {
             const target = e.currentTarget;
             if (target.dataset.fallbackApplied === "true") return;
@@ -195,10 +199,13 @@ export function LocationEventCard({
 
       {isPending ? (
         <div
-          className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-[var(--color-surface)]/55 backdrop-blur-[2px]"
+          className={cn(
+            "absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-[var(--color-surface)]/55 opacity-100 backdrop-blur-[2px]",
+            PUBLIC_LOADING_OVERLAY_CLASS,
+          )}
           aria-hidden
         >
-          <Loader2 className="h-7 w-7 animate-spin text-[color:var(--color-primary)]" />
+          <Loader2 className="h-7 w-7 animate-spin text-[color:var(--color-primary)] motion-reduce:animate-none" />
         </div>
       ) : null}
     </div>

@@ -9,7 +9,8 @@ import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
-import { EVENT_SECTION_NAV_HEIGHT_PX } from "@/components/public/event-section-nav";
+import { resolveBookNowScrollOffsetPx } from "@/lib/event-sticky-scroll-offset";
+import { PreviewEditHit, type PreviewEditorTarget } from "../../preview-edit-hit";
 
 type LucideIconName = keyof typeof Icons;
 
@@ -48,6 +49,12 @@ type BrochureSectionProps = {
   headingEmphasis?: HeadingEmphasis | string | null;
   /** Sticky header + section nav offset for in-page Book Now. */
   bookNowScrollOffsetPx?: number;
+  /** Preview → Step 3 event location fields. */
+  onEditLocation?: (target: PreviewEditorTarget) => void;
+  /** Preview → dates/packages (or fallback) for “Prices from”. */
+  onEditPrice?: (target: PreviewEditorTarget) => void;
+  /** When set, overrides the default Step 5 dates target on the price panel. */
+  priceEditTarget?: PreviewEditorTarget;
 };
 
 export default function BrochureSection({
@@ -56,8 +63,17 @@ export default function BrochureSection({
   showMapImmediately = false,
   omitPricePanel = false,
   headingEmphasis,
-  bookNowScrollOffsetPx = 72 + EVENT_SECTION_NAV_HEIGHT_PX,
+  bookNowScrollOffsetPx = resolveBookNowScrollOffsetPx({ headerOffsetPx: 72 }),
+  onEditLocation,
+  onEditPrice,
+  priceEditTarget,
 }: BrochureSectionProps) {
+  const resolvedPriceEditTarget =
+    priceEditTarget ??
+    ({
+      step: 5,
+      field: "dates",
+    } satisfies PreviewEditorTarget);
   const { format: formatMoney } = useCurrencyFormat();
   const narrowPreview = usePreviewNarrowLayout();
 
@@ -112,10 +128,94 @@ export default function BrochureSection({
 
   const gridClass = cn(
     "grid grid-cols-1 gap-4",
-    // Mobile / framed Mobile-Tablet: stack like live phone (map → price).
-    // Desktop preview + live desktop: side-by-side when price is shown.
     !narrowPreview && !omitPricePanel && "sm:grid-cols-2",
   );
+
+  const locationPanel = (
+    <section className="w-full overflow-hidden rounded-md">
+      <LocationMap
+        address={defaultLocation.description}
+        latitude={defaultLocation.latitude}
+        longitude={defaultLocation.longitude}
+        className="h-full w-full"
+        showMapImmediately={showMapImmediately}
+      />
+    </section>
+  );
+
+  const pricePanel = !omitPricePanel ? (
+    <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]">
+      {renderIcon(defaultPrice.icon, 24)}
+      <h2
+        className={cn(
+          "max-w-full break-words px-2 py-2 text-base font-bold uppercase",
+          !narrowPreview && "sm:py-3 sm:text-lg",
+        )}
+      >
+        {defaultPrice.title}
+      </h2>
+      <p
+        className={cn(
+          "max-w-full overflow-hidden px-2 text-xs break-words whitespace-normal",
+          !narrowPreview && "sm:text-sm",
+        )}
+        style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
+      >
+        {defaultPrice.description}
+      </p>
+      {defaultPrice.price_title ? (
+        <Button
+          variant="event-outline"
+          type="button"
+          className="mt-3"
+          asChild
+        >
+          {defaultPrice.link?.startsWith("#") ? (
+            <button
+              type="button"
+              onClick={() => {
+                const id = defaultPrice.link!.slice(1);
+                const el = id ? document.getElementById(id) : null;
+                scrollToElementIfNeeded(el, {
+                  headerOffsetPx: bookNowScrollOffsetPx,
+                });
+                if (el) {
+                  el.setAttribute("data-book-now-focus", "true");
+                  window.setTimeout(() => {
+                    el.removeAttribute("data-book-now-focus");
+                  }, 2500);
+                  const hint = el.querySelector(
+                    "[data-book-now-hint]",
+                  ) as HTMLElement | null;
+                  if (hint) {
+                    hint.hidden = false;
+                    window.setTimeout(() => {
+                      hint.hidden = true;
+                    }, 4000);
+                  }
+                }
+              }}
+            >
+              {defaultPrice.price_title}
+            </button>
+          ) : (
+            <a
+              href={sanitizeHref(defaultPrice.link) ?? "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!sanitizeHref(defaultPrice.link)) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              {defaultPrice.price_title}
+            </a>
+          )}
+        </Button>
+      ) : null}
+    </section>
+  ) : null;
 
   return (
     <section className="py-16 px-4 bg-[color:var(--color-background)]">
@@ -134,89 +234,34 @@ export default function BrochureSection({
           />
         </div>
         <section className={gridClass}>
-          <section className="w-full overflow-hidden rounded-md">
-            <LocationMap
-              address={defaultLocation.description}
-              latitude={defaultLocation.latitude}
-              longitude={defaultLocation.longitude}
-              className="h-full w-full"
-              showMapImmediately={showMapImmediately}
-            />
-          </section>
+          {onEditLocation ? (
+            <PreviewEditHit
+              step={3}
+              field="event_address"
+              guidedSectionId="event-location"
+              label="Event location"
+              onEdit={onEditLocation}
+            >
+              {locationPanel}
+            </PreviewEditHit>
+          ) : (
+            locationPanel
+          )}
 
-          {!omitPricePanel ? (
-            <section className="flex w-full flex-col items-center justify-center rounded-md bg-[var(--color-primary)] px-2 py-5 text-[var(--color-primary-foreground)]">
-              {renderIcon(defaultPrice.icon, 24)}
-              <h2
-                className={cn(
-                  "max-w-full break-words px-2 py-2 text-base font-bold uppercase",
-                  !narrowPreview && "sm:py-3 sm:text-lg",
-                )}
+          {pricePanel ? (
+            onEditPrice ? (
+              <PreviewEditHit
+                step={resolvedPriceEditTarget.step}
+                field={resolvedPriceEditTarget.field}
+                guidedSectionId={resolvedPriceEditTarget.guidedSectionId}
+                label="Pricing"
+                onEdit={onEditPrice}
               >
-                {defaultPrice.title}
-              </h2>
-              <p
-                className={cn(
-                  "max-w-full overflow-hidden px-2 text-xs break-words whitespace-normal",
-                  !narrowPreview && "sm:text-sm",
-                )}
-                style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
-              >
-                {defaultPrice.description}
-              </p>
-              {defaultPrice.price_title ? (
-                <Button
-                  variant="event-outline"
-                  type="button"
-                  className="mt-3"
-                  asChild
-                >
-                  {defaultPrice.link?.startsWith("#") ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const id = defaultPrice.link!.slice(1);
-                        const el = id ? document.getElementById(id) : null;
-                        scrollToElementIfNeeded(el, {
-                          headerOffsetPx: bookNowScrollOffsetPx,
-                        });
-                        // Primary CTA scrolls to dates — make the next step obvious.
-                        if (el) {
-                          el.setAttribute("data-book-now-focus", "true");
-                          window.setTimeout(() => {
-                            el.removeAttribute("data-book-now-focus");
-                          }, 2500);
-                          const hint = el.querySelector(
-                            "[data-book-now-hint]",
-                          ) as HTMLElement | null;
-                          if (hint) {
-                            hint.hidden = false;
-                            window.setTimeout(() => {
-                              hint.hidden = true;
-                            }, 4000);
-                          }
-                        }
-                      }}
-                    >
-                      {defaultPrice.price_title}
-                    </button>
-                  ) : (
-                    <a
-                      href={sanitizeHref(defaultPrice.link) ?? "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => {
-                        if (!sanitizeHref(defaultPrice.link)) {
-                          e.preventDefault();
-                        }
-                      }}
-                    >
-                      {defaultPrice.price_title}
-                    </a>
-                  )}
-                </Button>
-              ) : null}
-            </section>
+                {pricePanel}
+              </PreviewEditHit>
+            ) : (
+              pricePanel
+            )
           ) : null}
         </section>
       </div>

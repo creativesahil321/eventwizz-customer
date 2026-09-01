@@ -72,6 +72,11 @@ import {
   EVENT_SECTION_NAV_HEIGHT_PX,
   buildEventSectionNavItems,
 } from "@/components/public/event-section-nav";
+import {
+  EVENT_STICKY_SCROLL_MT_FALLBACK,
+  buildEventStickyOffsetCssVar,
+  resolveBookNowScrollOffsetPx,
+} from "@/lib/event-sticky-scroll-offset";
 
 /** Sticky site header height — keep scroll targets / triggers clear of the header. */
 const BASE_HEADER_OFFSET_PX = 72;
@@ -167,7 +172,9 @@ export default function EventDetailClient({
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           scrollToElementIfNeeded(bookingRef.current, {
-            headerOffsetPx: headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX,
+            headerOffsetPx: resolveBookNowScrollOffsetPx({
+              headerOffsetPx,
+            }),
           });
         });
       });
@@ -322,7 +329,7 @@ export default function EventDetailClient({
   const roomSelectorStickyTop = showSectionNav
     ? `calc(${roomBarStickyTop} + ${EVENT_SECTION_NAV_HEIGHT})`
     : roomBarStickyTop;
-  const sectionAnchorClass = "scroll-mt-[var(--event-sticky-offset,7.25rem)]";
+  const sectionAnchorClass = `scroll-mt-[var(--event-sticky-offset,${EVENT_STICKY_SCROLL_MT_FALLBACK})]`;
 
   const eventLocationLabel = formatEventLocationLabel(
     slices.event_address ?? "",
@@ -352,9 +359,10 @@ export default function EventDetailClient({
       <div
         className="event-detail-page"
         style={{
-          ["--event-sticky-offset" as string]: showSectionNav
-            ? `calc(${roomBarStickyTop} + ${EVENT_SECTION_NAV_HEIGHT})`
-            : roomBarStickyTop,
+          ["--event-sticky-offset" as string]: buildEventStickyOffsetCssVar({
+            headerOffset: roomBarStickyTop,
+            showSectionNav,
+          }),
         }}
       >
         <CommonHeader
@@ -574,7 +582,9 @@ export default function EventDetailClient({
           <LazyBrochureSection
             showMapImmediately
             headingEmphasis={headingEmphasisFromSite}
-            bookNowScrollOffsetPx={headerOffsetPx + EVENT_SECTION_NAV_HEIGHT_PX}
+            bookNowScrollOffsetPx={resolveBookNowScrollOffsetPx({
+              headerOffsetPx,
+            })}
             location={{
               title: "EVENT LOCATION",
               description:

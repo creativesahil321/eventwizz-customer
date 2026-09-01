@@ -9,6 +9,7 @@ import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import type { EventRoomChooserItem } from "@/lib/event-room-chooser-item";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { PUBLIC_MOTION_DURATION_MEDIUM, PUBLIC_MOTION_EASE } from "@/lib/public-rhythm";
 
 type EventRoomChooserProps = {
   rooms: EventRoomChooserItem[];
@@ -108,13 +109,20 @@ export function EventRoomChooser({
                     : `Select ${room.name}`
                 }
                 className={cn(
-                  "group relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--color-surface)] text-left transition-all duration-300",
+                  "group relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--color-surface)] text-left",
+                  PUBLIC_MOTION_DURATION_MEDIUM,
+                  PUBLIC_MOTION_EASE,
+                  "transition-all motion-reduce:transition-none",
+                  "active:scale-[0.99]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2",
                   isDisabled
                     ? "cursor-not-allowed border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] opacity-55 shadow-none"
                     : isActive
-                      ? "border-[color:var(--color-primary)] shadow-[0_22px_45px_-20px_color-mix(in_srgb,var(--color-primary)_60%,transparent)] ring-1 ring-[color:var(--color-primary)]"
-                      : "border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] shadow-[0_12px_30px_-24px_rgba(0,0,0,0.35)] hover:-translate-y-1 hover:border-[color:color-mix(in_srgb,var(--color-primary)_45%,transparent)] hover:shadow-[0_22px_45px_-24px_rgba(0,0,0,0.4)]",
+                      ? "scale-[1.01] border-[color:var(--color-primary)] shadow-[0_22px_45px_-20px_color-mix(in_srgb,var(--color-primary)_60%,transparent)] ring-1 ring-[color:var(--color-primary)]"
+                      : cn(
+                          "border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] shadow-[0_12px_30px_-24px_rgba(0,0,0,0.35)]",
+                          "[@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-1 [@media(hover:hover)_and_(pointer:fine)]:hover:border-[color:color-mix(in_srgb,var(--color-primary)_45%,transparent)] [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-[0_22px_45px_-24px_rgba(0,0,0,0.4)]",
+                        ),
                 )}
               >
                 <div className="relative aspect-[16/10] w-full overflow-hidden bg-[color:color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))]">
@@ -124,8 +132,9 @@ export function EventRoomChooser({
                       src={addCacheBusting(room.thumbnail)}
                       alt=""
                       className={cn(
-                        "h-full w-full object-cover transition-transform duration-500",
-                        !isDisabled && "group-hover:scale-105",
+                        "h-full w-full object-cover transition-transform duration-200 ease-out motion-reduce:transition-none",
+                        !isDisabled &&
+                          "[@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-105",
                         isDisabled && "grayscale",
                       )}
                     />

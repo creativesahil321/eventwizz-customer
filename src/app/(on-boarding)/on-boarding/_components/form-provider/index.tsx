@@ -41,8 +41,15 @@ interface FormContextType {
    * panel to open (if collapsed) and scroll/focus the matching field. The token
    * bumps on every request so repeating the same field still re-triggers.
    */
-  formFieldFocusRequest: { field: string; token: number } | null;
-  requestFormFieldFocus: (field: string) => void;
+  formFieldFocusRequest: {
+    field: string;
+    guidedSectionId?: string;
+    token: number;
+  } | null;
+  requestFormFieldFocus: (
+    field: string,
+    options?: { guidedSectionId?: string },
+  ) => void;
   setActiveStep: (
     step: number,
     options?: { skipSessionSync?: boolean },
@@ -122,18 +129,23 @@ export function FormProvider({
   const [activeField, setActiveField] = useState<string | null>(null);
   const [formFieldFocusRequest, setFormFieldFocusRequest] = useState<{
     field: string;
+    guidedSectionId?: string;
     token: number;
   } | null>(null);
-  /** Step save/next only; initial shell is gated by the parent onboarding query, not another artificial delay. */
-  const [isLoading, setIsLoading] = useState(false);
 
-  const requestFormFieldFocus = useCallback((field: string) => {
-    if (!field) return;
-    setFormFieldFocusRequest((prev) => ({
-      field,
-      token: (prev?.token ?? 0) + 1,
-    }));
-  }, []);
+  const requestFormFieldFocus = useCallback(
+    (field: string, options?: { guidedSectionId?: string }) => {
+      if (!field) return;
+      setFormFieldFocusRequest((prev) => ({
+        field,
+        guidedSectionId: options?.guidedSectionId,
+        token: (prev?.token ?? 0) + 1,
+      }));
+    },
+    [],
+  );
+  /** Step save/next only; initial shell is gated by the parent onboarding query. */
+  const [isLoading, setIsLoading] = useState(false);
 
   const maxSteps = 11;
   const dataLoadAttempted = useRef(false);

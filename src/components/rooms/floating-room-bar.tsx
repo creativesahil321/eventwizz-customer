@@ -138,6 +138,7 @@ export function FloatingRoomBar({
 
   return (
     <div
+      data-event-sticky-room-bar={layout === "sticky" ? "" : undefined}
       className={cn(
         "z-[45] flex w-full justify-center",
         narrowPreview ? "px-2.5 py-1.5" : "px-2.5 py-1.5 sm:px-4 sm:py-2",

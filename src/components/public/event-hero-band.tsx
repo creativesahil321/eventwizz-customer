@@ -26,6 +26,7 @@ import {
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import {
   PreviewEditHoverBadge,
   PreviewEditHoverFrame,
@@ -131,6 +132,7 @@ export function EventHeroBand({
   onEditHero,
   onEditMeta,
 }: EventHeroBandProps) {
+  const previewNarrow = usePreviewNarrowLayout();
   const syncBgUrl = useMemo(
     () => syncImageUrlFromInput(bannerImage, cacheBustImage),
     [bannerImage, cacheBustImage],
@@ -303,15 +305,17 @@ export function EventHeroBand({
               aria-label="Breadcrumb"
               className={cn(
                 "text-xs font-medium tracking-wide text-white/80 sm:text-sm",
-                heroHeadingAlignClass(bannerAlign, { fromMd: true }),
+                previewNarrow
+                  ? "text-center"
+                  : heroHeadingAlignClass(bannerAlign, { fromMd: true }),
               )}
             >
               <ol
                 className={cn(
-                  "flex flex-wrap items-center gap-x-1.5 gap-y-1 justify-center",
-                  bannerAlign === "left" && "md:justify-start",
-                  bannerAlign === "center" && "md:justify-center",
-                  bannerAlign === "right" && "md:justify-end",
+                  "flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1",
+                  !previewNarrow && bannerAlign === "left" && "md:justify-start",
+                  !previewNarrow && bannerAlign === "center" && "md:justify-center",
+                  !previewNarrow && bannerAlign === "right" && "md:justify-end",
                 )}
               >
                 {crumbs.map((crumb, index) => {
