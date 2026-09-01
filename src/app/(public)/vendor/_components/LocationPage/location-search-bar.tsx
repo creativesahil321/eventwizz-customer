@@ -246,9 +246,9 @@ export function LocationSearchBar({
     availableDateSet.size > 0;
 
   const fieldBtnClass = cn(
-    "flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2.5 py-2 text-left text-sm transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-text)_4%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:min-w-[9rem] sm:gap-2 sm:px-3 sm:py-2",
-    "@max-sm/preview:!min-w-0 @max-sm/preview:!px-2",
-    isPreviewMobile && "!min-w-0 !px-2",
+    "flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-full px-2 py-2.5 text-left text-sm transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-text)_4%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:min-h-0 sm:min-w-[9rem] sm:gap-2 sm:px-3 sm:py-2",
+    "@max-sm/preview:!min-h-11 @max-sm/preview:!min-w-0 @max-sm/preview:!px-2",
+    isPreviewMobile && "!min-h-11 !min-w-0 !px-2",
   );
 
   return (
@@ -274,7 +274,7 @@ export function LocationSearchBar({
             isPreviewMobile && "!flex-col !items-stretch !gap-1",
           )}
         >
-          <label className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-2 sm:px-3.5 sm:py-2 @max-sm/preview:!py-2">
+          <label className="relative flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2.5 py-2.5 sm:min-h-0 sm:px-3.5 sm:py-2 @max-sm/preview:!min-h-11 @max-sm/preview:!px-2">
             <Search
               className="h-4 w-4 shrink-0 text-[var(--color-primary)]"
               aria-hidden
@@ -289,7 +289,7 @@ export function LocationSearchBar({
                   ? "Search location events"
                   : "Search event and category"
               }
-              className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-dimmed)]"
+              className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-dimmed)] max-sm:placeholder:text-xs"
               aria-label={
                 hideCity
                   ? "Search location events"
@@ -508,12 +508,12 @@ export function LocationSearchBar({
               type="submit"
               aria-label="Search events"
               className={cn(
-                "inline-flex h-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[var(--color-footer)] px-3 text-sm font-semibold text-[var(--color-on-footer)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:h-9 sm:px-5",
+                "inline-flex h-12 min-h-12 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[var(--color-footer)] px-3 text-sm font-semibold text-[var(--color-on-footer)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:h-11 sm:min-h-0 sm:px-5",
                 !hideCity && "col-span-2 sm:col-span-1",
                 hideCity
                   ? previewSearchSubmitUntilSm
                   : previewSearchSubmitFullUntilSm,
-                isPreviewMobile && "!h-10",
+                isPreviewMobile && "!h-12 !min-h-12",
                 isPreviewMobile && !hideCity && "!col-span-2",
               )}
             >

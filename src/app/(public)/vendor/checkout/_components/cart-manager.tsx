@@ -82,6 +82,10 @@ import {
   hasRemainingDatesToAdd,
   hasRemainingDatesToAddAnywhere,
 } from "../_lib/remaining-dates";
+import {
+  countCheckoutDateStatuses,
+  formatCheckoutBookingMetaLine,
+} from "../_lib/checkout-readiness";
 import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
@@ -583,6 +587,17 @@ export default function CartManager({}: CartManagerProps) {
     editingData,
   ]);
 
+  const checkoutDateCounts = useMemo(() => {
+    if (!currentEventSlug) {
+      return { total: 0, ready: 0, needsItems: 0 };
+    }
+    return countCheckoutDateStatuses(
+      currentEventSlug,
+      allBookingDateKeys,
+      getDateData,
+    );
+  }, [currentEventSlug, allBookingDateKeys, getDateData, editingData]);
+
   const handleRemoveDate = async (dateKey: string) => {
     if (removingDateKey || deleteCartDateMutation.isPending) return;
 
@@ -728,25 +743,20 @@ export default function CartManager({}: CartManagerProps) {
     );
   }
 
-  const totalDatesAcrossRooms = roomMode
-    ? getAllRoomDateKeys(currentEventApiData).length
-    : totalCartItems;
   const activeRoom = rooms.find((r) => r.room_id === activeRoomId);
   const activeRoomIndex = Math.max(
     0,
     rooms.findIndex((r) => r.room_id === activeRoomId),
   );
-  const guestMetaSuffix =
-    totalGuestsAcrossCart > 0
-      ? ` · ${totalGuestsAcrossCart} guest${totalGuestsAcrossCart !== 1 ? "s" : ""}`
-      : "";
   const isSingleRoomCheckout = roomMode && rooms.length === 1;
   const isMultiRoomCheckout = roomMode && rooms.length > 1;
   const bookedRoomCount = rooms.length;
-  const bookingMetaLine =
-    roomMode && bookedRoomCount > 0
-      ? `${bookedRoomCount} ${bookedRoomCount === 1 ? "room" : "rooms"} · ${totalDatesAcrossRooms} ${totalDatesAcrossRooms === 1 ? "date" : "dates"}${guestMetaSuffix}`
-      : `${totalCartItems} ${totalCartItems === 1 ? "date" : "dates"}${guestMetaSuffix}`;
+  const bookingMetaLine = formatCheckoutBookingMetaLine({
+    roomMode: roomMode && bookedRoomCount > 0,
+    roomCount: bookedRoomCount,
+    dateCounts: checkoutDateCounts,
+    guestCount: totalGuestsAcrossCart,
+  });
 
   const locationName =
     typeof currentEventApiData?.location_name === "string"

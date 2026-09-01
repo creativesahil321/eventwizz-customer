@@ -6,6 +6,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type MenuItem = {
@@ -112,7 +113,7 @@ export default function MenuSection({
   const isSingleMenu = count === 1;
 
   return (
-    <section className="relative w-full overflow-hidden bg-[color:var(--color-background)] px-4 py-16">
+    <section className={cn("relative w-full overflow-hidden bg-[color:var(--color-background)] px-4", PUBLIC_SECTION_PY_CLASS)}>
       <div className="absolute inset-0 z-0">
         {menu_background_image && !menuBgImageFailed ? (
           <img

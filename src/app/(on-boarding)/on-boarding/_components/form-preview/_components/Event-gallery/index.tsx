@@ -5,6 +5,7 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { GalleryLightbox } from "@/components/public/gallery-lightbox";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
@@ -119,7 +120,7 @@ export default function EventGallery({
   );
 
   return (
-    <section className="w-full bg-[color:var(--color-background)] px-4 py-16">
+    <section className={cn("w-full bg-[color:var(--color-background)] px-4", PUBLIC_SECTION_PY_CLASS)}>
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 space-y-3 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">

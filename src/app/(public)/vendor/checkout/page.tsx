@@ -21,7 +21,7 @@ function CheckoutBootSkeleton({
   return (
     <div className="checkout-page min-h-screen">
       <CheckoutHeader settings={settings} />
-      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl px-4 py-4 md:px-6 md:py-8">
         <div className="grid grid-cols-1 items-start gap-6 sm:gap-8 lg:grid-cols-12">
           <div className="min-w-0 pb-[var(--checkout-mobile-bar-offset)] lg:col-span-8 lg:pb-0">
             <CartSkeletonLoader />
@@ -60,7 +60,7 @@ export default function CheckoutPage({}: CheckoutPageProps) {
     <div className="checkout-page min-h-screen">
       <CheckoutHeader settings={settings || undefined} />
 
-      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl px-4 py-4 md:px-6 md:py-8">
         <div className="grid grid-cols-1 items-start gap-6 sm:gap-8 lg:grid-cols-12">
           <div className="min-w-0 pb-[var(--checkout-mobile-bar-offset)] lg:col-span-8 lg:pb-0">
             <CartManager />

@@ -8,6 +8,11 @@ import {
   type RefObject,
 } from "react";
 import { cn } from "@/lib/utils";
+import {
+  PUBLIC_EVENT_NAV_TAB_ACTIVE_CLASS,
+  PUBLIC_EVENT_NAV_TAB_BASE_CLASS,
+  PUBLIC_EVENT_NAV_TAB_INACTIVE_CLASS,
+} from "@/lib/public-rhythm";
 
 export const EVENT_SECTION_NAV_HEIGHT = "3.5rem";
 export const EVENT_SECTION_NAV_HEIGHT_PX = 56;
@@ -384,10 +389,10 @@ export function EventSectionNav({
                   onItemClick?.(item.id);
                 }}
                 className={cn(
-                  "relative flex shrink-0 items-center text-[13px] font-medium leading-none tracking-wide transition-colors sm:text-sm",
+                  PUBLIC_EVENT_NAV_TAB_BASE_CLASS,
                   isActive
-                    ? "text-[var(--color-text)]"
-                    : "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]",
+                    ? PUBLIC_EVENT_NAV_TAB_ACTIVE_CLASS
+                    : PUBLIC_EVENT_NAV_TAB_INACTIVE_CLASS,
                 )}
                 aria-current={isActive ? "true" : undefined}
               >
@@ -395,10 +400,8 @@ export function EventSectionNav({
                 <span
                   aria-hidden
                   className={cn(
-                    "pointer-events-none absolute inset-x-0 bottom-0 h-0.5",
-                    isActive
-                      ? "bg-[color:var(--color-primary)]"
-                      : "bg-transparent",
+                    "pointer-events-none absolute inset-x-0 bottom-0",
+                    isActive ? "h-[3px] bg-[color:var(--color-primary)]" : "h-0.5 bg-transparent",
                   )}
                 />
               </button>

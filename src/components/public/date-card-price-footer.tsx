@@ -68,7 +68,7 @@ export function DateCardPriceFooter({
       <span
         className={cn(
           "block px-1 font-semibold tracking-wider text-white",
-          compact ? "py-1 text-sm" : "py-1 text-sm sm:py-1.5 sm:text-base",
+          compact ? "py-1 text-base" : "py-1 text-base sm:py-1.5 sm:text-lg",
           className,
         )}
       >
@@ -96,7 +96,7 @@ export function DateCardPriceFooter({
       <span
         className={cn(
           "font-semibold tabular-nums tracking-wider",
-          compact ? "text-sm leading-none" : "text-sm leading-none sm:text-base",
+          compact ? "text-sm leading-none" : "text-base leading-none sm:text-lg",
         )}
       >
         {priceLabel}

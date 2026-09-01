@@ -11,6 +11,7 @@ import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { useAuthStore } from "@/store/auth.store";
 import { useLocationStore } from "@/store/location.store";
@@ -80,7 +81,7 @@ function SubscribeShell({
   children: React.ReactNode;
 }) {
   return (
-    <section className="relative overflow-hidden bg-[var(--color-surface)] py-16 md:py-20">
+    <section className={cn("relative overflow-hidden bg-[var(--color-surface)]", PUBLIC_SECTION_PY_CLASS)}>
       <div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,color-mix(in_srgb,var(--color-primary)_8%,transparent),transparent)]"
         aria-hidden

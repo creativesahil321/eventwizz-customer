@@ -41,7 +41,7 @@ export const DateCard = ({
       aria-label={ariaLabel}
       disabled={soldOut}
       className={cn(
-        "cursor-pointer overflow-hidden rounded-2xl border border-[var(--color-primary)] bg-transparent text-center shadow-[0_0_15px_rgba(60,70,147,0.25)] transition-all duration-300 hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] flex-shrink-0",
+        "cursor-pointer overflow-hidden rounded-2xl border border-[color:color-mix(in_srgb,var(--color-primary)_55%,transparent)] bg-black/25 text-center shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] backdrop-blur-sm transition-all duration-300 hover:border-[var(--color-primary)] hover:bg-black/35 hover:shadow-[0_0_28px_rgba(60,70,147,0.55)] flex-shrink-0",
         soldOut && "cursor-not-allowed opacity-60 hover:shadow-[0_0_15px_rgba(60,70,147,0.25)]",
         narrowPreview
           ? "w-[85px]"

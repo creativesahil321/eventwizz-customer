@@ -86,6 +86,9 @@ import {
 } from "@/components/ui/sheet";
 import {
   assessCheckoutDatesReadiness,
+  countCheckoutDateStatuses,
+  findFirstIncompleteCheckoutDate,
+  formatCheckoutBookingMetaLine,
   resolveCheckoutCtaState,
 } from "../_lib/checkout-readiness";
 
@@ -797,15 +800,27 @@ export default function BookingSummary({}: BookingSummaryProps) {
   }, [availableDates, currentEventSlug, editingData, getDateData]);
 
   const summaryMetaLine = useMemo(() => {
-    const guestSuffix =
-      totalGuests > 0
-        ? ` · ${totalGuests} guest${totalGuests !== 1 ? "s" : ""}`
-        : "";
-    if (roomMode && rooms.length > 0) {
-      return `${rooms.length} room${rooms.length > 1 ? "s" : ""} · ${totalItems} date${totalItems !== 1 ? "s" : ""}${guestSuffix}`;
-    }
-    return `${totalItems} date${totalItems !== 1 ? "s" : ""}${guestSuffix}`;
-  }, [roomMode, rooms.length, totalItems, totalGuests]);
+    if (!currentEventSlug) return "";
+    const dateCounts = countCheckoutDateStatuses(
+      currentEventSlug,
+      availableDates,
+      getDateData,
+    );
+    return formatCheckoutBookingMetaLine({
+      roomMode: roomMode && rooms.length > 0,
+      roomCount: rooms.length,
+      dateCounts,
+      guestCount: totalGuests,
+    });
+  }, [
+    availableDates,
+    currentEventSlug,
+    editingData,
+    getDateData,
+    roomMode,
+    rooms.length,
+    totalGuests,
+  ]);
 
   const itineraryDates = useMemo(() => {
     if (!currentEventSlug) return [];
@@ -1252,6 +1267,14 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }
     if (hasValidationErrors) {
       e.preventDefault();
+      const incompleteDate = findFirstIncompleteCheckoutDate(
+        currentEventSlug,
+        availableDates,
+        getDateData,
+      );
+      if (incompleteDate) {
+        focusCheckoutDate(incompleteDate);
+      }
       toast.error(
         validationErrorMessage ||
           "Please select at least one table or ticket for each date",
@@ -1708,6 +1731,15 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   </div>
                 )}
               </Button>
+              {ctaState.needsGatewaySelection ? (
+                <p className="text-center text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
+                  Tap Pay to choose your payment method
+                </p>
+              ) : hasValidationErrors ? (
+                <p className="text-center text-[11px] leading-snug text-amber-700">
+                  Finish selections for each date above
+                </p>
+              ) : null}
             </div>
           </CheckoutMobileStickyBar>
         </div>

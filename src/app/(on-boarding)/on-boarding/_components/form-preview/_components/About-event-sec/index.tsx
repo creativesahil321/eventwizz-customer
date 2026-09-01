@@ -5,6 +5,7 @@ import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { addCacheBusting } from "@/lib/image-utils";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 
 interface AboutEventSecProps {
   about_event_heading?: string;
@@ -42,10 +43,10 @@ export default function AboutEventSec({
     "<p>Tell guests what makes this event special — the atmosphere, what’s included, and why they should book.</p><p>Add the latest dates, then keep this section short so people can scan it quickly.</p>";
 
   return (
-    <section className="w-full bg-[color:var(--color-background)] py-10 sm:py-14 md:py-24">
+    <section className={cn("w-full bg-[color:var(--color-background)]", PUBLIC_SECTION_PY_CLASS)}>
       <div
         className={cn(
-          "mx-auto grid w-full max-w-7xl items-start gap-8 px-4 sm:gap-10 sm:px-8",
+          "mx-auto grid w-full max-w-7xl items-start gap-8 px-4 md:px-6 sm:gap-10",
           !narrowPreview &&
             "lg:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)] lg:gap-14 @max-5xl/preview:!grid-cols-1 @max-5xl/preview:!gap-8",
         )}
@@ -90,7 +91,7 @@ export default function AboutEventSec({
                     key={`${highlight.label}-${highlight.value}`}
                     className="min-w-0 border-t border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] pt-2.5 sm:pt-3"
                   >
-                    <dt className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[color:var(--color-text-dimmed)] sm:text-xs sm:tracking-[0.16em]">
+                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--color-text-dimmed)] sm:tracking-[0.16em]">
                       {highlight.label}
                     </dt>
                     <dd className="mt-1 break-words text-sm font-semibold leading-snug text-[var(--color-text)] sm:mt-1.5 sm:text-base">
@@ -125,7 +126,7 @@ export default function AboutEventSec({
           </div>
         ) : null}
       </div>
-      <div className="mx-auto mt-12 h-px w-full max-w-7xl bg-[color:color-mix(in_srgb,var(--color-primary)_24%,transparent)] px-4 sm:px-8" />
+      <div className="mx-auto mt-10 h-px w-full max-w-7xl bg-[color:color-mix(in_srgb,var(--color-primary)_24%,transparent)] px-4 md:mt-12 md:px-6" />
     </section>
   );
 }

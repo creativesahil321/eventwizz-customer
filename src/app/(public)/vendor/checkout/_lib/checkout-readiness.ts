@@ -1,4 +1,98 @@
 import type { EditableDateData } from "@/store/cart-edit.store";
+import { buildDateSelectionSummary } from "./cart-calculations";
+
+export const CHECKOUT_EMPTY_DATE_SUMMARY = "No items selected yet";
+
+export interface CheckoutDateCounts {
+  total: number;
+  ready: number;
+  needsItems: number;
+}
+
+type CheckoutDateDataGetter = (
+  eventSlug: string,
+  date: string,
+) => EditableDateData | null | undefined;
+
+export function isCheckoutDateEmpty(
+  dateData: Parameters<typeof buildDateSelectionSummary>[0],
+): boolean {
+  return buildDateSelectionSummary(dateData) === CHECKOUT_EMPTY_DATE_SUMMARY;
+}
+
+export function countCheckoutDateStatuses(
+  eventSlug: string | null | undefined,
+  availableDates: string[],
+  getDateData: CheckoutDateDataGetter,
+): CheckoutDateCounts {
+  if (!eventSlug) {
+    return { total: 0, ready: 0, needsItems: 0 };
+  }
+
+  let ready = 0;
+  let needsItems = 0;
+
+  for (const date of availableDates) {
+    const dateData = getDateData(eventSlug, date);
+    if (!dateData) continue;
+
+    if (isCheckoutDateEmpty(dateData)) {
+      needsItems += 1;
+    } else {
+      ready += 1;
+    }
+  }
+
+  return { total: ready + needsItems, ready, needsItems };
+}
+
+export function findFirstIncompleteCheckoutDate(
+  eventSlug: string | null | undefined,
+  availableDates: string[],
+  getDateData: CheckoutDateDataGetter,
+): string | null {
+  if (!eventSlug) return null;
+
+  for (const date of availableDates) {
+    const dateData = getDateData(eventSlug, date);
+    if (!dateData) continue;
+    if (isCheckoutDateEmpty(dateData)) return date;
+  }
+
+  return null;
+}
+
+function formatDateReadinessPart(counts: CheckoutDateCounts): string {
+  const { total, ready, needsItems } = counts;
+  if (total === 0) return "0 dates";
+  if (needsItems === 0) {
+    return `${total} date${total !== 1 ? "s" : ""} ready`;
+  }
+  if (ready === 0) {
+    return `${total} date${total !== 1 ? "s" : ""} need items`;
+  }
+  return `${ready} date${ready !== 1 ? "s" : ""} ready · ${needsItems} need${needsItems !== 1 ? "s" : ""} items`;
+}
+
+export function formatCheckoutBookingMetaLine(params: {
+  roomMode: boolean;
+  roomCount: number;
+  dateCounts: CheckoutDateCounts;
+  guestCount?: number;
+}): string {
+  const { roomMode, roomCount, dateCounts, guestCount = 0 } = params;
+  const guestSuffix =
+    guestCount > 0
+      ? ` · ${guestCount} guest${guestCount !== 1 ? "s" : ""}`
+      : "";
+  const datePart = formatDateReadinessPart(dateCounts);
+
+  if (roomMode && roomCount > 0) {
+    return `${roomCount} room${roomCount !== 1 ? "s" : ""} · ${datePart}${guestSuffix}`;
+  }
+
+  return `${datePart}${guestSuffix}`;
+}
 
 export interface CheckoutDateReadiness {
   hasUnsavedEdits: boolean;

@@ -9,6 +9,11 @@ import {
   usePreviewEventSelect,
 } from "@/contexts/preview-context";
 import { formatEventCardFromPrice } from "./event-card-utils";
+import {
+  PUBLIC_CARD_TITLE_CLASS,
+  PUBLIC_METADATA_TEXT_CLASS,
+  PUBLIC_PRICE_TEXT_CLASS,
+} from "@/lib/public-rhythm";
 
 export type LocationEventCardModel = {
   title: string;
@@ -109,14 +114,17 @@ export function LocationEventCard({
 
       <div className="flex flex-1 flex-col p-4 md:p-5">
         <h3
-          className="line-clamp-2 text-left text-sm font-bold leading-snug text-[var(--color-text)] transition-colors duration-300 group-hover:text-[color:var(--color-primary)] md:text-[15px]"
+          className={cn(
+            PUBLIC_CARD_TITLE_CLASS,
+            "text-left text-sm text-[var(--color-text)] transition-colors duration-300 group-hover:text-[color:var(--color-primary)] md:text-[15px]",
+          )}
           style={{ fontFamily: "var(--font-heading)" }}
         >
           {event.title}
         </h3>
 
         {event.dateLabel || event.timeLabel ? (
-          <div className="mt-2 space-y-1 text-[12px] text-[var(--color-text-dimmed)]">
+          <div className={cn("mt-2 space-y-1", PUBLIC_METADATA_TEXT_CLASS)}>
             {event.dateLabel ? (
               <p className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
@@ -141,7 +149,7 @@ export function LocationEventCard({
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-4">
           {fromPrice ? (
-            <span className="text-[13px] font-medium text-[var(--color-text)]">
+            <span className={PUBLIC_PRICE_TEXT_CLASS}>
               {fromPrice}
             </span>
           ) : (

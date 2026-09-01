@@ -40,6 +40,7 @@ import {
   calculateEditableDateTotal,
   getDateGuestCount,
 } from "../_lib/cart-calculations";
+import { isCheckoutDateEmpty } from "../_lib/checkout-readiness";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { getCheckoutRoomTone } from "../_lib/checkout-room-tones";
 import { cn } from "@/lib/utils";
@@ -459,6 +460,7 @@ export default function DateAccordion({
   };
 
   const selectionSummary = buildDateSelectionSummary(dateData);
+  const isDateEmpty = isCheckoutDateEmpty(dateData);
   const roomTone = getCheckoutRoomTone(roomAccentIndex);
   const metaParts: string[] = [];
   const ticketQty = dateData.tickets
@@ -528,12 +530,7 @@ export default function DateAccordion({
               : "hover:bg-[color:var(--checkout-muted)]/50",
         )}
       >
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-start gap-2.5 text-left sm:items-center sm:gap-3"
-          onClick={onToggle}
-          aria-expanded={isExpanded}
-        >
+        <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:items-center sm:gap-3">
           <div
             className={cn(
               "mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg sm:mt-0",
@@ -545,32 +542,62 @@ export default function DateAccordion({
             <Calendar className="h-4 w-4" strokeWidth={2.25} />
           </div>
           <div className="min-w-0 flex-1 text-left">
-            <h3 className="text-[15px] font-bold leading-snug text-[color:var(--checkout-brand-primary)] sm:text-base">
-              <span className="hidden sm:inline">{formatDate(date)}</span>
-              <span className="sm:hidden">{formatDateMobile(date)}</span>
-            </h3>
-            <p className="mt-0.5 line-clamp-2 text-[12px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:line-clamp-1 sm:text-xs">
-              {trimmedRoomName ? (
-                <>
-                  <span className="font-semibold text-[color:var(--checkout-brand-accent)]">
-                    {trimmedRoomName}
-                  </span>
-                  <span className="text-[color:var(--checkout-muted-foreground)]">
-                    {" · "}
-                    {fallbackItemsMeta}
-                  </span>
-                </>
-              ) : (
-                metaLine || selectionSummary || "No items selected yet"
+            <button
+              type="button"
+              className="w-full text-left"
+              onClick={onToggle}
+              aria-expanded={isExpanded}
+            >
+              <h3 className="text-[15px] font-bold leading-snug text-[color:var(--checkout-brand-primary)] sm:text-base">
+                <span className="hidden sm:inline">{formatDate(date)}</span>
+                <span className="sm:hidden">{formatDateMobile(date)}</span>
+              </h3>
+              <p
+                className={cn(
+                  "mt-0.5 line-clamp-2 text-[12px] font-medium leading-relaxed sm:line-clamp-1 sm:text-xs",
+                  isDateEmpty
+                    ? "text-amber-700"
+                    : "text-[color:var(--checkout-muted-foreground)]",
+                )}
+              >
+                {trimmedRoomName ? (
+                  <>
+                    <span className="font-semibold text-[color:var(--checkout-brand-accent)]">
+                      {trimmedRoomName}
+                    </span>
+                    <span
+                      className={
+                        isDateEmpty
+                          ? "text-amber-700"
+                          : "text-[color:var(--checkout-muted-foreground)]"
+                      }
+                    >
+                      {" · "}
+                      {fallbackItemsMeta}
+                    </span>
+                  </>
+                ) : (
+                  metaLine || selectionSummary || "No items selected yet"
+                )}
+              </p>
+              {hasValidationError && (
+                <span className="mt-1.5 inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold leading-none text-amber-700 sm:hidden">
+                  Action needed
+                </span>
               )}
-            </p>
-            {hasValidationError && (
-              <span className="mt-1.5 inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold leading-none text-amber-700 sm:hidden">
-                Action needed
-              </span>
-            )}
+            </button>
+            {!isExpanded && isDateEmpty ? (
+              <button
+                type="button"
+                onClick={onToggle}
+                className="mt-1.5 inline-flex items-center gap-0.5 text-xs font-semibold text-[color:var(--checkout-brand-accent)] transition-colors hover:text-[color:var(--checkout-brand-primary)]"
+              >
+                Add items
+                <span aria-hidden>→</span>
+              </button>
+            ) : null}
           </div>
-        </button>
+        </div>
 
         <div className="flex shrink-0 items-center gap-2 pt-0.5 sm:gap-2.5 sm:pt-0">
           {hasValidationError && (
@@ -599,7 +626,7 @@ export default function DateAccordion({
                     {formatMoney(strikeBase)}
                   </span>
                 ) : null}
-                <span className="text-sm font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
+                <span className="text-lg font-semibold tabular-nums text-[color:var(--checkout-brand-primary)]">
                   {formatMoney(payableAmount)}
                 </span>
                 {appliedDiscount > 0 ? (

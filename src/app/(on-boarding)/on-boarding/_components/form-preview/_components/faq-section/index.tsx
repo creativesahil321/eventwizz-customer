@@ -12,6 +12,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 type Faq = {
   question?: string;
@@ -64,7 +65,8 @@ export default function FaqSection({
     <section
       className={cn(
         "w-full scroll-mt-20 bg-[var(--color-background)] px-4 text-center text-[var(--color-text)]",
-        narrowPreview ? "py-16" : "py-16 sm:scroll-mt-24 md:py-24",
+        PUBLIC_SECTION_PY_CLASS,
+        !narrowPreview && "sm:scroll-mt-24",
       )}
       aria-labelledby="faq-section-heading"
     >

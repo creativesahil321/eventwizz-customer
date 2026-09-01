@@ -5,6 +5,7 @@ import { Check, ImageIcon } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
@@ -105,7 +106,7 @@ export default function PackageSection({
   const useThreeColumns = details.length >= 12;
 
   return (
-    <section className="w-full bg-[var(--color-background)] px-4 py-16 md:py-24 @max-5xl/preview:!py-16">
+    <section className={cn("w-full bg-[var(--color-background)] px-4", PUBLIC_SECTION_PY_CLASS, "@max-5xl/preview:!py-12")}>
       <div className="container mx-auto max-w-7xl">
         <div
           className={cn(

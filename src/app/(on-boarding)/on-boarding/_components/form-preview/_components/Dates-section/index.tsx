@@ -151,23 +151,24 @@ function getDateCardContainerClass(
   narrowPreview: boolean,
 ): string {
   const base = cn(
-    "flex-shrink-0 overflow-hidden rounded-2xl border bg-transparent p-0 text-center transition-all duration-300",
+    "flex-shrink-0 overflow-hidden rounded-2xl border p-0 text-center transition-all duration-300",
+    "bg-black/25 backdrop-blur-sm shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]",
     narrowPreview ? "w-[85px]" : "w-[85px] sm:w-[100px] md:w-[120px]",
   );
 
   if (visual.isSoldOut) {
-    return `${base} border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]`;
+    return `${base} border-red-500/70 cursor-not-allowed bg-slate-900/50 opacity-85 shadow-[0_0_20px_rgba(239,68,68,0.35)]`;
   }
   if (visual.isSelecting) {
-    return `${base} border-[var(--color-primary)] ring-1 ring-white/30 shadow-[0_0_22px_rgba(255,255,255,0.12)] cursor-wait bg-black/30 backdrop-blur-sm`;
+    return `${base} border-[var(--color-primary)] ring-2 ring-white/30 shadow-[0_0_22px_rgba(255,255,255,0.15)] cursor-wait bg-black/35`;
   }
   if (visual.isOtherBusy) {
-    return `${base} border-[var(--color-primary)] opacity-45 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent`;
+    return `${base} border-[color:color-mix(in_srgb,var(--color-primary)_35%,transparent)] opacity-45 cursor-not-allowed`;
   }
   if (visual.isInCart) {
-    return `${base} border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30`;
+    return `${base} border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/45 bg-black/30 cursor-pointer shadow-[0_0_24px_var(--color-primary)]/35`;
   }
-  return `${base} border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent`;
+  return `${base} border-[color:color-mix(in_srgb,var(--color-primary)_55%,transparent)] cursor-pointer hover:border-[var(--color-primary)] hover:bg-black/35 hover:shadow-[0_0_28px_rgba(60,70,147,0.55)]`;
 }
 
 function dateCardAriaLabel(
@@ -485,10 +486,10 @@ export default function DatesSection({
     !narrowPreview && "sm:px-8 md:px-12",
   );
   const loginCtaClass = cn(
-    "mt-1 shrink-0 rounded-md border border-white/25 bg-[#1a1a24] !text-white shadow-sm hover:bg-[#26273a]",
+    "mt-2 min-h-12 shrink-0 rounded-full border-2 border-white/30 bg-white/10 px-8 font-semibold !text-white shadow-sm backdrop-blur-sm transition-colors hover:border-white/45 hover:bg-white/15",
     narrowPreview
-      ? "px-6 py-1.5 text-xs"
-      : "px-6 py-1.5 text-xs sm:px-8 sm:py-2 sm:text-sm",
+      ? "text-xs"
+      : "text-xs sm:text-sm",
   );
 
   // Setup client-side detection and window measurements

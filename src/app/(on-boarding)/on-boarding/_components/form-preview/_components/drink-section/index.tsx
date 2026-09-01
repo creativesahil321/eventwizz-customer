@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type DrinkPackage = {
@@ -99,7 +100,7 @@ export default function DrinkSection({
   };
 
   return (
-    <section className="w-full overflow-hidden bg-[var(--color-background)] px-4 py-16 text-[var(--color-text)]">
+    <section className={cn("w-full overflow-hidden bg-[var(--color-background)] px-4 text-[var(--color-text)]", PUBLIC_SECTION_PY_CLASS)}>
       <section className="mx-auto w-full max-w-5xl text-center">
         <div className="space-y-3 px-2">
           <SiteHeading

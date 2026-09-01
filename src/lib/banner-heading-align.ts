@@ -126,7 +126,7 @@ export function heroBannerContactRowClass(
   scope?: HeroAlignScope,
 ): string {
   return cn(
-    "flex w-fit max-w-full flex-row flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-white/90",
+    "flex w-fit max-w-full flex-row flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-white/90 sm:text-[15px]",
     measureAlignClass(align, scope?.fromMd),
     !scope?.fromMd && align === "center" && "justify-center",
     !scope?.fromMd && align === "left" && "justify-start",
@@ -245,7 +245,7 @@ export function vendorHomeTrustRowClass(align: BannerHeadingAlign): string {
 export const heroHeadingMeasureClass = "@container/hero min-w-0 w-full";
 
 const heroHeadingWrapClass =
-  "min-w-0 max-w-full text-pretty break-words [overflow-wrap:anywhere] [word-break:break-word]";
+  "min-w-0 max-w-full text-pretty break-words [overflow-wrap:anywhere] [word-break:break-word] max-md:line-clamp-2 max-md:!leading-[1.15] md:line-clamp-none";
 
 /**
  * Fluid hero H1 — phones stay compact, then scale with the hero container.

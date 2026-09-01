@@ -39,7 +39,7 @@ export default function LocationGrid({
       <div
         className={cn(
           "mx-auto grid max-w-[920px] grid-cols-1 gap-4",
-          !narrowPreview && "md:grid-cols-3 md:gap-6",
+          !narrowPreview && "sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6",
         )}
       >
         {Array(6)
@@ -96,7 +96,7 @@ export default function LocationGrid({
             !narrowPreview && "md:grid-cols-2",
           ),
         locations.length >= 3 &&
-          cn("grid-cols-1", !narrowPreview && "md:grid-cols-3"),
+          cn("grid-cols-1", !narrowPreview && "sm:grid-cols-2 lg:grid-cols-3"),
       )}
     >
       <AnimatePresence>

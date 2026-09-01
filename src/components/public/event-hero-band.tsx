@@ -369,6 +369,7 @@ export function EventHeroBand({
               "font-black tracking-tight",
               heroBannerHeadingTypeClass,
               bannerAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
+              "max-md:line-clamp-2 max-md:!leading-[1.15]",
             )}
           />
           {subHeading ? (
