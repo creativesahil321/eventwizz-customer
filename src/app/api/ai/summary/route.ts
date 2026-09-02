@@ -10,7 +10,14 @@ import {
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
-import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
+import {
+  FOOTER_BRAND_DESCRIPTION_AI_TARGET_CHARS,
+  FOOTER_BRAND_DESCRIPTION_AI_TARGET_WORDS,
+  FOOTER_BRAND_DESCRIPTION_MAX_CHARS,
+  FOOTER_BRAND_DESCRIPTION_MAX_WORDS,
+  clipFooterBrandDescription,
+  preferCompleteFooterSentence,
+} from "@/lib/footer-brand-description";
 import { toPlainText } from "@/lib/plain-text-length";
 
 type ContentType = "about" | "policy" | "contact" | "page" | "footer";
@@ -145,34 +152,44 @@ function buildFooterPrompt({
   venueSummary?: string;
   currentDescription?: string;
 }): { system: string; user: string; maxTokens: number } {
+  const name = venueName.trim() || "Our venue";
   const location = typeof city === "string" ? city.trim() : "";
-  let userPrompt = `Venue name: ${venueName}`;
-  if (location) {
-    userPrompt += `\nLocation: ${location}`;
-  }
   const summary = guestFacingDraft(venueSummary);
-  if (summary) {
-    userPrompt += `\nVenue summary (facts only — do not copy or discuss):\n${summary}`;
-  }
   const draft = guestFacingDraft(currentDescription);
+
+  const placeHint = location ? ` in ${location}` : "";
+  let userPrompt = `Write a short professional footer blurb for "${name}"${placeHint}.`;
+
+  if (summary) {
+    // Keep inspiration short so the model does not paste the about section.
+    const factHint = summary.slice(0, 160).trim();
+    userPrompt += `\nTone inspiration (paraphrase only, never quote or label): ${factHint}`;
+  }
   if (draft) {
-    userPrompt += `\nCurrent footer line to improve (rewrite it, do not quote or analyse it):\n${draft}`;
+    userPrompt += `\nImprove this draft without quoting it: ${draft.slice(0, 140).trim()}`;
   }
 
   userPrompt += `
 
-Write the one-line footer blurb shown under the logo for guests.
-- 1–2 warm sentences about this venue
-- At most 35 words and 180 characters
-- Plain text only
-- Do not mention writing tasks, drafts, UK vs India, or these rules
+Good examples:
+- "${name} hosts warm celebrations${placeHint} with festive atmosphere and memorable evenings."
+- "A welcoming events space${placeHint} for private parties, seasonal gatherings, and special nights out."
+
+Rules:
+- 1 complete sentence (2 short sentences max)
+- Aim for ~${FOOTER_BRAND_DESCRIPTION_AI_TARGET_WORDS} words / ~${FOOTER_BRAND_DESCRIPTION_AI_TARGET_CHARS} characters
+- Hard max ${FOOTER_BRAND_DESCRIPTION_MAX_WORDS} words / ${FOOTER_BRAND_DESCRIPTION_MAX_CHARS} characters
+- Finished sentence only — never end mid-phrase (no trailing "for", "and", "with")
+- Warm, professional UK English for guests
+- Plain text only — no HTML, quotes around the whole answer, labels, or bullet points
+- Never output phrases like "venue name", "location", "summary", "footer brand description", or task instructions
 - Reply with the blurb only`;
 
   return {
     system:
-      "You write short guest-facing venue footer lines. Reply with the finished blurb only — never planning, analysis, or restated instructions.",
+      "You write concise guest-facing venue footer blurbs. Output only the finished marketing sentence — never labels, planning, or restated instructions.",
     user: userPrompt,
-    maxTokens: 120,
+    maxTokens: 100,
   };
 }
 
@@ -229,18 +246,32 @@ function finaliseFooterBlurb(raw: string): string {
   }
   clean = clean
     .replace(/^["'“”`]+|["'“”`]+$/g, "")
-    .replace(/^(footer(?: brand)? description|footer blurb|blurb)\s*:\s*/i, "")
+    .replace(
+      /^(footer(?: brand)? description|footer blurb|blurb|description)\s*:\s*/i,
+      "",
+    )
+    .replace(/^(we have\s+)?venue\s*name\s*[:_\-]?\s*/i, "")
+    .replace(/\b(the\s+)?(?:venue\s+)?summary\s*:\s*/gi, " ")
+    .replace(/\blocation\s*:\s*/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+  clean = preferCompleteFooterSentence(clean);
   if (
     !clean ||
     clean.toUpperCase() === "REGENERATE" ||
-    looksLikeAiInstructionLeak(clean)
+    looksLikeAiInstructionLeak(clean) ||
+    clean.split(/\s+/).filter(Boolean).length < 6
   ) {
     return "";
   }
   const clipped = clipFooterBrandDescription(clean);
-  if (!clipped || looksLikeAiInstructionLeak(clipped)) return "";
+  if (
+    !clipped ||
+    looksLikeAiInstructionLeak(clipped) ||
+    clipped.split(/\s+/).filter(Boolean).length < 6
+  ) {
+    return "";
+  }
   return clipped;
 }
 

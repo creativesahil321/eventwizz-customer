@@ -21,17 +21,24 @@ export type PublicEventCardCategory = {
 /**
  * Event row on location listings (`latest_events` / `upcoming_events`).
  * Live API: name, slug, banner_image, lowest_price, category, next_available_date,
- * start_time, end_time. Extra date/time aliases are preview / older payloads only.
+ * start_time, end_time, booking_option. Extra date/time aliases are preview / older payloads only.
  */
 export interface Event {
   name: string;
   slug: string;
-  banner_image: string;
-  lowest_price: number;
+  banner_image: string | null;
+  lowest_price: number | string | null;
   category?: PublicEventCardCategory | null;
   next_available_date?: string | null;
   start_time?: string | null;
   end_time?: string | null;
+  /**
+   * Remaining bookable inventory on `next_available_date`.
+   * Omitted when that date has no tickets/tables left — do not treat as null.
+   */
+  booking_option?: "tickets" | "tables" | "both";
+  /** @deprecated Prefer `booking_option` on location listing cards. */
+  booking_type?: "tickets" | "tables" | "both" | null;
   /** @deprecated Live listings send `category.name` */
   event_category_name?: string | null;
   event_category?: string | { name?: string | null } | null;

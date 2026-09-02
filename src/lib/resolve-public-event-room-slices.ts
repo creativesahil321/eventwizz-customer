@@ -1,5 +1,6 @@
 import type { DatesSectionType } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
 import { withDateCardOffersFromApi } from "@/components/public/date-card-offer";
+import { normalizePublicBookingType } from "@/components/public/booking-type-icons";
 import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 import type { EventDetail, EventDetailRoom } from "@/services/common/events/type";
 import {
@@ -12,7 +13,17 @@ import { resolveEventLocation } from "@/lib/event-location";
 function mapPublicDates(
   dates: DatesSectionType | undefined,
 ): DatesSectionType | undefined {
-  return withDateCardOffersFromApi(dates) as DatesSectionType | undefined;
+  const withOffers = withDateCardOffersFromApi(dates) as
+    | DatesSectionType
+    | undefined;
+  if (!withOffers) return undefined;
+  return withOffers.map((date) => {
+    const bookingOption = normalizePublicBookingType(date.booking_option);
+    return {
+      ...date,
+      ...(bookingOption ? { booking_option: bookingOption } : {}),
+    };
+  });
 }
 
 export type PublicEventRoomRef = {

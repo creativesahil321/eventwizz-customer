@@ -435,6 +435,7 @@ export function EventPreview({
         return {
           event_date: date.event_date,
           price,
+          booking_type: date.booking_type,
         };
       }) ?? []
     );
@@ -460,10 +461,6 @@ export function EventPreview({
     datePrices: datesForSection.map((date) => date.price),
     packagePrices: drinkPackages.map((pkg) => pkg.price),
   });
-  const brochurePriceDescription =
-    brochureAmount != null
-      ? `${formatMoney(brochureAmount)} per person`
-      : "See dates below";
 
   const bannerImage = s1?.event_banner_image || "";
   const bannerVideo = s1?.event_banner_video || null;
@@ -793,9 +790,6 @@ export function EventPreview({
         <LazyBrochureSection
           showMapImmediately
           headingEmphasis={headingEmphasisForHero}
-          bookNowScrollOffsetPx={resolveBookNowScrollOffsetPx({
-            headerOffsetPx: HEADER_OFFSET_PX,
-          })}
           location={{
             title: "EVENT LOCATION",
             description:
@@ -803,12 +797,6 @@ export function EventPreview({
             icon: "MapPin",
             latitude: brochureLat,
             longitude: brochureLng,
-          }}
-          price={{
-            title: "PRICES FROM",
-            description: brochurePriceDescription,
-            link: "#booking",
-            price_title: "Book Now",
           }}
         />
 

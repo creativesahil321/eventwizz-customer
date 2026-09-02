@@ -44,10 +44,6 @@ import {
 } from "@/lib/event-location";
 import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
-import {
-  formatOnboardingPreviewBrochurePriceDescription,
-  resolveOnboardingPreviewPriceEditTarget,
-} from "../../_lib/resolve-onboarding-preview-price-edit-target";
 import { Image as ImageIcon } from "lucide-react";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { useEventCategories } from "@/services/vendor/events/query";
@@ -113,11 +109,16 @@ function minPriceFromStepFiveDate(d: StepFiveType["dates"][number]): number {
 
 function buildDatesPreviewFromStepFive(
   dates: StepFiveType["dates"] | undefined,
-): Array<{ event_date: string; price: number }> {
+): Array<{
+  event_date: string;
+  price: number;
+  booking_type?: "tickets" | "tables" | "both";
+}> {
   if (!dates?.length) return [];
   return dates.map((d) => ({
     event_date: d.event_date,
     price: minPriceFromStepFiveDate(d),
+    booking_type: d.booking_type,
   }));
 }
 
@@ -986,22 +987,6 @@ export default function FormPreview() {
         (pkg) => pkg.price,
       ),
     });
-    const previewBrochurePricePanel = {
-      title: activePreviewBrochure?.price?.title || "PRICES FROM",
-      description: formatOnboardingPreviewBrochurePriceDescription(
-        brochureFromPrice,
-        formatPriceUnit,
-      ),
-      link: "#booking",
-      icon: activePreviewBrochure?.price?.icon || "Tag",
-      price_title: brochureFromPrice != null ? "Book Now" : "",
-    };
-    const previewPriceEditTarget = resolveOnboardingPreviewPriceEditTarget({
-      datePrices: datesPreviewItems.map((date) => date.price),
-      packagePrices: (activePreviewDrinks?.packages ?? []).map(
-        (pkg) => pkg.price,
-      ),
-    });
     const aboutHighlights = buildEventAboutHighlights({
       occasion: heroCategoryLabel,
       dates: heroDateLabel,
@@ -1401,11 +1386,7 @@ export default function FormPreview() {
         >
           <BrochureSection
             location={activePreviewBrochureLocation}
-            price={previewBrochurePricePanel}
-            bookNowScrollOffsetPx={PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX}
             onEditLocation={jumpToEditor}
-            onEditPrice={jumpToEditor}
-            priceEditTarget={previewPriceEditTarget}
           />
         </div>
 

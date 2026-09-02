@@ -127,18 +127,18 @@ const AddressAutocomplete = forwardRef<
   const resolvedSuggestionsClassName =
     suggestionsClassName ??
     (isDark
-      ? "absolute z-50 w-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto"
-      : "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto");
+      ? "absolute z-[100] w-full mt-1 bg-slate-900 border border-white/15 rounded-lg shadow-2xl shadow-black/50 max-h-60 overflow-y-auto"
+      : "absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto");
   const suggestionItemTextClass = isDark ? "text-slate-200" : "text-gray-800";
   const clearButtonClass = isDark
     ? "text-slate-400 hover:text-red-400"
     : "text-gray-400 hover:text-red-600";
   const noResultsClass = isDark
-    ? "absolute z-50 w-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl p-4 text-slate-400 text-sm"
-    : "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4 text-gray-500 text-sm";
+    ? "absolute z-[100] w-full mt-1 bg-slate-900 border border-white/15 rounded-lg shadow-2xl shadow-black/50 p-4 text-slate-400 text-sm"
+    : "absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4 text-gray-500 text-sm";
   const unavailableClass = isDark
-    ? "absolute z-50 w-full mt-1 bg-amber-900/30 border border-amber-500/30 rounded-lg shadow-xl p-4 text-amber-200 text-sm"
-    : "absolute z-50 w-full mt-1 bg-yellow-50 border border-yellow-300 rounded-md shadow-lg p-4 text-yellow-700 text-sm";
+    ? "absolute z-[100] w-full mt-1 bg-amber-950 border border-amber-500/30 rounded-lg shadow-2xl p-4 text-amber-200 text-sm"
+    : "absolute z-[100] w-full mt-1 bg-yellow-50 border border-yellow-300 rounded-md shadow-lg p-4 text-yellow-700 text-sm";
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

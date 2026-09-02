@@ -473,7 +473,7 @@ export const normalizeSlug = (slug: string) => {
 // Helper function to format date and use direct price from API
 export const getDateInfo = (dateItem: {
   event_date: string;
-  price: number;
+  price: number | null;
 }) => {
   // Create a new date object with proper timezone handling
   const dateObj = new Date(`${dateItem.event_date}T12:00:00`);
@@ -482,11 +482,15 @@ export const getDateInfo = (dateItem: {
   const day = dateObj.toLocaleString("default", { weekday: "long" });
   const month = dateObj.toLocaleString("default", { month: "long" });
   const dateNum = dateObj.getDate();
+  const priceNum =
+    typeof dateItem.price === "number" && Number.isFinite(dateItem.price)
+      ? dateItem.price
+      : NaN;
 
   return {
     day,
     month,
     date: dateNum,
-    price: dateItem.price.toFixed(0),
+    price: Number.isFinite(priceNum) ? priceNum.toFixed(0) : "—",
   };
 };

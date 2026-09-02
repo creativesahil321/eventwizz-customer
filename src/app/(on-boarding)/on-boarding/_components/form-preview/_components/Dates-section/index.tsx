@@ -45,6 +45,11 @@ import {
   type PublicEventDateDiscount,
 } from "@/components/public/date-card-offer";
 import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
+import {
+  bookingOptionLabel,
+  resolveDateCardBookingOption,
+  type PublicBookingType,
+} from "@/components/public/booking-type-icons";
 import { savePendingBooking } from "@/lib/booking/pending-booking";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 import {
@@ -74,8 +79,15 @@ interface SessionUser {
 // New simplified date structure from optimized API
 export type DatesSectionType = {
   event_date: string;
-  price: number;
-  /** Active customer booking options for this date, when supplied by the API. */
+  price: number | null;
+  /**
+   * Live public event detail: remaining bookable inventory for this date.
+   * Omitted entirely when sold out / empty inventory — do not treat as null.
+   */
+  booking_option?: "tickets" | "tables" | "both";
+  /**
+   * Preview / vendor form config. Guest date cards prefer `booking_option`.
+   */
   booking_type?: "tickets" | "tables" | "both";
   sold_out?: boolean;
   /** Mapped for date cards (from API `discount` via room slices). */
@@ -175,12 +187,16 @@ function dateCardAriaLabel(
   dateInfo: { day: string; date: number | string; month: string; price: string },
   visual: DateCardVisualState,
   currencySymbol: string,
+  bookingType?: PublicBookingType | null,
 ): string {
   const when = `${dateInfo.day} ${dateInfo.date} ${dateInfo.month}`;
+  const typeLabel = bookingOptionLabel(bookingType);
+  const typeSuffix =
+    !visual.isSoldOut && typeLabel ? `, ${typeLabel.toLowerCase()}` : "";
   if (visual.isSoldOut) return `${when}, sold out`;
-  if (visual.isSelecting) return `Adding ${when} to cart`;
-  if (visual.isInCart) return `${when}, already in cart`;
-  return `Book ${when}, from ${currencySymbol}${dateInfo.price}`;
+  if (visual.isSelecting) return `Adding ${when} to cart${typeSuffix}`;
+  if (visual.isInCart) return `${when}, already in cart${typeSuffix}`;
+  return `Book ${when}, from ${currencySymbol}${dateInfo.price}${typeSuffix}`;
 }
 
 function getDateCardFooterClass(
@@ -238,6 +254,7 @@ function DateCardFooterContent({
   listPrice,
   offer,
   compact,
+  bookingType,
 }: {
   visual: DateCardVisualState;
   dateInfo: DateInfo;
@@ -245,6 +262,7 @@ function DateCardFooterContent({
   listPrice: number;
   offer?: DateCardOffer | null;
   compact?: boolean;
+  bookingType?: PublicBookingType | null;
 }) {
   const prefersReducedMotion = useReducedMotion();
   const footerKey = visual.isSelecting
@@ -254,6 +272,12 @@ function DateCardFooterContent({
       : visual.isSoldOut
         ? "soldout"
         : "price";
+
+  const showBookingIcons =
+    !visual.isSoldOut &&
+    !visual.isSelecting &&
+    !visual.isInCart &&
+    !(dateInfo.isPlaceholder && dateInfo.price === "—");
 
   let content: ReactNode;
   if (visual.isSoldOut) {
@@ -292,6 +316,7 @@ function DateCardFooterContent({
         listPrice={listPrice}
         offer={offer}
         compact={compact}
+        bookingType={showBookingIcons ? bookingType : null}
       />
     );
   }
@@ -886,6 +911,11 @@ export default function DatesSection({
     inCartStyle: "primary" | "green" = "primary",
   ) => {
     const dateInfo = getDateInfo(dateItem);
+    const bookingType = resolveDateCardBookingOption({
+      soldOut: dateItem.sold_out,
+      bookingOption: dateItem.booking_option,
+      bookingType: dateItem.booking_type,
+    });
     const visual = resolveDateCardVisual(
       dateItem.event_date,
       dateItem.sold_out,
@@ -902,7 +932,12 @@ export default function DatesSection({
         key={cardKey}
         onClick={() => handleDateCardClick(dateItem, visual)}
         aria-busy={visual.isSelecting}
-        aria-label={dateCardAriaLabel(dateInfo, visual, currencySymbol)}
+        aria-label={dateCardAriaLabel(
+          dateInfo,
+          visual,
+          currencySymbol,
+          bookingType,
+        )}
         disabled={visual.isSoldOut || visual.isOtherBusy}
       >
         <div className={dateCardBodyClass}>
@@ -928,6 +963,7 @@ export default function DatesSection({
                 : null
             }
             compact={narrowPreview}
+            bookingType={bookingType}
           />
         </div>
       </button>
@@ -940,6 +976,11 @@ export default function DatesSection({
     animationIndex: number,
   ) => {
     const dateInfo = getDateInfo(dateItem);
+    const bookingType = resolveDateCardBookingOption({
+      soldOut: dateItem.sold_out,
+      bookingOption: dateItem.booking_option,
+      bookingType: dateItem.booking_type,
+    });
     const visual = resolveDateCardVisual(
       dateItem.event_date,
       dateItem.sold_out,
@@ -985,7 +1026,12 @@ export default function DatesSection({
         }}
         onClick={() => handleDateCardClick(dateItem, visual)}
         aria-busy={visual.isSelecting}
-        aria-label={dateCardAriaLabel(dateInfo, visual, currencySymbol)}
+        aria-label={dateCardAriaLabel(
+          dateInfo,
+          visual,
+          currencySymbol,
+          bookingType,
+        )}
         disabled={visual.isSoldOut || visual.isOtherBusy}
       >
         <div className={dateCardBodyClass}>
@@ -1011,6 +1057,7 @@ export default function DatesSection({
                 : null
             }
             compact={narrowPreview}
+            bookingType={bookingType}
           />
         </div>
       </motion.button>

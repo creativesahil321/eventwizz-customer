@@ -88,6 +88,7 @@ import {
 } from "../_lib/checkout-readiness";
 import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { resolveDateCardBookingOption } from "@/components/public/booking-type-icons";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
 import { useCheckoutChatHandoff } from "../_lib/hooks/use-checkout-chat-handoff";
 import { readChatEventReturnHref, markCartClearedByUser } from "@/lib/checkout-chat-handoff";
@@ -201,8 +202,17 @@ export default function CartManager({}: CartManagerProps) {
 
     return new Map(
       (dates ?? [])
-        .filter((date) => date.booking_type)
-        .map((date) => [date.event_date, date.booking_type!]),
+        .map((date) => {
+          const option = resolveDateCardBookingOption({
+            soldOut: date.sold_out,
+            bookingOption: date.booking_option,
+            bookingType: date.booking_type,
+          });
+          return option ? ([date.event_date, option] as const) : null;
+        })
+        .filter((entry): entry is readonly [string, "tickets" | "tables" | "both"] =>
+          Boolean(entry),
+        ),
     );
   }, [activeRoomId, eventDetail, roomMode]);
 

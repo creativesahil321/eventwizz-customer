@@ -66,6 +66,16 @@ export function looksLikeAiInstructionLeak(text: string): boolean {
   ) {
     return true;
   }
+  // Model echoed labeled prompt fields into the footer blurb.
+  if (
+    /\b(we have )?venue name\b/i.test(t) ||
+    /\b(the )?summary\s*:/i.test(t) ||
+    /\bvenue summary\b/i.test(t) ||
+    /\blocation\s*:/i.test(t) ||
+    /\w+_location\b/i.test(t)
+  ) {
+    return true;
+  }
   return (
     /\b(existing draft|footer brand description for|must be warm|plain text only|respond only with|not the about section|which is india|,\s*not uk|max \d+ (words|characters))\b/i.test(
       t,

@@ -11,6 +11,7 @@ import {
 import { roomService } from "@/services/vendor/onboarding/room.service";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { writeVendorEventIsRoomsFlag } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
+import { isOnboardingCateringRoomReady } from "../../_lib/onboarding-catering-ready";
 
 const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
 
@@ -99,15 +100,7 @@ export const isRoomSectionComplete = (
   }
 
   if (section === "catering") {
-    const catering = room.catering;
-    if (!catering) return false;
-    const option = Number(catering.catering_option ?? 0);
-    if (option === 0) return true;
-    // A menu category must exist before menus count as complete — menus without
-    // a created category cannot be saved (see stepSixSchema enforcement).
-    const categoryId = Number(catering.event_menu_category_id ?? 0);
-    if (!Number.isFinite(categoryId) || categoryId < 1) return false;
-    return Array.isArray(catering.menus) && catering.menus.length > 0;
+    return isOnboardingCateringRoomReady(room.catering);
   }
 
   if (section === "drinks") {

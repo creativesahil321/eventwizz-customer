@@ -486,8 +486,8 @@ export default function AddressAutocomplete({
         <div
           className={
             isDark
-              ? "absolute z-[60] w-full mt-1 rounded-lg border border-white/10 bg-slate-950/98 backdrop-blur-md shadow-xl shadow-black/40 max-h-60 overflow-y-auto"
-              : "absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+              ? "absolute z-[100] w-full mt-1 rounded-lg border border-white/15 bg-slate-900 shadow-2xl shadow-black/50 max-h-60 overflow-y-auto"
+              : "absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
           }
         >
           {suggestions.map((suggestion) => (
@@ -526,8 +526,8 @@ export default function AddressAutocomplete({
           <div
             className={
               isDark
-                ? "absolute z-[60] w-full mt-1 rounded-lg border border-amber-500/25 bg-amber-950/40 p-3 shadow-lg"
-                : "absolute z-50 w-full mt-1 rounded-md border border-amber-200 bg-amber-50 p-4 shadow-lg dark:border-amber-800 dark:bg-amber-950/30"
+                ? "absolute z-[100] w-full mt-1 rounded-lg border border-amber-500/25 bg-amber-950 p-3 shadow-lg"
+                : "absolute z-[100] w-full mt-1 rounded-md border border-amber-200 bg-amber-50 p-4 shadow-lg dark:border-amber-800 dark:bg-amber-950"
             }
           >
             <p
@@ -549,8 +549,8 @@ export default function AddressAutocomplete({
           <div
             className={
               isDark
-                ? "absolute z-[60] w-full mt-1 rounded-lg border border-yellow-500/30 bg-yellow-950/35 p-3 shadow-lg"
-                : "absolute z-50 w-full mt-1 bg-yellow-50 border border-yellow-300 rounded-md shadow-lg p-4"
+                ? "absolute z-[100] w-full mt-1 rounded-lg border border-yellow-500/30 bg-yellow-950 p-3 shadow-lg"
+                : "absolute z-[100] w-full mt-1 bg-yellow-50 border border-yellow-300 rounded-md shadow-lg p-4"
             }
           >
             <div

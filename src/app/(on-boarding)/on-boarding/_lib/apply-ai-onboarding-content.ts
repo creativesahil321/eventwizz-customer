@@ -24,6 +24,7 @@ import {
   isValidMenuCategoryId,
   toPositiveId,
 } from "@/lib/event-menu-categories";
+import { sanitizeOnboardingMenusForSubmit } from "./onboarding-catering-ready";
 import { ensureFilePreview } from "@/lib/file-preview";
 import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
 import { getSession } from "next-auth/react";
@@ -739,8 +740,11 @@ async function applyAIGeneratedOnboardingContentInner({
 
   // --- Step 6: Menu ---
   setStep(5);
+  const sanitizedStepSixMenus = sanitizeOnboardingMenusForSubmit(
+    editedContent.stepSix?.menus,
+  );
   const hasMenus =
-    !vendorHints.omitCatering && (editedContent.stepSix?.menus?.length ?? 0) > 0;
+    !vendorHints.omitCatering && sanitizedStepSixMenus.length > 0;
 
   const roomsForMenuCategories = useRoomSystem
     ? (globalForm.getValues("multiSpace")?.rooms ?? [])
@@ -751,7 +755,7 @@ async function applyAIGeneratedOnboardingContentInner({
       ? await ensureEventMenuCategoriesForRoom(
           eventId,
           undefined,
-          editedContent.stepSix.menus,
+          sanitizedStepSixMenus,
         )
       : undefined;
 
@@ -763,7 +767,7 @@ async function applyAIGeneratedOnboardingContentInner({
       const categoryId = await ensureEventMenuCategoriesForRoom(
         eventId,
         roomId,
-        editedContent.stepSix.menus,
+        sanitizedStepSixMenus,
       );
       const linkedId = toPositiveId(categoryId);
       if (linkedId != null) {
@@ -795,7 +799,7 @@ async function applyAIGeneratedOnboardingContentInner({
       ? editedContent.stepSix.menu_description
       : "",
     event_menu_category_id: cateringPersistable ? primaryCategoryId : 0,
-    menus: cateringPersistable ? editedContent.stepSix.menus : [],
+    menus: cateringPersistable ? sanitizedStepSixMenus : [],
     isApproved: true,
   };
   globalForm.setValue("stepSix", stepSixData);
@@ -825,7 +829,9 @@ async function applyAIGeneratedOnboardingContentInner({
             event_menu_category_id:
               toPositiveId(room.event_menu_category_id) ??
               stepSixData.event_menu_category_id,
-            menus: Array.isArray(room.menus) ? room.menus : stepSixData.menus,
+            menus: sanitizeOnboardingMenusForSubmit(
+              Array.isArray(room.menus) ? room.menus : sanitizedStepSixMenus,
+            ),
           },
         ]) ?? [],
       )
@@ -853,8 +859,9 @@ async function applyAIGeneratedOnboardingContentInner({
           menu_title: stepSixData.menu_title,
           menu_description: stepSixData.menu_description,
           event_menu_category_id: stepSixData.event_menu_category_id,
-          menus: stepSixData.menus,
+          menus: sanitizedStepSixMenus,
         };
+        const roomMenus = sanitizeOnboardingMenusForSubmit(cateringBase.menus);
         const roomCategoryId = toPositiveId(
           roomMenuCategoryId ?? cateringBase.event_menu_category_id,
         );
@@ -862,8 +869,7 @@ async function applyAIGeneratedOnboardingContentInner({
         // category. Otherwise store it as "off" so no orphaned menus are saved.
         const roomCateringPersistable =
           cateringBase.catering_option === 1 &&
-          Array.isArray(cateringBase.menus) &&
-          cateringBase.menus.length > 0 &&
+          roomMenus.length > 0 &&
           isValidMenuCategoryId(roomCategoryId);
         return {
           ...room,
@@ -875,7 +881,7 @@ async function applyAIGeneratedOnboardingContentInner({
               ? cateringBase.menu_description
               : "",
             event_menu_category_id: roomCateringPersistable ? roomCategoryId : 0,
-            menus: roomCateringPersistable ? cateringBase.menus : [],
+            menus: roomCateringPersistable ? roomMenus : [],
           },
         };
       }) as any)

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import GoogleLocationSearch from "./google-location-search";
+import { cityFromFormattedAddress } from "../step-7/address-autocomplete";
 import { fetchLocationDetails, geocodeLocation } from "./_lib/actions";
 import { env } from "@/env";
 import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
@@ -40,6 +42,18 @@ import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
 import { slugify } from "@/lib/utils";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { LOCATION_COORDINATES_REQUIRED_MESSAGE } from "@/lib/to-location-coords-payload";
+
+const EventLocationMap = dynamic(
+  () => import("../step-7/event-location-map"),
+  {
+    ssr: false,
+    loading: () => (
+      <Skeleton className="h-64 w-full rounded-lg border border-white/10" />
+    ),
+  },
+);
 
 /** Public-link / input: subdomain label only (a-z, 0-9, hyphens, max 63). */
 function normalizeSubdomainLabel(
@@ -281,6 +295,18 @@ export default function StepEleven() {
   // Watch reminder email configuration state
   const showReminderDays =
     form.watch("reminder_email_before_days") !== undefined;
+  const duplicateVenueAddress = useWatch({
+    control: form.control,
+    name: "address",
+  });
+  const duplicateVenueLatitude = useWatch({
+    control: form.control,
+    name: "latitude",
+  });
+  const duplicateVenueLongitude = useWatch({
+    control: form.control,
+    name: "longitude",
+  });
 
   const onSubmit = async (values: StepElevenType) => {
     setLoading(true);
@@ -306,12 +332,12 @@ export default function StepEleven() {
           );
           if (!resolved) {
             form.setError("address", {
-              message:
-                "Please select the exact venue address from Google suggestions so its map coordinates can be saved.",
+              message: LOCATION_COORDINATES_REQUIRED_MESSAGE,
             });
             toast.error(
-              "Select the exact venue address from Google suggestions before continuing.",
+              "Confirm the venue on the map or pick the exact address from Google suggestions.",
             );
+            setLoading(false);
             return;
           }
           latitude = resolved.latitude;
@@ -938,9 +964,15 @@ export default function StepEleven() {
                                               env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
                                             }
                                             value={field.value || ""}
-                                            onChange={(value) =>
-                                              field.onChange(value)
-                                            }
+                                            onChange={(value) => {
+                                              field.onChange(value);
+                                              form.setValue("latitude", undefined, {
+                                                shouldDirty: true,
+                                              });
+                                              form.setValue("longitude", undefined, {
+                                                shouldDirty: true,
+                                              });
+                                            }}
                                             onSelect={(placeId) =>
                                               fetchLocationDetails(
                                                 form,
@@ -1011,6 +1043,60 @@ export default function StepEleven() {
                                       </FormItem>
                                     )}
                                   />
+
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="text-sm font-medium text-slate-200">
+                                        Confirm on map{" "}
+                                        <span className="text-red-400">*</span>
+                                      </p>
+                                      <p className="mt-1 text-xs text-muted-foreground">
+                                        Drag the pin to the venue entrance if
+                                        search did not land exactly — latitude
+                                        and longitude are required to save this
+                                        location.
+                                      </p>
+                                    </div>
+                                    <EventLocationMap
+                                      key={`duplicate-venue-${duplicateVenueLatitude ?? "na"}-${duplicateVenueLongitude ?? "na"}-${duplicateVenueAddress ?? ""}`}
+                                      initialAddress={duplicateVenueAddress || ""}
+                                      initialLatitude={duplicateVenueLatitude}
+                                      initialLongitude={duplicateVenueLongitude}
+                                      onLocationChange={({
+                                        address,
+                                        latitude,
+                                        longitude,
+                                      }) => {
+                                        form.setValue("address", address, {
+                                          shouldDirty: true,
+                                          shouldValidate: true,
+                                        });
+                                        form.setValue("latitude", latitude, {
+                                          shouldDirty: true,
+                                          shouldValidate: true,
+                                        });
+                                        form.setValue("longitude", longitude, {
+                                          shouldDirty: true,
+                                          shouldValidate: true,
+                                        });
+                                        const parsedCity =
+                                          cityFromFormattedAddress(address);
+                                        if (parsedCity) {
+                                          form.setValue("city", parsedCity, {
+                                            shouldValidate: true,
+                                            shouldDirty: true,
+                                          });
+                                        }
+                                        globalForm.setValue("stepEleven", {
+                                          ...globalForm.getValues("stepEleven"),
+                                          address,
+                                          latitude,
+                                          longitude,
+                                          ...(parsedCity ? { city: parsedCity } : {}),
+                                        });
+                                      }}
+                                    />
+                                  </div>
                                 </div>
                               )}
                             </div>

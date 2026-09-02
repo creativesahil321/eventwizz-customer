@@ -19,6 +19,10 @@ import {
   PUBLIC_METADATA_TEXT_CLASS,
   PUBLIC_PRICE_TEXT_CLASS,
 } from "@/lib/public-rhythm";
+import {
+  BookingTypeIcons,
+  type PublicBookingType,
+} from "@/components/public/booking-type-icons";
 
 export type LocationEventCardModel = {
   title: string;
@@ -30,6 +34,11 @@ export type LocationEventCardModel = {
   category?: string | null;
   /** Near Me distance from customer to event pin (km). */
   distanceKm?: number | null;
+  /**
+   * From location API `booking_option` — icons + accessible label near price.
+   * Missing when next available date has no remaining tickets/tables.
+   */
+  bookingType?: PublicBookingType | null;
 };
 
 type LocationEventCardProps = {
@@ -162,8 +171,16 @@ export function LocationEventCard({
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-4">
           {fromPrice ? (
-            <span className={PUBLIC_PRICE_TEXT_CLASS}>
-              {fromPrice}
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <BookingTypeIcons
+                bookingType={event.bookingType}
+                size={14}
+                className="shrink-0 text-[color:var(--color-primary)]"
+                labelled
+              />
+              <span className={cn(PUBLIC_PRICE_TEXT_CLASS, "truncate")}>
+                {fromPrice}
+              </span>
             </span>
           ) : (
             <span />

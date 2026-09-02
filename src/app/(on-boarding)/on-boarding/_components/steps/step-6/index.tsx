@@ -39,7 +39,11 @@ import {
   canShowApplyToAllButton,
   useRoomManager,
 } from "../../rooms/use-room-manager";
-import { isOnboardingCateringRoomReady } from "../../../_lib/onboarding-catering-ready";
+import {
+  getOnboardingCateringValidationMessage,
+  isOnboardingCateringRoomReady,
+  sanitizeOnboardingMenusForSubmit,
+} from "../../../_lib/onboarding-catering-ready";
 import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
@@ -639,6 +643,15 @@ export default function StepSix() {
   const onSubmit = async (data: StepSixType, applyToAllRooms = false) => {
     setLoading(true);
     try {
+      if (data.catering_option === 1) {
+        const cateringError = getOnboardingCateringValidationMessage(data);
+        if (cateringError) {
+          toast.error(cateringError);
+          setLoading(false);
+          return;
+        }
+      }
+
       // Validate the form
       const isValid = await form.trigger();
       if (!isValid) {
@@ -700,6 +713,11 @@ export default function StepSix() {
         catering_option: data.catering_option,
       };
 
+      const sanitizedMenus =
+        data.catering_option === 1
+          ? sanitizeOnboardingMenusForSubmit(data.menus ?? [])
+          : [];
+
       // Only include menu data if catering option is Yes (1)
       if (data.catering_option === 1) {
         globalForm.setValue("stepSix", {
@@ -707,7 +725,7 @@ export default function StepSix() {
           menu_title: data.menu_title,
           menu_description: data.menu_description,
           event_menu_category_id: data.event_menu_category_id,
-          menus: data.menus || [],
+          menus: sanitizedMenus,
         });
       } else {
         // If No, only include the basic fields (no menu category)
@@ -724,7 +742,7 @@ export default function StepSix() {
               catering_option: data.catering_option,
               menu_title: data.menu_title,
               menu_description: data.menu_description,
-              menus: data.menus || [],
+              menus: sanitizedMenus,
               event_menu_category_id: data.event_menu_category_id,
               isApproved: true as const,
             }

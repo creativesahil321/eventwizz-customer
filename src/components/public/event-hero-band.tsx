@@ -333,12 +333,15 @@ export function EventHeroBand({
                       {crumb.href && !isLast ? (
                         <Link
                           href={crumb.href}
-                          className="transition-colors hover:text-white"
+                          className="underline decoration-white/35 underline-offset-2 transition-colors hover:text-white hover:decoration-white"
                         >
                           {crumb.label}
                         </Link>
                       ) : (
-                        <span className={isLast ? "text-white" : undefined}>
+                        <span
+                          className={isLast ? "text-white" : undefined}
+                          aria-current={isLast ? "page" : undefined}
+                        >
                           {crumb.label}
                         </span>
                       )}

@@ -26,8 +26,10 @@ export type PublicEventDateDiscount = {
 
 export type DateWithOptionalOffer = {
   event_date: string;
-  price: number;
+  price: number | null;
   sold_out?: boolean;
+  /** Remaining bookable inventory — omitted when sold out / empty. */
+  booking_option?: "tickets" | "tables" | "both";
   offer?: DateCardOffer | null;
   /** API field — mapped to `offer` for the date cards. */
   discount?: PublicEventDateDiscount | null;

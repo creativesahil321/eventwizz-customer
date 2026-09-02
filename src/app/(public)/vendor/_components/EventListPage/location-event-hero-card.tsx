@@ -15,6 +15,7 @@ import {
   PUBLIC_CARD_HOVER_LIFT_CLASS,
   PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
 } from "@/lib/public-rhythm";
+import { BookingTypeIcons } from "@/components/public/booking-type-icons";
 
 type LocationEventHeroCardProps = {
   event: LocationEventCardModel;
@@ -75,7 +76,13 @@ export function LocationEventHeroCard({
       />
 
       {fromPrice ? (
-        <div className="absolute right-3 top-3 z-[1] rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold tabular-nums leading-none text-[var(--color-primary-foreground)] shadow-md md:right-4 md:top-4 md:px-3.5 md:py-2 md:text-sm">
+        <div className="absolute right-3 top-3 z-[1] inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold tabular-nums leading-none text-[var(--color-primary-foreground)] shadow-md md:right-4 md:top-4 md:px-3.5 md:py-2 md:text-sm">
+          <BookingTypeIcons
+            bookingType={event.bookingType}
+            size={12}
+            className="text-[color:var(--color-primary-foreground)]"
+            labelled
+          />
           {fromPrice}
         </div>
       ) : null}

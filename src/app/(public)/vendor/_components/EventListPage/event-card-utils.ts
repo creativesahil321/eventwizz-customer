@@ -4,6 +4,10 @@ import {
   resolveCurrencySymbol,
 } from "@/lib/currency-format";
 import type { LocationEventCardModel } from "./location-event-card";
+import {
+  resolveLocationCardBookingOption,
+  type PublicBookingType,
+} from "@/components/public/booking-type-icons";
 
 const CLOCK_RE =
   /(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)(?:\s*[-–]\s*(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?))?/;
@@ -189,6 +193,8 @@ export function toLocationEventCardModel(
   imageFallback: string,
 ): LocationEventCardModel {
   const symbol = resolveCurrencySymbol(currencySym);
+  const bookingType: PublicBookingType | null =
+    resolveLocationCardBookingOption(event.booking_option);
   return {
     title: event.name || "",
     price: formatEventListingPrice(event.lowest_price, symbol),
@@ -197,5 +203,6 @@ export function toLocationEventCardModel(
     category: getEventCardCategoryLabel(event),
     image: event.banner_image || imageFallback,
     slug: event.slug || "",
+    bookingType,
   };
 }

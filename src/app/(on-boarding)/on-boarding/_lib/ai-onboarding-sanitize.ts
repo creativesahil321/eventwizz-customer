@@ -4,6 +4,7 @@ import type {
   AIRoomDrinks,
 } from "@/app/api/ai/generate-onboarding/route";
 import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
+import { sanitizeOnboardingMenusForSubmit } from "./onboarding-catering-ready";
 
 export const AI_ONBOARDING_MIN_ROOMS = 2;
 export const AI_ONBOARDING_MAX_ROOMS = 3;
@@ -716,7 +717,7 @@ export function ensureStepSevenRooms(
 export function buildAiOnboardingJsonSchemaBlock(stepNineMaxFaqs: number): string {
   return `Return this JSON shape (compact keys, no extra commentary):
 {
-  "stepTwo": {"banner_heading":"≤30 words","banner_sub_heading":"≤80 chars","about_title":"≤40 chars","about_description":"≤340 chars, no HTML","footer_brand_description":"≤180 chars, no HTML, footer blurb under logo"},
+  "stepTwo": {"banner_heading":"≤30 words","banner_sub_heading":"≤80 chars","about_title":"≤40 chars","about_description":"≤340 chars, no HTML","footer_brand_description":"1 complete sentence, ≤140 chars preferred / ≤180 hard max, warm professional blurb under the logo — never labels like venue name/summary, never mid-sentence cut-offs"},
   "stepThree": {"event_name":"≤40 chars","event_address":"exact event address near the venue","event_banner_heading":"≤30 words","event_banner_sub_heading":"≤80 chars","about_event_heading":"≤50 chars","about_event_sub_heading":"≤80 chars","about_event_description":"≤340 chars, no HTML"},
   "stepFour": {"package_title":"≤40","package_description":"≤160","package_button_name":"≤18","package_details":[{"title":"≤40"},{"title":"≤40"},{"title":"≤40"},{"title":"≤40"},{"title":"≤40"}],"event_schedular_title":"≤40","event_schedule_subtitle":"≤160 optional","event_schedular":[{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"}]},
   "stepFive": {
@@ -1318,12 +1319,8 @@ export function fillOnboardingContentDefaults(
     };
   }
 
-  const hasMenus =
-    !omitHints.omitCatering &&
-    Array.isArray(next.stepSix?.menus) &&
-    next.stepSix.menus.some(
-      (m) => m.name?.trim() && Array.isArray(m.items) && m.items.length > 0,
-    );
+  const sanitizedAiMenus = sanitizeOnboardingMenusForSubmit(next.stepSix?.menus);
+  const hasMenus = !omitHints.omitCatering && sanitizedAiMenus.length > 0;
   next.stepSix = omitHints.omitCatering
     ? {
         menu_title: "",
@@ -1336,7 +1333,7 @@ export function fillOnboardingContentDefaults(
       next.stepSix?.menu_description ||
       `Seasonal dishes prepared for ${kind} at ${venue}.`,
     menus: hasMenus
-      ? next.stepSix.menus
+      ? sanitizedAiMenus
       : [
           {
             name: "Starters",

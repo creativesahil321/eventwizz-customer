@@ -1412,8 +1412,10 @@ export default function StepThree() {
                           <span className="text-red-400">*</span>
                         </FormLabel>
                         <FormControl>
-                          <AddressAutocomplete
-                            value={field.value}
+                          <div className="relative isolate z-[100]">
+                            <AddressAutocomplete
+                              variant="dark"
+                              value={field.value}
                             biasCity={
                               selectedLocation?.city ??
                               selectedLocation?.name ??
@@ -1450,6 +1452,7 @@ export default function StepThree() {
                             placeholder="Type to search for a UK address or location..."
                             className="w-full"
                           />
+                          </div>
                         </FormControl>
                         <p className="text-xs font-medium text-[var(--color-primary,#38bdf8)]">
                           Restricted to{" "}

@@ -27,6 +27,7 @@ import {
   toLocationCoordsPayload,
   LOCATION_COORDINATES_REQUIRED_MESSAGE,
 } from "@/lib/to-location-coords-payload";
+import { sanitizeOnboardingMenusForSubmit } from "@/app/(on-boarding)/on-boarding/_lib/onboarding-catering-ready";
 // import { OnBoardingPreviewType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 
 /** Reads the persisted onboarding mode from sessionStorage (client-only, safe). */
@@ -962,23 +963,21 @@ export const onboardingService = {
       formData.append("menu_description", data.menu_description);
     }
 
-    if (data.menus) {
-      // Add menus with the required array-like notation
-      data.menus?.forEach((menu, menuIndex) => {
-        formData.append(`menus[${menuIndex}][name]`, menu.name);
+    const menusForSubmit = sanitizeOnboardingMenusForSubmit(data.menus);
+    menusForSubmit.forEach((menu, menuIndex) => {
+      formData.append(`menus[${menuIndex}][name]`, menu.name ?? "");
 
-        (menu.items ?? []).forEach((item, itemIndex) => {
-          formData.append(
-            `menus[${menuIndex}][items][${itemIndex}][title]`,
-            item.title
-          );
-          formData.append(
-            `menus[${menuIndex}][items][${itemIndex}][description]`,
-            item.description || ""
-          );
-        });
+      menu.items.forEach((item, itemIndex) => {
+        formData.append(
+          `menus[${menuIndex}][items][${itemIndex}][title]`,
+          item.title ?? "",
+        );
+        formData.append(
+          `menus[${menuIndex}][items][${itemIndex}][description]`,
+          item.description ?? "",
+        );
       });
-    }
+    });
 
     appendManualIsApprovedToFormData(formData, data.isApproved);
 
@@ -1043,26 +1042,24 @@ export const onboardingService = {
           );
         }
 
-        (catering.menus ?? []).forEach((menu, menuIndex) => {
-          const m = menu as {
-            name?: string;
-            items?: Array<{ title?: string; description?: string }>;
-          };
-          formData.append(
-            `rooms[${roomIndex}][menus][${menuIndex}][name]`,
-            m.name ?? "",
-          );
-          (m.items ?? []).forEach((item, itemIndex) => {
+        sanitizeOnboardingMenusForSubmit(catering.menus).forEach(
+          (menu, menuIndex) => {
             formData.append(
-              `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][title]`,
-              item.title ?? "",
+              `rooms[${roomIndex}][menus][${menuIndex}][name]`,
+              menu.name ?? "",
             );
-            formData.append(
-              `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][description]`,
-              item.description ?? "",
-            );
-          });
-        });
+            menu.items.forEach((item, itemIndex) => {
+              formData.append(
+                `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][title]`,
+                item.title ?? "",
+              );
+              formData.append(
+                `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][description]`,
+                item.description ?? "",
+              );
+            });
+          },
+        );
       }
     });
 

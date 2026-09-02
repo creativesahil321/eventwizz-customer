@@ -56,6 +56,7 @@ import {
   readEventCategoryLabel,
 } from "@/lib/event-hero-meta";
 import { formatEventLocationLabel } from "@/lib/event-location";
+import { locationDisplayName } from "@/lib/slug-short-label";
 import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
 import {
   firstBookablePublicRoomIndex,
@@ -334,6 +335,13 @@ export default function EventDetailClient({
   const eventLocationLabel = formatEventLocationLabel(
     slices.event_address ?? "",
   );
+  /** Parent venue location from the URL (`/kangra-7/...`), not the event address. */
+  const parentLocationLabel = useMemo(() => {
+    const matched = vendorTheme?.locations?.find(
+      (loc) => loc.slug?.toLowerCase() === locationSlug.toLowerCase(),
+    );
+    return locationDisplayName(matched?.city, locationSlug);
+  }, [vendorTheme?.locations, locationSlug]);
   const heroCategoryLabel = readEventCategoryLabel(eventData);
   const heroDateLabel = formatEventHeroDateRange(
     (slices.dates ?? []).map((d) => d.event_date),
@@ -406,9 +414,10 @@ export default function EventDetailClient({
             imageAlt={eventData.event_name || "Event banner"}
             breadcrumbs={[
               { label: "Home", href: "/" },
-              ...(eventLocationLabel
-                ? [{ label: eventLocationLabel }]
-                : []),
+              {
+                label: parentLocationLabel,
+                href: `/${locationSlug}`,
+              },
               {
                 label:
                   eventData.event_name?.trim() ||
@@ -582,9 +591,6 @@ export default function EventDetailClient({
           <LazyBrochureSection
             showMapImmediately
             headingEmphasis={headingEmphasisFromSite}
-            bookNowScrollOffsetPx={resolveBookNowScrollOffsetPx({
-              headerOffsetPx,
-            })}
             location={{
               title: "EVENT LOCATION",
               description:
@@ -592,15 +598,6 @@ export default function EventDetailClient({
               icon: "MapPin",
               latitude: slices.lat,
               longitude: slices.long,
-            }}
-            price={{
-              title: "PRICES FROM",
-              description:
-                brochureFromPrice != null
-                  ? `${formatPriceUnit(brochureFromPrice)} per person`
-                  : "See dates below",
-              link: "#booking",
-              price_title: "Book Now",
             }}
           />
         </div>

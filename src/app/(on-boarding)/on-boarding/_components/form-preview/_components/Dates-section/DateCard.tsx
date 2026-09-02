@@ -7,6 +7,10 @@ import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
+import {
+  bookingOptionLabel,
+  resolveDateCardBookingOption,
+} from "@/components/public/booking-type-icons";
 
 interface DateCardProps {
   dateItem: DatesSectionType[0];
@@ -26,14 +30,21 @@ export const DateCard = ({
   const dateInfo = getDateInfo(dateItem);
   const listPrice = Number.parseFloat(String(dateInfo.price));
   const soldOut = Boolean(dateItem.sold_out);
+  const bookingType = resolveDateCardBookingOption({
+    soldOut,
+    bookingOption: dateItem.booking_option,
+    bookingType: dateItem.booking_type,
+  });
   const priceLabel = Number.isFinite(listPrice)
     ? `${currencySymbol}${dateInfo.price}`
     : "";
+  const typeLabel = bookingOptionLabel(bookingType);
+  const typeSuffix = typeLabel ? `, ${typeLabel.toLowerCase()}` : "";
   const ariaLabel = soldOut
     ? `${dateInfo.day} ${dateInfo.date} ${dateInfo.month}, sold out`
     : `Book ${dateInfo.day} ${dateInfo.date} ${dateInfo.month}${
         priceLabel ? `, from ${priceLabel}` : ""
-      }`;
+      }${typeSuffix}`;
 
   return (
     <motion.button
@@ -91,6 +102,7 @@ export const DateCard = ({
           listPrice={Number.isFinite(listPrice) ? listPrice : 0}
           offer={dateItem.offer}
           compact={narrowPreview}
+          bookingType={soldOut ? null : bookingType}
         />
       </div>
     </motion.button>

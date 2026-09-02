@@ -31,7 +31,9 @@ import {
   parseOptionalCoordinate,
 } from "@/lib/to-location-coords-payload";
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { ArrowLeft, Settings2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { OnboardingCard } from "@/components/ui/card";
 import { OnboardingFieldGroupTitle } from "@/components/ui/typography";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
@@ -53,6 +55,16 @@ import {
   AIFlowProgress,
 } from "../../ai-onboarding/ai-choice-pair";
 import { toast } from "sonner";
+
+const EventLocationMap = dynamic(
+  () => import("../step-7/event-location-map"),
+  {
+    ssr: false,
+    loading: () => (
+      <Skeleton className="h-64 w-full rounded-lg border border-white/10" />
+    ),
+  },
+);
 
 const RESOLVE_STEP_ONE_ERROR_INDEX = (keys: string[]) =>
   keys.some((k) => k === "name" || k === "has_multiple_locations") ? 0 : 1;
@@ -687,9 +699,10 @@ export default function StepOne() {
                                 {isBrandMode ? "Address" : "Venue address"}
                               </FormLabel>
                               <FormControl>
-                                <AddressAutocomplete
-                                  variant="dark"
-                                  value={field.value}
+                                <div className="relative isolate z-[100]">
+                                  <AddressAutocomplete
+                                    variant="dark"
+                                    value={field.value}
                                   onChange={(value) => {
                                     field.onChange(value);
                                     form.setValue("latitude", undefined, {
@@ -736,11 +749,12 @@ export default function StepOne() {
                                   noResultsMessage="No UK addresses found. Try a street, postcode, or place name."
                                   unavailableMessage="Address search is unavailable. Check your connection and try again."
                                 />
+                                </div>
                               </FormControl>
                               <p className="text-xs text-muted-foreground mt-1">
                                 {isBrandMode
-                                  ? "Search Google for your head office or main site address."
-                                  : "Auto-filled when you pick a venue — or search Google to set it yourself."}
+                                  ? "Search Google for your head office or main site address, then confirm the pin on the map below."
+                                  : "Auto-filled when you pick a venue — or search Google, then confirm the pin on the map below."}
                               </p>
                               <FormMessage />
                             </FormItem>
@@ -796,6 +810,48 @@ export default function StepOne() {
                           )}
                         />
                       </div>
+
+                      <div className="mt-6">
+                        <p className="text-sm font-medium mb-1">
+                          Confirm on map{" "}
+                          <span className="text-red-400">*</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Drag the pin to your venue entrance if search did not
+                          land exactly — required to save latitude and longitude.
+                        </p>
+                        <EventLocationMap
+                          initialAddress={form.watch("address")}
+                          initialLatitude={form.watch("latitude")}
+                          initialLongitude={form.watch("longitude")}
+                          onLocationChange={({
+                            address,
+                            latitude,
+                            longitude,
+                          }) => {
+                            form.setValue("address", address, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                            form.setValue("latitude", latitude, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                            form.setValue("longitude", longitude, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                            const parsedCity = cityFromFormattedAddress(address);
+                            if (parsedCity) {
+                              form.setValue("city", parsedCity, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+
                       <GuidedSectionActionFooter
                         isActive={guided.currentSectionIndex === 1}
                         hideSectionMeta

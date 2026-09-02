@@ -19,7 +19,12 @@ import {
   countWords,
 } from "@/lib/word-count";
 import { FOOTER_BRAND_DESCRIPTION_MAX_CHARS } from "@/lib/footer-brand-description";
-import { parseOptionalCoordinate } from "@/lib/to-location-coords-payload";
+import {
+  hasValidLocationCoordinates,
+  LOCATION_COORDINATES_REQUIRED_MESSAGE,
+  parseOptionalCoordinate,
+} from "@/lib/to-location-coords-payload";
+import { getOnboardingEmptyMenuCategoryNames } from "../../_lib/onboarding-catering-ready";
 
 /** API / form state may send null, strings, or numbers — normalize at runtime via parseOptionalCoordinate. */
 export const optionalCoordinateSchema = z.number().optional();
@@ -814,6 +819,17 @@ export const stepSixSchema = z
           path: ["menus"],
         });
       }
+
+      getOnboardingEmptyMenuCategoryNames(data.menus).forEach((categoryName) => {
+        const menuIndex = (data.menus ?? []).findIndex(
+          (menu) => String(menu.name ?? "").trim() === categoryName,
+        );
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Add at least one item to ${categoryName}.`,
+          path: ["menus", Math.max(menuIndex, 0), "items"],
+        });
+      });
     }
   });
 export type StepSixType = z.infer<typeof stepSixSchema>;
@@ -1217,6 +1233,14 @@ export const stepElevenSchema = z.object({
           path: ["contact_number"],
         });
       }
+    }
+
+    if (!hasValidLocationCoordinates(data.latitude, data.longitude)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: LOCATION_COORDINATES_REQUIRED_MESSAGE,
+        path: ["address"],
+      });
     }
   }
 });
