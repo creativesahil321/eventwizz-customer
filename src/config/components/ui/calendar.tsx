@@ -1,19 +1,72 @@
 "use client";
 
 import * as React from "react";
-import { DayPicker } from "react-day-picker";
+import { format } from "date-fns";
+import { DayPicker, type DayButtonProps } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarSeasonIcon } from "@/components/public/calendar-season-icon";
+import {
+  EVENT_SEASON_THEME_LABEL,
+  type EventSeasonTheme,
+} from "@/lib/event-season-theme";
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>;
+export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
+  /**
+   * Optional season theme per `yyyy-MM-dd`. Icons stay secondary to the
+   * date number and gold availability/selection state.
+   */
+  seasonThemesByDate?: Record<string, EventSeasonTheme>;
+};
+
+function SeasonDayButton({
+  day,
+  modifiers,
+  seasonThemesByDate,
+  children,
+  className,
+  ...buttonProps
+}: DayButtonProps & {
+  seasonThemesByDate?: Record<string, EventSeasonTheme>;
+}) {
+  const ref = React.useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    if (modifiers.focused) ref.current?.focus();
+  }, [modifiers.focused]);
+
+  const theme = seasonThemesByDate?.[format(day.date, "yyyy-MM-dd")];
+  const themeLabel = theme ? EVENT_SEASON_THEME_LABEL[theme] : null;
+
+  return (
+    <button
+      ref={ref}
+      {...buttonProps}
+      className={cn(className, "flex-col gap-0 leading-none")}
+      title={themeLabel ? `${buttonProps.title ?? ""} ${themeLabel}`.trim() : buttonProps.title}
+    >
+      <span>{children}</span>
+      {theme ? (
+        <CalendarSeasonIcon theme={theme} />
+      ) : (
+        <span className="h-[11px]" aria-hidden />
+      )}
+    </button>
+  );
+}
 
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  seasonThemesByDate,
+  components,
   ...props
 }: CalendarProps) {
+  const showSeasonIcons = Boolean(
+    seasonThemesByDate && Object.keys(seasonThemesByDate).length > 0,
+  );
+
   return (
     <DayPicker
       navLayout="around"
@@ -39,10 +92,14 @@ function Calendar({
         weekday:
           "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
         week: "flex w-full mt-2",
-        day: "h-9 w-9 text-center text-sm p-0 relative [&:has([data-selected].day-range-end)]:rounded-r-md [&:has([data-selected].day-outside)]:bg-accent/50 [&:has([data-selected])]:bg-accent first:[&:has([data-selected])]:rounded-l-md last:[&:has([data-selected])]:rounded-r-md focus-within:relative focus-within:z-10",
+        day: cn(
+          "w-9 text-center text-sm p-0 relative [&:has([data-selected].day-range-end)]:rounded-r-md [&:has([data-selected].day-outside)]:bg-accent/50 [&:has([data-selected])]:bg-accent first:[&:has([data-selected])]:rounded-l-md last:[&:has([data-selected])]:rounded-r-md focus-within:relative focus-within:z-10",
+          showSeasonIcons ? "h-11" : "h-9",
+        ),
         day_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+          "w-9 p-0 font-normal aria-selected:opacity-100",
+          showSeasonIcons ? "h-11" : "h-9",
         ),
         range_end: "day-range-end",
         selected:
@@ -64,6 +121,17 @@ function Calendar({
           ) : (
             <ChevronRight className="h-4 w-4" />
           ),
+        ...(showSeasonIcons
+          ? {
+              DayButton: (dayButtonProps: DayButtonProps) => (
+                <SeasonDayButton
+                  {...dayButtonProps}
+                  seasonThemesByDate={seasonThemesByDate}
+                />
+              ),
+            }
+          : {}),
+        ...components,
       }}
       {...props}
     />

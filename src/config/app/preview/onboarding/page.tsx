@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar, Globe, Loader2, MapPin } from "lucide-react";
 import { PreviewProvider } from "@/contexts/preview-context";
+import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
+import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
 import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview";
 import { MainLandingSitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/main-landing-site-preview";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
@@ -17,6 +19,8 @@ import {
   useOnboardingPreviewEventQuery,
 } from "./_lib/use-onboarding-preview-queries";
 import { mapOnboardingEventToDetailData } from "./_lib/map-onboarding-event-to-detail";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
+import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
 import {
   OnboardingPreviewReviewChrome,
   type OnboardingPreviewTab,
@@ -83,6 +87,7 @@ export default function OnboardingPreviewPage() {
 function OnboardingPreviewContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const deviceFrameRef = useRef<HTMLDivElement>(null);
 
   /* ── API: Main Landing (also provides locations list, multi-location flag) ── */
   const { data: mainData, isLoading: isLoadingMain } =
@@ -107,12 +112,15 @@ function OnboardingPreviewContent() {
   /* ── Derive event slug from location API response ── */
   const [activeEventSlug, setActiveEventSlug] = useState<string | undefined>();
 
-  /* ── API: Location Page — only fetch when user reaches location tab ── */
+  /* ── API: Location Page — fetch when location OR event tab is opened
+   * (event slug is resolved from location payload, so Event Page needs this too) */
   const [hasVisitedLocationTab, setHasVisitedLocationTab] = useState(false);
+  const [hasVisitedEventTab, setHasVisitedEventTab] = useState(false);
   const { data: locationData, isLoading: isLoadingLocation } =
     useOnboardingPreviewLocationQuery(
       activeLocationSlug,
-      hasVisitedLocationTab && Boolean(activeLocationSlug?.trim()),
+      (hasVisitedLocationTab || hasVisitedEventTab) &&
+        Boolean(activeLocationSlug?.trim()),
     );
 
   const eventSlugFromLocation = useMemo(() => {
@@ -123,12 +131,24 @@ function OnboardingPreviewContent() {
   }, [locationData, activeEventSlug]);
 
   /* ── API: Event Page — only fetch when user navigates to event tab ── */
-  const [hasVisitedEventTab, setHasVisitedEventTab] = useState(false);
   const { data: eventApiData, isLoading: isLoadingEvent } =
     useOnboardingPreviewEventQuery(
       eventSlugFromLocation,
       hasVisitedEventTab && Boolean(eventSlugFromLocation?.trim()),
     );
+
+  const isEventPreviewLoading =
+    hasVisitedEventTab &&
+    !eventApiData &&
+    (isLoadingEvent ||
+      // Still resolving event slug from location (direct Event tab click)
+      (!eventSlugFromLocation &&
+        Boolean(activeLocationSlug?.trim()) &&
+        isLoadingLocation) ||
+      (!eventSlugFromLocation &&
+        Boolean(activeLocationSlug?.trim()) &&
+        !locationData &&
+        (hasVisitedLocationTab || hasVisitedEventTab)));
 
   /* ── Transform event API data into EventDetailData ── */
   const eventDetailData = useMemo<EventDetailData | null>(() => {
@@ -141,6 +161,72 @@ function OnboardingPreviewContent() {
   const locationPreviewData = locationData as
     | SiteEssentialsFormValues
     | undefined;
+
+  /**
+   * Location + event footers need the live theme shape:
+   * `locations[]` (venue card) + `contactDetails` (head office).
+   * Prefer main landing for those; keep location-scoped fields when present.
+   * Global identity (`footer_brand_description`, copyright, logo) must survive
+   * a slug-scoped GET that omits them.
+   */
+  const locationSiteEssentials = useMemo(():
+    | SiteEssentialsFormValues
+    | undefined => {
+    if (!locationPreviewData && !mainPreviewData) return undefined;
+    const base = locationPreviewData ?? mainPreviewData!;
+    return {
+      ...base,
+      contactDetails:
+        mainPreviewData?.contactDetails ?? base.contactDetails,
+      locations: mainPreviewData?.locations ?? base.locations,
+      slug: activeLocationSlug ?? base.slug,
+      copyright:
+        (typeof locationPreviewData?.copyright === "string" &&
+        locationPreviewData.copyright.trim()
+          ? locationPreviewData.copyright
+          : mainPreviewData?.copyright) ?? base.copyright,
+      logo: locationPreviewData?.logo || mainPreviewData?.logo || base.logo,
+      favicon:
+        locationPreviewData?.favicon ||
+        mainPreviewData?.favicon ||
+        base.favicon,
+      footer_brand_description:
+        firstFooterBrandDescription(
+          locationPreviewData?.footer_brand_description,
+          mainPreviewData?.footer_brand_description,
+          base.footer_brand_description,
+        ) ?? "",
+    };
+  }, [locationPreviewData, mainPreviewData, activeLocationSlug]);
+
+  const eventSiteEssentials = useMemo(():
+    | SiteEssentialsFormValues
+    | undefined => {
+    if (!locationSiteEssentials && !eventApiData) return undefined;
+    const base = locationSiteEssentials;
+    const eventRoot = eventApiData;
+    const eventNested = eventApiData?.event;
+    if (!base && !eventRoot) return undefined;
+    return {
+      ...(base ?? (eventRoot as SiteEssentialsFormValues)),
+      copyright:
+        (typeof eventRoot?.copyright === "string" && eventRoot.copyright.trim()
+          ? eventRoot.copyright
+          : undefined) ||
+        (typeof eventNested?.copyright === "string" &&
+        eventNested.copyright.trim()
+          ? eventNested.copyright
+          : undefined) ||
+        base?.copyright,
+      logo: eventRoot?.logo || eventNested?.logo || base?.logo,
+      footer_brand_description:
+        firstFooterBrandDescription(
+          eventRoot?.footer_brand_description,
+          eventNested?.footer_brand_description,
+          base?.footer_brand_description,
+        ) ?? "",
+    };
+  }, [locationSiteEssentials, eventApiData]);
 
   /* ── Location label ── */
   const locationLabel = useMemo(() => {
@@ -202,9 +288,14 @@ function OnboardingPreviewContent() {
 
   const handleTabChange = useCallback((tab: PreviewTab) => {
     if (tab === "location") setHasVisitedLocationTab(true);
-    if (tab === "event") setHasVisitedEventTab(true);
+    if (tab === "event") {
+      // Event slug comes from the location payload — fetch location if needed.
+      setHasVisitedLocationTab(true);
+      setHasVisitedEventTab(true);
+    }
     setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    deviceFrameRef.current?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
   }, []);
 
   const handlePreviewLocationFromGrid = useCallback(
@@ -214,7 +305,8 @@ function OnboardingPreviewContent() {
       setHasVisitedLocationTab(true);
       setApproved((prev) => ({ ...prev, "main-landing": true }));
       setActiveTab("location");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0 });
+      deviceFrameRef.current?.scrollTo({ top: 0 });
       return true;
     },
     [],
@@ -226,7 +318,8 @@ function OnboardingPreviewContent() {
     setHasVisitedEventTab(true);
     setApproved((prev) => ({ ...prev, location: true }));
     setActiveTab("event");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
+    deviceFrameRef.current?.scrollTo({ top: 0 });
   }, []);
 
   const handlePrimaryAction = useCallback(() => {
@@ -264,9 +357,13 @@ function OnboardingPreviewContent() {
     const nextTab = reviewSteps[stepIndex + 1];
     if (nextTab) {
       if (nextTab === "location") setHasVisitedLocationTab(true);
-      if (nextTab === "event") setHasVisitedEventTab(true);
+      if (nextTab === "event") {
+        setHasVisitedLocationTab(true);
+        setHasVisitedEventTab(true);
+      }
       setActiveTab(nextTab);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0 });
+      deviceFrameRef.current?.scrollTo({ top: 0 });
     }
   }, [
     activeTab,
@@ -279,14 +376,37 @@ function OnboardingPreviewContent() {
   ]);
 
   const handleEdit = useCallback(() => {
+    // Open the Branding editor for the page being reviewed — not Presets.
     if (activeTab === "main-landing") {
-      router.push("/vendor/sites-essentials");
-    } else if (activeTab === "location") {
-      router.push("/vendor/sites-essentials");
-    } else if (activeTab === "event") {
+      router.push(
+        hasMultipleLocations
+          ? "/vendor/sites-essentials?tab=branding&scope=main-home"
+          : "/vendor/sites-essentials?tab=branding&scope=location-page",
+      );
+      return;
+    }
+
+    if (activeTab === "location") {
+      router.push(
+        "/vendor/sites-essentials?tab=branding&scope=location-page",
+      );
+      return;
+    }
+
+    if (activeTab === "event") {
+      const eventId = eventApiData?.event?.event_id;
+      if (typeof eventId === "number" && Number.isFinite(eventId) && eventId > 0) {
+        router.push(`/vendor/events/${eventId}`);
+        return;
+      }
       router.push("/vendor/events");
     }
-  }, [activeTab, router]);
+  }, [
+    activeTab,
+    eventApiData?.event?.event_id,
+    hasMultipleLocations,
+    router,
+  ]);
 
   const previewLocationOptions = useMemo(() => {
     if (!hasMultipleLocations || !mainData?.locations?.length) return undefined;
@@ -296,6 +416,8 @@ function OnboardingPreviewContent() {
         id: loc.id,
         slug: loc.slug.trim(),
         city: loc.city?.trim() || loc.slug,
+        total_events:
+          typeof loc.total_events === "number" ? loc.total_events : undefined,
       }));
   }, [hasMultipleLocations, mainData?.locations]);
 
@@ -341,8 +463,18 @@ function OnboardingPreviewContent() {
         hasMultipleLocations ? handlePreviewLocationFromGrid : undefined
       }
     >
-      <div className="min-h-screen bg-white pb-28 sm:pb-32">
-        <div className="min-h-screen">
+      <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-slate-900">
+        <div className="flex shrink-0 justify-center px-4 py-3">
+          <PreviewDeviceToolbar className="pointer-events-auto" />
+        </div>
+        <PreviewDeviceFrame
+          ref={deviceFrameRef}
+          stageClassName="min-h-0 flex-1 items-stretch bg-slate-900 px-2 pb-2 pt-1 sm:px-4"
+          frameClassName="min-h-0"
+          style={{
+            paddingBottom: `var(${PREVIEW_REVIEW_CHROME_HEIGHT_VAR}, 8rem)`,
+          }}
+        >
           {/* Main Landing Page */}
           {activeTab === "main-landing" && mainPreviewData && (
             <MainLandingSitePreview
@@ -358,10 +490,8 @@ function OnboardingPreviewContent() {
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <Loader2 className="h-8 w-8 text-gray-300 animate-spin" />
                 </div>
-              ) : locationPreviewData ? (
-                <SitePreview formValues={locationPreviewData} />
-              ) : mainPreviewData ? (
-                <SitePreview formValues={mainPreviewData} />
+              ) : locationSiteEssentials ? (
+                <SitePreview formValues={locationSiteEssentials} />
               ) : null}
             </>
           )}
@@ -369,18 +499,15 @@ function OnboardingPreviewContent() {
           {/* Event Page */}
           {activeTab === "event" && (
             <>
-              {isLoadingEvent && !eventDetailData ? (
+              {isEventPreviewLoading ? (
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <Loader2 className="h-8 w-8 text-gray-300 animate-spin" />
                 </div>
               ) : eventDetailData ? (
                 <EventPreview
                   data={eventDetailData}
-                  siteEssentials={
-                    (locationPreviewData ?? mainPreviewData) as
-                      | SiteEssentialsFormValues
-                      | undefined
-                  }
+                  locationSlug={activeLocationSlug}
+                  siteEssentials={eventSiteEssentials}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
@@ -396,7 +523,7 @@ function OnboardingPreviewContent() {
               )}
             </>
           )}
-        </div>
+        </PreviewDeviceFrame>
 
         <OnboardingPreviewReviewChrome
           hasMultipleLocations={hasMultipleLocations}

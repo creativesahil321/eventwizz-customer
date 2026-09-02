@@ -1,4 +1,4 @@
-import { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
@@ -6,6 +6,7 @@ import React from "react";
 import { Transaction } from "../_lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { parseFormattedMoney } from "@/lib/currency-format";
+import { formatTransactionPaymentMethod } from "@/lib/transaction-payment-method";
 
 function ledgerAmount(value: string): number {
   const parsed = parseFormattedMoney(String(value ?? ""));
@@ -152,7 +153,9 @@ export function getTransactionColumns({
       enableHiding: false,
     },
     {
-      accessorKey: "card_brand",
+      id: "payment_method",
+      accessorFn: (row) =>
+        row.payment_method ?? row.card_brand ?? row.card_last4 ?? row.cardLast4 ?? "",
       header: ({ column }) => (
         <DataTableColumnHeader
           className="text-foreground"
@@ -161,16 +164,12 @@ export function getTransactionColumns({
         />
       ),
       cell: ({ row }) => {
-        const cardBrand = row.original.card_brand;
-        const cardLast4 = row.original.cardLast4;
-        if (!cardBrand && !cardLast4) {
+        const label = formatTransactionPaymentMethod(row.original);
+        if (!label) {
           return <span className="text-sm text-muted-foreground">—</span>;
         }
         return (
-          <span className="text-sm font-medium capitalize">
-            {cardBrand ?? "Card"}
-            {cardLast4 ? ` ••${cardLast4}` : ""}
-          </span>
+          <span className="text-sm font-medium capitalize">{label}</span>
         );
       },
       enableSorting: false,

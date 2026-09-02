@@ -1,24 +1,22 @@
-"use client";
-
 import { useEffect } from "react";
-import {
-  allPresetGridCdnStylesheetUrls,
-  allPresetGridGoogleFontFamilies,
-} from "@/app/(protected)/_shared/sites-essentials/_lib/site-theme-presets";
 import { siteEssentialsGoogleFontsStylesheetHref } from "@/lib/site-typography-google-fonts";
 
 const PRESET_GRID_CDN_LINK_PREFIX = "site-essentials-preset-grid-cdn-";
 const PRESET_GRID_GOOGLE_LINK_ID = "site-essentials-preset-grid-google-fonts";
 
 /**
- * Injects one Google Fonts css2 URL (all Site Essentials preset families) plus
- * every preset CDN stylesheet. Use wherever preset font previews render
- * (Theme Presets tab, Try theme sidebar on /preview/site and /preview/event).
+ * Injects Google Fonts + CDN stylesheets for Try theme card previews.
+ * Pass families/urls from the theme catalog (API) when available.
  */
-export function useSiteEssentialsPresetFontsPreload() {
+export function useSiteEssentialsPresetFontsPreload(
+  googleFamilies: readonly string[] = [],
+  cdnStylesheetUrls: readonly string[] = [],
+) {
+  const familiesKey = googleFamilies.join("|");
+  const cdnKey = cdnStylesheetUrls.join("|");
+
   useEffect(() => {
-    const families = allPresetGridGoogleFontFamilies();
-    const href = siteEssentialsGoogleFontsStylesheetHref(families);
+    const href = siteEssentialsGoogleFontsStylesheetHref([...googleFamilies]);
     if (!href) return;
 
     let link = document.getElementById(
@@ -37,10 +35,10 @@ export function useSiteEssentialsPresetFontsPreload() {
     return () => {
       document.getElementById(PRESET_GRID_GOOGLE_LINK_ID)?.remove();
     };
-  }, []);
+  }, [familiesKey, googleFamilies]);
 
   useEffect(() => {
-    const hrefs = allPresetGridCdnStylesheetUrls();
+    const hrefs = [...cdnStylesheetUrls];
     const createdIds: string[] = [];
     hrefs.forEach((href, i) => {
       const id = `${PRESET_GRID_CDN_LINK_PREFIX}${i}`;
@@ -55,5 +53,5 @@ export function useSiteEssentialsPresetFontsPreload() {
     return () => {
       createdIds.forEach((id) => document.getElementById(id)?.remove());
     };
-  }, []);
+  }, [cdnKey, cdnStylesheetUrls]);
 }

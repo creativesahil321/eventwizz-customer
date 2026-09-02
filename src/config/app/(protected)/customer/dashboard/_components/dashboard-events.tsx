@@ -3,13 +3,12 @@ import Link from "next/link";
 import { Badge as BadgeComponent } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar, Clock, MapPin, Ticket } from "lucide-react";
+import { Calendar, MapPin, Ticket } from "lucide-react";
 
 interface Event {
   id: string;
   title: string;
   date: string;
-  time: string;
   location: string;
   ticketType: string;
   eventSlug?: string;
@@ -68,10 +67,6 @@ export default function DashboardEvents({
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
                             <span className="text-xs">{event.date}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />
-                            <span className="text-xs">{event.time}</span>
                           </div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <MapPin className="h-3.5 w-3.5 text-[var(--color-primary)] flex-shrink-0" />

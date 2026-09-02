@@ -5,16 +5,17 @@ import {
   LocationRowAction,
   ToggleLocationStatusMutation,
 } from "../_lib/types";
-import { Settings, ChevronDown, XCircle } from "lucide-react";
+import { MoreHorizontal, XCircle, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/utils";
+import { formatDate, toTitleCase } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -44,25 +45,45 @@ export const getColumns = ({
       />
     ),
     cell: ({ row }) => {
-      const city = row.original.city || "-";
+      const city = row.original.city
+        ? toTitleCase(row.original.city)
+        : "-";
+      const isHeadquarters = Boolean(row.original.is_headquarters);
       return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setRowAction({ type: "view", row })}
-                className="max-w-[200px] min-w-0 truncate rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-left text-foreground transition-colors hover:bg-slate-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                title={`View location: ${city}`}
-              >
-                {city}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-md break-words">
-              <p className="break-words whitespace-normal">{city}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="flex min-w-0 max-w-[280px] flex-wrap items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setRowAction({ type: "view", row })}
+                  className="min-w-0 truncate rounded-md px-1.5 py-1 -mx-1.5 -my-1 text-left font-medium text-foreground transition-colors hover:bg-slate-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  title={`View location: ${city}`}
+                >
+                  {city}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-md break-words">
+                <p className="break-words whitespace-normal">{city}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          {isHeadquarters ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge className="shrink-0 gap-1 border-0 bg-[var(--color-primary)] px-2 py-0.5 text-[11px] font-semibold text-white shadow-none hover:bg-[var(--color-primary)]">
+                    <Building2 className="h-3 w-3" />
+                    Head office
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>This is the fixed head office for this account</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
+        </div>
       );
     },
     enableSorting: true,
@@ -154,6 +175,28 @@ export const getColumns = ({
     },
   },
   {
+    accessorKey: "active_events_count",
+    header: ({ column }) => (
+      <DataTableColumnHeader
+        className="text-foreground"
+        column={column}
+        title="Active Events"
+      />
+    ),
+    cell: ({ row }) => {
+      const count = row.original.active_events_count ?? 0;
+      return (
+        <span className="text-sm tabular-nums text-foreground">{count}</span>
+      );
+    },
+    enableSorting: true,
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.active_events_count ?? 0;
+      const b = rowB.original.active_events_count ?? 0;
+      return a - b;
+    },
+  },
+  {
     accessorKey: "created_at",
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -198,18 +241,21 @@ export const getColumns = ({
   {
     id: "actions",
     header: "Actions",
-    meta: { className: "pr-4 whitespace-nowrap" },
+    meta: { className: "pr-4 text-right whitespace-nowrap" },
     cell: ({ row }) => {
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="event-primary" size="sm" className="shrink-0">
-              <span className="sr-only">Open menu</span>
-              <Settings className="h-3.5 w-3.5 text-gray-600 shrink-0" />
-              <span className="hidden sm:inline-block text-xs font-medium">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0 border-slate-200 bg-white px-2.5 text-slate-700 shadow-none hover:bg-slate-50 hover:text-slate-900"
+            >
+              <span className="sr-only">Open actions</span>
+              <span className="hidden text-xs font-medium sm:inline">
                 Actions
               </span>
-              <ChevronDown className="h-3 w-3 ml-0.5 shrink-0 text-[var(--color-secondary)]" />
+              <MoreHorizontal className="h-4 w-4 sm:ml-1" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[180px]">
@@ -265,10 +311,21 @@ export const getColumns = ({
                 <DropdownMenuItem
                   onClick={() => setRowAction({ type: "setDefault", row })}
                 >
-                  Set as default
+                  Manage this Location
                 </DropdownMenuItem>
               </PermissionGuard>
             )}
+            {!row.original.is_default ? (
+              <PermissionGuard permissionKey="update-event-location">
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-600"
+                  onClick={() => setRowAction({ type: "delete", row })}
+                >
+                  Delete permanently
+                </DropdownMenuItem>
+              </PermissionGuard>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       );

@@ -188,13 +188,23 @@ export function RescheduleDateModal({
     ? Number.parseFloat(String(currentDateData.price))
     : currentDate.price;
 
+  const paidAmountValue = (() => {
+    if (currentDateData?.paid_amount == null) return undefined;
+    const parsed = Number.parseFloat(String(currentDateData.paid_amount));
+    return Number.isFinite(parsed) ? parsed : undefined;
+  })();
+
   const selectedRequiresUpgrade =
     selectedDate != null &&
-    selectedRequiresPayment(selectedDate, currentPriceValue);
+    selectedRequiresPayment(selectedDate, currentPriceValue, paidAmountValue);
 
   const selectedAdditionalPayment =
     selectedDate != null
-      ? getAdditionalPaymentRequired(selectedDate, currentPriceValue)
+      ? getAdditionalPaymentRequired(
+          selectedDate,
+          currentPriceValue,
+          paidAmountValue,
+        )
       : 0;
 
   const handleClose = () => {
@@ -555,10 +565,12 @@ export function RescheduleDateModal({
                       const dateRequiresPayment = selectedRequiresPayment(
                         date,
                         currentPriceValue,
+                        paidAmountValue,
                       );
                       const extraPayment = getAdditionalPaymentRequired(
                         date,
                         currentPriceValue,
+                        paidAmountValue,
                       );
 
                       return (
@@ -717,7 +729,7 @@ export function RescheduleDateModal({
 
                 {/* Price Difference Message - Only show if price increases */}
                 {isPriceIncrease && (
-                  <div className="border border-orange-200 bg-orange-50 rounded-lg p-4">
+                  <div className="border border-orange-200 bg-orange-50 rounded-lg p-4 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-orange-900">
                         Additional Payment Required:
@@ -726,6 +738,10 @@ export function RescheduleDateModal({
                         {formatMoney(priceDifference)}
                       </span>
                     </div>
+                    <p className="text-xs text-orange-800/90">
+                      Reschedule pricing does not re-apply checkout discounts or
+                      coupon codes.
+                    </p>
                   </div>
                 )}
               </motion.div>

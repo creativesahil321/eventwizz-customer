@@ -14,17 +14,18 @@ import { bookingsService } from "@/services/customer/bookings/bookings.service";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { buildCartDateLookupKey } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
+import { parseSavedAmount } from "@/lib/booking-saved-amount";
 import BookingCheckoutPage from "./booking-checkout/booking-checkout-page";
 import type { BookingDateSource } from "./booking-checkout/build-line-items";
 import type { BookingRescheduleRequest } from "@/services/customer/bookings/type";
 import { useState } from "react";
 
 interface AdjustBookingContentProps {
-  bookingId: string;
+  bookingNumber: string;
 }
 
 export default function AdjustBookingContent({
-  bookingId,
+  bookingNumber,
 }: AdjustBookingContentProps) {
   const { format: formatCurrency } = useCurrencyFormat();
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function AdjustBookingContent({
     data: bookingResponse,
     isLoading,
     error,
-  } = useBookingDetails(parseInt(bookingId));
+  } = useBookingDetails(bookingNumber);
 
   const bookingData = bookingResponse?.data;
 
@@ -83,6 +84,8 @@ export default function AdjustBookingContent({
           ) || datesPaidTotal;
         const depositSelectedAmount = parseAmount(apiSummary?.deposit_amount);
 
+        const savedAmount = parseSavedAmount(apiSummary?.saved_amount);
+
         const pendingFromSummary =
           apiSummary?.total_pending_amount ?? apiSummary?.pending_amount;
         const outstandingAmount =
@@ -103,6 +106,7 @@ export default function AdjustBookingContent({
           can_reschedule?: boolean;
           total: string;
           totalAmount: number;
+          savedAmount?: number | null;
           paidAmount: number;
           pendingAmount: number | null;
           paymentStatus: ReturnType<typeof normalizePaymentStatus>;
@@ -154,6 +158,7 @@ export default function AdjustBookingContent({
             canPayNow: dateCanPay,
             total: formatCurrency(dateEntry.total_amount),
             totalAmount: totalAmountForDate,
+            savedAmount: parseSavedAmount(dateEntry.saved_amount),
             paidAmount: paidAmountForDate,
             pendingAmount,
             partialPayment: dateEntry.paid_amount
@@ -168,11 +173,11 @@ export default function AdjustBookingContent({
         });
 
         return {
-          id: bookingId,
+          id: String(bookingData.booking_id),
           event_name: bookingData.event_name,
           booking_id: bookingData.booking_id.toString(),
           booking_number:
-            bookingData.booking_number || bookingData.booking_id.toString(),
+            bookingData.booking_number || bookingNumber,
           location: bookingData.location,
           payment_status: paymentStatusLabel,
           booking_status:
@@ -190,6 +195,7 @@ export default function AdjustBookingContent({
             paid: paidAmount,
             outstanding: outstandingAmount,
             depositSelected: depositSelectedAmount,
+            savedAmount,
           },
           dates,
         };
@@ -197,10 +203,10 @@ export default function AdjustBookingContent({
     : null;
 
   const handleDownloadInvoice = async () => {
-    if (isDownloadingInvoice) return;
+    if (!bookingData || isDownloadingInvoice) return;
     setIsDownloadingInvoice(true);
     try {
-      await bookingsService.downloadBookingInvoice(parseInt(bookingId));
+      await bookingsService.downloadBookingInvoice(bookingData.booking_id);
       toast.success("Invoice downloaded successfully");
     } catch (err) {
       console.error("Invoice download failed:", err);
@@ -231,7 +237,7 @@ export default function AdjustBookingContent({
     );
   }
 
-  if (error || !transformedData) {
+  if (error || !bookingData || !transformedData) {
     return (
       <section className="w-full space-y-4">
         <Button
@@ -258,7 +264,7 @@ export default function AdjustBookingContent({
 
   return (
     <BookingCheckoutPage
-      bookingId={bookingId}
+      bookingId={String(bookingData.booking_id)}
       bookingNumber={transformedData.booking_number}
       eventName={transformedData.event_name}
       location={transformedData.location}

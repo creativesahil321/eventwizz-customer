@@ -31,6 +31,31 @@ import { cn } from "@/lib/utils";
 
 const DATE_RANGES: DashboardDateRange[] = ["today", "7d", "30d"];
 
+function formatSupportOverviewSummary(
+  openCount: number,
+  attentionCount: number,
+): string {
+  if (openCount === 0 && attentionCount === 0) {
+    return "All clear — no open conversations right now.";
+  }
+
+  const openLabel =
+    openCount === 1
+      ? "1 conversation is open"
+      : `${openCount} conversations are open`;
+
+  if (attentionCount === 0) {
+    return `${openLabel}. None need attention.`;
+  }
+
+  const attentionLabel =
+    attentionCount === 1
+      ? "1 needs attention"
+      : `${attentionCount} need attention`;
+
+  return `${openLabel}. ${attentionLabel}.`;
+}
+
 function StatCard({
   label,
   value,
@@ -119,7 +144,10 @@ export default function VendorSupportDashboard() {
           <p className="mt-1 text-sm text-muted-foreground">
             {isLoading
               ? "Loading support overview…"
-              : `${stats.totalOpen} conversations are open. ${needsAttention.length} need attention.`}
+              : formatSupportOverviewSummary(
+                  stats.totalOpen,
+                  needsAttention.length,
+                )}
           </p>
         </div>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">

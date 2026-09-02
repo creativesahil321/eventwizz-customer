@@ -130,10 +130,10 @@ export default function SupportConversationSidebar({
 
       <section>
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Recent tickets
+          Recent enquiries
         </h3>
         {recentTickets.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">No other tickets.</p>
+          <p className="mt-3 text-sm text-muted-foreground">No other enquiries.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {recentTickets.map((ticket) => (

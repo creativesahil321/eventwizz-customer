@@ -53,9 +53,8 @@ interface DateRangePickerProps {
    */
   enabledDates?: string[];
   /**
-   * When true, only enabledDates are selectable. While enabledDates is still
-   * empty (e.g. API loading), every day stays disabled to avoid a flash of
-   * all dates appearing clickable.
+   * When true, only enabledDates are selectable. Pass `undefined` while dates
+   * are still loading; pass `[]` when loaded with none available.
    */
   restrictToEnabledDates?: boolean;
 }
@@ -81,8 +80,9 @@ export function DateRangePicker({
     [enabledDates],
   );
 
-  const datesReady =
-    !restrictToEnabledDates || (enabledDates !== undefined && enabledDates.length > 0);
+  // undefined = still loading; [] = loaded, nothing selectable
+  const datesReady = !restrictToEnabledDates || enabledDates !== undefined;
+  const hasEnabledDates = (enabledDates?.length ?? 0) > 0;
 
   const defaultMonth = React.useMemo(() => {
     if (date?.from) return date.from;
@@ -179,6 +179,10 @@ export function DateRangePicker({
             <div className="flex items-center justify-center p-8 text-sm text-muted-foreground min-w-[280px]">
               Loading available dates…
             </div>
+          ) : restrictToEnabledDates && !hasEnabledDates ? (
+            <div className="flex items-center justify-center p-8 text-sm text-muted-foreground min-w-[280px]">
+              No available dates
+            </div>
           ) : (
             <Calendar
               initialFocus
@@ -190,7 +194,9 @@ export function DateRangePicker({
               disabled={disabledDates}
             />
           )}
-          {showApplyButton && datesReady && (
+          {showApplyButton &&
+            datesReady &&
+            (!restrictToEnabledDates || hasEnabledDates) && (
             <div className="flex justify-end gap-2 p-3 border-t">
               <Button
                 type="button"

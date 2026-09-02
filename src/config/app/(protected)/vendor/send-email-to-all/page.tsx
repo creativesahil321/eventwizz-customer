@@ -1,3 +1,4 @@
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 import { Shell } from "@/components/shell";
 import EmailForm from "./_components/email-form";
 import React from "react";
@@ -32,11 +33,15 @@ export default async function Page() {
                     href="/vendor/customers"
                     label="Back to Customers"
                   />
-                  <header className="flex w-full items-center justify-between gap-2 overflow-auto bg-background p-6 border rounded-lg">
+                  <header
+                    className={pageCardClassName(
+                      "flex w-full items-center justify-between gap-2 overflow-auto min-w-0",
+                    )}
+                  >
                     <nav className="items-center gap-2 relative">
-                      <h2 className="text-2xl title-header font-bold">
+                      <h1 className="text-2xl title-header font-bold">
                         Send Email to All Customers
-                      </h2>
+                      </h1>
                     </nav>
                   </header>
                   <main className="w-full space-y-2.5 overflow-auto">

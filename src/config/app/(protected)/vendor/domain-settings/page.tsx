@@ -2,9 +2,11 @@
 
 import React from "react";
 import { Globe } from "lucide-react";
+import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 import { Shell } from "@/components/shell";
 import { PermissionRoute } from "@/components/permission";
 import { DomainTab } from "@/app/(protected)/_shared/sites-essentials/_components/tabs/domain-tab";
+import { LocationScopedTitle } from "@/components/location-indicator";
 
 export default function DomainSettingsPage() {
   return (
@@ -16,21 +18,21 @@ export default function DomainSettingsPage() {
         <Shell className="gap-4">
           <div className="flex flex-col gap-4 min-w-0">
             {/* Page header */}
-            <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-sm p-4 sm:p-6 min-w-0">
-              <div className="flex items-center gap-2.5  title-header">
-                <Globe className="w-5 h-5 text-primary  shrink-0" />
+            <div className={pageCardClassName("min-w-0")}>
+              <div className="flex items-center gap-2.5 title-header">
+                <Globe className="w-5 h-5 text-primary shrink-0" />
                 <h1 className="text-xl font-bold text-foreground tracking-tight">
-                  Domain Settings
+                  <LocationScopedTitle title="Domain Settings" />
                 </h1>
               </div>
               <p className="text-sm text-muted-foreground mt-1.5">
-                Manage your domain, verify your business, and unlock all
-                platform features.
+                Domain and verification for this venue&apos;s public site.
+                Switch location in the header to manage another venue.
               </p>
             </div>
 
             {/* Domain tab content */}
-            <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-sm p-4 sm:p-6 min-w-0">
+            <div className={pageCardClassName("min-w-0")}>
               <DomainTab />
             </div>
           </div>

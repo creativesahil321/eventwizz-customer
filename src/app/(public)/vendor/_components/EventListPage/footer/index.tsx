@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { addCacheBusting } from "@/lib/image-utils";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 import {
   buildMapsDirectionsUrl,
   resolveFooterContactBlocks,
@@ -202,10 +203,12 @@ function FooterBrand({
 }) {
   const { mediaVersion } = useTheme();
   const image = (
-    <img
+    <BrandLogoImage
       src={addCacheBusting(logoPath, mediaVersion)}
-      className="h-10 w-auto max-w-[min(100%,12rem)] object-contain sm:h-11"
+      className="max-h-10 max-w-[min(100%,12rem)] sm:max-h-11"
       alt={brandName}
+      width={200}
+      height={116}
     />
   );
 

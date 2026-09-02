@@ -2,7 +2,10 @@
 
 import { cn } from "@/lib/utils";
 import type { BannerHeadingAlign } from "@/lib/banner-heading-align";
+import { heroHeadingAlignClass } from "@/lib/banner-heading-align";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewDeviceStore } from "@/store/preview-device.store";
 import {
   normalizeHeadingEmphasis,
   splitBannerHeading,
@@ -11,7 +14,7 @@ import {
 
 type SiteHeadingLevel = 1 | 2 | 3;
 
-type SiteHeadingVariant = "onDark" | "onSurface";
+type SiteHeadingVariant = "onDark" | "onSurface" | "onLight";
 
 export type SiteHeadingProps = {
   /** Semantic heading level */
@@ -22,13 +25,22 @@ export type SiteHeadingProps = {
   accentHint?: string | null;
   /** Override theme (e.g. previews) */
   emphasis?: HeadingEmphasis;
-  /** onDark: hero over imagery; onSurface: page body */
+  /**
+   * onDark: white, for hero over dark imagery.
+   * onLight: near-black, for hero over light imagery (image-driven auto-contrast).
+   * onSurface: theme body text, for page content.
+   */
   variant?: SiteHeadingVariant;
   /**
    * Match hero column alignment (`heroBannerStackClass`). Used for `accent_tail`
    * via `text-left` / `text-center` / `text-right` so wrapped lines align with the hero.
    */
   align?: BannerHeadingAlign;
+  /**
+   * Phone stays `text-center`; `md+` uses `align`.
+   * Location / event heroes only — home stays fully centered.
+   */
+  alignFromMd?: boolean;
   className?: string;
 };
 
@@ -38,40 +50,31 @@ const levelClass: Record<SiteHeadingLevel, string> = {
   3: "text-2xl font-semibold tracking-tight md:text-3xl",
 };
 
-/** Script/display fonts exceed tight metrics; bg-clip-text clips glyph swashes. */
-const headingLine =
-  "leading-[1.22] md:leading-[1.18] overflow-visible max-w-full";
-const headingBox = "inline-block max-w-full overflow-visible";
-/** Extra right padding: script tails (e.g. “UK”) often extend past the em-box; bg-clip-text clips without it. */
-const accentTailScriptPad =
-  "inline-block  pl-[0.06em] pr-[0.5em] py-[0.06em]";
+/** Phone / tablet device frames — sizes match a real handset, not the desktop window.
+ * Each size is repeated at sm/md/lg/xl as literals so Tailwind emits them and they
+ * beat consumer `md:!text-5xl` while the preview sits in a wide monitor. */
+const compactLevelClass = {
+  mobile: {
+    1: "font-semibold tracking-tight !text-[1.65rem] !leading-[1.22] sm:!text-[1.65rem] sm:!leading-[1.22] md:!text-[1.65rem] md:!leading-[1.22] lg:!text-[1.65rem] lg:!leading-[1.22] xl:!text-[1.65rem] xl:!leading-[1.22]",
+    2: "font-semibold tracking-tight !text-xl !leading-snug sm:!text-xl sm:!leading-snug md:!text-xl md:!leading-snug lg:!text-xl lg:!leading-snug xl:!text-xl xl:!leading-snug",
+    3: "font-semibold tracking-tight !text-lg !leading-snug sm:!text-lg sm:!leading-snug md:!text-lg md:!leading-snug lg:!text-lg lg:!leading-snug xl:!text-lg xl:!leading-snug",
+  },
+  tablet: {
+    1: "font-semibold tracking-tight !text-[2.15rem] !leading-[1.18] sm:!text-[2.15rem] sm:!leading-[1.18] md:!text-[2.15rem] md:!leading-[1.18] lg:!text-[2.15rem] lg:!leading-[1.18] xl:!text-[2.15rem] xl:!leading-[1.18]",
+    2: "font-semibold tracking-tight !text-2xl !leading-snug sm:!text-2xl sm:!leading-snug md:!text-2xl md:!leading-snug lg:!text-2xl lg:!leading-snug xl:!text-2xl xl:!leading-snug",
+    3: "font-semibold tracking-tight !text-xl !leading-snug sm:!text-xl sm:!leading-snug md:!text-xl md:!leading-snug lg:!text-xl lg:!leading-snug xl:!text-xl xl:!leading-snug",
+  },
+} as const satisfies Record<
+  "mobile" | "tablet",
+  Record<SiteHeadingLevel, string>
+>;
 
-/** Soft bloom behind accent tail text */
-function AccentTailTrail({ variant }: { variant: SiteHeadingVariant }) {
-  const isDark = variant === "onDark";
-  return (
-    <>
-      <span
-        className={cn(
-          "pointer-events-none absolute left-[48%] top-1/2 z-0 min-h-[2.25rem] w-[min(115%,14rem)] -translate-x-1/2 -translate-y-1/2 scale-x-[1.15] rounded-full blur-[26px] md:min-h-[2.75rem] md:blur-[34px]",
-          isDark
-            ? "h-[0.88em] bg-[color:color-mix(in_srgb,var(--color-primary)_48%,transparent)]"
-            : "h-[0.82em] bg-[color:color-mix(in_srgb,var(--color-primary)_32%,transparent)]",
-        )}
-        aria-hidden
-      />
-      <span
-        className={cn(
-          "pointer-events-none absolute left-[54%] top-[56%] z-0 h-[0.42em] min-h-[1rem] w-[min(95%,11rem)] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[18px] md:blur-[22px]",
-          isDark
-            ? "bg-[color:color-mix(in_srgb,var(--color-primary)_28%,transparent)]"
-            : "bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)]",
-        )}
-        aria-hidden
-      />
-    </>
-  );
-}
+/** Script/display fonts exceed tight metrics; keep overflow visible so glyphs aren't sliced. */
+const headingLine =
+  "leading-[1.22] overflow-visible min-w-0 max-w-full break-words [overflow-wrap:anywhere]";
+const headingBox = "inline-block max-w-full overflow-visible";
+/** Breathing room for display swashes without forcing an unbreakable inline-block. */
+const accentTailScriptPad = "pl-[0.04em] pr-[0.12em] py-[0.08em]";
 
 /**
  * Public-site marketing heading (`typography.headingEmphasis`).
@@ -88,12 +91,19 @@ export function SiteHeading({
   emphasis: emphasisProp,
   variant = "onDark",
   align,
+  alignFromMd = false,
   className,
 }: SiteHeadingProps) {
   const { theme } = useTheme();
+  const narrowPreview = usePreviewNarrowLayout();
+  const previewDevice = usePreviewDeviceStore((s) => s.device);
   const emphasis = normalizeHeadingEmphasis(
     emphasisProp ?? theme?.typography?.headingEmphasis,
   );
+  const compactType =
+    narrowPreview && previewDevice !== "desktop"
+      ? compactLevelClass[previewDevice]
+      : null;
 
   const Tag = level === 2 ? "h2" : level === 3 ? "h3" : "h1";
 
@@ -102,25 +112,49 @@ export function SiteHeading({
   const baseOnDark =
     "text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.55),0_1px_3px_rgba(0,0,0,0.4)]";
   const baseOnSurface = "text-[var(--color-text)]";
+  /** Literal near-black (not theme token) so it stays readable on any light image. */
+  const baseOnLight =
+    "text-[#0c0d10] [text-shadow:0_1px_12px_rgba(255,255,255,0.55),0_1px_2px_rgba(255,255,255,0.65)]";
 
-  const accentGradient =
-    "bg-gradient-to-r from-[color:var(--color-primary)] via-[color:var(--color-primary)] to-[color:color-mix(in_srgb,var(--color-primary)_82%,white)] bg-clip-text text-transparent";
+  /** Base text color for the current variant (accent tail keeps brand color). */
+  const baseColorClass =
+    variant === "onDark"
+      ? baseOnDark
+      : variant === "onLight"
+        ? baseOnLight
+        : baseOnSurface;
 
+  /**
+   * Hero photos: lift primary toward white so emerald/burgundy still brand
+   * but stay readable. Page body: solid primary on cream/surface.
+   */
+  const accentOnPhoto =
+    "text-[color:color-mix(in_srgb,var(--color-primary)_38%,white)] [text-shadow:0_2px_18px_rgba(0,0,0,0.55),0_1px_3px_rgba(0,0,0,0.4)]";
   const accentSolidPrimary = "text-[color:var(--color-primary)]";
 
   const headingFamily = "var(--font-heading)";
   const bodyFamily = "var(--font-body)";
 
+  /** When align is set, force block so siblings (e.g. CTAs) don't sit inline beside the title. */
+  const alignBox =
+    align === "center" || align === "right" || align === "left"
+      ? cn(
+          "block w-full max-w-full",
+          heroHeadingAlignClass(align, { fromMd: alignFromMd }),
+        )
+      : headingBox;
+
   if (emphasis === "uniform" || !accent) {
     return (
       <Tag
         className={cn(
-          headingBox,
+          alignBox,
           headingLine,
-          levelClass[level],
-          variant === "onDark" ? baseOnDark : baseOnSurface,
+          !compactType && levelClass[level],
+          baseColorClass,
           "px-[0.12em] py-[0.08em]",
           className,
+          compactType?.[level],
         )}
         style={{ fontFamily: headingFamily }}
       >
@@ -133,12 +167,15 @@ export function SiteHeading({
     return (
       <Tag
         className={cn(
-          headingBox,
+          alignBox,
           headingLine,
-          levelClass[level],
-          variant === "onDark" ? accentGradient : accentSolidPrimary,
+          !compactType && levelClass[level],
+          variant === "onDark" || variant === "onLight"
+            ? accentOnPhoto
+            : accentSolidPrimary,
           "px-[0.2em] py-[0.1em]",
           className,
+          compactType?.[level],
         )}
         style={{ fontFamily: headingFamily }}
       >
@@ -147,44 +184,44 @@ export function SiteHeading({
     );
   }
 
-  /* accent_tail — lead: body + neutral; tail: heading + primary. Inline text flow
-   * (not flex-wrap) keeps the tail on the same line as the last base words when
-   * width allows; flex-wrap was forcing the tail onto its own row after a full-width
-   * base block. Tail padding avoids bg-clip-text slicing swashes. */
+  /* accent_tail — lead: body + neutral; tail: heading + primary. Keep both spans
+   * `inline` so the tail wraps with the sentence (inline-block + max-w-full was
+   * overflowing the remaining line width and clipping “Club”). Inherit line-height
+   * so display fonts aren't sliced by leading-none. */
 
   return (
     <Tag
       className={cn(
-        "block w-full max-w-full overflow-visible",
-        align === "right" && "text-right",
-        align === "center" && "text-center",
-        align !== "right" && align !== "center" && "text-left",
+        "block w-full min-w-0 max-w-full overflow-visible",
+        heroHeadingAlignClass(align ?? "left", { fromMd: alignFromMd }),
         headingLine,
-        levelClass[level],
-        "px-[0.12em] py-[0.12em]",
+        !compactType && levelClass[level],
+        "py-[0.14em] pl-[0.12em] pr-[0.4em]",
         className,
+        compactType?.[level],
       )}
       style={{ fontFamily: bodyFamily }}
     >
-      <span
-        className={cn(
-          "leading-none",
-          variant === "onDark" ? baseOnDark : baseOnSurface,
-        )}
-        style={{ fontFamily: bodyFamily }}
-      >
-        {base}
-      </span>
+        <span
+          className={cn(
+            "break-words [overflow-wrap:anywhere] leading-[inherit]",
+            baseColorClass,
+          )}
+          style={{ fontFamily: bodyFamily }}
+        >
+          {base}
+        </span>
       {accent ? (
         <>
           {" "}
-          <span className="relative inline-block max-w-full align-baseline">
-            <AccentTailTrail variant={variant} />
+          <span className="inline min-w-0 break-words [overflow-wrap:anywhere] align-baseline">
             <span
               className={cn(
-                "relative z-[1] font-black leading-none align-baseline",
+                "inline font-black align-baseline break-words [overflow-wrap:anywhere] leading-[inherit]",
                 accentTailScriptPad,
-                variant === "onDark" ? accentGradient : accentSolidPrimary,
+                variant === "onDark" || variant === "onLight"
+                  ? accentOnPhoto
+                  : accentSolidPrimary,
               )}
               style={{ fontFamily: headingFamily }}
             >

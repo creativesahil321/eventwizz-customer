@@ -1,7 +1,30 @@
 import { eventsService } from "@/services/vendor/events/events.service";
 import type { EventMenuCategory } from "@/services/vendor/events/type";
+import { toPositiveId } from "@/lib/to-positive-id";
 
 export type MenuNameSource = { name?: string | null };
+
+export { toPositiveId };
+
+/**
+ * A menu category is only valid once it exists on the backend (id > 0). Menu
+ * items must never be persisted as "catering enabled" without one — see
+ * `stepSixSchema`. Use this everywhere the AI/apply flows decide whether a
+ * catering slot can be saved.
+ */
+export function isValidMenuCategoryId(id: unknown): boolean {
+  return toPositiveId(id) != null;
+}
+
+export function normalizeMenuCategory(
+  category: EventMenuCategory | null | undefined,
+): EventMenuCategory | null {
+  if (!category) return null;
+  const id = toPositiveId(category.id);
+  const name = String(category.name ?? "").trim();
+  if (id == null || !name) return null;
+  return { ...category, id, name };
+}
 
 /** Menu categories are event-level — dedupe by id so the dropdown never lists duplicates. */
 export function dedupeMenuCategoriesById(
@@ -9,20 +32,27 @@ export function dedupeMenuCategoriesById(
 ): EventMenuCategory[] {
   const byId = new Map<number, EventMenuCategory>();
   for (const cat of categories) {
-    const id = Number(cat.id);
-    if (!Number.isFinite(id)) continue;
-    if (!byId.has(id)) byId.set(id, cat);
+    const normalized = normalizeMenuCategory(cat);
+    if (!normalized) continue;
+    if (!byId.has(normalized.id)) byId.set(normalized.id, normalized);
   }
   return Array.from(byId.values());
 }
 
-export function extractMenuCategoriesList(response: unknown): EventMenuCategory[] {
+export function extractMenuCategoriesList(
+  response: unknown,
+): EventMenuCategory[] {
   if (!response || typeof response !== "object") return [];
-  if ("data" in response && Array.isArray((response as { data: unknown }).data)) {
-    return (response as { data: EventMenuCategory[] }).data;
+  let raw: EventMenuCategory[] = [];
+  if (
+    "data" in response &&
+    Array.isArray((response as { data: unknown }).data)
+  ) {
+    raw = (response as { data: EventMenuCategory[] }).data;
+  } else if (Array.isArray(response)) {
+    raw = response as EventMenuCategory[];
   }
-  if (Array.isArray(response)) return response as EventMenuCategory[];
-  return [];
+  return dedupeMenuCategoriesById(raw);
 }
 
 export function extractCreatedMenuCategory(
@@ -34,16 +64,38 @@ export function extractCreatedMenuCategory(
     (response as { status?: boolean }).status &&
     "data" in response
   ) {
-    const data = (response as { data: EventMenuCategory }).data;
-    if (data?.id && data?.name) return data;
+    return normalizeMenuCategory(
+      (response as { data: EventMenuCategory }).data,
+    );
   }
   if ("id" in response && "name" in response) {
-    return {
+    return normalizeMenuCategory({
       id: (response as { id: number }).id,
       name: (response as { name: string }).name,
-    };
+    });
   }
   return null;
+}
+
+/** Prefer the category whose name matches the first menu section (Starters, …). */
+export function findMenuCategoryIdForMenus(
+  categories: EventMenuCategory[],
+  menus: MenuNameSource[] | undefined,
+): number | undefined {
+  const firstName = (menus ?? [])
+    .map((menu) => String(menu?.name ?? "").trim().toLowerCase())
+    .find((name) => name.length > 0);
+
+  if (firstName) {
+    const match = categories.find(
+      (category) =>
+        String(category.name ?? "").trim().toLowerCase() === firstName,
+    );
+    const matchedId = toPositiveId(match?.id);
+    if (matchedId != null) return matchedId;
+  }
+
+  return toPositiveId(categories[0]?.id);
 }
 
 /**
@@ -64,8 +116,7 @@ export async function ensureEventMenuCategoriesForRoom(
   ];
   if (uniqueNames.length === 0) return undefined;
 
-  const scopedRoomId =
-    roomId != null && roomId > 0 ? roomId : undefined;
+  const scopedRoomId = toPositiveId(roomId);
 
   let existing: EventMenuCategory[] = [];
   try {
@@ -102,5 +153,7 @@ export async function ensureEventMenuCategoriesForRoom(
   }
 
   const firstMenuKey = uniqueNames[0]?.toLowerCase();
-  return firstMenuKey ? byNameLower.get(firstMenuKey)?.id : undefined;
+  return firstMenuKey
+    ? toPositiveId(byNameLower.get(firstMenuKey)?.id)
+    : undefined;
 }

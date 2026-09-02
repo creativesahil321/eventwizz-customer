@@ -9,6 +9,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { SiteHeading } from "@/components/public/site-heading";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 type Faq = {
   question?: string;
   answer?: string;
@@ -17,6 +22,7 @@ type FaqSectionProps = {
   faqs: Faq[];
   /** Show FAQ list without an extra click (default: open on public + preview). */
   defaultExpanded?: boolean;
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 function normalizeFaqQuestion(text: string | undefined): string {
@@ -28,8 +34,10 @@ function normalizeFaqQuestion(text: string | undefined): string {
 export default function FaqSection({
   faqs,
   defaultExpanded = true,
+  headingEmphasis,
 }: FaqSectionProps) {
   const [showMore, setShowMore] = useState(defaultExpanded);
+  const narrowPreview = usePreviewNarrowLayout();
 
   const filteredFaqs = useMemo(
     () => (faqs || []).filter((faq) => faq.question || faq.answer),
@@ -55,7 +63,11 @@ export default function FaqSection({
 
   return (
     <section
-      className="w-full scroll-mt-20 bg-[var(--color-background)] px-4 text-center text-[var(--color-text)] py-20 sm:scroll-mt-24 md:py-28"
+      className={cn(
+        "w-full scroll-mt-20 bg-[var(--color-background)] px-4 text-center text-[var(--color-text)]",
+        PUBLIC_SECTION_PY_CLASS,
+        !narrowPreview && "sm:scroll-mt-24",
+      )}
       aria-labelledby="faq-section-heading"
     >
       <div className="mx-auto w-full max-w-2xl">
@@ -63,12 +75,16 @@ export default function FaqSection({
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
             Got Questions?
           </p>
-          <h2
-            id="faq-section-heading"
-            className="text-3xl font-black tracking-tight text-[var(--color-text)] md:text-4xl"
-          >
-            Frequently Asked Questions
-          </h2>
+          <div id="faq-section-heading">
+            <SiteHeading
+              level={2}
+              title="Frequently Asked Questions"
+              emphasis={headingEmphasis}
+              variant="onSurface"
+              align="center"
+              className="!text-3xl !font-black tracking-tight md:!text-4xl"
+            />
+          </div>
         </div>
         <div className="flex w-full justify-center pb-2 pt-4">
           <Button
@@ -88,7 +104,7 @@ export default function FaqSection({
           </Button>
         </div>
 
-        <div className="mt-4 text-left sm:mt-5">
+        <div className={cn("mt-4 text-left", !narrowPreview && "sm:mt-5")}>
           <Accordion
             key={showMore ? "faq-expanded" : "faq-collapsed"}
             type="single"
@@ -104,7 +120,10 @@ export default function FaqSection({
                   key={index}
                 >
                   <AccordionTrigger
-                    className="items-start gap-3 rounded-none border-none bg-[var(--color-surface)] px-4 py-5 text-left text-base text-[var(--color-on-surface)] hover:no-underline focus-visible:ring-0 sm:px-5 sm:text-xl [&[data-state=open]]:rounded-b-none"
+                    className={cn(
+                      "items-start gap-3 rounded-none border-none bg-[var(--color-surface)] px-4 py-5 text-left text-base text-[var(--color-on-surface)] hover:no-underline focus-visible:ring-0 [&[data-state=open]]:rounded-b-none",
+                      !narrowPreview && "sm:px-5 sm:text-xl",
+                    )}
                     style={{
                       wordBreak: "break-word",
                       overflowWrap: "break-word",
@@ -113,7 +132,10 @@ export default function FaqSection({
                     {normalizeFaqQuestion(data.question)}
                   </AccordionTrigger>
                   <AccordionContent
-                    className="overflow-hidden whitespace-normal break-words bg-[var(--color-background)] px-4 text-base text-[var(--color-on-background)] sm:px-5"
+                    className={cn(
+                      "overflow-hidden whitespace-normal break-words bg-[var(--color-background)] px-4 text-base text-[var(--color-on-background)]",
+                      !narrowPreview && "sm:px-5",
+                    )}
                     style={{
                       wordBreak: "break-word",
                       overflowWrap: "break-word",

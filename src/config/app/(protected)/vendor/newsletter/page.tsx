@@ -1,28 +1,20 @@
 import { Shell } from "@/components/shell";
-import React, { lazy } from "react";
-import { NewsletterFormSkeleton } from "./_components/skeleton";
+import { Suspense } from "react";
+import NewsletterManager from "./_components/newsletter-manager";
+import { NewsletterManagerSkeleton } from "./_components/skeleton";
 import { PermissionRoute } from "@/components/permission";
 
-const NewsletterForm = lazy(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-  return import("./_components/newsletter-form");
-});
-
-interface PageProps {
-  searchParams: unknown;
-}
-export default async function Page(props: PageProps) {
-  await props.searchParams;
+export default function Page() {
   return (
     <PermissionRoute
       permissionKey="read-newsletter"
       fallbackPath="/vendor/dashboard"
     >
-      <section className="page">
+      <section className="page min-w-0 text-black">
         <Shell className="gap-2">
-          <React.Suspense fallback={<NewsletterFormSkeleton />}>
-            <NewsletterForm />
-          </React.Suspense>
+          <Suspense fallback={<NewsletterManagerSkeleton />}>
+            <NewsletterManager />
+          </Suspense>
         </Shell>
       </section>
     </PermissionRoute>

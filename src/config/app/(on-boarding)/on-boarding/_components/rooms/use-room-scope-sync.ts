@@ -334,12 +334,8 @@ export function useRoomScopeSync(section: RoomSection): RoomScopeSyncReturn {
           break;
         }
         case "brochure": {
-          const data = stepData as StepSevenType;
           response = await onboardingService.storeStepSevenRoomsData({
             event_id: eventId,
-            event_address: data.event_address ?? "",
-            latitude: data.latitude,
-            longitude: data.longitude,
             rooms: roomsToSave,
             isApproved: true,
           });
@@ -351,10 +347,6 @@ export function useRoomScopeSync(section: RoomSection): RoomScopeSyncReturn {
 
       if (!response?.status) {
         return false;
-      }
-
-      if (section === "brochure") {
-        globalForm.setValue("stepSeven.event_address", (stepData as StepSevenType).event_address ?? "");
       }
 
       onMultiRoomSuccess?.();

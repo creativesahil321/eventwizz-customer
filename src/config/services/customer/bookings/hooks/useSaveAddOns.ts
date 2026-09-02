@@ -14,76 +14,29 @@ export function useSaveAddOns() {
   return useMutation<SaveAddOnsResponse, Error, SaveAddOnsPayload | FormData>({
     mutationFn: (payload: SaveAddOnsPayload | FormData) =>
       bookingsService.saveAddOns(payload),
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       const invalidatePromises = [
         queryClient.invalidateQueries({
           queryKey: ["add-ons-details"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: bookingsKeys.bookingDetails(),
+        }),
+        queryClient.refetchQueries({
+          queryKey: bookingsKeys.bookingDetails(),
+          type: "active",
+        }),
       ];
-
-      let bookingIdToInvalidate: number | null = null;
-
-      if (variables instanceof FormData) {
-        const rawId = variables.get("booking_id");
-        if (typeof rawId === "string") {
-          const parsed = parseInt(rawId, 10);
-          if (!Number.isNaN(parsed) && parsed > 0) {
-            bookingIdToInvalidate = parsed;
-          }
-        }
-      } else if (
-        variables &&
-        typeof (variables as SaveAddOnsPayload).booking_id === "number"
-      ) {
-        const parsed = (variables as SaveAddOnsPayload).booking_id;
-        if (!Number.isNaN(parsed) && parsed > 0) {
-          bookingIdToInvalidate = parsed;
-        }
-      }
-
-      if (bookingIdToInvalidate) {
-        const bookingDetailKey = bookingsKeys.bookingDetail(
-          bookingIdToInvalidate
-        );
-        invalidatePromises.push(
-          queryClient.invalidateQueries({
-            queryKey: bookingDetailKey,
-          }),
-          queryClient.refetchQueries({
-            queryKey: bookingDetailKey,
-            type: "active",
-          })
-        );
-      }
 
       void Promise.all(invalidatePromises);
     },
-    onError: (error: Error, variables) => {
+    onError: (error: Error) => {
       const status = (error as AxiosError)?.response?.status;
       if (status !== 409) return;
 
-      let bookingIdToInvalidate: number | null = null;
-
-      if (variables instanceof FormData) {
-        const rawId = variables.get("booking_id");
-        if (typeof rawId === "string") {
-          const parsed = Number.parseInt(rawId, 10);
-          if (!Number.isNaN(parsed) && parsed > 0) {
-            bookingIdToInvalidate = parsed;
-          }
-        }
-      } else if (
-        variables &&
-        typeof (variables as SaveAddOnsPayload).booking_id === "number"
-      ) {
-        bookingIdToInvalidate = (variables as SaveAddOnsPayload).booking_id;
-      }
-
-      if (bookingIdToInvalidate) {
-        queryClient.invalidateQueries({
-          queryKey: bookingsKeys.bookingDetail(bookingIdToInvalidate),
-        });
-      }
+      queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetails(),
+      });
       queryClient.invalidateQueries({
         queryKey: ["add-ons-details"],
       });

@@ -108,7 +108,7 @@ export default function PaymentSelection({
                   <span className="font-semibold text-green-700">
                     {formatCurrency(totalAmount)}
                   </span>
-                  <span className="text-gray-500">Due today</span>
+                  <span className="text-gray-500">Pay today</span>
                 </div>
               </div>
             </Label>

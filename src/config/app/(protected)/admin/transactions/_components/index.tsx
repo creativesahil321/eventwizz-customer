@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Search, Download, Loader2, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -13,110 +13,68 @@ import {
 } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
-import { format } from "date-fns";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { AdminTransactionsDataTable } from "./transactions-data-table";
-import { AdminTransactionsTableSkeleton } from "./skeleton-loader";
-import {
-  getDummyEarnings,
-  getFilteredDummyTransactions,
-  DUMMY_TRANSACTIONS,
-} from "../_lib/dummy-data";
 import type { SearchParams } from "../_lib/types";
-import type { Transaction } from "../_lib/types";
-import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import {
+  ADMIN_TRANSACTION_STATUS_OPTIONS,
+  DEFAULT_ADMIN_TRANSACTION_STATUS,
+  dateParamsFromRange,
+} from "../_lib/filters";
+import { useExportAdminTransactions } from "@/services/admin/transactions";
+import { toast } from "sonner";
 
 export default function Transactions() {
-  const { formatLocale } = useCurrencyFormat();
   const [globalFilterValue, setGlobalFilterValue] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [earnings, setEarnings] = useState(() =>
-    getDummyEarnings(DUMMY_TRANSACTIONS)
+  const [statusFilter, setStatusFilter] = useState(
+    DEFAULT_ADMIN_TRANSACTION_STATUS,
   );
-  const [isLoading, setIsLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [earningsLabel, setEarningsLabel] = useState("£0.00");
 
-  const debouncedSearch = useDebounce(globalFilterValue, 500);
+  const debouncedSearch = useDebounce(globalFilterValue, 300);
+  const exportMutation = useExportAdminTransactions();
+  const dateParams = useMemo(
+    () => dateParamsFromRange(dateRange),
+    [dateRange],
+  );
 
-  const fromDate = dateRange?.from
-    ? format(dateRange.from, "yyyy-MM-dd")
-    : undefined;
-  const toDate = dateRange?.to
-    ? format(dateRange.to, "yyyy-MM-dd")
-    : undefined;
+  const searchValue = debouncedSearch.trim().slice(0, 255);
 
   const searchParams: SearchParams = {
-    page: "1",
-    per_page: "30",
-    search: debouncedSearch,
-    status: statusFilter === "all" ? "" : statusFilter,
-    from_date: fromDate,
-    to_date: toDate,
+    search: searchValue || undefined,
+    status: statusFilter,
+    ...dateParams,
   };
 
-  const handleEarningsUpdate = useCallback((earningsValue: string) => {
-    setEarnings(earningsValue);
+  const handleEarningsUpdate = useCallback((label: string) => {
+    setEarningsLabel(label);
   }, []);
 
   const hasActiveFilters =
-    !!debouncedSearch ||
-    statusFilter !== "all" ||
+    !!searchValue ||
+    statusFilter !== DEFAULT_ADMIN_TRANSACTION_STATUS ||
     !!dateRange?.from ||
     !!dateRange?.to;
 
   const handleResetAllFilters = () => {
     setGlobalFilterValue("");
-    setStatusFilter("all");
+    setStatusFilter(DEFAULT_ADMIN_TRANSACTION_STATUS);
     setDateRange(undefined);
   };
 
   const handleCSVExport = () => {
-    const filtered = getFilteredDummyTransactions({
-      search: debouncedSearch,
-      status: statusFilter === "all" ? "" : statusFilter,
-      from_date: fromDate,
-      to_date: toDate,
-    });
-    const headers = [
-      "Booking Number",
-      "Txn ID",
-      "Booking Date",
-      "Event Date",
-      "Full Name",
-      "Email",
-      "Payment Method",
-      "Status",
-      "Amount",
-      "Platform Fee",
-    ];
-    const rows = filtered.map((t) =>
-      [
-        t.booking_number,
-        t.transaction_id,
-        t.booking_date,
-        t.event_date,
-        t.full_name,
-        t.email,
-        `${t.card_brand} **${t.cardLast4}`,
-        t.status,
-        t.amount,
-        t.platform_fee,
-      ].join(",")
-    );
-    const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `admin-transaction-history-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+    if (!dateParams.booking_date && !dateParams.from_date) {
+      toast.error("Please select a booking date to export");
+      return;
+    }
 
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
+    exportMutation.mutate({
+      ...dateParams,
+      search: searchValue || undefined,
+      status: statusFilter,
+    });
+  };
 
   return (
     <div className="flex flex-col gap-4 min-w-0 max-w-full">
@@ -132,7 +90,7 @@ export default function Transactions() {
                   Earnings:
                 </span>
                 <span className="text-lg font-bold text-green-600">
-                  {formatLocale(parseFloat(earnings))}
+                  {earningsLabel}
                 </span>
               </div>
             </div>
@@ -148,14 +106,14 @@ export default function Transactions() {
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="All Status" />
+                  <SelectValue placeholder="Success" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
+                  {ADMIN_TRANSACTION_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <div className="relative w-full sm:w-[220px]">
@@ -163,6 +121,7 @@ export default function Transactions() {
                 <Input
                   placeholder="Txn ID / Booking Num..."
                   value={globalFilterValue}
+                  maxLength={255}
                   onChange={(e) => setGlobalFilterValue(e.target.value)}
                   className="pl-8 w-full"
                 />
@@ -181,24 +140,26 @@ export default function Transactions() {
               <Button
                 variant="event-primary"
                 onClick={handleCSVExport}
+                disabled={exportMutation.isPending}
+                aria-busy={exportMutation.isPending}
                 className="gap-2 shrink-0"
               >
-                <Download className="h-4 w-4" />
-                Export CSV
+                {exportMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {exportMutation.isPending ? "Exporting…" : "Export CSV"}
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      {isLoading ? (
-        <AdminTransactionsTableSkeleton rowCount={9} />
-      ) : (
-        <AdminTransactionsDataTable
-          search={searchParams}
-          onEarningsUpdate={handleEarningsUpdate}
-        />
-      )}
+      <AdminTransactionsDataTable
+        search={searchParams}
+        onEarningsUpdate={handleEarningsUpdate}
+      />
     </div>
   );
 }

@@ -1,5 +1,11 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useForm, useFieldArray, Resolver, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -30,7 +36,6 @@ import { onboardingService } from "@/services/vendor/onboarding/onboarding.servi
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import {
   getDefaultDate,
   stepFiveSchema,
@@ -68,8 +73,8 @@ const formatDateDisplay = (dateString: string | undefined | null): string => {
   if (!dateString) return "New Date";
 
   try {
-    // Handle YYYY-MM-DD format (from date input)
-    const date = new Date(dateString + "T00:00:00"); // Add time to avoid timezone issues
+    // Noon local avoids timezone off-by-one for YYYY-MM-DD strings
+    const date = new Date(`${dateString}T12:00:00`);
 
     // Check if date is valid
     if (isNaN(date.getTime())) {
@@ -92,10 +97,7 @@ const hasMeaningfulDateData = (
   dates: StepFiveType["dates"] | undefined,
 ): boolean => {
   if (!dates || dates.length === 0) return false;
-  const hasNonEmpty = (value: unknown) =>
-    String(value ?? "")
-      .trim()
-      .length > 0;
+  const hasNonEmpty = (value: unknown) => String(value ?? "").trim().length > 0;
   return dates.some((date) => {
     const hasDate = hasNonEmpty(date?.event_date);
     const hasTickets =
@@ -122,9 +124,7 @@ const hasMeaningfulDateData = (
   });
 };
 
-const normalizeDepositType = (
-  value: unknown,
-): "amount" | "percentage" => {
+const normalizeDepositType = (value: unknown): "amount" | "percentage" => {
   return value === "percentage" ? "percentage" : "amount";
 };
 
@@ -162,7 +162,9 @@ export default function StepFive() {
   const previousRoomIndexRef = useRef(currentRoomIndex);
   const lastHydratedRoomIndexRef = useRef<number | null>(null);
   const activeScopedDates = roomScope.isMultiRoom
-    ? (rooms[currentRoomIndex]?.dates?.dates as StepFiveType["dates"] | undefined)
+    ? (rooms[currentRoomIndex]?.dates?.dates as
+        | StepFiveType["dates"]
+        | undefined)
     : (stepFiveScopedData?.dates as StepFiveType["dates"] | undefined);
 
   // Initialize form with combined step data
@@ -270,8 +272,7 @@ export default function StepFive() {
     if (!roomScope.isMultiRoom) return;
 
     const shouldHydrateFromPersisted =
-      persistedProgressHydrated &&
-      lastHydratedRoomIndexRef.current === null;
+      persistedProgressHydrated && lastHydratedRoomIndexRef.current === null;
     const switchedRoom = lastHydratedRoomIndexRef.current !== currentRoomIndex;
 
     if (!shouldHydrateFromPersisted && !switchedRoom) {
@@ -280,7 +281,9 @@ export default function StepFive() {
     }
 
     const incomingDates = cleanDatesData(
-      rooms[currentRoomIndex]?.dates?.dates as StepFiveType["dates"] | undefined,
+      rooms[currentRoomIndex]?.dates?.dates as
+        | StepFiveType["dates"]
+        | undefined,
     );
     const currentDates = form.getValues("dates");
     if (JSON.stringify(currentDates) === JSON.stringify(incomingDates)) {
@@ -675,7 +678,7 @@ export default function StepFive() {
       return (
         <>
           <OnboardingFieldGroupTitle>
-            Ticket Information
+            Ticket information
           </OnboardingFieldGroupTitle>
           <div className="mt-5 space-y-4 pt-4 border-t border-white/10">
             <div className="flex justify-between items-center gap-3">
@@ -720,11 +723,11 @@ export default function StepFive() {
                         return (
                           <FormItem>
                             <FormLabel className="text-md font-medium">
-                              Ticket Name
+                              Ticket name
                             </FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="e.g., Standard Ticket"
+                                placeholder="e.g. Standard Ticket"
                                 {...field}
                                 className="w-full h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
@@ -764,7 +767,7 @@ export default function StepFive() {
                             </FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="e.g., Access to all areas"
+                                placeholder="e.g. Access to all areas"
                                 {...field}
                                 className="w-full h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
@@ -797,7 +800,7 @@ export default function StepFive() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-md font-medium">
-                            Total Tickets
+                            Total tickets
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -842,7 +845,7 @@ export default function StepFive() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-md font-medium">
-                            Price/Person
+                            Price / person
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -934,7 +937,7 @@ export default function StepFive() {
         <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <OnboardingFieldGroupTitle>
-              Table Information
+              Table information
             </OnboardingFieldGroupTitle>
             <Button
               type="button"
@@ -1324,7 +1327,7 @@ export default function StepFive() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-md font-medium">
-                        Event Date
+                        Event date
                       </FormLabel>
                       <FormControl>
                         <div className="relative w-full">
@@ -1366,6 +1369,10 @@ export default function StepFive() {
                       <FormLabel className="text-md font-medium">
                         Is it a ticketed or seated event?
                       </FormLabel>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Defaults to Tickets — switch to Tables or Both if guests
+                        reserve seats.
+                      </p>
                       <FormControl>
                         <Select
                           value={field.value}
@@ -1406,7 +1413,7 @@ export default function StepFive() {
                 form.watch(`dates.${dateIndex}.booking_type`) === "both") && (
                 <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
                   <OnboardingFieldGroupTitle>
-                    Table Payment Settings
+                    Table payment settings
                   </OnboardingFieldGroupTitle>
                   <p className="text-sm text-muted-foreground">
                     Configure payment options for table bookings (deposit or
@@ -1421,7 +1428,7 @@ export default function StepFive() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-md font-medium">
-                              Payment Type
+                              Payment type
                             </FormLabel>
                             <FormControl>
                               <RadioGroup
@@ -1462,22 +1469,18 @@ export default function StepFive() {
                                 }}
                                 className="flex space-x-4 pt-2"
                               >
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                  <FormControl>
-                                    <RadioGroupItem value="full" />
-                                  </FormControl>
-                                  <FormLabel className="font-normal cursor-pointer">
-                                    Full Payment
-                                  </FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                  <FormControl>
-                                    <RadioGroupItem value="deposit" />
-                                  </FormControl>
-                                  <FormLabel className="font-normal cursor-pointer">
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                  <RadioGroupItem value="full" />
+                                  <span className="text-sm font-normal">
+                                    Full payment
+                                  </span>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                  <RadioGroupItem value="deposit" />
+                                  <span className="text-sm font-normal">
                                     Deposit
-                                  </FormLabel>
-                                </FormItem>
+                                  </span>
+                                </label>
                               </RadioGroup>
                             </FormControl>
                             <FormMessage />
@@ -1495,168 +1498,169 @@ export default function StepFive() {
                           control={form.control}
                           name={`dates.${dateIndex}.deposit_type`}
                           render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-md font-medium">
-                                    Deposit Type
-                                  </FormLabel>
-                                  <FormControl>
-                                    <RadioGroup
-                                      value={safeDepositType}
-                                      onValueChange={(
-                                        value: "amount" | "percentage",
-                                      ) => {
-                                        field.onChange(value);
+                            <FormItem>
+                              <FormLabel className="text-md font-medium">
+                                Deposit type
+                              </FormLabel>
+                              <FormControl>
+                                <RadioGroup
+                                  value={safeDepositType}
+                                  onValueChange={(
+                                    value: "amount" | "percentage",
+                                  ) => {
+                                    field.onChange(value);
+                                    handleFieldFocus(
+                                      `dates.${dateIndex}.deposit_type`,
+                                    );
+                                    // Clear the deposit_value when switching type
+                                    form.setValue(
+                                      `dates.${dateIndex}.deposit_value`,
+                                      "",
+                                    );
+                                  }}
+                                  className="flex space-x-4 pt-2"
+                                >
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <RadioGroupItem value="amount" />
+                                    <span className="text-sm font-normal">
+                                      Fixed Amount
+                                    </span>
+                                  </label>
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <RadioGroupItem value="percentage" />
+                                    <span className="text-sm font-normal">
+                                      Percentage
+                                    </span>
+                                  </label>
+                                </RadioGroup>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Unified Deposit Value Field */}
+                          <FormField
+                            control={form.control}
+                            name={`dates.${dateIndex}.deposit_value`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  {safeDepositType === "amount"
+                                    ? "Deposit Amount/Person"
+                                    : "Deposit Percentage (%)"}
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={
+                                      safeDepositType === "percentage"
+                                        ? "20"
+                                        : "1"
+                                    }
+                                    max={
+                                      safeDepositType === "percentage"
+                                        ? "80"
+                                        : undefined
+                                    }
+                                    step="1"
+                                    placeholder={
+                                      safeDepositType === "amount"
+                                        ? "Enter deposit amount"
+                                        : "Enter percentage (20-80)"
+                                    }
+                                    {...field}
+                                    value={field.value ?? ""}
+                                    className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      const depositType = safeDepositType;
+
+                                      // Allow empty value
+                                      if (value === "") {
+                                        field.onChange("");
+                                        return;
+                                      }
+
+                                      // Remove any decimal points and non-numeric characters except digits
+                                      const cleanedValue = value.replace(
+                                        /[^\d]/g,
+                                        "",
+                                      );
+
+                                      if (cleanedValue === "") {
+                                        field.onChange("");
+                                        return;
+                                      }
+
+                                      const numValue = parseInt(
+                                        cleanedValue,
+                                        10,
+                                      );
+
+                                      if (!isNaN(numValue) && numValue >= 0) {
+                                        // For percentage: limit to 100
+                                        if (depositType === "percentage") {
+                                          if (numValue <= 100) {
+                                            field.onChange(numValue);
+                                          } else {
+                                            field.onChange(100);
+                                          }
+                                        } else {
+                                          // For amount: allow any positive integer
+                                          field.onChange(numValue);
+                                        }
+                                      }
+                                    }}
+                                    onFocus={() =>
+                                      handleFieldFocus(
+                                        `dates.${dateIndex}.deposit_value`,
+                                      )
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Balance due date */}
+                          <FormField
+                            control={form.control}
+                            name={`dates.${dateIndex}.deposit_due_date`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Balance due date</FormLabel>
+                                <FormControl>
+                                  <div className="relative w-full">
+                                    <Input
+                                      type="date"
+                                      placeholder="Select due date"
+                                      {...field}
+                                      min={getTodayDateString()}
+                                      className="w-full h-11 bg-white/5 border-white/10"
+                                      onFocus={() =>
                                         handleFieldFocus(
-                                          `dates.${dateIndex}.deposit_type`,
-                                        );
-                                        // Clear the deposit_value when switching type
-                                        form.setValue(
-                                          `dates.${dateIndex}.deposit_value`,
-                                          "",
-                                        );
-                                      }}
-                                      className="flex space-x-4 pt-2"
-                                    >
-                                      <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                          <RadioGroupItem value="amount" />
-                                        </FormControl>
-                                        <Label className="font-normal cursor-pointer">
-                                          Fixed Amount
-                                        </Label>
-                                      </FormItem>
-                                      <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                          <RadioGroupItem value="percentage" />
-                                        </FormControl>
-                                        <Label className="font-normal cursor-pointer">
-                                          Percentage
-                                        </Label>
-                                      </FormItem>
-                                    </RadioGroup>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {/* Unified Deposit Value Field */}
-                              <FormField
-                                control={form.control}
-                                name={`dates.${dateIndex}.deposit_value`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>
-                                      {safeDepositType === "amount"
-                                        ? "Deposit Amount/Person"
-                                        : "Deposit Percentage (%)"}
-                                    </FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        min={safeDepositType === "percentage" ? "20" : "1"}
-                                        max={safeDepositType === "percentage" ? "80" : undefined}
-                                        step="1"
-                                        placeholder={
-                                          safeDepositType === "amount"
-                                            ? "Enter deposit amount"
-                                            : "Enter percentage (20-80)"
-                                        }
-                                        {...field}
-                                        value={field.value ?? ""}
-                                        className="w-full h-11 bg-white/5 border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                        onChange={(e) => {
-                                          const value = e.target.value;
-                                          const depositType = safeDepositType;
-
-                                          // Allow empty value
-                                          if (value === "") {
-                                            field.onChange("");
-                                            return;
-                                          }
-
-                                          // Remove any decimal points and non-numeric characters except digits
-                                          const cleanedValue = value.replace(
-                                            /[^\d]/g,
-                                            "",
-                                          );
-
-                                          if (cleanedValue === "") {
-                                            field.onChange("");
-                                            return;
-                                          }
-
-                                          const numValue = parseInt(
-                                            cleanedValue,
-                                            10,
-                                          );
-
-                                          if (
-                                            !isNaN(numValue) &&
-                                            numValue >= 0
-                                          ) {
-                                            // For percentage: limit to 100
-                                            if (depositType === "percentage") {
-                                              if (numValue <= 100) {
-                                                field.onChange(numValue);
-                                              } else {
-                                                field.onChange(100);
-                                              }
-                                            } else {
-                                              // For amount: allow any positive integer
-                                              field.onChange(numValue);
-                                            }
-                                          }
-                                        }}
-                                        onFocus={() =>
-                                          handleFieldFocus(
-                                            `dates.${dateIndex}.deposit_value`,
-                                          )
-                                        }
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              {/* Balance due date */}
-                              <FormField
-                                control={form.control}
-                                name={`dates.${dateIndex}.deposit_due_date`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Balance due date</FormLabel>
-                                    <FormControl>
-                                      <div className="relative w-full">
-                                        <Input
-                                          type="date"
-                                          placeholder="Select due date"
-                                          {...field}
-                                          min={getTodayDateString()}
-                                          className="w-full h-11 bg-white/5 border-white/10"
-                                          onFocus={() =>
-                                            handleFieldFocus(
-                                              `dates.${dateIndex}.deposit_due_date`,
-                                            )
-                                          }
-                                        />
-                                        {!field.value && (
-                                          <span
-                                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground sm:hidden"
-                                            aria-hidden
-                                          >
-                                            dd-mm-yyyy
-                                          </span>
-                                        )}
-                                      </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
+                                          `dates.${dateIndex}.deposit_due_date`,
+                                        )
+                                      }
+                                    />
+                                    {!field.value && (
+                                      <span
+                                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground sm:hidden"
+                                        aria-hidden
+                                      >
+                                        dd-mm-yyyy
+                                      </span>
+                                    )}
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1823,7 +1827,7 @@ export default function StepFive() {
     <div className="flex flex-col items-center justify-center w-full min-h-screen py-8 px-4">
       <OnboardingCard className="w-full max-w-4xl mb-4">
         <CardHeader className="text-center pb-2">
-          <OnboardingTitle>Tell Us About Your Event Booking</OnboardingTitle>
+          <OnboardingTitle>Tell us about your event booking</OnboardingTitle>
         </CardHeader>
 
         <CardContent className="px-6 py-4">

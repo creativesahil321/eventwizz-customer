@@ -1,10 +1,17 @@
 import {
-  buildCheckoutStripeSession,
+  resolveCheckoutPaymentAction,
   type CheckoutPaymentAction,
 } from "../checkout/checkout-payment";
 import type { CheckoutResponseData } from "../checkout/type";
 import type { BookingPaymentResponseData } from "./type";
 
+/**
+ * Maps booking-payment API data into the shared checkout payment shape so
+ * Stripe (Elements) and PayPal/redirect gateways resolve the same way as cart checkout.
+ *
+ * PayPal nests the hosted URL at `payment.paypal.redirect_url`.
+ * Stripe nests credentials at `payment.stripe.{client_secret,publishable_key,...}`.
+ */
 function toCheckoutPaymentShape(
   data: BookingPaymentResponseData,
 ): CheckoutResponseData {
@@ -17,9 +24,13 @@ function toCheckoutPaymentShape(
       payment: {
         gateway: data.payment.gateway,
         stripe: data.payment.stripe,
+        paypal: data.payment.paypal,
         redirect_url: data.payment.redirect_url,
       },
-      redirect_url: data.redirect_url ?? data.payment.redirect_url,
+      redirect_url:
+        data.redirect_url ??
+        data.payment.redirect_url ??
+        data.payment.paypal?.redirect_url,
     };
   }
 
@@ -38,17 +49,7 @@ function toCheckoutPaymentShape(
 export function resolveBookingPaymentAction(
   data: BookingPaymentResponseData,
 ): CheckoutPaymentAction | null {
-  const session = buildCheckoutStripeSession(toCheckoutPaymentShape(data));
-  if (session) {
-    return { type: "stripe", session };
-  }
-
-  const redirectUrl = data.redirect_url ?? data.payment?.redirect_url;
-  if (redirectUrl) {
-    return { type: "redirect", url: redirectUrl };
-  }
-
-  return null;
+  return resolveCheckoutPaymentAction(toCheckoutPaymentShape(data));
 }
 
 export type { CheckoutPaymentAction };

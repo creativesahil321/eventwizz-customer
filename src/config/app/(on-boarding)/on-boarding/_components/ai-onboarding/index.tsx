@@ -3,14 +3,14 @@
 import React, { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import AICollectInfo from "./collect-info";
-import AIGenerating from "./generating";
-import AIAutoApply from "./ai-auto-apply";
+import AIOnboardingBuilding from "./building";
 import { useAIOnboarding } from "../../_lib/hooks/useAIOnboarding";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 
 interface AIOnboardingFlowProps {
   onComplete: () => void;
   onSwitchToManual: () => void;
+  onBackToMode: () => void;
   /** From GET persistence: `null` = never set → show location gate; `true`/`false` = skip gate. */
   persistedHasMultipleLocations: boolean | null;
   /** From GET persistence: `null` = unknown; otherwise pre-lock room-system choice. */
@@ -22,6 +22,7 @@ interface AIOnboardingFlowProps {
 export default function AIOnboardingFlow({
   onComplete,
   onSwitchToManual,
+  onBackToMode,
   persistedHasMultipleLocations,
   persistedHasRoomSystem,
   persistedRoomNames,
@@ -87,6 +88,7 @@ export default function AIOnboardingFlow({
             <AICollectInfo
               onSubmit={handleCollectComplete}
               onSwitchToManual={onSwitchToManual}
+              onBackToMode={onBackToMode}
               isLoading={isGenerating}
               initialData={venueInput}
               persistedHasMultipleLocations={persistedHasMultipleLocations}
@@ -96,30 +98,19 @@ export default function AIOnboardingFlow({
           </motion.div>
         )}
 
-        {step === "generating" && (
+        {(step === "generating" ||
+          (step === "applying" && content && venueInput)) && (
           <motion.div
-            key="generating"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.4 }}
+            key="building"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.35 }}
           >
-            <AIGenerating
+            <AIOnboardingBuilding
+              phase={step === "applying" ? "applying" : "generating"}
               venueName={venueInput?.venueName || ""}
               hasMultipleLocations={venueInput?.has_multiple_locations === true}
-            />
-          </motion.div>
-        )}
-
-        {step === "applying" && content && venueInput && (
-          <motion.div
-            key="applying"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.4 }}
-          >
-            <AIAutoApply
               content={content}
               venueInput={venueInput}
               onComplete={handleAIApplyComplete}

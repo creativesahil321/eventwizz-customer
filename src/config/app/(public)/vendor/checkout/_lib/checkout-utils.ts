@@ -14,6 +14,7 @@ import { EditableDateData } from "@/store/cart-edit.store";
 import type { ApiEventCartData } from "@/lib/types/cart.types";
 import {
   extractEventsFromApiResponse,
+  findApiCartEventBySlug,
   findEventBySlug,
   getAllRoomDateKeys,
   getApiDateData,
@@ -24,7 +25,21 @@ import {
   parseRoomDateKey,
 } from "./cart-calculations";
 import { formatMoney, resolveCurrencySymbol } from "@/lib/currency-format";
+import { normalizeSlug } from "@/lib/utils";
 import { useDomainStore } from "@/store/domain.store";
+
+function editingDataForEventSlug(
+  editingData: Record<string, Record<string, EditableDateData>>,
+  eventSlug: string,
+): Record<string, Record<string, EditableDateData>> | null {
+  if (editingData[eventSlug]) return editingData;
+  const want = normalizeSlug(eventSlug);
+  const match = Object.keys(editingData).find(
+    (key) => normalizeSlug(key) === want,
+  );
+  if (!match) return null;
+  return { ...editingData, [eventSlug]: editingData[match] };
+}
 
 interface DatePaymentTotals {
   dateTotal: number;
@@ -354,6 +369,159 @@ function collectCheckoutRooms(
   return { rooms, subTotal, payToday, payLater, depositToday };
 }
 
+export function roundCheckoutMoney(n: number): number {
+  return Math.round(Math.max(0, n) * 100) / 100;
+}
+
+/** Compare checkout money after cent rounding — avoids float false mismatches. */
+export function checkoutMoneyEquals(a: number, b: number): boolean {
+  return roundCheckoutMoney(a) === roundCheckoutMoney(b);
+}
+
+/**
+ * After a booking-level discount, top-level `partial_payment` is the discounted
+ * table-deposit total. Per-date `deposit_amount` values must sum to that same
+ * figure or validation rejects: "partial_payment must equal the sum of table
+ * deposit amounts across deposit dates".
+ */
+function scaleDepositAmountsToTarget(
+  dates: CheckoutDateData[],
+  targetDepositToday: number,
+): void {
+  const depositDates = dates.filter(
+    (date) => date.is_deposit && date.deposit_amount > 0,
+  );
+  if (depositDates.length === 0) return;
+
+  const originalSum = depositDates.reduce(
+    (sum, date) => sum + date.deposit_amount,
+    0,
+  );
+  if (originalSum <= 0) return;
+
+  const target = roundCheckoutMoney(Math.max(0, targetDepositToday));
+  if (Math.abs(originalSum - target) <= 0.02) return;
+
+  let allocated = 0;
+  depositDates.forEach((date, index) => {
+    if (index === depositDates.length - 1) {
+      date.deposit_amount = roundCheckoutMoney(target - allocated);
+      return;
+    }
+    const scaled = roundCheckoutMoney(
+      (date.deposit_amount / originalSum) * target,
+    );
+    date.deposit_amount = scaled;
+    allocated = roundCheckoutMoney(allocated + scaled);
+  });
+}
+
+/**
+ * Confirmed checkout money rule:
+ * 1) Apply the single discount to the booking total first
+ * 2) Then derive pay-today / pay-later from that discounted total
+ *    (keeps the same today:later ratio as the pre-discount split)
+ *
+ * Drink packages are never coupon-eligible. Pass them as
+ * `nonDiscountablePayToday` so they stay full-price on pay-today while the
+ * percentage coupon applies only to tables + tickets (matching the API).
+ *
+ * Example: £1000 total, 10% off → £900; 30% partial → £270 today / £630 later.
+ */
+export function applyDiscountThenSplitPayment(options: {
+  subTotal: number;
+  discountAmount: number;
+  payToday: number;
+  payLater: number;
+  depositToday?: number;
+  /** Drink packages (and any other never-discounted pay-today amount). */
+  nonDiscountablePayToday?: number;
+}): {
+  discountAmount: number;
+  discountedTotal: number;
+  payToday: number;
+  payLater: number;
+  depositToday: number;
+} {
+  const subTotal = roundCheckoutMoney(options.subTotal);
+  const payTodayRaw = roundCheckoutMoney(Math.max(0, options.payToday));
+  const payLaterRaw = roundCheckoutMoney(Math.max(0, options.payLater));
+  const drinksToday = roundCheckoutMoney(
+    Math.max(
+      0,
+      Math.min(options.nonDiscountablePayToday ?? 0, payTodayRaw),
+    ),
+  );
+
+  // Coupon % is on tables+tickets only — peel drinks out, split, then add back.
+  const discountableSubTotal = roundCheckoutMoney(
+    Math.max(0, subTotal - drinksToday),
+  );
+  const discountablePayToday = roundCheckoutMoney(
+    Math.max(0, payTodayRaw - drinksToday),
+  );
+  const discountAmount = roundCheckoutMoney(
+    Math.min(Math.max(0, options.discountAmount), discountableSubTotal),
+  );
+  const discountedDiscountable = roundCheckoutMoney(
+    discountableSubTotal - discountAmount,
+  );
+  const discountedTotal = roundCheckoutMoney(
+    discountedDiscountable + drinksToday,
+  );
+
+  if (subTotal <= 0 || discountedTotal <= 0) {
+    return {
+      discountAmount,
+      discountedTotal: 0,
+      payToday: 0,
+      payLater: 0,
+      depositToday: 0,
+    };
+  }
+
+  // Full payment — charge the full discounted total today.
+  if (payLaterRaw <= 0) {
+    return {
+      discountAmount,
+      discountedTotal,
+      payToday: discountedTotal,
+      payLater: 0,
+      depositToday: 0,
+    };
+  }
+
+  // Partial payment — same ratio on the discountable (tables+tickets) total.
+  const todayRatio =
+    discountableSubTotal > 0
+      ? Math.min(1, Math.max(0, discountablePayToday / discountableSubTotal))
+      : 0;
+  const discountedPayTodayCore = roundCheckoutMoney(
+    discountedDiscountable * todayRatio,
+  );
+  const payLater = roundCheckoutMoney(
+    discountedDiscountable - discountedPayTodayCore,
+  );
+  const payToday = roundCheckoutMoney(discountedPayTodayCore + drinksToday);
+  const depositRatio =
+    options.depositToday != null &&
+    options.depositToday > 0 &&
+    discountablePayToday > 0
+      ? Math.min(1, options.depositToday / discountablePayToday)
+      : 0;
+  const depositToday = roundCheckoutMoney(
+    discountedPayTodayCore * depositRatio,
+  );
+
+  return {
+    discountAmount,
+    discountedTotal,
+    payToday,
+    payLater,
+    depositToday,
+  };
+}
+
 /**
  * Transform cart edit store data into checkout API format.
  */
@@ -362,15 +530,21 @@ export function transformCartToCheckout(
   editingData: Record<string, Record<string, EditableDateData>>,
   apiCartData: unknown,
   paymentGateway?: string | number | null,
+  options?: {
+    couponCode?: string | null;
+    /** Absolute discount for the booking (applied to total before partial split). */
+    discountAmount?: number | null;
+  },
 ): CheckoutRequest | null {
-  const eventData = editingData[eventSlug];
-  if (!eventData) {
+  const resolvedEditing = editingDataForEventSlug(editingData, eventSlug);
+  if (!resolvedEditing?.[eventSlug]) {
     console.error("No event data found for slug:", eventSlug);
     return null;
   }
 
-  const eventsArray = extractEventsFromApiResponse(apiCartData);
-  const apiEventData = findEventBySlug(eventsArray, eventSlug);
+  const apiEventData =
+    findApiCartEventBySlug(apiCartData, eventSlug) ??
+    findEventBySlug(extractEventsFromApiResponse(apiCartData), eventSlug);
   const vendorEventId = apiEventData?.vendor_event_id;
 
   if (!vendorEventId) {
@@ -393,14 +567,22 @@ export function transformCartToCheckout(
   let checkoutRooms: CheckoutRoomData[] | undefined;
 
   if (roomMode) {
-    const collected = collectCheckoutRooms(eventSlug, editingData, apiEventData);
+    const collected = collectCheckoutRooms(
+      eventSlug,
+      resolvedEditing,
+      apiEventData,
+    );
     subTotal = collected.subTotal;
     payToday = collected.payToday;
     payLater = collected.payLater;
     depositToday = collected.depositToday;
     checkoutRooms = collected.rooms;
   } else {
-    const collected = collectCheckoutDates(eventSlug, editingData, apiEventData);
+    const collected = collectCheckoutDates(
+      eventSlug,
+      resolvedEditing,
+      apiEventData,
+    );
     subTotal = collected.subTotal;
     payToday = collected.payToday;
     payLater = collected.payLater;
@@ -417,15 +599,69 @@ export function transformCartToCheckout(
     return null;
   }
 
+  const couponCode = options?.couponCode?.trim().toUpperCase() || null;
+  const discountAmountRaw = Number(options?.discountAmount ?? 0);
+  const requestedDiscount =
+    Number.isFinite(discountAmountRaw) && discountAmountRaw > 0
+      ? discountAmountRaw
+      : 0;
+
+  // Discount tables+tickets first (drinks stay full price), then split partial.
+  const drinksToday = roomMode
+    ? (checkoutRooms ?? []).reduce(
+        (sum, room) =>
+          sum +
+          room.dates.reduce(
+            (dateSum, date) => dateSum + sumDrinkTotal(date.drink_package),
+            0,
+          ),
+        0,
+      )
+    : (checkoutDates ?? []).reduce(
+        (sum, date) => sum + sumDrinkTotal(date.drink_package),
+        0,
+      );
+
+  const split = applyDiscountThenSplitPayment({
+    subTotal,
+    discountAmount: requestedDiscount,
+    payToday,
+    payLater,
+    depositToday,
+    nonDiscountablePayToday: drinksToday,
+  });
+
+  // Keep per-date deposit_amount in sync with discounted partial_payment.
+  if (split.depositToday > 0 && split.discountAmount > 0) {
+    if (roomMode && checkoutRooms) {
+      scaleDepositAmountsToTarget(
+        checkoutRooms.flatMap((room) => room.dates),
+        split.depositToday,
+      );
+    } else if (checkoutDates) {
+      scaleDepositAmountsToTarget(checkoutDates, split.depositToday);
+    }
+  }
+
   const checkoutPayload: CheckoutRequest = {
     vendor_event_id: vendorEventId,
     event_slug: eventSlug,
     is_rooms: roomMode,
     payment_gateway: gatewayId,
     sub_total: subTotal,
-    // Sum of table deposit amounts charged today (e.g. $25, or $25+$20 across dates)
-    partial_payment: depositToday > 0 ? depositToday : null,
-    total: payToday,
+    // Deposit / partial portion charged today (after discount).
+    partial_payment: split.depositToday > 0 ? split.depositToday : null,
+    total: split.payToday,
+    ...(couponCode
+      ? {
+          coupon_code: couponCode,
+          discount_amount: split.discountAmount,
+        }
+      : split.discountAmount > 0
+        ? {
+            discount_amount: split.discountAmount,
+          }
+        : {}),
   };
 
   if (roomMode) {
@@ -441,7 +677,9 @@ export function transformCartToCheckout(
     sub_total: checkoutPayload.sub_total,
     partial_payment: checkoutPayload.partial_payment,
     total: checkoutPayload.total,
-    balance_due_later: payLater > 0 ? payLater : null,
+    coupon_code: checkoutPayload.coupon_code ?? null,
+    discount_amount: checkoutPayload.discount_amount ?? 0,
+    balance_due_later: split.payLater > 0 ? split.payLater : null,
     payment_gateway: checkoutPayload.payment_gateway,
     dates_count: roomMode
       ? checkoutPayload.rooms?.reduce(

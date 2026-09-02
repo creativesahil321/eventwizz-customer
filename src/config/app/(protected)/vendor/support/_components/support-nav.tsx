@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Inbox, LayoutDashboard, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveSupportUnreadCount } from "@/app/(protected)/_shared/support/support-unread-count";
 import { useVendorSupportTickets } from "@/services/vendor/support";
 
 const NAV_ITEMS = [
@@ -36,7 +37,10 @@ function isNavActive(pathname: string, href: string, exact: boolean) {
 export default function VendorSupportNav() {
   const pathname = usePathname();
   const { data } = useVendorSupportTickets({ sort: "newest" });
-  const badgeCount = data?.inbox_count ?? 0;
+  const badgeCount = resolveSupportUnreadCount(
+    data?.unread_count,
+    data?.data
+  );
 
   return (
     <nav

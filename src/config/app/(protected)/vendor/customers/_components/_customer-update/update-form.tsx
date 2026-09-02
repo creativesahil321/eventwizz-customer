@@ -255,7 +255,7 @@ export function UpdateCustomerForm({
               <Select value={field.value} onValueChange={field.onChange}>
                 <FormControl>
                   <SelectTrigger
-                    className={apiErrors.status ? "border-red-500" : ""}
+                    className={`w-full ${apiErrors.status ? "border-red-500" : ""}`}
                   >
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

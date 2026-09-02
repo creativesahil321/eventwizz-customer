@@ -15,7 +15,16 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
     const data = table.getFilteredRowModel().rows.map((row) => row.original);
 
     // Convert to CSV format
-    const headers = ["ID", "Name", "City", "Address", "Default", "Created At"];
+    const headers = [
+      "ID",
+      "Name",
+      "City",
+      "Address",
+      "Headquarters",
+      "In use",
+      "Active Events",
+      "Created At",
+    ];
 
     const csvRows = [
       headers.join(","),
@@ -25,7 +34,9 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
           `"${item.name}"`,
           `"${item.city}"`,
           `"${item.address || ""}"`,
+          item.is_headquarters ? "Yes" : "No",
           item.is_default ? "Yes" : "No",
+          item.active_events_count ?? 0,
           item.created_at || "",
         ].join(","),
       ),

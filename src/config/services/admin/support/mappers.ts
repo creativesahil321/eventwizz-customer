@@ -305,6 +305,7 @@ export function getAdminMessagesPayload(
     can_reply: response?.can_reply,
     can_manage: response?.can_manage,
     can_pin: response?.can_pin,
+    can_escalate: response?.can_escalate,
     recent_tickets: response?.recent_tickets ?? [],
     meta: response?.meta,
   };

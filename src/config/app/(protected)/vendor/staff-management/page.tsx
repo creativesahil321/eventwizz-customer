@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 import { PermissionRoute } from "@/components/permission/PermissionRoute";
+import { AllLocationsBadge } from "@/components/location-indicator";
 
 export default function Page() {
   return (
@@ -21,9 +22,12 @@ export default function Page() {
             <section className="w-full relative">
               <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-6 text-black">
                 <div className="flex justify-between items-center flex-wrap gap-4">
-                  <h1 className="text-2xl title-header font-bold">
-                    Staff Management
-                  </h1>
+                  <div className="min-w-0 flex flex-wrap items-center gap-2">
+                    <h1 className="text-2xl title-header font-bold">
+                      Staff Management
+                    </h1>
+                    <AllLocationsBadge />
+                  </div>
 
                   {/* Hide Add Staff button if user doesn't have create-staff permission */}
                   <PermissionGuard permissionKey="create-staff">
@@ -38,8 +42,8 @@ export default function Page() {
                   </PermissionGuard>
                 </div>
                 <p className="text-muted-foreground mt-2">
-                  Manage your staff members and assign roles to control access
-                  levels. Each staff member can have specific roles with
+                  Manage staff across every venue and assign roles to control
+                  access. Each staff member can have specific roles with
                   customized permissions.
                 </p>
               </div>

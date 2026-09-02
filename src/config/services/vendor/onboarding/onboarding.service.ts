@@ -23,6 +23,11 @@ import {
   parseCheckEventNameResponse,
   type CheckEventNameAvailability,
 } from "@/lib/parse-check-event-name";
+import {
+  toLocationCoordsPayload,
+  LOCATION_COORDINATES_REQUIRED_MESSAGE,
+} from "@/lib/to-location-coords-payload";
+import { sanitizeOnboardingMenusForSubmit } from "@/app/(on-boarding)/on-boarding/_lib/onboarding-catering-ready";
 // import { OnBoardingPreviewType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 
 /** Reads the persisted onboarding mode from sessionStorage (client-only, safe). */
@@ -155,6 +160,17 @@ function resolveStepFiveEventDate(
   return String(raw ?? "").trim();
 }
 
+function readRoomStepFiveDates(
+  room: RoomType,
+): StepFiveType["dates"] {
+  const nested = room.dates?.dates;
+  if (Array.isArray(nested)) return nested as StepFiveType["dates"];
+  if (Array.isArray(room.dates)) {
+    return room.dates as unknown as StepFiveType["dates"];
+  }
+  return [];
+}
+
 function normalizeStepFiveDatePayload(
   date: StepFiveType["dates"][number],
 ): Record<string, unknown> {
@@ -237,30 +253,6 @@ export const onboardingService = {
     return parseCheckEventNameResponse(response);
   },
 
-  /**
-   * Check if response indicates onboarding is already completed
-   * If so, update session and redirect to welcome page
-   */
-  checkOnboardingCompleted: async (response: ApiResponse): Promise<boolean> => {
-    if (
-      !response.status &&
-      response.message === "OnBoarding is already completed."
-    ) {
-      // Update session to mark as onboarded
-      await authService.updateSession({
-        isOnboarded: true,
-      });
-
-      // Redirect to welcome page
-      if (typeof window !== "undefined") {
-        window.location.href = "/welcome/select-location?onboarded=true";
-      }
-
-      return true;
-    }
-    return false;
-  },
-
   getCurrentStep: async (): Promise<number> => {
     try {
       const stepFromSession = await authService.getCurrentOnboardingStep();
@@ -272,6 +264,64 @@ export const onboardingService = {
     }
 
     return 1;
+  },
+
+  /**
+   * Event id the persistence GET is bound to for this location.
+   * Step saves to a different event_id succeed but GET still returns this one
+   * (empty room dates) — AI apply must write to this id.
+   */
+  readPersistedOnboardingEventId: async (
+    locationId: number,
+  ): Promise<number | undefined> => {
+    if (!Number.isFinite(locationId) || locationId <= 0) return undefined;
+
+    const headers = {
+      "X-Venue-Location-Id": String(locationId),
+    };
+
+    const fetchOnce = async (isRooms: boolean) => {
+      const response = await request<ApiResponse>({
+        url: API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
+          "{location_id}",
+          String(locationId),
+        ).replace("{is_rooms}", isRooms ? "true" : "false"),
+        method: "GET",
+        headers,
+        returnFullResponse: true,
+      });
+      if (!response?.status) return null;
+      return response.data ?? null;
+    };
+
+    const payload =
+      (await fetchOnce(true).catch(() => null)) ||
+      (await fetchOnce(false).catch(() => null));
+    if (!payload || typeof payload !== "object") return undefined;
+
+    const root = payload as unknown as Record<string, unknown>;
+    const nested =
+      root.data && typeof root.data === "object"
+        ? (root.data as Record<string, unknown>)
+        : root;
+
+    for (const key of [
+      "stepThree",
+      "stepFour",
+      "stepFive",
+      "stepSix",
+      "stepSeven",
+      "stepEight",
+      "stepNine",
+      "stepTen",
+      "stepEleven",
+    ]) {
+      const step = nested[key];
+      if (!step || typeof step !== "object") continue;
+      const id = Number((step as { event_id?: unknown }).event_id);
+      if (Number.isFinite(id) && id > 0) return id;
+    }
+    return undefined;
   },
 
   saveStep: async (
@@ -330,6 +380,17 @@ export const onboardingService = {
       }),
     };
 
+    const coords = toLocationCoordsPayload(data.latitude, data.longitude);
+    if (addressTrimmed && !coords) {
+      return {
+        status: false,
+        message: LOCATION_COORDINATES_REQUIRED_MESSAGE,
+      };
+    }
+    if (coords) {
+      Object.assign(payload, coords);
+    }
+
     const response = await api.post<ApiResponse>(
       API_ENDPOINTS.VENDOR.ONBOARDING.STEPS,
       mergeManualIsApproved(payload, data.isApproved),
@@ -337,14 +398,6 @@ export const onboardingService = {
         returnFullResponse: true,
       }
     );
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // If successful, get vendor_location_id from response and save it
     if (response.status && response.data) {
@@ -401,6 +454,10 @@ export const onboardingService = {
     formData.append("banner_sub_heading", data.banner_sub_heading);
     formData.append("about_title", data.about_title);
     formData.append("about_description", data.about_description);
+    formData.append(
+      "footer_brand_description",
+      data.footer_brand_description ?? "",
+    );
 
     // Add logo and cover_image if they exist
     // Check for both File and Blob (cropped images might be Blob)
@@ -430,14 +487,6 @@ export const onboardingService = {
       },
       returnFullResponse: true,
     });
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // Notify that data has changed if successful
     if (response.status) {
@@ -479,8 +528,23 @@ export const onboardingService = {
     // Add only the necessary fields as specified
     formData.append("step", "3");
     formData.append("vendor_location_id", vendorLocationId);
+    const existingEventId = Number(data.event_id);
+    if (Number.isFinite(existingEventId) && existingEventId > 0) {
+      formData.append("event_id", String(existingEventId));
+    }
     formData.append("event_category_id", data.event_category_id.toString());
     formData.append("event_name", data.event_name || "");
+    formData.append("event_address", data.event_address || "");
+    const eventCoords = toLocationCoordsPayload(
+      data.latitude,
+      data.longitude,
+    );
+    if (eventCoords) {
+      formData.append("latitude", eventCoords.latitude.toString());
+      formData.append("longitude", eventCoords.longitude.toString());
+      formData.append("lat", eventCoords.lat.toString());
+      formData.append("long", eventCoords.long.toString());
+    }
 
     // Add video if it exists - handle both File and Blob
     if (data.event_banner_video) {
@@ -608,14 +672,6 @@ export const onboardingService = {
       returnFullResponse: true,
     });
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -667,6 +723,10 @@ export const onboardingService = {
       } else {
         formData.append(`rooms[${key}][package_description]`, "");
       }
+      formData.append(
+        `rooms[${key}][package_button_name]`,
+        p.package_button_name ?? "",
+      );
       formData.append(
         `rooms[${key}][event_schedular_title]`,
         p.event_schedular_title ?? "",
@@ -805,6 +865,7 @@ export const onboardingService = {
       {
         step: data.step,
         event_id: data.event_id,
+        is_rooms: 0,
         dates: formattedDates,
       },
       data.isApproved,
@@ -817,14 +878,6 @@ export const onboardingService = {
         returnFullResponse: true,
       }
     );
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // Session update will be handled by the component
 
@@ -846,13 +899,19 @@ export const onboardingService = {
     isApproved?: boolean;
   }): Promise<ApiResponse> => {
     const roomBlocks = payload.rooms
-      .filter((room) => Number.isFinite(Number(room.id)) && Number(room.id) > 0)
-      .map((room) => ({
-        room_id: Number(room.id),
-        dates: ((room.dates?.dates ?? []) as StepFiveType["dates"])
-          .filter((date) => resolveStepFiveEventDate(date).length > 0)
-          .map(normalizeStepFiveDatePayload),
-      }));
+      .map((room) => {
+        const roomId = Number(
+          room.id ?? (room as { room_id?: unknown }).room_id,
+        );
+        if (!Number.isFinite(roomId) || roomId <= 0) return null;
+        return {
+          room_id: roomId,
+          dates: readRoomStepFiveDates(room)
+            .filter((date) => resolveStepFiveEventDate(date).length > 0)
+            .map(normalizeStepFiveDatePayload),
+        };
+      })
+      .filter((block): block is NonNullable<typeof block> => block !== null);
 
     const firstDate = roomBlocks[0]?.dates?.[0] as
       | { booking_type?: "tickets" | "tables" | "both" }
@@ -904,23 +963,21 @@ export const onboardingService = {
       formData.append("menu_description", data.menu_description);
     }
 
-    if (data.menus) {
-      // Add menus with the required array-like notation
-      data.menus?.forEach((menu, menuIndex) => {
-        formData.append(`menus[${menuIndex}][name]`, menu.name);
+    const menusForSubmit = sanitizeOnboardingMenusForSubmit(data.menus);
+    menusForSubmit.forEach((menu, menuIndex) => {
+      formData.append(`menus[${menuIndex}][name]`, menu.name ?? "");
 
-        menu.items.forEach((item, itemIndex) => {
-          formData.append(
-            `menus[${menuIndex}][items][${itemIndex}][title]`,
-            item.title
-          );
-          formData.append(
-            `menus[${menuIndex}][items][${itemIndex}][description]`,
-            item.description || ""
-          );
-        });
+      menu.items.forEach((item, itemIndex) => {
+        formData.append(
+          `menus[${menuIndex}][items][${itemIndex}][title]`,
+          item.title ?? "",
+        );
+        formData.append(
+          `menus[${menuIndex}][items][${itemIndex}][description]`,
+          item.description ?? "",
+        );
       });
-    }
+    });
 
     appendManualIsApprovedToFormData(formData, data.isApproved);
 
@@ -934,14 +991,6 @@ export const onboardingService = {
         },
       }
     );
-
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     // Notify that data has changed if successful
     if (response.status) {
@@ -993,26 +1042,24 @@ export const onboardingService = {
           );
         }
 
-        (catering.menus ?? []).forEach((menu, menuIndex) => {
-          const m = menu as {
-            name?: string;
-            items?: Array<{ title?: string; description?: string }>;
-          };
-          formData.append(
-            `rooms[${roomIndex}][menus][${menuIndex}][name]`,
-            m.name ?? "",
-          );
-          (m.items ?? []).forEach((item, itemIndex) => {
+        sanitizeOnboardingMenusForSubmit(catering.menus).forEach(
+          (menu, menuIndex) => {
             formData.append(
-              `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][title]`,
-              item.title ?? "",
+              `rooms[${roomIndex}][menus][${menuIndex}][name]`,
+              menu.name ?? "",
             );
-            formData.append(
-              `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][description]`,
-              item.description ?? "",
-            );
-          });
-        });
+            menu.items.forEach((item, itemIndex) => {
+              formData.append(
+                `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][title]`,
+                item.title ?? "",
+              );
+              formData.append(
+                `rooms[${roomIndex}][menus][${menuIndex}][items][${itemIndex}][description]`,
+                item.description ?? "",
+              );
+            });
+          },
+        );
       }
     });
 
@@ -1070,20 +1117,6 @@ export const onboardingService = {
         formData.append("remove_brochure_pdf_2", "true");
       }
 
-      // Add text fields
-      if (data.event_address) {
-        formData.append("event_address", data.event_address);
-      }
-
-      // Add latitude and longitude coordinates
-      if (data.latitude !== undefined) {
-        formData.append("lat", data.latitude.toString());
-      }
-
-      if (data.longitude !== undefined) {
-        formData.append("long", data.longitude.toString());
-      }
-
       if (data.price_start_from) {
         formData.append("price_start_from", data.price_start_from);
       }
@@ -1104,14 +1137,6 @@ export const onboardingService = {
       }
     );
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1122,13 +1147,10 @@ export const onboardingService = {
 
   /**
    * Store step 7 data in multi-room mode.
-   * Backend expects shared `event_address` and per-room brochure files/removal flags.
+   * Backend expects per-room brochure files/removal flags; location is stored in Step 3.
    */
   storeStepSevenRoomsData: async (payload: {
     event_id: number;
-    event_address: string;
-    latitude?: number;
-    longitude?: number;
     rooms: RoomType[];
     isApproved?: boolean;
   }): Promise<ApiResponse> => {
@@ -1136,13 +1158,6 @@ export const onboardingService = {
     formData.append("step", "7");
     formData.append("event_id", payload.event_id.toString());
     formData.append("is_rooms", "1");
-    formData.append("event_address", payload.event_address ?? "");
-    if (typeof payload.latitude === "number") {
-      formData.append("lat", payload.latitude.toString());
-    }
-    if (typeof payload.longitude === "number") {
-      formData.append("long", payload.longitude.toString());
-    }
 
     payload.rooms.forEach((room, roomIndex) => {
       const roomId = Number(room.id);
@@ -1190,12 +1205,10 @@ export const onboardingService = {
         );
       }
 
-      if (brochure.price_start_from) {
-        formData.append(
-          `rooms[${roomIndex}][price_start_from]`,
-          String(brochure.price_start_from),
-        );
-      }
+      formData.append(
+        `rooms[${roomIndex}][price_start_from]`,
+        String(brochure.price_start_from ?? ""),
+      );
 
       if (brochure.remove_brochure_pdf) {
         formData.append(`rooms[${roomIndex}][remove_brochure_pdf]`, "true");
@@ -1258,14 +1271,6 @@ export const onboardingService = {
       }
     );
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1314,13 +1319,6 @@ export const onboardingService = {
         returnFullResponse: true,
       },
     );
-
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response,
-    );
-    if (isCompleted) {
-      return response;
-    }
 
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1377,14 +1375,6 @@ export const onboardingService = {
       returnFullResponse: true,
     });
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1422,14 +1412,6 @@ export const onboardingService = {
       returnFullResponse: true,
     });
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1439,7 +1421,8 @@ export const onboardingService = {
   },
 
   /**
-   * Store step 11 onboarding data (Reminder Emails & Submit Type)
+   * Store step 11 onboarding data (Domain / publish)
+   * Domain, confirm domain, reminder emails, and optional duplicate location.
    * @param data Step 11 data to be stored
    * @returns API response with status and message
    */
@@ -1451,11 +1434,8 @@ export const onboardingService = {
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
     formData.append("submit_type", data.submit_type);
-    formData.append("domain", data.domain);
+    formData.append("domain", data.domain.trim().toLowerCase());
     formData.append("confirm_domain", data.confirm_domain ? "true" : "false");
-
-    // // Add category_id with a default value if not provided
-    // formData.append("category_id", (data.category_id || 1).toString());
 
     // Handle city and address fields
     const city = data.city || "";
@@ -1488,6 +1468,17 @@ export const onboardingService = {
       formData.append("contact_number", data.contact_number);
     }
 
+    const coords = toLocationCoordsPayload(
+      (data as { latitude?: number }).latitude,
+      (data as { longitude?: number }).longitude,
+    );
+    if (coords) {
+      formData.append("latitude", String(coords.latitude));
+      formData.append("longitude", String(coords.longitude));
+      formData.append("lat", String(coords.lat));
+      formData.append("long", String(coords.long));
+    }
+
     if (data.reminder_email_before_days) {
       formData.append(
         "reminder_email_before_days",
@@ -1507,14 +1498,6 @@ export const onboardingService = {
       returnFullResponse: true,
     });
 
-    // Check if onboarding is already completed
-    const isCompleted = await onboardingService.checkOnboardingCompleted(
-      response
-    );
-    if (isCompleted) {
-      return response;
-    }
-
     // Notify that data has changed if successful
     if (response.status) {
       await onboardingService.notifyDataChanged();
@@ -1523,75 +1506,85 @@ export const onboardingService = {
     return response;
   },
 
-  getAllSteps: async (
-    headers: Record<string, string>,
-    isRooms = false,
-  ): Promise<ApiResponse> => {
-    const locationId = headers["X-Venue-Location-Id"];
-    const endpoint = API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
-      "{location_id}",
-      locationId,
-    ).replace("{is_rooms}", isRooms ? "true" : "false");
-
-    return request<ApiResponse>({
-      url: endpoint,
-      method: "GET",
-      returnFullResponse: true,
-      headers,
-    });
-  },
-
-  // Function to notify subscribers that data has changed
-  notifyDataChanged: async (): Promise<void> => {
-    // This is a placeholder function that will be used by the React Query integration
-    // The actual implementation will be handled by the useOnboardingData hook
-
-    // Dispatch a custom event that can be listened to by components
-    if (typeof window !== "undefined") {
-      const event = new CustomEvent("onboarding-data-changed");
-      window.dispatchEvent(event);
-    }
-  },
-
-  /**
-   * Connect payment gateway (Stripe Connect, PayPal Commerce, TrueLayer, etc.)
-   * @param paymentGateway Payment gateway name: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna"
-   * @returns Standardized API response with onboarding_url/auth_url and account_id
-   */
   connectPaymentGateway: async (
-    paymentGateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna"
+    paymentGateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna",
+    credentials: { key: string; secret: string },
   ): Promise<{
     status: boolean;
     message: string;
     data?: {
-      onboarding_url?: string; // For Stripe/PayPal
-      auth_url?: string; // For TrueLayer
-      account_id?: string; // For Stripe/PayPal
       gateway: string;
+      account?: {
+        id: number;
+        account_status?: "pending" | "active" | "under_review" | "restricted";
+        is_enabled?: boolean;
+        key?: string;
+        client_secret?: string;
+        account_id?: string;
+      };
+      webhook_url?: string | null;
+      manual_webhook?: boolean;
+      webhook_setup_hint?: string | null;
+      public_key?: string | null;
+      verification?: {
+        stripe_account_verified_at?: string | null;
+        paypal_oauth_verified_at?: string | null;
+        truelayer_oauth_verified_at?: string | null;
+        truelayer_env?: string | null;
+        charges_enabled?: boolean;
+        payouts_enabled?: boolean;
+        manual_webhook?: boolean;
+        signing_key_generated?: boolean;
+      };
+      account_id?: string;
       connection_status?: string;
-      return_url?: string;
-      refresh_url?: string;
     };
-    errors: string[];
+    errors: string[] | Record<string, string[]>;
   }> => {
     try {
       const payload = {
         payment_gateway: paymentGateway,
+        credentials: {
+          key: credentials.key.trim(),
+          secret: credentials.secret.trim(),
+        },
       };
 
       const response = await api.post<{
         status: boolean;
         message: string;
         data?: {
-          onboarding_url?: string;
-          auth_url?: string;
-          account_id?: string;
           gateway: string;
+          account?: {
+            id: number;
+            account_status?:
+              | "pending"
+              | "active"
+              | "under_review"
+              | "restricted";
+            is_enabled?: boolean;
+            key?: string;
+            client_secret?: string;
+            account_id?: string;
+          };
+          webhook_url?: string | null;
+          manual_webhook?: boolean;
+          webhook_setup_hint?: string | null;
+          public_key?: string | null;
+          verification?: {
+            stripe_account_verified_at?: string | null;
+            paypal_oauth_verified_at?: string | null;
+            truelayer_oauth_verified_at?: string | null;
+            truelayer_env?: string | null;
+            charges_enabled?: boolean;
+            payouts_enabled?: boolean;
+            manual_webhook?: boolean;
+            signing_key_generated?: boolean;
+          };
+          account_id?: string;
           connection_status?: string;
-          return_url?: string;
-          refresh_url?: string;
         };
-        errors: string[];
+        errors: string[] | Record<string, string[]>;
       }>(API_ENDPOINTS.VENDOR.ONBOARDING.PAYMENT_GATEWAYS, payload, {
         returnFullResponse: true,
       });
@@ -1679,6 +1672,20 @@ export const onboardingService = {
         ],
       };
     }
+  },
+
+  /**
+   * Notify listeners that onboarding data changed (React Query refetch via
+   * `useOnboardingData` listening for `onboarding-data-changed`).
+   */
+  notifyDataChanged: async (): Promise<void> => {
+    if (typeof window === "undefined") return;
+    const { isAIBulkApplyInProgress } = await import(
+      "@/app/(on-boarding)/on-boarding/_lib/ai-bulk-apply-session-flag"
+    );
+    // Mid-apply GET resets the form to leftover event data (e.g. a previous venue).
+    if (isAIBulkApplyInProgress()) return;
+    window.dispatchEvent(new CustomEvent("onboarding-data-changed"));
   },
 
   /**

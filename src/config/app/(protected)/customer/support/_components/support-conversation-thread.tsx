@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
 import {
   MAX_SUPPORT_ATTACHMENTS,
   SUPPORT_ATTACHMENT_ACCEPT,
@@ -31,6 +30,14 @@ import {
   groupMessagesByDate,
 } from "../_lib/utils";
 import { useStoreCustomerSupportMessage } from "@/services/customer/support";
+import {
+  buildOptimisticAttachments,
+  createOptimisticId,
+  useOptimisticSupportMessages,
+  type OptimisticStatus,
+} from "@/app/(protected)/_shared/support/use-optimistic-messages";
+
+type ThreadMessage = SupportMessage & { optimisticStatus?: OptimisticStatus };
 
 function AttachmentCards({
   attachments,
@@ -119,10 +126,11 @@ function CustomerMessage({
   message,
   customerImage,
 }: {
-  message: SupportMessage;
+  message: ThreadMessage;
   customerImage?: string | null;
 }) {
   const displayName = message.senderName?.trim() || "You";
+  const isSending = message.optimisticStatus === "sending";
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -135,16 +143,25 @@ function CustomerMessage({
         <div className="min-w-0 text-right">
           <p className="text-xs font-semibold text-foreground">{displayName}</p>
           <p className="text-[10px] text-muted-foreground">
-            {formatSupportMessageTimestamp(message.createdAt)}
+            {isSending
+              ? "Sending…"
+              : formatSupportMessageTimestamp(message.createdAt)}
           </p>
         </div>
       </div>
 
-      <div className="max-w-[min(100%,42rem)] rounded-2xl rounded-tr-md bg-[var(--color-primary)] px-3 py-2 text-[13px] leading-snug text-white shadow-sm">
-        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-          {message.content}
-        </p>
-      </div>
+      {message.content?.trim() ? (
+        <div
+          className={cn(
+            "max-w-[min(100%,42rem)] rounded-2xl rounded-tr-md bg-[var(--color-primary)] px-3 py-2 text-[13px] leading-snug text-white shadow-sm transition-opacity",
+            isSending && "opacity-70"
+          )}
+        >
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {message.content}
+          </p>
+        </div>
+      ) : null}
 
       {message.attachments && message.attachments.length > 0 ? (
         <AttachmentCards attachments={message.attachments} align="right" />
@@ -168,11 +185,13 @@ function AgentMessage({ message }: { message: SupportMessage }) {
         </div>
       </div>
 
-      <div className="max-w-[min(100%,42rem)] rounded-2xl rounded-tl-md border border-slate-200 bg-white px-3 py-2 text-[13px] leading-snug text-foreground shadow-sm">
-        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-          {message.content}
-        </p>
-      </div>
+      {message.content?.trim() ? (
+        <div className="max-w-[min(100%,42rem)] rounded-2xl rounded-tl-md border border-slate-200 bg-white px-3 py-2 text-[13px] leading-snug text-foreground shadow-sm">
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {message.content}
+          </p>
+        </div>
+      ) : null}
 
       {message.attachments && message.attachments.length > 0 ? (
         <AttachmentCards attachments={message.attachments} align="left" />
@@ -212,9 +231,9 @@ export default function SupportConversationThread({
   messages,
   isComposerDisabled = false,
   onReopen,
-  closedReopenMessage = "This ticket is closed. Reopen it to continue the conversation.",
+  closedReopenMessage = "This enquiry is closed. Reopen it to continue the conversation.",
   showReopenHint = false,
-  reopenHintMessage = "Send a message to reopen this ticket.",
+  reopenHintMessage = "Send a message to reopen this enquiry.",
   onMessageSent,
   hasMore = false,
   isLoadingMore = false,
@@ -229,7 +248,9 @@ export default function SupportConversationThread({
   const { data: session } = useSession();
   const user = useAuthStore((state) => state.user);
   const customerImage = user?.avatar || session?.user?.avatar;
-  const groupedMessages = groupMessagesByDate(messages);
+  const { messages: displayMessages, addPending, removePending } =
+    useOptimisticSupportMessages<ThreadMessage>(messages, ticketKey);
+  const groupedMessages = groupMessagesByDate(displayMessages);
   const isSending = storeMessage.isPending;
 
   const handleFilesSelected = (
@@ -254,33 +275,54 @@ export default function SupportConversationThread({
 
   const handleSend = useCallback(async () => {
     if (isComposerDisabled || isSending) return;
-    if (!reply.trim() && attachments.length === 0) return;
+    const message = reply.trim();
+    const sentAttachments = attachments;
+    if (!message && sentAttachments.length === 0) return;
+
+    // Optimistic: show the message instantly and clear the composer.
+    const optimisticId = addPending({
+      id: createOptimisticId(),
+      sender: "customer",
+      senderName: user?.first_name?.trim() || "You",
+      content: message,
+      createdAt: new Date().toISOString(),
+      attachments: buildOptimisticAttachments(sentAttachments),
+      optimisticStatus: "sending",
+    });
+    setReply("");
+    setAttachments([]);
+    setStickToBottomKey((key) => key + 1);
 
     try {
       await storeMessage.mutateAsync({
         ticketKey,
-        message: reply.trim(),
-        attachments,
+        message,
+        attachments: sentAttachments,
       });
-      setReply("");
-      setAttachments([]);
-      setStickToBottomKey((key) => key + 1);
       onMessageSent?.();
     } catch {
-      // API client already surfaces validation / network toasts
+      // Roll back so the user can retry; API client surfaces the error toast.
+      removePending(optimisticId);
+      setReply((current) => (current ? current : message));
+      setAttachments((current) =>
+        current.length ? current : sentAttachments
+      );
     }
   }, [
+    addPending,
     attachments,
     isComposerDisabled,
     isSending,
     onMessageSent,
+    removePending,
     reply,
     storeMessage,
     ticketKey,
+    user?.first_name,
   ]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void handleSend();
     }
@@ -351,7 +393,7 @@ export default function SupportConversationThread({
                 onClick={onReopen}
               >
                 <RotateCcw className="size-4" />
-                Reopen ticket
+                Reopen enquiry
               </Button>
             ) : null}
           </div>
@@ -368,7 +410,6 @@ export default function SupportConversationThread({
               value={reply}
               onChange={(event) => setReply(event.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isSending}
               className="min-h-[40px] max-h-[120px] resize-none rounded-none border-0 bg-white px-3.5 py-2.5 text-sm shadow-none focus-visible:ring-0 sm:min-h-[48px]"
             />
 
@@ -446,9 +487,6 @@ export default function SupportConversationThread({
               </div>
 
               <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
-                <span className="hidden text-xs text-muted-foreground sm:inline">
-                  {getModKeyLabel()} + Enter to send
-                </span>
                 <Button
                   type="button"
                   variant="event-primary"
@@ -458,7 +496,7 @@ export default function SupportConversationThread({
                   className="h-8 rounded-full px-5"
                 >
                   <Send className="size-4" />
-                  {isSending ? "Sending..." : "Send reply"}
+                  {isSending ? "Sending…" : "Send reply"}
                 </Button>
               </div>
             </div>

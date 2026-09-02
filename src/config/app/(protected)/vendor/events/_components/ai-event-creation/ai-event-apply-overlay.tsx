@@ -45,8 +45,10 @@ export function AIEventApplyOverlay({ applyStep, applyDone }: AIEventApplyOverla
                 <CheckCircle2 className="w-10 h-10 text-green-500" />
               </motion.div>
               <div>
-                <h2 className="text-2xl font-bold text-white">Event created! 🎉</h2>
-                <p className="text-sm text-slate-400 mt-2">Redirecting to your event preview…</p>
+                <h2 className="text-2xl font-bold text-white">Event created</h2>
+                <p className="text-sm text-slate-400 mt-2">
+                  Redirecting to your event preview…
+                </p>
               </div>
               <div className="w-full h-1 rounded-full bg-white/5 overflow-hidden">
                 <motion.div
@@ -74,7 +76,9 @@ export function AIEventApplyOverlay({ applyStep, applyDone }: AIEventApplyOverla
                   <Loader2 className="w-7 h-7" style={accent.text} />
                 </motion.div>
                 <h2 className="text-xl font-bold text-white">Building your event</h2>
-                <p className="text-slate-500 text-xs mt-1">Please don&apos;t close this page</p>
+                <p className="text-slate-500 text-xs mt-1">
+                  Please do not close this page
+                </p>
               </div>
 
               <div className="mb-6">

@@ -16,23 +16,26 @@ export function eventCarouselNavButtonClass(extra?: string) {
 }
 
 /**
- * Mobile strip for 2–4 events: one main card plus a sliver of the next slide.
- * (Legacy Embla `CarouselItem` basis — prefer `mobileEventRowPeekScrollItemClass` for native scroll.)
+ * Legacy Embla `CarouselItem` basis — prefer `mobileEventRowPeekScrollItemClass`.
  */
 export const mobileEventRowPeekItemClass =
-  "basis-[min(88%,19.5rem)] sm:basis-[min(88%,20.5rem)]";
+  "basis-[min(85%,19.5rem)] sm:basis-[min(85%,20.5rem)]";
 
-/** Fixed widths for `EventListingHorizontalScroll` (viewport-based, not % of content width). */
+/**
+ * Mobile peek strip for 2–4 events: one main card + sliver of the next.
+ * Uses `--event-scroll-slot` from EventListingHorizontalScroll (measured track
+ * width) so one full card fits — never `vw`, which ignored arrow padding.
+ */
 export const mobileEventRowPeekScrollItemClass =
-  "shrink-0 w-[min(88vw,19.5rem)] sm:w-[min(88vw,20.5rem)]";
+  "shrink-0 snap-center w-[min(19.5rem,calc(var(--event-scroll-slot,100%)-0.75rem))] sm:w-[min(20.5rem,calc(var(--event-scroll-slot,100%)-1rem))]";
 
 export const eventListingManyScrollItemClass =
-  "shrink-0 w-[min(88vw,19.5rem)] sm:w-[min(46vw,20rem)] md:w-[min(32vw,18rem)] lg:w-[min(24vw,16rem)] xl:w-[280px]";
+  "shrink-0 snap-center w-[min(19.5rem,calc(var(--event-scroll-slot,100%)-0.75rem))] sm:w-[min(20rem,46%)] md:w-[min(18rem,32%)] lg:w-[min(16rem,24%)] xl:w-[280px]";
 
 /** Centered carousel-slide width for single-event hero sections (~65–70% of container). */
 export const singleEventShowcaseSlideClass =
-  "mx-auto w-full max-w-[min(92vw,42rem)] md:max-w-[min(70vw,52rem)]";
+  "mx-auto w-full max-w-[min(100%,42rem)] md:max-w-[min(70vw,52rem)]";
 
 /** Centered frame for two standard cards side-by-side (same carousel family as single). */
 export const dualEventShowcaseFrameClass =
-  "mx-auto w-full max-w-[min(96vw,36rem)] sm:max-w-[min(94vw,44rem)] md:max-w-[min(88vw,56rem)]";
+  "mx-auto w-full max-w-[min(100%,36rem)] sm:max-w-[min(94vw,44rem)] md:max-w-[min(88vw,56rem)]";

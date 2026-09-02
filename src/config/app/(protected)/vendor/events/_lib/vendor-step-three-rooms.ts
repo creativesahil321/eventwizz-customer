@@ -1,4 +1,8 @@
 import type { StepThreeType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import {
+  isVendorDateCancelled,
+  isVendorDateReadonlyCancelled,
+} from "@/app/(protected)/vendor/events/_lib/vendor-date-cancelled";
 
 export type VendorStepThreeRoomEntry = {
   room_id: number;
@@ -7,8 +11,61 @@ export type VendorStepThreeRoomEntry = {
 
 type DateRow = StepThreeType["dates"][number];
 
+export type VendorDateAction = NonNullable<DateRow["date_action"]>;
+
+export {
+  isVendorDateCancelled,
+  isVendorDateReadonlyCancelled,
+} from "@/app/(protected)/vendor/events/_lib/vendor-date-cancelled";
+
 const hasNonEmpty = (value: unknown): boolean =>
   String(value ?? "").trim().length > 0;
+
+function parseDateAction(value: unknown): VendorDateAction | undefined {
+  return value === "cancel" ||
+    value === "remove" ||
+    value === "cancelled"
+    ? value
+    : undefined;
+}
+
+/** True when the date must be cancelled (kept in payload), not hard-removed. */
+export function shouldUseCancelDateAction(
+  date: Pick<DateRow, "date_action" | "use_cancel_date_action"> | undefined,
+): boolean {
+  if (!date) return false;
+  // Already cancelled on the server — never offer Cancel / Undo again.
+  if (isVendorDateReadonlyCancelled(date)) return false;
+  return date.date_action === "cancel" || date.use_cancel_date_action === true;
+}
+
+/**
+ * Clone a date row for "Duplicate" — clears persisted id + cancel/remove flags
+ * so the new row behaves as a fresh removable date.
+ */
+export function cloneDateRowForDuplicate(date: DateRow): DateRow {
+  const {
+    id: _id,
+    date_action: _dateAction,
+    use_cancel_date_action: _useCancel,
+    has_financial_bookings: _hasFinancial,
+    has_bookings: _hasBookings,
+    cancellation_request_pending: _pending,
+    cancelled: _cancelled,
+    cancel_reason: _reason,
+    status: _status,
+    is_cancelled: _isCancelled,
+    is_readonly: _isReadonly,
+    can_edit: _canEdit,
+    cancelled_at: _cancelledAt,
+    ...rest
+  } = date;
+
+  return {
+    ...rest,
+    event_date: "",
+  };
+}
 
 /** True when at least one date row has meaningful user input. */
 export function hasMeaningfulVendorDates(
@@ -92,6 +149,27 @@ export function normalizeVendorStepThreeDateRow(
       : String(raw.deposit_due_date);
 
   const dateId = parseOptionalFiniteNumber(raw.id);
+  const status = parseOptionalFiniteNumber(raw.status);
+  const dateAction = parseDateAction(raw.date_action);
+  const isCancelledFlag = normalizeApiBoolean(raw.is_cancelled);
+  const cancelledFlag = normalizeApiBoolean(raw.cancelled);
+  const isReadonlyFlag = normalizeApiBoolean(raw.is_readonly);
+  const canEditFlag = normalizeApiBoolean(raw.can_edit);
+
+  const cancelled =
+    cancelledFlag === true ||
+    isCancelledFlag === true ||
+    dateAction === "cancelled" ||
+    status === 2;
+
+  const cancelReason = String(
+    raw.cancel_reason ?? raw.cancellation_reason ?? "",
+  ).trim();
+
+  const cancelledAt =
+    raw.cancelled_at === null || raw.cancelled_at === undefined
+      ? undefined
+      : String(raw.cancelled_at);
 
   return {
     ...(dateId !== undefined && dateId > 0 ? { id: dateId } : {}),
@@ -116,15 +194,21 @@ export function normalizeVendorStepThreeDateRow(
         ) as DateRow["tickets"])
       : [],
     has_bookings: normalizeApiBoolean(raw.has_bookings),
-    use_cancel_date_action: normalizeApiBoolean(raw.use_cancel_date_action),
+    ...(status !== undefined && { status }),
+    is_cancelled: isCancelledFlag ?? (cancelled || undefined),
+    is_readonly: isReadonlyFlag ?? (cancelled || undefined),
+    can_edit: canEditFlag ?? (cancelled ? false : undefined),
+    date_action: dateAction,
+    use_cancel_date_action: cancelled
+      ? false
+      : normalizeApiBoolean(raw.use_cancel_date_action),
     cancellation_request_pending: normalizeApiBoolean(
       raw.cancellation_request_pending,
     ),
     has_financial_bookings: normalizeApiBoolean(raw.has_financial_bookings),
-    cancelled: normalizeApiBoolean(raw.cancelled),
-    cancel_reason: String(
-      raw.cancel_reason ?? raw.cancellation_reason ?? "",
-    ).trim(),
+    cancelled: cancelled || undefined,
+    cancel_reason: cancelReason,
+    ...(cancelledAt !== undefined && { cancelled_at: cancelledAt }),
   };
 }
 
@@ -161,19 +245,66 @@ export function normalizeVendorStepThreeRooms(
   return [];
 }
 
-/** Align persisted step-three rooms with the active step-two room list. */
+/**
+ * Align persisted step-three rooms with the active step-two room list.
+ *
+ * Prefer exact `room_id` matches. When ids diverge (common after duplicating an
+ * event to another location that has different venue room ids), fall back to
+ * room order / first unused dated entry so API dates are not wiped from the UI.
+ */
 export function syncStepThreeRoomsFromStepTwo(
   stepTwoRooms: Array<{ room_id?: number; name?: string }>,
   existing: VendorStepThreeRoomEntry[],
 ): VendorStepThreeRoomEntry[] {
+  const usedExistingIndexes = new Set<number>();
+
   return stepTwoRooms
     .filter((room) => Number(room.room_id) > 0)
-    .map((room) => {
+    .map((room, index) => {
       const roomId = Number(room.room_id);
-      const found = existing.find((entry) => entry.room_id === roomId);
+
+      const byIdIndex = existing.findIndex(
+        (entry, i) =>
+          entry.room_id === roomId && !usedExistingIndexes.has(i),
+      );
+      if (byIdIndex >= 0) {
+        usedExistingIndexes.add(byIdIndex);
+        return {
+          room_id: roomId,
+          dates: existing[byIdIndex]?.dates?.length
+            ? existing[byIdIndex].dates
+            : [],
+        };
+      }
+
+      // Same ordinal after a location duplicate — room ids differ, order matches.
+      if (
+        index < existing.length &&
+        !usedExistingIndexes.has(index) &&
+        existing[index]?.dates?.length
+      ) {
+        usedExistingIndexes.add(index);
+        return {
+          room_id: roomId,
+          dates: existing[index].dates,
+        };
+      }
+
+      const fallbackIndex = existing.findIndex(
+        (entry, i) =>
+          !usedExistingIndexes.has(i) && Boolean(entry.dates?.length),
+      );
+      if (fallbackIndex >= 0) {
+        usedExistingIndexes.add(fallbackIndex);
+        return {
+          room_id: roomId,
+          dates: existing[fallbackIndex].dates,
+        };
+      }
+
       return {
         room_id: roomId,
-        dates: found?.dates?.length ? found.dates : [],
+        dates: [],
       };
     });
 }
@@ -197,28 +328,25 @@ export function formatVendorStepThreeDateForApi(
   date: DateRow,
 ): Record<string, unknown> {
   const bookingType = date.booking_type ?? "tickets";
+  const cancelled = isVendorDateCancelled(date);
   const base: Record<string, unknown> = {
     ...(typeof date.id === "number" &&
       Number.isFinite(date.id) &&
       date.id > 0 && { id: date.id }),
     event_date: date.event_date,
     booking_type: bookingType,
-    ...(date.cancelled === true && { cancelled: true }),
-    ...(date.cancelled === true &&
+    ...(cancelled && { cancelled: true }),
+    ...(cancelled &&
       date.cancel_reason?.trim() && {
         cancel_reason: date.cancel_reason.trim(),
         cancellation_reason: date.cancel_reason.trim(),
       }),
     total_table_types:
-      bookingType !== "tickets"
-        ? date.total_table_types ?? (date.tables?.length ?? 0)
-        : 0,
-    tables: bookingType !== "tickets" ? (date.tables ?? []) : [],
+      date.total_table_types ?? (date.tables?.length ?? 0),
+    tables: date.tables ?? [],
     total_ticket_types:
-      bookingType !== "tables"
-        ? date.total_ticket_types ?? (date.tickets?.length ?? 0)
-        : 0,
-    tickets: bookingType !== "tables" ? (date.tickets ?? []) : [],
+      date.total_ticket_types ?? (date.tickets?.length ?? 0),
+    tickets: date.tickets ?? [],
   };
 
   if (bookingType === "tickets") {
@@ -255,6 +383,41 @@ export function formatVendorStepThreeDateForApi(
   };
 }
 
+/** Preserve API identity + cancel/remove flags across form clean passes. */
+function pickDateActionMeta(date: DateRow): Partial<DateRow> {
+  const dateAction = parseDateAction(date.date_action);
+  const id =
+    typeof date.id === "number" && Number.isFinite(date.id) && date.id > 0
+      ? date.id
+      : undefined;
+
+  return {
+    ...(id !== undefined && { id }),
+    ...(date.has_bookings !== undefined && { has_bookings: date.has_bookings }),
+    ...(date.status !== undefined && { status: date.status }),
+    ...(date.is_cancelled !== undefined && { is_cancelled: date.is_cancelled }),
+    ...(date.is_readonly !== undefined && { is_readonly: date.is_readonly }),
+    ...(date.can_edit !== undefined && { can_edit: date.can_edit }),
+    ...(dateAction !== undefined && { date_action: dateAction }),
+    ...(date.use_cancel_date_action !== undefined && {
+      use_cancel_date_action: date.use_cancel_date_action,
+    }),
+    ...(date.cancellation_request_pending !== undefined && {
+      cancellation_request_pending: date.cancellation_request_pending,
+    }),
+    ...(date.has_financial_bookings !== undefined && {
+      has_financial_bookings: date.has_financial_bookings,
+    }),
+    ...(date.cancelled !== undefined && { cancelled: date.cancelled }),
+    ...(date.cancel_reason !== undefined && {
+      cancel_reason: date.cancel_reason,
+    }),
+    ...(date.cancelled_at !== undefined && {
+      cancelled_at: date.cancelled_at,
+    }),
+  };
+}
+
 export function cleanVendorStepThreeDatesForForm(
   dates: StepThreeType["dates"] | undefined,
 ): StepThreeType["dates"] {
@@ -263,20 +426,27 @@ export function cleanVendorStepThreeDatesForForm(
   }
 
   return dates.map((date) => {
+    const actionMeta = pickDateActionMeta(date);
+
     if (date.booking_type === "tickets") {
       return {
+        ...date,
+        ...actionMeta,
         event_date: date.event_date,
         booking_type: date.booking_type,
-        total_ticket_types: Number(date.total_ticket_types) || 0,
+        total_ticket_types:
+          Number(date.total_ticket_types) || (date.tickets?.length ?? 0),
         tickets: date.tickets ?? [],
-        total_table_types: 0,
-        tables: [],
+        total_table_types:
+          Number(date.total_table_types) || (date.tables?.length ?? 0),
+        tables: date.tables ?? [],
       };
     }
 
     if (date.payment_type === "full" || !date.payment_type) {
       return {
         ...date,
+        ...actionMeta,
         payment_type: "full" as const,
         is_deposit_enabled: false,
         deposit_type: undefined,
@@ -287,6 +457,7 @@ export function cleanVendorStepThreeDatesForForm(
 
     return {
       ...date,
+      ...actionMeta,
       is_deposit_enabled: true,
     };
   });

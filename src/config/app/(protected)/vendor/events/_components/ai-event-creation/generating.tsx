@@ -21,13 +21,13 @@ const themeAccent = {
 };
 
 const GENERATION_STEPS = [
-  { label: "Analyzing event details", duration: 2000 },
-  { label: "Crafting banner headlines", duration: 2500 },
+  { label: "Analysing event details", duration: 2000 },
+  { label: "Writing banner headlines", duration: 2500 },
   { label: "Writing event descriptions", duration: 3000 },
-  { label: "Creating packages & pricing", duration: 2500 },
-  { label: "Generating menus & other packages", duration: 2000 },
+  { label: "Creating packages and pricing", duration: 2500 },
+  { label: "Generating menus and other packages", duration: 2000 },
   { label: "Writing FAQs", duration: 1500 },
-  { label: "Finalizing your event", duration: 2000 },
+  { label: "Finalising your event", duration: 2000 },
 ];
 
 interface AIEventGeneratingProps {

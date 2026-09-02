@@ -8,6 +8,7 @@ import {
 } from "./guided-sticky-approval-bar";
 import { useGuidedOnboardingSections } from "../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../_lib/hooks/use-guided-onboarding-sections";
+import { useOnboardingPreviewFieldFocus } from "../_lib/onboarding-preview-field-focus";
 import { guidedSectionSurfaceClass } from "./guided-section-surface";
 import { GuidedSectionTitleBar } from "./guided-section-title-bar";
 
@@ -37,6 +38,8 @@ type Props<T extends FieldValues> = {
   persistenceHydrated?: boolean;
   /** From global `stepN.isApproved` when API already marked this step approved. */
   persistedStepApproved?: boolean;
+  /** When set, preview clicks unlock this whole-step guided shell. */
+  previewFocusStep?: number;
 };
 
 /**
@@ -52,6 +55,7 @@ export function WholeStepGuidedShell<T extends FieldValues>({
   lenientApproval = false,
   persistenceHydrated = false,
   persistedStepApproved = false,
+  previewFocusStep,
 }: Props<T>) {
   const sectionConfigs = useMemo((): GuidedSectionConfig<T>[] => {
     return [
@@ -76,6 +80,11 @@ export function WholeStepGuidedShell<T extends FieldValues>({
     persistedStepApproved,
   });
 
+  useOnboardingPreviewFieldFocus(
+    previewFocusStep ?? -1,
+    guided.focusGuidedSection,
+  );
+
   return (
     <>
       <section
@@ -83,14 +92,23 @@ export function WholeStepGuidedShell<T extends FieldValues>({
         tabIndex={-1}
         className={guidedSectionSurfaceClass(true, "overflow-hidden p-0")}
       >
-        <div className="p-5 sm:p-6 space-y-6">
+        <div className="space-y-4 p-4 sm:p-5">
           <GuidedSectionTitleBar
             sectionIndex={0}
             sectionId={sectionId}
             guided={guided}
             title={chipLabel}
           />
-          {children(guided)}
+          <fieldset
+            disabled={guided.currentSectionIndex !== 0}
+            className={
+              guided.currentSectionIndex !== 0
+                ? "min-w-0 border-0 p-0 pointer-events-none"
+                : "min-w-0 border-0 p-0"
+            }
+          >
+            {children(guided)}
+          </fieldset>
           <GuidedSectionActionFooter
             isActive
             sectionLabel={chipLabel}

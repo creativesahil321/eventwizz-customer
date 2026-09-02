@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Loader2 } from "lucide-react";
+import { Calendar, Clock, Loader2 } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -9,7 +9,13 @@ import {
   usePreviewEventSelect,
 } from "@/contexts/preview-context";
 import type { LocationEventCardModel } from "./location-event-card";
+import { formatEventCardFromPrice } from "./event-card-utils";
 import { SiteHeading } from "@/components/public/site-heading";
+import {
+  PUBLIC_CARD_HOVER_LIFT_CLASS,
+  PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
+} from "@/lib/public-rhythm";
+import { BookingTypeIcons } from "@/components/public/booking-type-icons";
 
 type LocationEventHeroCardProps = {
   event: LocationEventCardModel;
@@ -34,17 +40,21 @@ export function LocationEventHeroCard({
   const onPreviewEventSelect = usePreviewEventSelect();
   const isInteractivePreview = isPreview && Boolean(onPreviewEventSelect);
   const href = `/${locationSlug}/events/${event.slug}`;
+  const fromPrice = formatEventCardFromPrice(event.price);
 
+  // Visual hover is decoupled from click interactivity so the Site Essentials
+  // preview matches the live site. Only the loading state blocks pointer events.
   const cardClassName = cn(
     "group relative block w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 outline-none md:rounded-3xl",
-    "shadow-md transition-all duration-300 ease-out",
-    (!isPreview || isInteractivePreview) &&
-      "hover:-translate-y-0.5 hover:border-[color:var(--color-primary)] hover:shadow-xl hover:shadow-black/30",
-    (!isPreview || isInteractivePreview) &&
-      "hover:ring-2 hover:ring-[color:var(--color-primary)] hover:ring-offset-0",
+    "shadow-md",
+    PUBLIC_CARD_HOVER_LIFT_CLASS,
+    !isPending &&
+      "[@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:border-[color:var(--color-primary)] [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-xl [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-black/30",
+    !isPending &&
+      "[@media(hover:hover)_and_(pointer:fine)]:hover:ring-2 [@media(hover:hover)_and_(pointer:fine)]:hover:ring-[color:var(--color-primary)] [@media(hover:hover)_and_(pointer:fine)]:hover:ring-offset-0",
     (!isPreview || isInteractivePreview) &&
       "focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]",
-    (isPending || (isPreview && !isInteractivePreview)) && "pointer-events-none",
+    isPending && "pointer-events-none",
   );
 
   const cardBody = (
@@ -52,7 +62,7 @@ export function LocationEventHeroCard({
       <img
         src={addCacheBusting(event.image)}
         alt={event.title}
-        className="h-full w-full object-cover transition-transform duration-500 ease-out will-change-transform group-hover:scale-[1.03]"
+        className={cn("h-full w-full object-cover", PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS)}
         onError={(e) => {
           const target = e.currentTarget;
           if (target.dataset.fallbackApplied === "true") return;
@@ -65,9 +75,15 @@ export function LocationEventHeroCard({
         aria-hidden
       />
 
-      {event.price ? (
-        <div className="absolute right-3 top-3 z-[1] rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold tabular-nums leading-none text-[var(--color-primary-foreground)] shadow-md md:right-4 md:top-4 md:px-3.5 md:py-2 md:text-sm">
-          {event.price}
+      {fromPrice ? (
+        <div className="absolute right-3 top-3 z-[1] inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold tabular-nums leading-none text-[var(--color-primary-foreground)] shadow-md md:right-4 md:top-4 md:px-3.5 md:py-2 md:text-sm">
+          <BookingTypeIcons
+            bookingType={event.bookingType}
+            size={12}
+            className="text-[color:var(--color-primary-foreground)]"
+            labelled
+          />
+          {fromPrice}
         </div>
       ) : null}
 
@@ -83,14 +99,23 @@ export function LocationEventHeroCard({
           variant="onDark"
           className={cn(
             "!text-left !text-xl !font-semibold leading-tight drop-shadow-sm sm:!text-2xl md:!text-3xl",
-            !isPreview &&
-              "transition-colors duration-300 group-hover:!text-[color:var(--color-primary)]",
+            "transition-colors duration-300 group-hover:!text-[color:var(--color-primary)]",
           )}
         />
-        {event.dateLabel ? (
-          <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
-            <Calendar className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
-            <span>{event.dateLabel}</span>
+        {event.dateLabel || event.timeLabel ? (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-white/90 sm:text-sm">
+            {event.dateLabel ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
+                {event.dateLabel}
+              </span>
+            ) : null}
+            {event.timeLabel ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
+                {event.timeLabel}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>

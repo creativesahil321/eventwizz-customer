@@ -58,8 +58,8 @@ export function groupMessagesByDate<T extends { createdAt: string }>(
 }
 
 export const CATEGORY_LABELS: Record<SupportCategory, string> = {
-  general_support: "General Support",
-  technical_support: "Technical Support",
+  general_support: "Event & booking support",
+  technical_support: "Account & technical support",
 };
 
 export const SUPPORT_PRIORITIES: SupportPriority[] = ["low", "medium", "high"];
@@ -94,10 +94,10 @@ export const CUSTOMER_INBOX_STATUS_FILTERS: SupportStatus[] = [
 export const STATUS_LABELS: Record<SupportStatus, string> = {
   new: "New",
   open: "Open",
-  reopen: "Reopen",
-  waiting_customer: "Waiting for You",
-  waiting_general_support: "Waiting for General Support",
-  waiting_platform_support: "Waiting for Technical Support",
+  reopen: "Reopened",
+  waiting_customer: "Awaiting your reply",
+  waiting_general_support: "With our support team",
+  waiting_platform_support: "With technical support",
   resolved: "Resolved",
   closed: "Closed",
 };

@@ -148,15 +148,13 @@ function PaymentSuccessContent() {
   useEffect(() => {
     if (!paymentData) return;
     void invalidateCustomerBookingsList(queryClient);
-    if (paymentData.booking_id > 0) {
-      void queryClient.invalidateQueries({
-        queryKey: bookingsKeys.bookingDetail(paymentData.booking_id),
-      });
-      void queryClient.refetchQueries({
-        queryKey: bookingsKeys.bookingDetail(paymentData.booking_id),
-        type: "active",
-      });
-    }
+    void queryClient.invalidateQueries({
+      queryKey: bookingsKeys.bookingDetails(),
+    });
+    void queryClient.refetchQueries({
+      queryKey: bookingsKeys.bookingDetails(),
+      type: "active",
+    });
   }, [paymentData, queryClient]);
 
   const handleViewBookings = () => {
@@ -320,7 +318,7 @@ function PaymentSuccessContent() {
                           <p className="text-sm text-gray-600 mt-1">
                             {new Date(
                               paymentData.event_date
-                            ).toLocaleDateString("en-US", {
+                            ).toLocaleDateString("en-GB", {
                               weekday: "long",
                               year: "numeric",
                               month: "long",

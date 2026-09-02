@@ -55,6 +55,9 @@ export interface AIOnboardingInput {
   guestCount?: string;
   priceRange?: string;
   description?: string;
+  /** Venue pin from collect form / map picker */
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface AITicket {

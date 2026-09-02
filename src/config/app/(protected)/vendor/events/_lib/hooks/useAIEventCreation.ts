@@ -60,7 +60,9 @@ export function useAIEventCreation(): UseAIEventCreationReturn {
         return data.content;
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Failed to generate content";
+          err instanceof Error
+            ? err.message
+            : "Could not generate content. Please try again.";
         setError(message);
         setStep("error");
         return null;

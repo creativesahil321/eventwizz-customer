@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { ServerContext } from "@/lib/server-context";
-import { useSession } from "next-auth/react";
+import { useAuthStore } from "@/store/auth.store";
 import { addCacheBusting } from "@/lib/image-utils";
 import BookACallModal from "../book-a-call-modal";
 
@@ -19,8 +19,19 @@ export default function AdminHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [bookCallOpen, setBookCallOpen] = useState(false);
   const { theme } = useContext(ServerContext);
-  const { data: session, status } = useSession();
-  const isAuthenticated = status === "authenticated";
+  // Read auth state from the Zustand store (synced from NextAuth via
+  // SessionValidator) instead of useSession() — avoids the
+  // "useSession must be wrapped in SessionProvider" crash on public pages.
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const accountType = useAuthStore((s) => s.account_type);
+  const isOnboarded = useAuthStore((s) => s.isOnboarded);
+  const needsOnboarding = accountType === "vendor" && !isOnboarded;
+  const accountHomeHref = needsOnboarding
+    ? "/on-boarding"
+    : `/${accountType}/dashboard`;
+  const accountHomeLabel = needsOnboarding
+    ? "Continue Onboarding"
+    : "Dashboard";
 
   const logoPath =
     theme?.logo?.startsWith("/") ||
@@ -68,10 +79,10 @@ export default function AdminHeader() {
 
             {isAuthenticated ? (
               <Link
-                href={`/${session?.user?.account_type}/dashboard`}
+                href={accountHomeHref}
                 className="text-sm font-medium hover:text-[color:var(--color-primary)] transition-colors"
               >
-                Dashboard
+                {accountHomeLabel}
               </Link>
             ) : (
               <div className="flex items-center gap-3">
@@ -136,9 +147,9 @@ export default function AdminHeader() {
                 </Button>
 
                 {isAuthenticated ? (
-                  <Link href={`/${session?.user?.account_type}/dashboard`}>
+                  <Link href={accountHomeHref}>
                     <Button variant="event-primary" className="w-full">
-                      Dashboard
+                      {accountHomeLabel}
                     </Button>
                   </Link>
                 ) : (

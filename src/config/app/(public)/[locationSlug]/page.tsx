@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { QueryClient, dehydrate } from "@tanstack/react-query";
 import LocationPageClient from "./_components/location-page-client";
 import { Hydrate } from "./_components/hydration-provider";
@@ -8,17 +8,41 @@ import {
   eventsService,
   eventKeys,
 } from "@/services/common/events/events.service";
+import { locationDisplayName } from "@/lib/slug-short-label";
+import { resolveLocationCoverHeroSrc } from "@/lib/resolve-hero-cover-image";
+import { preloadHeroImage } from "@/lib/preload-hero-image";
+
+/** Paths that must never be treated as venue location slugs. */
+const RESERVED_LOCATION_SLUGS = new Set([
+  "checkout",
+  "payment",
+  "auth",
+  "customer",
+  "vendor",
+  "admin",
+  "on-boarding",
+  "api",
+  "contact",
+  "about",
+  "blog",
+  "policies",
+  "terms",
+  "privacy",
+]);
 
 export async function generateMetadata(props: {
   params: { locationSlug: string };
 }): Promise<Metadata> {
   const params = await props.params;
   const locationSlug = params.locationSlug;
+  if (RESERVED_LOCATION_SLUGS.has(locationSlug.toLowerCase())) {
+    return { title: locationSlug.toLowerCase() === "checkout" ? "Checkout" : "Not Found" };
+  }
   const { locationData } = await fetchLocationData(locationSlug);
 
   if (!locationData) return { title: "Location Not Found" };
 
-  const cityName = locationData.city || locationSlug;
+  const cityName = locationDisplayName(locationData.city, locationSlug);
 
   return {
     title: `${cityName} Events`,
@@ -73,6 +97,13 @@ export default async function LocationPage(props: {
   const params = await props.params;
   const locationSlug = params.locationSlug;
 
+  if (RESERVED_LOCATION_SLUGS.has(locationSlug.toLowerCase())) {
+    if (locationSlug.toLowerCase() === "checkout") {
+      redirect("/checkout");
+    }
+    notFound();
+  }
+
   // Create a new QueryClient for SSR
   const queryClient = new QueryClient();
 
@@ -82,6 +113,8 @@ export default async function LocationPage(props: {
   if (!locationData) {
     notFound();
   }
+
+  preloadHeroImage(resolveLocationCoverHeroSrc(locationData.cover_image));
 
   // Prefetch the query to populate the cache - only need to do this once
   await queryClient.prefetchQuery({

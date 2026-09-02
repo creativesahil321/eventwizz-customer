@@ -34,7 +34,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { LocationIndicator } from "@/components/location-indicator";
+import { LocationScopedTitle } from "@/components/location-indicator";
 
 export default function EmailLogsPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
@@ -158,12 +158,11 @@ export default function EmailLogsPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
                   <div className="min-w-0 flex flex-col gap-3">
                     <h1 className="text-xl sm:text-2xl title-header font-bold text-black break-words">
-                      Email Logs
+                      <LocationScopedTitle title="Email Logs" />
                     </h1>
-                    <LocationIndicator variant="card" />
                     <p className="text-muted-foreground break-words">
-                      View and manage all email logs. Search by recipient email
-                      or subject line.
+                      Emails sent for this venue. Search by recipient or
+                      subject.
                     </p>
                   </div>
                   <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:w-auto min-w-0 max-w-full">

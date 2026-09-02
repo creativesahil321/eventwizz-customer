@@ -23,6 +23,10 @@ import type {
 import type { BookingDate } from "./add-ons/types";
 import { normalizeTableAllocations } from "@/lib/booking-table-allocation";
 import {
+  parseCouponCode,
+  parseSavedAmount,
+} from "@/lib/booking-saved-amount";
+import {
   normalizeVendorPaymentStatus,
   resolvePaymentStatusCode,
 } from "./vendor-booking-status";
@@ -36,6 +40,8 @@ export interface VendorCheckoutDate extends BookingDateSource {
   reschedule_block_reason?: string;
   total: string;
   totalAmount: number;
+  /** Present only when this date has promo savings. */
+  savedAmount?: number | null;
   paidAmount: number;
   pendingAmount: number | null;
   paymentStatus: ReturnType<typeof normalizeVendorPaymentStatus>;
@@ -67,6 +73,8 @@ export interface MappedVendorBookingCheckout {
     total: number;
     paid: number;
     outstanding: number;
+    savedAmount?: number | null;
+    couponCode?: string | null;
   };
   dates: VendorCheckoutDate[];
   addOnsTabDates: BookingDate[];
@@ -196,6 +204,7 @@ function mapLegacyEventDate(
     total_amount: date.total_amount,
     paid_amount: date.paid_amount,
     pending_amount: date.pending_payment,
+    saved_amount: date.saved_amount,
     has_unbooked_event_dates: date.has_unbooked_event_dates,
     package_title: packageTitleFallback,
     tickets: (date.tickets ?? []).map(mapLegacyTicket),
@@ -270,6 +279,7 @@ function mapDetailDate(
     ),
     total: formatCurrency(totalAmount),
     totalAmount,
+    savedAmount: parseSavedAmount(date.saved_amount),
     paidAmount,
     pendingAmount:
       pendingAmount != null && pendingAmount > 0 ? pendingAmount : null,
@@ -367,6 +377,8 @@ export function mapVendorBookingToCheckout(
       total,
       paid,
       outstanding,
+      savedAmount: parseSavedAmount(apiSummary?.saved_amount),
+      couponCode: parseCouponCode(apiSummary?.coupon_code),
     },
     dates,
     addOnsTabDates,

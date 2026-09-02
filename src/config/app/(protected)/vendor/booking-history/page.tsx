@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { useQueryState, parseAsInteger } from "nuqs";
 import { TableToolbarActions } from "./_components/table-toolbar-actions";
-import { LocationIndicator } from "@/components/location-indicator";
+import { LocationScopedTitle } from "@/components/location-indicator";
 import { PermissionRoute } from "@/components/permission";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
@@ -212,15 +212,14 @@ export default function BookingHistoryPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
                   <div className="flex flex-col gap-3">
                     <h1 className="text-2xl title-header font-bold text-black flex items-center gap-2">
-                      Booking History
+                      <LocationScopedTitle title="Booking History" />
                       {isFetching && (
                         <Loader2 className="h-5 w-5 animate-spin text-primary" />
                       )}
                     </h1>
-                    <LocationIndicator variant="card"/>
                     <p className="text-muted-foreground">
-                      View and manage all booking transactions. Filter by status
-                      and track booking details.
+                      Bookings for this venue. Switch location in the header to
+                      view another. Filter by status to track details.
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center w-full sm:w-auto min-w-0">

@@ -88,6 +88,7 @@ export function resolveRescheduleEventDateId(
 export function selectedRequiresPayment(
   date: Pick<AvailableRescheduleDate, "requires_payment" | "additional_payment_required" | "unpaid_amount" | "price">,
   currentPrice?: number,
+  paidAmount?: number,
 ): boolean {
   if (date.requires_payment === true) return true;
   if (date.requires_payment === false) return false;
@@ -98,8 +99,10 @@ export function selectedRequiresPayment(
   if (date.unpaid_amount != null) {
     return date.unpaid_amount > 0;
   }
-  if (currentPrice != null) {
-    return date.price > currentPrice;
+  // Prefer paid_amount as baseline — customer already paid this toward the booking
+  const baseline = paidAmount ?? currentPrice;
+  if (baseline != null) {
+    return date.price > baseline;
   }
   return false;
 }
@@ -110,8 +113,9 @@ export function getAdditionalPaymentRequired(
     "requires_payment" | "additional_payment_required" | "unpaid_amount" | "price"
   >,
   currentPrice?: number,
+  paidAmount?: number,
 ): number {
-  if (!selectedRequiresPayment(date, currentPrice)) return 0;
+  if (!selectedRequiresPayment(date, currentPrice, paidAmount)) return 0;
 
   if (date.additional_payment_required != null) {
     return Math.max(0, date.additional_payment_required);
@@ -119,8 +123,9 @@ export function getAdditionalPaymentRequired(
   if (date.unpaid_amount != null) {
     return Math.max(0, date.unpaid_amount);
   }
-  if (currentPrice != null && date.price > currentPrice) {
-    return date.price - currentPrice;
+  const baseline = paidAmount ?? currentPrice;
+  if (baseline != null && date.price > baseline) {
+    return date.price - baseline;
   }
   return 0;
 }
@@ -137,6 +142,11 @@ function mapTableDetailsForStore(
   }));
 }
 
+/**
+ * Builds the reschedule API payload.
+ * Confirmed product rule: reschedule amounts never re-apply checkout
+ * discounts/coupons — use server `price` / `unpaid_amount` only.
+ */
 export function buildRescheduleStorePayload(input: {
   bookingId: number;
   bookingDateId: number;
@@ -148,11 +158,21 @@ export function buildRescheduleStorePayload(input: {
   const currentPrice = input.current
     ? Number.parseFloat(String(input.current.price))
     : undefined;
+  const paidAmountRaw =
+    input.current?.paid_amount != null
+      ? Number.parseFloat(String(input.current.paid_amount))
+      : undefined;
+  const paidAmount = Number.isFinite(paidAmountRaw) ? paidAmountRaw : undefined;
 
-  const requiresPayment = selectedRequiresPayment(input.selected, currentPrice);
+  const requiresPayment = selectedRequiresPayment(
+    input.selected,
+    currentPrice,
+    paidAmount,
+  );
   const unpaidAmount = getAdditionalPaymentRequired(
     input.selected,
     currentPrice,
+    paidAmount,
   );
 
   const gateways =

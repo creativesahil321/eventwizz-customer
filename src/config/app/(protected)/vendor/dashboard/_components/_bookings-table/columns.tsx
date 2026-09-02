@@ -11,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { parseFormattedMoney } from "@/lib/currency-format";
 
 function bookingMoneyAmount(value: unknown): number {
@@ -179,11 +180,30 @@ export function getColumns({
           title="Total"
         />
       ),
-      cell: ({ row }) => (
-        <span className="font-medium text-right tabular-nums block">
-          {formatMoneyLocale(bookingMoneyAmount(row.original.total_amount))}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const savedAmount = row.original.saved_amount;
+        const couponCode = row.original.coupon_code;
+        return (
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="font-medium text-right tabular-nums block">
+              {formatMoneyLocale(bookingMoneyAmount(row.original.total_amount))}
+            </span>
+            {savedAmount != null ? (
+              <span className="text-[11px] font-semibold text-emerald-700">
+                You saved {formatMoneyLocale(savedAmount)}
+              </span>
+            ) : null}
+            {couponCode ? (
+              <Badge
+                variant="outline"
+                className="mt-0.5 h-5 px-1.5 text-[10px] font-semibold"
+              >
+                {couponCode}
+              </Badge>
+            ) : null}
+          </div>
+        );
+      },
       enableSorting: true,
       enableHiding: false,
       meta: { className: "text-right align-middle" },

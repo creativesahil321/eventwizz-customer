@@ -20,12 +20,6 @@ export function cloneOnboardingBrochureForApplyAll(
     remove_faq_pdf: Boolean(source.remove_faq_pdf),
     price_start_from:
       typeof source.price_start_from === "string" ? source.price_start_from : "",
-    event_address:
-      typeof source.event_address === "string" ? source.event_address : "",
-    latitude:
-      typeof source.latitude === "number" ? source.latitude : undefined,
-    longitude:
-      typeof source.longitude === "number" ? source.longitude : undefined,
     downloads: Array.isArray(source.downloads) ? source.downloads : [],
     more_info: Array.isArray(source.more_info) ? source.more_info : [],
   };

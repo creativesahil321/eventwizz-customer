@@ -7,12 +7,10 @@ import AdjustBookingContent from "./_components/adjust-booking-content";
 
 function AdjustBookingPage() {
   const params = useParams();
-  const bookingId = params.id as string;
+  // Route param is booking_number (e.g. EV-080), not numeric booking_id
+  const bookingNumber = params.id as string;
 
-  // TODO: Fetch booking data from API using bookingId
-  // const { data: bookingData, isLoading } = useGetBookingData(bookingId);
-
-  return <AdjustBookingContent bookingId={bookingId} />;
+  return <AdjustBookingContent bookingNumber={bookingNumber} />;
 }
 
 export default function Page() {

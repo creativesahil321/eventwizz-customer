@@ -37,10 +37,17 @@ export interface VenueLocation {
   slug: string;
   city?: string;
   address?: string;
+  /** Venue pin — preferred for map bias / event location defaults when present */
+  latitude?: number | string;
+  longitude?: number | string;
   contact_number?: string;
   email?: string;
   is_default: boolean;
+  /** Fixed head office — does not change when the vendor switches working location */
+  is_headquarters?: boolean;
   status?: boolean; // Dynamic status field: true = Active, false = Inactive
+  /** Live/active events currently tied to this location */
+  active_events_count?: number;
   created_at?: string;
   updated_at?: string;
   [key: string]: string | number | boolean | undefined;

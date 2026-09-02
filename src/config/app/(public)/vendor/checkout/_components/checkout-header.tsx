@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
+import { resolveCheckoutHeaderSurface } from "../_lib/checkout-header-surface";
+import { useLogoMarkTone } from "../_lib/use-logo-mark-tone";
 import { CheckoutHeaderProps } from "../_lib/types";
 
 const DEFAULT_LOGO = "/assets/images/logos/eventwizz-logo.png";
@@ -24,17 +27,31 @@ function resolveSiteLogo(logo?: string | null): string {
 
 export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
   const router = useRouter();
+  const { mediaVersion } = useTheme();
   const logoPath = resolveSiteLogo(settings?.logo);
   const brandName = settings?.name || "EventWizz";
+  const logoSrc = addCacheBusting(logoPath, mediaVersion);
+  const logoTone = useLogoMarkTone(logoSrc);
+  const { background, foreground } = resolveCheckoutHeaderSurface(
+    settings?.colors,
+    { logoTone },
+  );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[color:var(--checkout-border)] bg-white/80 backdrop-blur-md">
+    <header
+      className="sticky top-0 z-40 border-b shadow-[0_8px_28px_-20px_rgba(0,0,0,0.45)]"
+      style={{
+        backgroundColor: background,
+        color: foreground,
+        borderBottomColor: `color-mix(in srgb, ${foreground} 10%, transparent)`,
+      }}
+    >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={() => router.back()}
-            className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)] hover:text-[color:var(--checkout-foreground)]"
+            className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full transition-colors hover:bg-[color-mix(in_srgb,currentColor_12%,transparent)]"
             aria-label="Go back"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -46,11 +63,11 @@ export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
             className="flex min-w-0 items-center"
           >
             <img
-              src={addCacheBusting(logoPath)}
+              src={logoSrc}
               alt={brandName}
               width={200}
               height={56}
-              className="max-h-10 w-auto object-contain sm:max-h-11"
+              className="max-h-11 w-auto max-w-[min(100%,10rem)] object-contain sm:max-h-12 sm:max-w-[min(100%,12rem)]"
             />
           </Link>
         </div>

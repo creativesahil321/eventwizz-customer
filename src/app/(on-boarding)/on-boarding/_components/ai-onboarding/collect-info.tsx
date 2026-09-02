@@ -34,6 +34,23 @@ import AddressAutocomplete, {
   cityFromFormattedAddress,
   cityFromGooglePlace,
 } from "../steps/step-7/address-autocomplete";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
+import { geocodeLocation } from "../steps/step-11/_lib/actions";
+import {
+  hasValidLocationCoordinates,
+  parseOptionalCoordinate,
+} from "@/lib/to-location-coords-payload";
+
+const EventLocationMap = dynamic(
+  () => import("../steps/step-7/event-location-map"),
+  {
+    ssr: false,
+    loading: () => (
+      <Skeleton className="h-64 w-full rounded-lg border border-white/10" />
+    ),
+  },
+);
 import { AIChoicePair, AIFlowProgress } from "./ai-choice-pair";
 
 const themeAccent = {
@@ -75,6 +92,8 @@ const collectInfoSchema = z
     guestCount: z.string().optional(),
     priceRange: z.string().optional(),
     description: z.string().max(800, "Max 800 characters").optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
   })
   .superRefine((data, ctx) => {
     if (typeof data.has_room_system !== "boolean") {
@@ -120,21 +139,31 @@ const collectInfoSchema = z
           path: ["venueName"],
         });
       }
-      return;
+    } else {
+      if (!name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Venue name is required",
+          path: ["venueName"],
+        });
+      } else if (name.length >= 2 && !data.selectedPlaceId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please select a venue from the Google suggestions",
+          path: ["venueName"],
+        });
+      }
     }
-    if (!name) {
+
+    if (
+      data.address?.trim() &&
+      !hasValidLocationCoordinates(data.latitude, data.longitude)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Venue name is required",
-        path: ["venueName"],
-      });
-      return;
-    }
-    if (name.length >= 2 && !data.selectedPlaceId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Please select a venue from the Google suggestions",
-        path: ["venueName"],
+        message:
+          "Drop a pin on the map to confirm your venue location (drag the marker if needed).",
+        path: ["latitude"],
       });
     }
   });
@@ -281,6 +310,8 @@ export default function AICollectInfo({
       guestCount: initialData?.guestCount || "",
       priceRange: initialData?.priceRange || "",
       description: initialData?.description || "",
+      latitude: parseOptionalCoordinate(initialData?.latitude),
+      longitude: parseOptionalCoordinate(initialData?.longitude),
     },
     mode: "onTouched",
     reValidateMode: "onChange",
@@ -461,6 +492,7 @@ export default function AICollectInfo({
             "url",
             "business_status",
             "address_components",
+            "geometry",
           ],
         },
         (place, status) => {
@@ -498,6 +530,21 @@ export default function AICollectInfo({
               shouldDirty: true,
             });
           }
+
+          const loc = place.geometry?.location;
+          if (loc) {
+            form.setValue("latitude", loc.lat(), {
+              shouldValidate: true,
+              shouldDirty: true,
+            });
+            form.setValue("longitude", loc.lng(), {
+              shouldValidate: true,
+              shouldDirty: true,
+            });
+          } else {
+            form.setValue("latitude", undefined, { shouldValidate: true });
+            form.setValue("longitude", undefined, { shouldValidate: true });
+          }
         },
       );
     },
@@ -510,6 +557,8 @@ export default function AICollectInfo({
     form.setValue("address", "");
     form.setValue("city", "");
     form.setValue("contactNumber", "");
+    form.setValue("latitude", undefined, { shouldValidate: false });
+    form.setValue("longitude", undefined, { shouldValidate: false });
     setSearchQuery("");
     setSuggestions([]);
     setIsPlaceSelected(false);
@@ -531,8 +580,37 @@ export default function AICollectInfo({
       : "This venue name is already in use",
   });
 
-  const handleFormSubmit = (data: CollectInfoForm) => {
+  const handleFormSubmit = async (data: CollectInfoForm) => {
     if (brandNameTaken || brandNameChecking) return;
+
+    let latitude = parseOptionalCoordinate(data.latitude);
+    let longitude = parseOptionalCoordinate(data.longitude);
+
+    if (
+      data.address?.trim() &&
+      !hasValidLocationCoordinates(latitude, longitude)
+    ) {
+      const resolved = await geocodeLocation(data.address, data.city);
+      if (resolved) {
+        latitude = resolved.latitude;
+        longitude = resolved.longitude;
+        form.setValue("latitude", latitude, { shouldValidate: true });
+        form.setValue("longitude", longitude, { shouldValidate: true });
+      }
+    }
+
+    if (
+      data.address?.trim() &&
+      !hasValidLocationCoordinates(latitude, longitude)
+    ) {
+      form.setError("latitude", {
+        type: "manual",
+        message:
+          "Drop a pin on the map to confirm your venue location (drag the marker if needed).",
+      });
+      return;
+    }
+
     const { selectedPlaceId: _, ...rest } = data;
     const categoryId = data.venueType ? Number(data.venueType) : undefined;
     const category = eventCategories.find((c) => c.id === categoryId);
@@ -544,6 +622,8 @@ export default function AICollectInfo({
       data.has_room_system === true && normalizedRoomNames.length >= 2;
     const payload: AIOnboardingInput = {
       ...rest,
+      latitude,
+      longitude,
       venueType: category?.name ?? data.venueType,
       event_category_id: categoryId,
       has_multiple_locations: data.has_multiple_locations,
@@ -557,6 +637,9 @@ export default function AICollectInfo({
   const roomNameFields = form.watch("room_names");
   const addressValue = form.watch("address");
   const cityValue = form.watch("city");
+  const latitudeValue = form.watch("latitude");
+  const longitudeValue = form.watch("longitude");
+  const showLocationMap = Boolean(addressValue?.trim());
   const showConfirmedAddress =
     !isBrandMode &&
     isPlaceSelected &&
@@ -615,6 +698,8 @@ export default function AICollectInfo({
     form.setValue("address", "", { shouldValidate: false });
     form.setValue("city", "", { shouldValidate: false });
     form.setValue("contactNumber", "", { shouldValidate: false });
+    form.setValue("latitude", undefined, { shouldValidate: false });
+    form.setValue("longitude", undefined, { shouldValidate: false });
     setIsPlaceSelected(false);
     setSearchQuery("");
     setSuggestions([]);
@@ -1110,13 +1195,19 @@ export default function AICollectInfo({
                         variant="dark"
                         includeEstablishments
                         value={form.watch("address")}
-                        onChange={(address) =>
+                        onChange={(address) => {
                           form.setValue("address", address, {
                             shouldValidate: true,
                             shouldDirty: true,
-                          })
-                        }
-                        onResolved={({ address, city, phone }) => {
+                          });
+                          form.setValue("latitude", undefined, {
+                            shouldValidate: true,
+                          });
+                          form.setValue("longitude", undefined, {
+                            shouldValidate: true,
+                          });
+                        }}
+                        onResolved={({ address, city, phone, latitude, longitude }) => {
                           form.setValue("address", address, {
                             shouldValidate: true,
                             shouldDirty: true,
@@ -1131,6 +1222,21 @@ export default function AICollectInfo({
                           }
                           if (phone) {
                             form.setValue("contactNumber", phone, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          }
+                          if (
+                            latitude != null &&
+                            longitude != null &&
+                            Number.isFinite(latitude) &&
+                            Number.isFinite(longitude)
+                          ) {
+                            form.setValue("latitude", latitude, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                            form.setValue("longitude", longitude, {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
@@ -1172,6 +1278,50 @@ export default function AICollectInfo({
                     </p>
                   )}
                 </div>
+
+                {showLocationMap ? (
+                  <div className="sm:col-span-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                      <MapPin className="w-4 h-4" style={themeAccent.text} />
+                      Confirm on map <span className="text-red-400">*</span>
+                    </label>
+                    <p className="text-xs text-slate-500 mb-3">
+                      Drag the pin if the address search did not land on your
+                      entrance — same as event location setup.
+                    </p>
+                    <EventLocationMap
+                      initialAddress={addressValue}
+                      initialLatitude={latitudeValue}
+                      initialLongitude={longitudeValue}
+                      onLocationChange={({ address, latitude, longitude }) => {
+                        form.setValue("address", address, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                        form.setValue("latitude", latitude, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                        form.setValue("longitude", longitude, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                        const parsedCity = cityFromFormattedAddress(address);
+                        if (parsedCity) {
+                          form.setValue("city", parsedCity, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }
+                      }}
+                    />
+                    {form.formState.errors.latitude && (
+                      <p className="text-red-400 text-xs mt-1.5">
+                        {form.formState.errors.latitude.message}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
 
                 <div className="sm:col-span-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">

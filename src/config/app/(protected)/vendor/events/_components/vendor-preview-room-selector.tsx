@@ -12,6 +12,7 @@ type VendorPreviewRoomSelectorProps = {
   visible?: boolean;
   /** Sticky below site header (default). `inline` for full-page preview under chrome. */
   layout?: "sticky" | "inline";
+  stickyTop?: string;
   className?: string;
 };
 
@@ -22,6 +23,7 @@ export function VendorPreviewRoomSelector({
   onRoomChange,
   visible = true,
   layout = "sticky",
+  stickyTop,
   className,
 }: VendorPreviewRoomSelectorProps) {
   return (
@@ -29,6 +31,7 @@ export function VendorPreviewRoomSelector({
       rooms={rooms.map((room, index) => ({
         key: `${room.room_id}-${index}`,
         label: room.name || `Room ${index + 1}`,
+        disabled: room.disabled,
       }))}
       activeIndex={currentRoomIndex}
       onSelect={onRoomChange}
@@ -36,8 +39,12 @@ export function VendorPreviewRoomSelector({
       minRooms={2}
       layout={layout}
       stickyTop={
-        layout === "sticky" ? ONBOARDING_PREVIEW_HEADER_OFFSET : undefined
+        layout === "sticky"
+          ? (stickyTop ?? ONBOARDING_PREVIEW_HEADER_OFFSET)
+          : undefined
       }
+      label="Choose Room"
+      size="sm"
       className={cn("z-[58] mx-auto max-w-7xl sm:px-6", className)}
     />
   );

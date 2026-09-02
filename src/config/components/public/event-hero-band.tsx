@@ -1,13 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { Calendar, Clock, MapPin, Pencil } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
+import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import type { EventHeroBreadcrumb, EventHeroMeta } from "@/lib/event-hero-meta";
 import {
   heroBandContentPadClass,
-  heroBandVerticalClass,
+  heroBandCopyPlacementClass,
+  heroBandCopyPlacementStyle,
+  heroBandMediaOverlayClass,
+  heroBannerContactRowClass,
+  heroBannerHeadingTypeClass,
   heroBannerStackClass,
+  heroHeadingAlignClass,
+  heroHeadingMeasureClass,
   heroBannerSubheadingClass,
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
@@ -16,6 +26,11 @@ import {
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import {
+  PreviewEditHoverBadge,
+  PreviewEditHoverFrame,
+} from "@/components/preview/preview-edit-hint";
 
 type MediaInput =
   | string
@@ -39,6 +54,12 @@ export interface EventHeroBandProps {
   cacheBustImage?: boolean;
   /** `alt` for the banner image when present */
   imageAlt?: string;
+  /** Home / city / event trail (live event page). */
+  breadcrumbs?: EventHeroBreadcrumb[] | null;
+  /** Category chip under the crumbs (e.g. Festive). */
+  categoryLabel?: string | null;
+  /** Date / time / place row under the title. */
+  meta?: EventHeroMeta | null;
   /** Rendered above the title row (e.g. “Back to …” on the live event page) */
   beforeTitle?: ReactNode;
   /**
@@ -49,6 +70,10 @@ export interface EventHeroBandProps {
   sectionRef?: React.Ref<HTMLElement>;
   /** Extra classes on the outer `<section>` */
   className?: string;
+  /** Onboarding preview: click the cover to edit event branding. */
+  onEditHero?: () => void;
+  /** Onboarding preview: click date / time / city on the cover. */
+  onEditMeta?: (key: "date" | "time" | "location") => void;
   /**
    * Hint LCP: high fetch priority on hero `<img>` (live public pages).
    * Set false for small embeds if needed.
@@ -96,12 +121,18 @@ export function EventHeroBand({
   bannerVideo,
   cacheBustImage = false,
   imageAlt = "",
+  breadcrumbs,
+  categoryLabel,
+  meta,
   beforeTitle,
   emptyMediaSlot,
   sectionRef,
   className,
   priorityHeroImage = true,
+  onEditHero,
+  onEditMeta,
 }: EventHeroBandProps) {
+  const previewNarrow = usePreviewNarrowLayout();
   const syncBgUrl = useMemo(
     () => syncImageUrlFromInput(bannerImage, cacheBustImage),
     [bannerImage, cacheBustImage],
@@ -140,12 +171,12 @@ export function EventHeroBand({
     return undefined;
   }, [bannerVideo]);
 
-  const bgImage =
-    bannerImage instanceof File ? blobImageUrl : syncBgUrl;
-  const videoUrl =
-    bannerVideo instanceof File ? blobVideoUrl : syncVideoUrl;
+  const bgImage = bannerImage instanceof File ? blobImageUrl : syncBgUrl;
+  const videoUrl = bannerVideo instanceof File ? blobVideoUrl : syncVideoUrl;
 
-  const bannerAlign = normalizeBannerHeadingAlign(bannerHeadingAlign ?? "center");
+  const bannerAlign = normalizeBannerHeadingAlign(
+    bannerHeadingAlign ?? "center",
+  );
   const bannerValign = normalizeBannerHeadingValign(
     bannerHeadingValign ?? "center",
   );
@@ -155,6 +186,13 @@ export function EventHeroBand({
     typeof accentHint === "string" && accentHint.trim().length > 0
       ? accentHint.trim()
       : null;
+
+  const crumbs = (breadcrumbs ?? []).filter((crumb) => crumb.label.trim());
+  const chip = categoryLabel?.trim() || "";
+  const metaDate = meta?.date?.trim() || "";
+  const metaTime = meta?.time?.trim() || "";
+  const metaLocation = meta?.location?.trim() || "";
+  const hasMeta = Boolean(metaDate || metaTime || metaLocation);
 
   const heroStyles = {
     videoBackground: "absolute inset-0 h-full w-full object-cover",
@@ -169,15 +207,34 @@ export function EventHeroBand({
     <section
       ref={sectionRef}
       className={cn(
-        "relative mx-auto flex w-full justify-center overflow-hidden",
-        "h-[min(70dvh,760px)] min-h-[400px] max-h-[820px]",
-        heroBandVerticalClass(bannerValign),
-        bannerAlign === "left" &&
-          bannerValign === "center" &&
-          "!items-stretch",
+        "relative mx-auto w-full overflow-hidden",
+        "h-[min(64dvh,700px)] min-h-[360px] max-h-[760px] md:h-[min(68dvh,720px)] md:min-h-[380px]",
+        onEditHero && "group/preview-edit cursor-pointer",
         className,
       )}
+      onClick={
+        onEditHero
+          ? (event) => {
+              if (
+                event.target instanceof Element &&
+                event.target.closest("[data-hero-meta-edit]")
+              ) {
+                return;
+              }
+              onEditHero();
+            }
+          : undefined
+      }
+      title={onEditHero ? "Click to edit event cover" : undefined}
     >
+      {onEditHero ? (
+        <>
+          <PreviewEditHoverFrame className="z-[25]" />
+          <div className="pointer-events-none absolute right-4 top-4 z-30">
+            <PreviewEditHoverBadge label="cover" />
+          </div>
+        </>
+      ) : null}
       <div className="absolute inset-0 overflow-hidden">
         {videoUrl ? (
           <>
@@ -198,8 +255,11 @@ export function EventHeroBand({
               preload="auto"
             />
           </>
+        ) : bgImage && !bgImage.startsWith("blob:") && priorityHeroImage ? (
+          <HeroCoverImage src={bgImage} alt={imageAlt} className="scale-105" />
         ) : bgImage ? (
-          // eslint-disable-next-line @next/next/no-img-element -- external vendor URLs + optional cache busting
+          // File blob / non-priority embeds — keep native <img> (next/image can't optimize blobs)
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={bgImage}
             alt={imageAlt}
@@ -217,30 +277,93 @@ export function EventHeroBand({
           />
         )}
         <div
-          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/60 via-black/35 to-[color:var(--color-background)]"
+          className={cn(
+            "pointer-events-none absolute inset-0 z-[1]",
+            heroBandMediaOverlayClass,
+          )}
           aria-hidden
         />
       </div>
 
       <div
-        className="pointer-events-none absolute left-1/4 top-16 z-[2] h-72 w-72 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_18%,transparent)] blur-[100px] md:h-96 md:w-96 md:blur-[120px]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute bottom-24 right-1/4 z-[2] h-64 w-64 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_10%,transparent)] blur-[90px]"
-        aria-hidden
-      />
-
-      <div
         className={cn(
-          "relative z-20 max-w-7xl mx-auto w-full overflow-visible px-4",
+          heroBandCopyPlacementClass(bannerValign),
+          "max-w-7xl px-3 sm:px-4",
+          heroHeadingMeasureClass,
           heroBandContentPadClass(bannerValign),
         )}
+        style={heroBandCopyPlacementStyle(bannerValign)}
       >
         <div
-          className={cn(heroBannerStackClass(bannerAlign), "overflow-visible")}
+          className={cn(
+            heroBannerStackClass(bannerAlign, { fromMd: true }),
+            "min-h-0 max-h-full",
+          )}
         >
-          {beforeTitle}
+          {crumbs.length > 0 ? (
+            <nav
+              aria-label="Breadcrumb"
+              className={cn(
+                "text-xs font-medium tracking-wide text-white/80 sm:text-sm",
+                previewNarrow
+                  ? "text-center"
+                  : heroHeadingAlignClass(bannerAlign, { fromMd: true }),
+              )}
+            >
+              <ol
+                className={cn(
+                  "flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1",
+                  !previewNarrow && bannerAlign === "left" && "md:justify-start",
+                  !previewNarrow && bannerAlign === "center" && "md:justify-center",
+                  !previewNarrow && bannerAlign === "right" && "md:justify-end",
+                )}
+              >
+                {crumbs.map((crumb, index) => {
+                  const isLast = index === crumbs.length - 1;
+                  return (
+                    <li
+                      key={`${crumb.label}-${index}`}
+                      className="inline-flex items-center gap-x-1.5"
+                    >
+                      {index > 0 ? (
+                        <span className="text-white/45" aria-hidden>
+                          /
+                        </span>
+                      ) : null}
+                      {crumb.href && !isLast ? (
+                        <Link
+                          href={crumb.href}
+                          className="underline decoration-white/35 underline-offset-2 transition-colors hover:text-white hover:decoration-white"
+                        >
+                          {crumb.label}
+                        </Link>
+                      ) : (
+                        <span
+                          className={isLast ? "text-white" : undefined}
+                          aria-current={isLast ? "page" : undefined}
+                        >
+                          {crumb.label}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
+          ) : (
+            beforeTitle
+          )}
+          {chip ? (
+            <p
+              className={cn(
+                "inline-flex rounded-full border border-white/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/95",
+                bannerAlign === "left" && "md:self-start",
+                bannerAlign === "right" && "md:self-end",
+              )}
+            >
+              {chip}
+            </p>
+          ) : null}
           <SiteHeading
             level={1}
             title={title}
@@ -248,24 +371,55 @@ export function EventHeroBand({
             emphasis={emphasis}
             variant="onDark"
             align={bannerAlign}
+            alignFromMd
             className={cn(
-              "mb-4 text-pretty font-black tracking-tight",
-              /* Fluid type between phone and desktop (replaces stepped 3xl→6xl). */
-              "!text-[clamp(1.5rem,4.25vw+0.75rem,3.75rem)] !leading-[0.98]",
-              bannerAlign === "left"
-                ? "max-w-[min(100%,28rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
-                : "max-w-4xl",
+              "font-black tracking-tight",
+              heroBannerHeadingTypeClass,
+              bannerAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
+              "max-md:line-clamp-2 max-md:!leading-[1.15]",
             )}
           />
           {subHeading ? (
             <p
               className={cn(
                 "max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg md:text-xl",
-                heroBannerSubheadingClass(bannerAlign),
+                heroBannerSubheadingClass(bannerAlign, { fromMd: true }),
               )}
             >
               {subHeading}
             </p>
+          ) : null}
+          {hasMeta ? (
+            <div
+              className={heroBannerContactRowClass(bannerAlign, {
+                fromMd: true,
+              })}
+            >
+              {metaDate ? (
+                <HeroMetaItem
+                  icon={Calendar}
+                  label={metaDate}
+                  editable={Boolean(onEditMeta)}
+                  onEdit={() => onEditMeta?.("date")}
+                />
+              ) : null}
+              {metaTime ? (
+                <HeroMetaItem
+                  icon={Clock}
+                  label={metaTime}
+                  editable={Boolean(onEditMeta)}
+                  onEdit={() => onEditMeta?.("time")}
+                />
+              ) : null}
+              {metaLocation ? (
+                <HeroMetaItem
+                  icon={MapPin}
+                  label={metaLocation}
+                  editable={Boolean(onEditMeta)}
+                  onEdit={() => onEditMeta?.("location")}
+                />
+              ) : null}
+            </div>
           ) : null}
           {!hasMedia && !awaitingFileBlob && emptyMediaSlot ? (
             <div className="mt-6">{emptyMediaSlot}</div>
@@ -273,5 +427,50 @@ export function EventHeroBand({
         </div>
       </div>
     </section>
+  );
+}
+
+function HeroMetaItem({
+  icon: Icon,
+  label,
+  editable,
+  onEdit,
+}: {
+  icon: typeof Calendar;
+  label: string;
+  editable: boolean;
+  onEdit: () => void;
+}) {
+  if (!editable) {
+    return (
+      <span className="inline-flex min-w-0 max-w-full items-center gap-2">
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+        <span
+          className="min-w-0 max-w-[min(70vw,24rem)] truncate"
+          title={label}
+        >
+          {label}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      data-hero-meta-edit=""
+      title="Click to edit"
+      onClick={(event) => {
+        event.stopPropagation();
+        onEdit();
+      }}
+      className="group/meta inline-flex min-w-0 max-w-full items-center gap-2 rounded-full px-1.5 py-0.5 text-left transition-colors hover:bg-white/15"
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="min-w-0 max-w-[min(70vw,24rem)] truncate" title={label}>
+        {label}
+      </span>
+      <Pencil className="h-3 w-3 shrink-0 opacity-70 transition-opacity group-hover/meta:opacity-100" />
+    </button>
   );
 }

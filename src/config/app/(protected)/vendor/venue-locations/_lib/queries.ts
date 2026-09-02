@@ -6,7 +6,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { SearchParams } from "./types";
-import { LocationFormValues } from "./validations";
+import { LocationFormValues, MAX_VENDOR_LOCATIONS } from "./validations";
 import { VenueLocation as ApiVenueLocation } from "@/types/api.types";
 import { locationService } from "@/services/vendor/locations/locations.service";
 import { useSitePreviewStore } from "@/store/site-preview.store";
@@ -16,9 +16,36 @@ import {
 } from "@/services/vendor/locations/type";
 import { useSession } from "next-auth/react";
 import { useLocationStore } from "@/store/location.store";
+import { toLocationCoordsPayload } from "@/lib/to-location-coords-payload";
 
 // Constants
 const LOCATIONS_STALE_TIME = 10 * 60 * 1000; // 10 minutes
+
+export { MAX_VENDOR_LOCATIONS };
+
+/** Resolve current vendor location count from React Query cache and Zustand. */
+export function resolveVendorLocationCount(queryClient: QueryClient): number {
+  let count = useLocationStore.getState().allLocations.length;
+
+  const caches = queryClient.getQueriesData<
+    LocationsQueryData | ApiVenueLocation[]
+  >({ queryKey: ["locations"] });
+
+  for (const [, value] of caches) {
+    if (!value) continue;
+    if (Array.isArray(value)) {
+      count = Math.max(count, value.length);
+      continue;
+    }
+    if (typeof value.meta?.total === "number") {
+      count = Math.max(count, value.meta.total);
+    } else if (Array.isArray(value.data)) {
+      count = Math.max(count, value.data.length);
+    }
+  }
+
+  return count;
+}
 
 /** Query key prefixes to invalidate when default location changes (APIs use location from session/header) */
 export const LOCATION_DEPENDENT_QUERY_KEYS = [
@@ -29,6 +56,10 @@ export const LOCATION_DEPENDENT_QUERY_KEYS = [
   ["vendor", "email-logs"],
   ["site-essentials"],
   ["events"],
+  ["vendor-discounts"],
+  ["vendor", "payment-gateways"],
+  // Profile carries site_url, has_payment_provider, notification_stats per location
+  ["profile"],
 ] as const;
 
 // Helper: Get current location ID from session (no localStorage)
@@ -79,11 +110,34 @@ function isLocationArray(value: unknown): value is ApiVenueLocation[] {
 // Shared function to normalize location data
 const normalizeLocation = (location: unknown): ApiVenueLocation => {
   const loc = location as Record<string, unknown>;
+  const activeEventsCount = Number(loc.active_events_count);
+
+  const latRaw = loc.latitude ?? loc.lat;
+  const lngRaw = loc.longitude ?? loc.long ?? loc.lng;
+  const latitude =
+    latRaw == null || latRaw === ""
+      ? undefined
+      : Number.isFinite(Number(latRaw))
+        ? Number(latRaw)
+        : undefined;
+  const longitude =
+    lngRaw == null || lngRaw === ""
+      ? undefined
+      : Number.isFinite(Number(lngRaw))
+        ? Number(lngRaw)
+        : undefined;
+
   return {
     ...loc,
     is_default: Boolean(loc.is_default),
+    is_headquarters: Boolean(loc.is_headquarters),
     status: loc.status !== undefined ? Boolean(loc.status) : undefined,
+    active_events_count: Number.isFinite(activeEventsCount)
+      ? activeEventsCount
+      : 0,
     deleted_at: loc.deleted_at || undefined,
+    ...(latitude != null ? { latitude } : {}),
+    ...(longitude != null ? { longitude } : {}),
   } as unknown as ApiVenueLocation;
 };
 
@@ -174,6 +228,10 @@ export const useLocations = (
       const normalizedLocations = locations.map((location) => normalizeLocation(location));
       const meta = response?.meta;
 
+      if (normalizedLocations.length > 0) {
+        useLocationStore.getState().setLocations(normalizedLocations);
+      }
+
       return { data: normalizedLocations, meta };
     },
     staleTime: LOCATIONS_STALE_TIME,
@@ -217,6 +275,14 @@ export const useCreateLocation = () => {
 
   return useMutation({
     mutationFn: (data: LocationFormValues) => {
+      const locationCount = resolveVendorLocationCount(queryClient);
+      if (locationCount >= MAX_VENDOR_LOCATIONS) {
+        throw new Error(
+          `You can add a maximum of ${MAX_VENDOR_LOCATIONS} locations`,
+        );
+      }
+
+      const coords = toLocationCoordsPayload(data.latitude, data.longitude);
       const payload: LocationCreatePayload = {
         name: data.name || "",
         city: data.city || "",
@@ -225,6 +291,7 @@ export const useCreateLocation = () => {
         email: data.email,
         contact_number: data.contact_number,
         is_default: data.is_default === true,
+        ...(coords ?? {}),
       };
       return locationService.createLocation(payload);
     },
@@ -240,6 +307,7 @@ export const useUpdateLocation = (id: number | string) => {
 
   return useMutation({
     mutationFn: (data: LocationFormValues) => {
+      const coords = toLocationCoordsPayload(data.latitude, data.longitude);
       const payload: LocationUpdatePayload = {
         city: data.city,
         address: data.address,
@@ -247,6 +315,7 @@ export const useUpdateLocation = (id: number | string) => {
         is_default: data.is_default === true,
         contact_number: data.contact_number,
         email: data.email,
+        ...(coords ?? {}),
       };
       return locationService.updateLocation(id, payload);
     },
@@ -365,16 +434,42 @@ export const useToggleLocationStatus = () => {
   });
 };
 
-// Function to delete a location
+export const useSendLocationDeleteOtp = () => {
+  return useMutation({
+    mutationFn: (id: number | string) => locationService.sendDeleteOtp(id),
+  });
+};
+
+export const useVerifyLocationDeleteOtp = () => {
+  return useMutation({
+    mutationFn: ({
+      id,
+      otp,
+    }: {
+      id: number | string;
+      otp: string;
+    }) => locationService.verifyDeleteOtp(id, { otp }),
+  });
+};
+
+// Function to delete a location (requires verified OTP + confirmation phrase)
 export const useDeleteLocation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number | string) => locationService.deleteLocation(id),
-    onSuccess: async (_response, deletedId) => {
+    mutationFn: ({
+      id,
+      otp,
+      confirmation,
+    }: {
+      id: number | string;
+      otp: string;
+      confirmation: string;
+    }) => locationService.deleteLocation(id, { otp, confirmation }),
+    onSuccess: async (_response, variables) => {
       // Invalidate all location queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ["locations"] });
-      queryClient.removeQueries({ queryKey: ["location", deletedId] });
+      queryClient.removeQueries({ queryKey: ["location", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },

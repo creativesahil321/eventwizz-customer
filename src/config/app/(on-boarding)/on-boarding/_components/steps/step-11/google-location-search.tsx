@@ -25,7 +25,7 @@ type Props = {
 
 declare global {
   interface Window {
-    google: typeof google;
+    google: any;
   }
 }
 
@@ -46,7 +46,7 @@ const GoogleLocationSearch: React.FC<Props> = ({
   const [isSelected, setIsSelected] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const autocompleteService =
-    useRef<google.maps.places.AutocompleteService | null>(null);
+    useRef<any | null>(null);
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,8 +103,8 @@ const GoogleLocationSearch: React.FC<Props> = ({
             componentRestrictions: { country: "GB" },
           },
           (
-            predictions: google.maps.places.AutocompletePrediction[] | null,
-            status: google.maps.places.PlacesServiceStatus,
+            predictions: any[] | null,
+            status: any,
           ) => {
             if (safetyTimeoutRef.current) {
               clearTimeout(safetyTimeoutRef.current);
@@ -112,11 +112,11 @@ const GoogleLocationSearch: React.FC<Props> = ({
             }
             setIsSearching(false);
             if (
-              status === google.maps.places.PlacesServiceStatus.OK &&
+              status === (window.google.maps.places.PlacesServiceStatus as any)?.OK &&
               predictions
             ) {
               setSuggestions(
-                predictions.map((p) => ({
+                predictions.map((p: any) => ({
                   description: p.description,
                   place_id: p.place_id,
                 })),
@@ -230,14 +230,14 @@ const GoogleLocationSearch: React.FC<Props> = ({
                 types: ["geocode", "establishment"],
                 componentRestrictions: { country: "GB" },
               },
-              (predictions, status) => {
+              (predictions: any[] | null, status: any) => {
                 setIsSearching(false);
                 if (
-                  status === google.maps.places.PlacesServiceStatus.OK &&
+                  status === (window.google.maps.places.PlacesServiceStatus as any)?.OK &&
                   predictions
                 ) {
                   setSuggestions(
-                    predictions.map((p) => ({
+                    predictions.map((p: any) => ({
                       description: p.description,
                       place_id: p.place_id,
                     })),

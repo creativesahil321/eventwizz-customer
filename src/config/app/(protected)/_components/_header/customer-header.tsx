@@ -28,17 +28,18 @@ import {
 import { cn } from "@/lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
 import { logout } from "@/lib/auth/logout";
+import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
 import { useAuthStore } from "@/store/auth.store";
 import { useDomainStore } from "@/store/domain.store";
 import { MenuItemProps } from "@/config/menus/types";
 import MobileSidebar from "./_components/mobile-sidebar";
 import LayoutToggle from "./_components/layout-toggle";
-import { notificationService } from "@/services/common/notification";
 import {
   mapCustomerSupportTicketToConversation,
   useCustomerSupportTickets,
 } from "@/services/customer/support";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
+import { useProfileData } from "@/app/(protected)/_shared/profile/_lib";
 
 const CUSTOMER_QUICK_LINKS = [
   {
@@ -53,7 +54,7 @@ const CUSTOMER_QUICK_LINKS = [
   },
   {
     title: "Support",
-    href: "/customer/support/inbox",
+    href: "/customer/support",
     keywords: ["support", "help", "enquiry", "ticket"],
   },
   {
@@ -93,7 +94,7 @@ function CustomerHeaderSearch() {
   const debouncedQuery = useDebounce(query, 400);
   const { data: supportTicketsResponse } = useCustomerSupportTickets(
     { sort: "newest", search: debouncedQuery.trim() || undefined },
-    { enabled: isSupportWorkspace && debouncedQuery.trim().length > 0 }
+    { enabled: isSupportWorkspace && debouncedQuery.trim().length > 0 },
   );
 
   const results = useMemo(() => {
@@ -114,12 +115,12 @@ function CustomerHeaderSearch() {
     return CUSTOMER_QUICK_LINKS.filter(
       (item) =>
         item.title.toLowerCase().includes(q) ||
-        item.keywords.some((keyword) => keyword.includes(q))
+        item.keywords.some((keyword) => keyword.includes(q)),
     )
       .slice(0, 6)
       .map((item) => ({
         title: item.title,
-        subtitle: "Open page",
+        subtitle: "Go to page",
         href: item.href,
       }));
   }, [isSupportWorkspace, query, supportTicketsResponse?.data]);
@@ -142,12 +143,14 @@ function CustomerHeaderSearch() {
   }, [openSearch]);
 
   const placeholder = isSupportWorkspace
-    ? "Search conversations, customers, bookin..."
-    : "Search bookings, events, pages...";
+    ? "Search conversations or bookings…"
+    : "Search bookings, events, or pages…";
 
   const dialogPlaceholder = isSupportWorkspace
-    ? "Search conversations, customers, bookings..."
-    : "Search bookings, events, or pages...";
+    ? "Search conversations or bookings…"
+    : "Search bookings, events, or pages…";
+
+  const modKey = getModKeyLabel();
 
   return (
     <>
@@ -159,13 +162,13 @@ function CustomerHeaderSearch() {
           className="flex h-9 w-full items-center rounded-full border border-slate-200 bg-white pl-9 pr-3 text-left text-sm text-muted-foreground shadow-sm transition-colors hover:border-slate-300 sm:pr-12"
           aria-label="Search"
         >
-          <span className="truncate text-[13px] sm:hidden">Search...</span>
+          <span className="truncate text-[13px] sm:hidden">Search…</span>
           <span className="hidden truncate text-[13px] sm:inline">
             {placeholder}
           </span>
         </button>
         <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 items-center rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
-          ⌘K
+          {modKey === "Cmd" ? "⌘K" : "Ctrl+K"}
         </kbd>
       </div>
 
@@ -274,22 +277,11 @@ function CustomerUserPill() {
 
 function CustomerNotificationBell() {
   const router = useRouter();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await notificationService.getNotificationStats();
-        setUnreadCount(data.unread ?? 0);
-      } catch (error) {
-        console.error("Failed to fetch notification stats:", error);
-      }
-    };
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data: profileResponse } = useProfileData({}, "customer");
+  const unreadCount =
+    Number(
+      profileResponse?.data?.notification_stats?.unread_notifications ?? 0,
+    ) || 0;
 
   return (
     <Button
@@ -303,8 +295,8 @@ function CustomerNotificationBell() {
       {unreadCount > 0 && (
         <span
           className={cn(
-            "absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full text-[10px] font-bold",
-            "bg-[var(--color-primary)] text-white"
+            "absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white",
+            "bg-[var(--color-primary)]",
           )}
         >
           {unreadCount > 9 ? "9+" : unreadCount}
@@ -324,8 +316,8 @@ export default function CustomerHeader({ menus = [] }: CustomerHeaderProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 flex-none border-b border-slate-200 bg-white px-2 py-2.5 shadow-sm transition-all duration-300 sm:px-4 md:px-6",
-        collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]"
+        "sticky top-0 z-40 flex-none border-b border-slate-200 bg-white px-2 py-2.5 shadow-sm transition-all duration-300 sm:px-4 md:px-6",
+        collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
       )}
     >
       <div className="flex items-center justify-between gap-2 sm:gap-3">

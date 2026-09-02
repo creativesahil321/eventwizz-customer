@@ -1,6 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { useAuthStore } from "@/store/auth.store";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import {
   ThemeSettings,
@@ -22,6 +29,11 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { resolveCurrencySymbol } from "@/lib/currency-format";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import {
+  addCacheBusting,
+  mediaUpdatedAtToVersion,
+  resolveMediaUpdatedAt,
+} from "@/lib/image-utils";
 
 /**
  * Context type definition for theme data and state
@@ -30,6 +42,11 @@ interface ThemeContextType {
   theme: ThemeSettings | null;
   loading: boolean;
   error: string | null;
+  /**
+   * DB-backed cache key from theme `media_updated_at` (ms).
+   * Use with `addCacheBusting` for logo / favicon / main landing cover.
+   */
+  mediaVersion?: number;
 }
 
 /**
@@ -39,6 +56,7 @@ const defaultContext: ThemeContextType = {
   theme: null,
   loading: true,
   error: null,
+  mediaVersion: undefined,
 };
 
 const ThemeContext = createContext<ThemeContextType>(defaultContext);
@@ -110,6 +128,32 @@ const createDefaultSEO = (title: string = "EventWizz"): SEO => ({
 });
 
 /**
+ * Theme `/theme/settings` → `live_events` now sends flat `category_name`.
+ * Older payloads nested it as `category.name` (or a category string).
+ */
+function readThemeLiveEventCategoryName(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as {
+    category_name?: unknown;
+    category?: { name?: unknown } | string | null;
+  };
+  const flat =
+    typeof rec.category_name === "string" ? rec.category_name.trim() : "";
+  if (flat) return flat;
+  const nested = rec.category;
+  if (typeof nested === "string" && nested.trim()) return nested.trim();
+  if (
+    nested &&
+    typeof nested === "object" &&
+    typeof nested.name === "string" &&
+    nested.name.trim()
+  ) {
+    return nested.name.trim();
+  }
+  return null;
+}
+
+/**
  * Converts domain theme schema to application theme settings
  * @param schema - Domain theme schema or null
  * @returns Properly formatted ThemeSettings object
@@ -164,14 +208,37 @@ const mapSchemaToSettings = (
     domain: schema.domain || "",
     website_role: schema.website_role || "",
     currency_symbol: resolveCurrencySymbol(schema.currency_symbol),
+    live_events: Array.isArray(schema.live_events)
+      ? schema.live_events
+          .filter(
+            (e) =>
+              e &&
+              typeof e.title === "string" &&
+              typeof e.slug === "string" &&
+              typeof e.location_slug === "string",
+          )
+          .map((e) => ({
+            title: e.title.trim(),
+            slug: e.slug.trim(),
+            location_slug: e.location_slug.trim(),
+            location_city: (e.location_city || e.location_slug).trim(),
+            category_name: readThemeLiveEventCategoryName(e),
+          }))
+      : [],
+    locations: Array.isArray(schema.locations) ? schema.locations : [],
   };
 };
 
 /**
  * Applies theme CSS variables to document root
  * @param settings - Theme settings to apply
+ * @param mediaUpdatedAt - DB `media_updated_at` (ISO) so overwritten logo/favicon
+ *   at the same path are not served from browser cache
  */
-const applyThemeToDOM = (settings: ThemeSchema): void => {
+const applyThemeToDOM = (
+  settings: ThemeSchema,
+  mediaUpdatedAt?: string | null,
+): void => {
   if (!settings) return;
 
   // Generate CSS using the shared utility
@@ -204,8 +271,11 @@ const applyThemeToDOM = (settings: ThemeSchema): void => {
       link.rel = "icon";
       document.head.appendChild(link);
     }
-    if (link.href !== settings.favicon) {
-      link.href = settings.favicon;
+    const version =
+      resolveMediaUpdatedAt(settings) ?? mediaUpdatedAt ?? null;
+    const faviconHref = addCacheBusting(settings.favicon, version);
+    if (link.getAttribute("href") !== faviconHref) {
+      link.href = faviconHref;
     }
   }
 
@@ -239,6 +309,39 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     error: queryError,
   } = useThemeQuery(domain, initialTheme);
 
+  const isSessionChecked = useAuthStore((s) => s.isSessionChecked);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const accountType = useAuthStore((s) => s.account_type);
+  const newsletterThemeSyncKeyRef = useRef("");
+
+  // SSR/guest theme cache has no `is_newsletter_subscribed`. Refetch the same
+  // query with the customer token (or without it after logout) so the flag matches.
+  useEffect(() => {
+    if (!isSessionChecked || !domain) return;
+
+    const isCustomer = Boolean(isAuthenticated && accountType === "customer");
+    const hasFlag =
+      typeof queryThemeData?.is_newsletter_subscribed === "boolean";
+    if (isCustomer === hasFlag) return;
+
+    const syncKey = `${isAuthenticated}:${accountType ?? ""}`;
+    if (newsletterThemeSyncKeyRef.current === syncKey) return;
+    newsletterThemeSyncKeyRef.current = syncKey;
+
+    void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+  }, [
+    isSessionChecked,
+    isAuthenticated,
+    accountType,
+    domain,
+    queryThemeData?.is_newsletter_subscribed,
+    queryClient,
+  ]);
+
+  // DB-backed; identical on SSR + client (unlike query dataUpdatedAt).
+  const mediaUpdatedAt = resolveMediaUpdatedAt(queryThemeData, initialTheme);
+  const mediaVersion = mediaUpdatedAtToVersion(mediaUpdatedAt);
+
   // Apply theme from either initialTheme (SSR) or query result (CSR)
   useEffect(() => {
     // If we have domain loading or query running, keep the existing theme
@@ -255,8 +358,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
         const themeSettings = mapSchemaToSettings(themeToApply);
         setTheme(themeSettings);
 
-        // Apply theme to DOM
-        applyThemeToDOM(themeToApply);
+        // Apply theme to DOM (version busts favicon when storage path is reused)
+        applyThemeToDOM(
+          themeToApply,
+          resolveMediaUpdatedAt(themeToApply),
+        );
 
         setLoading(false);
       } catch (err) {
@@ -269,16 +375,30 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
       setError("Theme settings not available");
       setLoading(false);
     }
-  }, [queryThemeData, initialTheme, isQueryLoading, isDomainLoading]);
+  }, [
+    queryThemeData,
+    initialTheme,
+    isQueryLoading,
+    isDomainLoading,
+  ]);
 
   // Apply initial theme immediately on mount if available
   useEffect(() => {
     if (initialTheme && typeof window !== "undefined") {
-      applyThemeToDOM(initialTheme);
+      applyThemeToDOM(
+        initialTheme,
+        resolveMediaUpdatedAt(initialTheme),
+      );
 
       // Pre-populate the query cache with a mutable copy so TanStack Query
       // never mutates a read-only (frozen) server object (avoids "Cannot assign to read only property 'primary'").
-      queryClient.setQueryData(themeKeys.all, structuredClone(initialTheme));
+      queryClient.setQueryData(themeKeys.all, (current: ThemeSchema | undefined) => {
+        const next = structuredClone(initialTheme);
+        if (typeof current?.is_newsletter_subscribed === "boolean") {
+          next.is_newsletter_subscribed = current.is_newsletter_subscribed;
+        }
+        return next;
+      });
     }
   }, [initialTheme, queryClient]);
 
@@ -289,6 +409,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
         theme,
         loading: loading && !initialTheme, // Don't show loading if we have initialTheme
         error: queryError ? String(queryError) : error,
+        mediaVersion,
       }}
     >
       {children}

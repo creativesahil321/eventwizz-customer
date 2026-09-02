@@ -15,7 +15,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { AlertCircle, UserCog, Save, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +23,6 @@ import {
   Permission,
 } from "@/services/common/manage-roles/type";
 import { useCreateRole } from "../_lib/queries";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { createRoleSchema, CreateRoleFormValues } from "../_lib/schemas";
 
@@ -405,184 +403,163 @@ export default function CreateRoleForm({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Create New Role</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            {/* Display form error if there is one */}
-            {formError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
-                <AlertCircle className="h-4 w-4 inline-block mr-1" />
-                {formError}
-              </div>
-            )}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {formError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+            <AlertCircle className="h-4 w-4 inline-block mr-1" />
+            {formError}
+          </div>
+        )}
 
-            {/* Role Information */}
-            <div className="space-y-2 mb-6">
-              <FormField
-                control={form.control}
-                name="label"
-                render={({ field }) => (
-                  <FormItem className="space-y-1">
-                    <FormLabel className="text-sm font-semibold">
-                      Role Name
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="E.g., Marketing Manager"
-                        {...field}
-                        maxLength={50}
-                        onChange={(e) => {
-                          const raw = e.target.value.slice(0, 50);
-                          const value = raw.replace(
-                            /[^a-zA-Z0-9\s\-']/g,
-                            ""
-                          );
-                          e.target.value = value;
-                          field.onChange(value);
-                        }}
-                        className="h-10"
-                      />
-                    </FormControl>
-                    <div className="flex items-center justify-between">
-                      <FormDescription className="text-xs text-black/50">
-                        Letters, numbers, spaces, hyphens and apostrophes
-                        only.
-                      </FormDescription>
-                      <span className="text-xs text-muted-foreground">
-                        {field.value?.length || 0}/50
-                      </span>
-                    </div>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Permissions Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-semibold">Permissions</h3>
-                  {getSelectionCount() > 0 && (
-                    <Badge className="bg-[var(--color-primary)] text-white">
-                      {getSelectionCount()} enabled
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Global toggle all switch */}
-                <div className="flex items-center">
-                  <FormLabel htmlFor="toggle-all" className="mr-2 text-sm">
-                    Toggle All Permissions
-                  </FormLabel>
-                  <Switch
-                    id="toggle-all"
-                    checked={isAllChecked}
-                    onCheckedChange={toggleAllPermissions}
+        <div className="space-y-2">
+          <FormField
+            control={form.control}
+            name="label"
+            render={({ field }) => (
+              <FormItem className="space-y-1">
+                <FormLabel className="text-sm font-semibold">
+                  Role Name
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="E.g., Marketing Manager"
+                    {...field}
+                    maxLength={50}
+                    onChange={(e) => {
+                      const raw = e.target.value.slice(0, 50);
+                      const value = raw.replace(/[^a-zA-Z0-9\s\-']/g, "");
+                      e.target.value = value;
+                      field.onChange(value);
+                    }}
+                    className="h-10"
                   />
+                </FormControl>
+                <div className="flex items-center justify-between">
+                  <FormDescription className="text-xs text-black/50">
+                    Letters, numbers, spaces, hyphens and apostrophes only.
+                  </FormDescription>
+                  <span className="text-xs text-muted-foreground">
+                    {field.value?.length || 0}/50
+                  </span>
                 </div>
-              </div>
+                <FormMessage className="text-xs" />
+              </FormItem>
+            )}
+          />
+        </div>
 
-              <ScrollArea className="h-[500px] rounded-md border p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {displayPermissions.map((group) => (
-                    <div
-                      key={group.slug}
-                      className="border border-[var(--color-border)] p-4 rounded-lg shadow-sm bg-background"
-                    >
-                      <div className="flex items-center mb-2">
-                        <UserCog className="h-5 w-5 text-[var(--color-primary)] mr-2" />
-                        <h3 className="font-semibold text-lg">{group.title}</h3>
-                      </div>
-                      <Separator className="mb-3" />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
-                        {group.permissions.map((perm) => {
-                          if (perm.id === undefined) return null;
-                          const isRead = isReadPermission(perm);
-                          const readRequiredByWrite =
-                            isRead &&
-                            hasWriteEnabledInGroup(
-                              group,
-                              selectedPermissions,
-                            );
-                          const staffManagementLocksReadRole =
-                            isReadRolePermission(perm) &&
-                            isStaffManagementEnabled(selectedPermissions);
-                          return (
-                            <div
-                              key={perm.id}
-                              className="flex items-center space-x-2 p-1 rounded hover:bg-[var(--color-background-hover)]"
-                            >
-                              <Switch
-                                id={`perm-${perm.id}`}
-                                checked={selectedPermissions.includes(perm.id)}
-                                onCheckedChange={(checked) =>
-                                  updatePermissionSelections(perm.id!, checked)
-                                }
-                                disabled={
-                                  readRequiredByWrite ||
-                                  staffManagementLocksReadRole
-                                }
-                              />
-                              <FormLabel
-                                htmlFor={`perm-${perm.id}`}
-                                className="capitalize cursor-pointer flex-1"
-                                title={
-                                  readRequiredByWrite
-                                    ? "Required when Create, Edit, Update, Delete, Resend or Send is enabled in this group"
-                                    : staffManagementLocksReadRole
-                                      ? "Required while any Staff Management permission is enabled"
-                                      : undefined
-                                }
-                              >
-                                {perm.label}
-                              </FormLabel>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold">Permissions</h3>
+              {getSelectionCount() > 0 && (
+                <Badge className="bg-[var(--color-primary)] text-white">
+                  {getSelectionCount()} enabled
+                </Badge>
+              )}
+            </div>
 
-              <FormField
-                control={form.control}
-                name="permissions"
-                render={() => (
-                  <FormMessage className="mt-2 text-red-500 font-medium" />
-                )}
+            <div className="flex items-center">
+              <FormLabel htmlFor="toggle-all" className="mr-2 text-sm">
+                Toggle All Permissions
+              </FormLabel>
+              <Switch
+                id="toggle-all"
+                checked={isAllChecked}
+                onCheckedChange={toggleAllPermissions}
               />
             </div>
+          </div>
 
-            <div className="flex justify-end gap-4 pt-4 border-t border-[var(--color-border)]">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push(returnPath)}
-                disabled={isLoading}
-                className="flex items-center gap-2"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {displayPermissions.map((group) => (
+              <div
+                key={group.slug}
+                className="border border-[var(--color-border)] p-4 rounded-lg shadow-sm bg-background"
               >
-                <X className="h-4 w-4" />
-                Cancel
-              </Button>
-              <Button
-                variant="event-primary"
-                type="submit"
-                disabled={isLoading}
-                className="flex items-center gap-2"
-              >
-                <Save className="h-4 w-4" />
-                {isLoading ? "Creating..." : "Create Role"}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+                <div className="flex items-center mb-2">
+                  <UserCog className="h-5 w-5 text-[var(--color-primary)] mr-2" />
+                  <h3 className="font-semibold text-lg">{group.title}</h3>
+                </div>
+                <Separator className="mb-3" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+                  {group.permissions.map((perm) => {
+                    if (perm.id === undefined) return null;
+                    const isRead = isReadPermission(perm);
+                    const readRequiredByWrite =
+                      isRead &&
+                      hasWriteEnabledInGroup(group, selectedPermissions);
+                    const staffManagementLocksReadRole =
+                      isReadRolePermission(perm) &&
+                      isStaffManagementEnabled(selectedPermissions);
+                    return (
+                      <div
+                        key={perm.id}
+                        className="flex items-center space-x-2 p-1 rounded hover:bg-[var(--color-background-hover)]"
+                      >
+                        <Switch
+                          id={`perm-${perm.id}`}
+                          checked={selectedPermissions.includes(perm.id)}
+                          onCheckedChange={(checked) =>
+                            updatePermissionSelections(perm.id!, checked)
+                          }
+                          disabled={
+                            readRequiredByWrite || staffManagementLocksReadRole
+                          }
+                        />
+                        <FormLabel
+                          htmlFor={`perm-${perm.id}`}
+                          className="capitalize cursor-pointer flex-1"
+                          title={
+                            readRequiredByWrite
+                              ? "Required when Create, Edit, Update, Delete, Resend or Send is enabled in this group"
+                              : staffManagementLocksReadRole
+                                ? "Required while any Staff Management permission is enabled"
+                                : undefined
+                          }
+                        >
+                          {perm.label}
+                        </FormLabel>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <FormField
+            control={form.control}
+            name="permissions"
+            render={() => (
+              <FormMessage className="mt-2 text-red-500 font-medium" />
+            )}
+          />
+        </div>
+
+        <div className="flex justify-end gap-4 pt-4 border-t border-[var(--color-border)]">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(returnPath)}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <X className="h-4 w-4" />
+            Cancel
+          </Button>
+          <Button
+            variant="event-primary"
+            type="submit"
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <Save className="h-4 w-4" />
+            {isLoading ? "Creating..." : "Create Role"}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }

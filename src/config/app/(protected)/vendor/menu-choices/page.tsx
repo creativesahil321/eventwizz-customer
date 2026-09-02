@@ -28,7 +28,7 @@ import { useCustomerMenuChoicesList } from "./_lib/queries";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import { menuChoicesService } from "@/services/vendor/menu_choices";
 import type { EventWithDates } from "@/services/vendor/menu_choices/type";
-import { LocationIndicator } from "@/components/location-indicator";
+import { LocationScopedTitle } from "@/components/location-indicator";
 import { PermissionRoute } from "@/components/permission";
 
 /** Event option for filter dropdown (from events_with_dates) */
@@ -245,11 +245,10 @@ export default function Page() {
                 {/* Title */}
                 <div className="flex flex-col gap-3">
                   <h1 className="text-2xl title-header font-bold text-black">
-                    Customer Menu Choices
+                    <LocationScopedTitle title="Customer Menu Choices" />
                   </h1>
-                  <LocationIndicator variant="card" />
                   <p className="text-muted-foreground">
-                    View and manage all customer menu choices.
+                    Guest menu choices for events at this venue.
                   </p>
                 </div>
 

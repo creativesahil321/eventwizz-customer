@@ -11,6 +11,7 @@ import {
 import { roomService } from "@/services/vendor/onboarding/room.service";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { writeVendorEventIsRoomsFlag } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
+import { isOnboardingCateringRoomReady } from "../../_lib/onboarding-catering-ready";
 
 const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
 
@@ -99,11 +100,7 @@ export const isRoomSectionComplete = (
   }
 
   if (section === "catering") {
-    const catering = room.catering;
-    if (!catering) return false;
-    const option = Number(catering.catering_option ?? 0);
-    if (option === 0) return true;
-    return Array.isArray(catering.menus) && catering.menus.length > 0;
+    return isOnboardingCateringRoomReady(room.catering);
   }
 
   if (section === "drinks") {
@@ -136,8 +133,8 @@ export const isRoomSectionComplete = (
   const brochure = room.brochure;
   if (!brochure) return false;
 
-  // Brochure PDF is optional (see stepSevenSchema). Only event address is required.
-  return String(brochure.event_address ?? "").trim().length > 0;
+  // Brochure files and pricing are optional; event location is shared in Step 3.
+  return true;
 };
 
 const blankRoom = (name: string): RoomType => ({

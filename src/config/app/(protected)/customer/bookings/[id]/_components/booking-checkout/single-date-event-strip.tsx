@@ -3,7 +3,6 @@
 import type { CSSProperties } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { CheckoutDateCard } from "./types";
 import { getDateCalendarParts } from "./build-line-items";
 import { RescheduledDateIndicator } from "./rescheduled-date-indicator";
@@ -167,7 +166,12 @@ export function SingleDateEventStrip({
             <p className="text-[0.625rem] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
               Total
             </p>
-            <p className="mt-1 text-lg font-extrabold leading-none text-foreground tabular-nums sm:text-xl">
+            {card.savedAmount != null ? (
+              <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+                You saved {formatCurrency(card.savedAmount)}
+              </p>
+            ) : null}
+            <p className="mt-1 text-lg font-extrabold leading-none tabular-nums text-foreground sm:text-xl">
               {card.amountFormatted}
             </p>
           </div>

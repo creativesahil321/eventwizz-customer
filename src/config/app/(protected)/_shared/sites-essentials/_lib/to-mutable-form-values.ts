@@ -1,6 +1,8 @@
 import type { SiteEssentials } from "@/services/common/site-essentials/type";
 import type { SiteEssentialsFormValues } from "./schema";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
+import { toPlainText, wrapPlainTextAsHtml } from "@/lib/plain-text-length";
 
 type MediaField = string | File | null | undefined;
 
@@ -57,6 +59,40 @@ function preserveMediaField(
   return cloned ?? null;
 }
 
+function normalizeFooterBrandDescription(raw: unknown): string {
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  const clipped = clipFooterBrandDescription(raw);
+  if (clipped === toPlainText(raw)) return raw;
+  return wrapPlainTextAsHtml(clipped);
+}
+
+/**
+ * FAQ items may arrive as an array (GET) or a JSON string (echoed back from a
+ * multipart PATCH). The form always needs a mutable array so `useFieldArray`
+ * can bind to it.
+ */
+function normalizeFaqItems(
+  raw: unknown,
+): SiteEssentialsFormValues["home_faq_items"] {
+  let list: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((item): item is Record<string, unknown> =>
+      Boolean(item && typeof item === "object"),
+    )
+    .map((item) => ({
+      question: String(item.question ?? ""),
+      answer: String(item.answer ?? ""),
+    }));
+}
+
 /**
  * Deep-clone site essentials for react-hook-form.
  * TanStack Query (and some merges) return frozen objects; RHF `values` / `reset`
@@ -78,8 +114,19 @@ export function toMutableSiteEssentialsFormValues(
       source.main_landing_cover_image,
     ),
     typography: normalizeSiteEssentialsTypography(source.typography),
+    theme_preset_id:
+      "theme_preset_id" in source
+        ? ((source as { theme_preset_id?: string | null }).theme_preset_id ??
+          null)
+        : (cloned.theme_preset_id ?? null),
+    footer_brand_description: normalizeFooterBrandDescription(
+      cloned.footer_brand_description ?? source.footer_brand_description,
+    ),
     banner_heading_accent: cloned.banner_heading_accent ?? "",
     banner_heading_align: cloned.banner_heading_align ?? "center",
     banner_heading_valign: cloned.banner_heading_valign ?? "center",
+    home_faq_items: normalizeFaqItems(
+      (source as { home_faq_items?: unknown }).home_faq_items,
+    ),
   };
 }

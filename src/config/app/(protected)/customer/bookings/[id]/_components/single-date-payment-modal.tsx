@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Calendar, X, Loader2 } from "lucide-react";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import PaymentGatewaySelector from "@/app/(public)/vendor/checkout/_components/payment-gateway-selector";
 
 interface SingleDatePaymentModalProps {
   isOpen: boolean;
@@ -30,6 +31,9 @@ interface SingleDatePaymentModalProps {
     unpaid_amount: number;
   } | null;
   isProcessing?: boolean;
+  paymentGateways?: Array<{ id: number; slug: string }>;
+  selectedPaymentGatewayId?: number | null;
+  onPaymentGatewaySelect?: (gatewayId: number) => void;
 }
 
 export function SingleDatePaymentModal({
@@ -39,6 +43,9 @@ export function SingleDatePaymentModal({
   onConfirm,
   rescheduleRequest,
   isProcessing = false,
+  paymentGateways = [],
+  selectedPaymentGatewayId = null,
+  onPaymentGatewaySelect,
 }: SingleDatePaymentModalProps) {
   const { format: formatCurrency } = useCurrencyFormat();
   const [useDeposit, setUseDeposit] = useState(false);
@@ -61,7 +68,16 @@ export function SingleDatePaymentModal({
   const payTodayAmount =
     useDeposit && hasDepositOption ? depositAmount : fullAmount;
   const balanceAfterPayment =
-    useDeposit && hasDepositOption ? Math.max(0, fullAmount - depositAmount) : 0;
+    useDeposit && hasDepositOption
+      ? Math.max(0, fullAmount - depositAmount)
+      : 0;
+
+  const requiresGatewayChoice = paymentGateways.length > 1;
+  const hasGatewaySelected =
+    selectedPaymentGatewayId != null &&
+    paymentGateways.some((g) => g.id === selectedPaymentGatewayId);
+  const canConfirm =
+    payTodayAmount > 0 && (!requiresGatewayChoice || hasGatewaySelected);
 
   useEffect(() => {
     if (!isOpen) {
@@ -76,14 +92,14 @@ export function SingleDatePaymentModal({
   };
 
   const handleConfirm = () => {
-    if (payTodayAmount <= 0) return;
+    if (!canConfirm) return;
     onConfirm();
     setUseDeposit(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto p-0">
         <DialogHeader className="sticky top-0 z-10 border-b bg-white px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -168,6 +184,27 @@ export function SingleDatePaymentModal({
             </label>
           )}
 
+          {requiresGatewayChoice && onPaymentGatewaySelect && (
+            <div className="rounded-lg border border-border bg-white p-3 sm:p-4">
+              <PaymentGatewaySelector
+                availableGateways={paymentGateways}
+                selectedGateway={
+                  selectedPaymentGatewayId != null
+                    ? selectedPaymentGatewayId.toString()
+                    : null
+                }
+                onGatewaySelect={(gatewayId) => {
+                  const parsed = Number.parseInt(gatewayId, 10);
+                  if (Number.isFinite(parsed)) {
+                    onPaymentGatewaySelect(parsed);
+                  }
+                }}
+                disabled={isProcessing}
+                showError={!hasGatewaySelected && !isProcessing}
+              />
+            </div>
+          )}
+
           <div className="rounded-lg border border-green-100 bg-green-50/70 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -199,15 +236,14 @@ export function SingleDatePaymentModal({
           <Button
             variant="event-primary"
             onClick={handleConfirm}
-            disabled={isProcessing || payTodayAmount <= 0}
+            disabled={isProcessing || !canConfirm}
             className="flex-1 gap-2 sm:flex-none"
             style={{
               backgroundColor:
-                isProcessing || payTodayAmount <= 0
+                isProcessing || !canConfirm
                   ? undefined
                   : "var(--color-primary)",
-              color:
-                isProcessing || payTodayAmount <= 0 ? undefined : "white",
+              color: isProcessing || !canConfirm ? undefined : "white",
             }}
           >
             {isProcessing && (

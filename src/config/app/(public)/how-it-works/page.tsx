@@ -3,6 +3,8 @@ import AdminHeader from "@/app/(public)/admin/_components/header";
 import AdminFooter from "@/app/(public)/admin/_components/footer";
 import HowItWorksContent from "./_components/how-it-works-content";
 import { appConfig } from "@/config/app";
+import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
+import { fetchInfoPagesHtml } from "@/lib/server-info-pages";
 
 export const metadata: Metadata = {
   title: "How It Works - Event Management Process",
@@ -26,12 +28,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HowItWorksPage() {
+export default async function HowItWorksPage() {
+  const host = await assertAdminPublicSite();
+  const content = await fetchInfoPagesHtml(
+    "admin",
+    ["how_it_works_page_content"],
+    host,
+  );
+
   return (
     <>
       <AdminHeader />
       <main className="pt-24">
-        <HowItWorksContent />
+        <HowItWorksContent
+          contentHtml={content.how_it_works_page_content ?? null}
+        />
       </main>
       <AdminFooter />
     </>

@@ -47,7 +47,7 @@ export default function PerformanceOverview({
       label: "Total Revenue",
       displayLabel: "Total Revenue",
       value: data.totalRevenue,
-      icon: <Banknote className="size-6 text-white" />,
+      icon: <Banknote className="size-5 sm:size-6 text-white" />,
       bgColor: "bg-blue-900",
     },
     {
@@ -55,7 +55,7 @@ export default function PerformanceOverview({
       label: "Admin Commission",
       displayLabel: "Admin Commission",
       value: data.commissionEarned,
-      icon: <PieChart className="size-6 text-white" />,
+      icon: <PieChart className="size-5 sm:size-6 text-white" />,
       bgColor: "bg-green-800",
     },
     {
@@ -63,7 +63,7 @@ export default function PerformanceOverview({
       label: "Commission Pending",
       displayLabel: "Commission Pending",
       value: data.commissionPending,
-      icon: <Wallet className="size-6 text-white" />,
+      icon: <Wallet className="size-5 sm:size-6 text-white" />,
       bgColor: "bg-teal-600",
     },
     {
@@ -71,26 +71,26 @@ export default function PerformanceOverview({
       label: "New Vendors",
       displayLabel: "New Vendors",
       value: data.newVendors,
-      icon: <UserPlus className="size-6 text-white" />,
+      icon: <UserPlus className="size-5 sm:size-6 text-white" />,
       bgColor: "bg-orange-500",
     },
   ];
 
   return (
-    <Card className="w-full border shadow-sm">
-      <CardContent className="p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <CardTitle className="text-2xl mb-0 title-header font-medium">
+    <Card className="w-full min-w-0 border shadow-sm">
+      <CardContent className="p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+          <CardTitle className="text-xl sm:text-2xl mb-0 title-header font-medium">
             {title}
           </CardTitle>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {PERIODS.map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => applyPeriod(p)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 cursor-pointer ${
+                className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 cursor-pointer ${
                   period === p
                     ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground,white)] hover:bg-[var(--color-primary-hover)] shadow-sm"
                     : "border border-[var(--color-primary)] bg-white text-[var(--color-primary)] hover:bg-[#f0fafa] hover:border-[var(--color-primary-hover)]"
@@ -102,17 +102,30 @@ export default function PerformanceOverview({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/*
+          Wrap by available width (sidebar shrinks content): 1 → 2 → 4 cols.
+          Avoid lg:grid-cols-4 — viewport can be “lg” while content is still narrow.
+        */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           {metrics.map((metric) => (
             <Card
               key={metric.id}
-              className={`border-none shadow-sm ${metric.bgColor} rounded-lg p-4`}
+              className={`border-none shadow-sm ${metric.bgColor} rounded-lg p-3 sm:p-4 min-w-0 overflow-hidden`}
             >
-              <div className="flex items-center justify-between">
-                <div className="bg-white/20 rounded-full p-3">{metric.icon}</div>
-                <div className="text-right">
-                  <p className="text-white text-sm mb-1">{metric.displayLabel}</p>
-                  <p className="text-white text-3xl font-bold">{metric.value}</p>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="bg-white/20 rounded-full p-2.5 sm:p-3 shrink-0">
+                  {metric.icon}
+                </div>
+                <div className="min-w-0 flex-1 text-right">
+                  <p className="text-white/90 text-xs sm:text-sm mb-0.5 truncate">
+                    {metric.displayLabel}
+                  </p>
+                  <p
+                    className="text-white text-xl sm:text-2xl font-bold tabular-nums leading-tight break-words"
+                    title={String(metric.value)}
+                  >
+                    {metric.value}
+                  </p>
                 </div>
               </div>
             </Card>

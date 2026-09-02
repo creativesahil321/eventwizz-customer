@@ -7,6 +7,7 @@ import type { AIEventInput } from "@/app/api/ai/generate-event/route";
 import {
   ensureStepFiveRooms,
   ensureStepSevenRooms,
+  formatVendorFactsForPrompt,
   normalizeAiRoomNames,
   parseVendorDescriptionHints,
   sanitizeVendorDescription,
@@ -119,11 +120,15 @@ export function parseAiEventVendorIntent(
     );
 
   const wantsBothTicketsAndTables =
-    /\b(tickets?\s+and\s+tables?|table system and tickets?|both tickets and tables)\b/i.test(
-      lower,
-    ) &&
     !base.prefersTicketsOnly &&
-    !base.prefersTablesBooking;
+    ((base.bookingFacts.ticketPrice != null &&
+      (base.bookingFacts.tableCount != null ||
+        base.bookingFacts.tablePrice != null ||
+        base.bookingFacts.tablePricePerPerson != null)) ||
+      (/\b(tickets?\s+and\s+tables?|tables?\s+and\s+tickets?|both tickets and tables)\b/i.test(
+        lower,
+      ) &&
+        !base.prefersTablesBooking));
 
   const faqMatch = lower.match(
     /\b(at least|minimum|min\.?)\s*(\d{1,2})\s*(faq|faqs|frequently asked)\b/i,
@@ -179,15 +184,15 @@ CRITICAL RULES:
 3. Times: HH:mm 24-hour, chronological within a day
 4. Prices: positive integers (strings in dates; numbers in drink packages)
 5. No HTML in text fields
-6. Honor vendor specs EXACTLY when stated (dates, prices, room names, deposit %, booking types)
+6. Honor vendor specs EXACTLY when stated (dates, prices, room names, deposit %, booking types). If they list dates like 26, 27, 28 Dec or "15 tables" or "tickets £10 per person", use those numbers — do not invent different dates or prices.
 7. Ignore jokes, insults, unrelated noise — use only event facts
 8. PAYMENT (backend rejects invalid combos):
    - booking_type "tickets": payment_type "full", no deposit fields
    - booking_type "tables" or "both": payment_type required ("full" or "deposit")
    - deposit: is_deposit_enabled true, deposit_type amount|percentage, deposit_value (percentage 20-80), deposit_due_date BEFORE event_date
 9. stepThree.dates: YYYY-MM-DD, ascending, no duplicates, today or future
-10. stepFour/stepFive optional when vendor says no food/drinks
-11. stepSeven.faqs: max ${maxFaqs}; when vendor asks for 10+ FAQs, provide ${maxFaqs} strong relevant FAQs
+10. stepFour/stepFive optional when vendor says no food/drinks — if they say no catering/menus, set catering_option 0 and menus []. If they say no drinks, set packages [].
+11. stepSeven.faqs: max ${maxFaqs}; when vendor asks for 10+ FAQs, provide ${maxFaqs} strong relevant FAQs. If they say no FAQs, return faqs [].
 12. ROOM SYSTEM (when YES):
     - Use EXACT room names provided (${AI_EVENT_MIN_ROOMS}-${AI_EVENT_MAX_ROOMS} rooms)
     - stepThree.rooms: one entry per room_name with its own dates[] when dates differ per room
@@ -285,7 +290,8 @@ export function buildAiEventJsonSchemaBlock(
     "event_banner_sub_heading": "string (max 80 chars)",
     "about_event_heading": "string (max 50 chars)",
     "about_event_sub_heading": "string (max 80 chars)",
-    "about_event_description": "string (max 340 chars, no HTML)"
+    "about_event_description": "string (max 340 chars, no HTML)",
+    "event_address": "${input.venueAddress || input.venueCity || ""}"
   },
   "stepTwo": {
     "package_title": "string (max 40 chars)",
@@ -322,7 +328,6 @@ export function buildAiEventJsonSchemaBlock(
     "packages": [{"title": "string (max 25)", "description": "string (max 160)", "price": number, "available_quantity": number}]${stepFiveRoomBlock}
   },
   "stepSix": {
-    "event_address": "${input.venueAddress || input.venueCity || ""}",
     "price_start_from": "string (e.g. '55')",
     "price_start_from_button_text": "Book Now"${stepSixRoomBlock}
   },
@@ -365,15 +370,19 @@ export function buildAiEventUserPrompt(params: {
       ? "DIFFERENT dates per room — put each room's dates ONLY in stepThree.rooms; stepThree.dates can mirror first room or stay minimal."
       : "Assign dates per vendor text; use stepThree.rooms when rooms differ.";
 
-  const menuHint = hints.wantsPerRoomMenus
-    ? "DIFFERENT menus per room — fill stepFour.rooms with room-specific menus (e.g. Italian in both if stated)."
-    : "Shared menu in stepFour unless vendor specifies per-room differences.";
+  const menuHint = hints.omitCatering
+    ? "Vendor does NOT want catering/menus — set stepFour.catering_option 0, empty menus, do not invent a menu."
+    : hints.wantsPerRoomMenus
+      ? "DIFFERENT menus per room — fill stepFour.rooms with room-specific menus (e.g. Italian in both if stated)."
+      : "Shared menu in stepFour unless vendor specifies per-room differences.";
 
-  const drinksHint = hints.wantsPerRoomDrinks
-    ? "DIFFERENT drink packages per room — use stepFive.rooms (e.g. whisky/beverages in one room, soft drinks only in another)."
-    : hints.wantsSecondRoomNonAlcoholDrinks
-      ? "Second room: non-alcoholic packages only in stepFive.rooms."
-      : "Shared drinks in stepFive unless vendor specifies per-room packages.";
+  const drinksHint = hints.omitDrinks
+    ? "Vendor does NOT want drink/bar packages — set stepFive.packages [] and empty per-room packages."
+    : hints.wantsPerRoomDrinks
+      ? "DIFFERENT drink packages per room — use stepFive.rooms (e.g. whisky/beverages in one room, soft drinks only in another)."
+      : hints.wantsSecondRoomNonAlcoholDrinks
+        ? "Second room: non-alcoholic packages only in stepFive.rooms."
+        : "Shared drinks in stepFive unless vendor specifies per-room packages.";
 
   const packagesHint = hints.wantsPerRoomPackages
     ? "DIFFERENT package features per room — use stepTwo.rooms with distinct package_details (e.g. drink packages vs exclusive packages)."
@@ -383,14 +392,17 @@ export function buildAiEventUserPrompt(params: {
     ? "Brochure/location copy per room — fill stepSix.rooms with location_description per room_name."
     : "Shared stepSix location unless vendor asks per-room brochure info.";
 
-  const faqHint = `Provide at least ${hints.requestedMinFaqs} FAQs (max ${maxFaqs}) covering pricing, deposits, what's included, room differences, and policies from vendor text.`;
+  const faqHint = hints.omitFaqs
+    ? "Vendor does NOT want FAQs — return stepSeven.faqs as []."
+    : `Provide at least ${hints.requestedMinFaqs} FAQs (max ${maxFaqs}) covering pricing, deposits, what's included, room differences, and policies from vendor text.`;
 
+  const factsBlock = formatVendorFactsForPrompt(hints.bookingFacts);
   const descriptionBlock = hints.sanitizedDescription
     ? `\nVENDOR REQUIREMENTS (natural language — extract ALL facts, ignore noise):\n"""${hints.sanitizedDescription}"""\n`
     : "";
 
   const exampleBlock = hasRoomSystem
-    ? `\nEXAMPLE (multi-room): "Room Snow Ball dates 25-27 Aug 2026 with tickets+tables+deposit%; Room Office dates 2,6,8 Sep 2026 with tickets+tables; different menus and drink packages per room; Italian menu; whisky in Snow Ball, soft drinks in Office; packages price 55 USD; 10 FAQs" → map each fact to the correct step and room_name.\n`
+    ? `\nEXAMPLE (multi-room): "Room Snow Ball dates 25-27 Aug 2026 with tickets+tables+deposit%; Room Office dates 2,6,8 Sep 2026 with tickets+tables; different menus and drink packages per room; Italian menu; whisky in Snow Ball, soft drinks in Office; packages price £55; 10 FAQs" → map each fact to the correct step and room_name.\n`
     : "";
 
   return `Generate complete event content for:
@@ -403,9 +415,10 @@ ${input.venueCity ? `- City: "${input.venueCity}"` : ""}
 ${input.venueAddress ? `- Address: "${input.venueAddress}"` : ""}
 ${input.guestCount ? `- Expected Guests: "${input.guestCount}"` : ""}
 ${input.priceRange ? `- Price Range: "${input.priceRange}"` : ""}
+LOCATION RULE: stepOne.event_address MUST be the venue address above (or a more specific street address in the same city). Do NOT substitute London or another UK city.
 ROOM SYSTEM: ${hasRoomSystem ? "YES" : "NO"}
 ${hasRoomSystem ? `- Room names (use EXACTLY): ${roomNames.map((n) => `"${n}"`).join(", ")}` : ""}
-${descriptionBlock}${exampleBlock}
+${descriptionBlock}${factsBlock ? `\n${factsBlock}\n` : ""}${exampleBlock}
 INTERPRETATION HINTS:
 - ${datesHint}
 - ${paymentHint}
@@ -516,8 +529,18 @@ export function resolveRoomBrochureDescription(
   return match?.location_description?.trim() || defaultDescription;
 }
 
+export function inferAiEventRemovedSections(
+  hints: Pick<AiEventVendorIntent, "omitCatering" | "omitDrinks" | "omitFaqs">,
+): Set<string> {
+  const removed = new Set<string>();
+  if (hints.omitCatering) removed.add("stepFour");
+  if (hints.omitDrinks) removed.add("stepFive");
+  if (hints.omitFaqs) removed.add("stepSeven");
+  return removed;
+}
+
 export const AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER =
-  "Describe tickets, tables, dates per room, menus, drink packages, deposits, pricing, brochures, timeline, VIP rules, copy-from-room instructions, etc. Example: Room A dates 25–27 Aug with tickets+tables and 25% deposit; Room B dates 2, 6, 8 Sep with tickets+tables; Italian menu in both; whisky packages in Room A, soft drinks in Room B; packages from 55 USD; at least 10 FAQs.";
+  "e.g. 15 tables at £20 per person, tickets £10 per person, 20% deposit, dates 26, 27 and 28 Dec. Add room names if setups differ, plus menu or drinks notes.";
 
 export const AI_EVENT_ADDITIONAL_DETAILS_HINT =
-  "The AI understands natural language: per-room dates, menus, drinks, packages, deposits, bulk copy rules, pricing, FAQs, and more. Be specific about room names, dates, and prices.";
+  "Be specific with numbers: dates, table count, ticket/table prices, and deposit %. We use those facts instead of inventing placeholders.";

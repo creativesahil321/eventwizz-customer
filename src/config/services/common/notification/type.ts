@@ -21,8 +21,17 @@ export interface Notification {
 }
 
 export interface NotificationFilters {
-  category?: string;
-  status?: "read" | "unread" | string;
+  /** API feed filter: unread | bookings | payments | customers | vendors | system */
+  filter?:
+    | "unread"
+    | "bookings"
+    | "payments"
+    | "customers"
+    | "vendors"
+    | "system"
+    | string;
+  /** Server-side search query */
+  search?: string;
   page?: number;
   limit?: number;
 }
@@ -30,9 +39,7 @@ export interface NotificationFilters {
 export interface NotificationStats {
   total: number;
   unread: number;
-  categories: {
-    [key: string]: number;
-  };
+  read: number;
 }
 
 export interface NotificationResponse {

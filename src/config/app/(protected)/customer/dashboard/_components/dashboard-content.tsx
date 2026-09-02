@@ -6,6 +6,7 @@ import { useDomain } from "@/providers/domain-provider/domain-provider";
 import DashboardEvents from "./dashboard-events";
 import DashboardRecentBookings from "./dashboard-recent-bookings";
 import DashboardNearbyEvents from "./dashboard-nearby-events";
+import DashboardNewsletterCard from "./dashboard-newsletter-card";
 import { CustomerDashboardSkeleton } from "./customer-dashboard-skeleton";
 
 /** Event shape expected by DashboardEvents */
@@ -13,7 +14,6 @@ interface DashboardEventItem {
   id: string;
   title: string;
   date: string;
-  time: string;
   location: string;
   ticketType: string;
   eventSlug?: string;
@@ -28,7 +28,6 @@ function mapUpcomingEvents(
     id: String(e.booking_date_id ?? e.id ?? e.event_slug ?? i),
     title: e.title ?? e.event_name ?? "Event",
     date: e.date ?? new Date().toISOString().slice(0, 10),
-    time: e.time ?? "—",
     location: e.location ?? "—",
     ticketType: e.ticketType ?? e.ticket_type ?? "—",
     eventSlug: e.event_slug,
@@ -65,6 +64,10 @@ export default function CustomerDashboardContent() {
 
   return (
     <>
+      <section className="w-full relative">
+        <DashboardNewsletterCard />
+      </section>
+
       <section className="w-full relative">
         <DashboardEvents
           title="My Upcoming Events"

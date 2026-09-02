@@ -17,6 +17,10 @@ interface RoomTabSelectorProps {
   addRoomUrl?: string;
 }
 
+/**
+ * Room picker as side-by-side horizontal cards —
+ * icon + ROOM label + name + price, matching checkout design.
+ */
 export default function RoomTabSelector({
   rooms,
   activeRoomId,
@@ -29,100 +33,95 @@ export default function RoomTabSelector({
 
   if (rooms.length === 0) return null;
 
-  const useScrollRow = rooms.length > 2;
-  const gridClass = cn(
-    useScrollRow
-      ? "flex gap-2.5 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] snap-x snap-mandatory sm:grid sm:overflow-visible sm:pb-0"
-      : "grid gap-2.5 sm:gap-3",
-    !useScrollRow && rooms.length === 1 && "grid-cols-1",
-    !useScrollRow &&
-      rooms.length === 2 &&
-      !showAddRoom &&
-      "grid-cols-1 min-[420px]:grid-cols-2",
-    !useScrollRow &&
-      rooms.length === 2 &&
-      showAddRoom &&
-      addRoomUrl &&
-      "grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-[1fr_1fr_auto]",
-    useScrollRow &&
-      "sm:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))]",
-  );
+  const showAdd = Boolean(showAddRoom && addRoomUrl);
 
   return (
-    <div className={gridClass}>
-      {rooms.map((room, index) => {
-        const tone = getCheckoutRoomTone(index);
-        const isActive = room.room_id === activeRoomId;
+    <div className="space-y-2">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--checkout-muted-foreground)]">
+        Rooms
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {rooms.map((room, index) => {
+          const tone = getCheckoutRoomTone(index);
+          const isActive = room.room_id === activeRoomId;
+          const subtotal =
+            roomSubtotals?.[room.room_id] ?? room.room_subtotal ?? 0;
 
-        return (
-          <button
-            key={room.room_id}
-            type="button"
-            onClick={() => onRoomChange(room.room_id)}
+          return (
+            <button
+              key={room.room_id}
+              type="button"
+              onClick={() => onRoomChange(room.room_id)}
+              aria-pressed={isActive}
+              className={cn(
+                "flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all",
+                "active:scale-[0.99]",
+                isActive
+                  ? "border-[color:var(--checkout-brand-primary)] bg-[color:var(--checkout-brand-primary)] text-white shadow-sm"
+                  : tone.tabInactive,
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                  isActive ? "bg-white/15 text-white" : tone.iconInactive,
+                )}
+              >
+                <DoorOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span
+                  className={cn(
+                    "block text-[10px] font-medium uppercase tracking-[0.12em] leading-none",
+                    isActive
+                      ? "text-white/70"
+                      : "text-[color:var(--checkout-muted-foreground)]",
+                  )}
+                >
+                  Room
+                </span>
+                <span
+                  className={cn(
+                    "mt-1 block truncate text-sm font-semibold leading-tight",
+                    isActive
+                      ? "text-white"
+                      : "text-[color:var(--checkout-foreground)]",
+                  )}
+                >
+                  {room.room_name}
+                </span>
+              </span>
+
+              <span
+                className={cn(
+                  "shrink-0 text-sm font-bold tabular-nums",
+                  isActive
+                    ? "text-white"
+                    : "text-[color:var(--checkout-brand-accent)]",
+                )}
+              >
+                {formatMoney(subtotal)}
+              </span>
+            </button>
+          );
+        })}
+
+        {showAdd && addRoomUrl ? (
+          <Link
+            href={addRoomUrl}
             className={cn(
-              "flex min-h-[3.25rem] items-center gap-2.5 rounded-[var(--checkout-radius)] border px-3 py-2.5 text-left transition-all sm:gap-3 sm:px-3.5 sm:py-3",
-              useScrollRow &&
-                "w-[min(100%,14.5rem)] shrink-0 snap-start sm:w-auto sm:shrink",
-              isActive
-                ? "border-[color:var(--checkout-brand-primary)] bg-[color:var(--checkout-brand-primary)] text-white shadow-sm"
-                : tone.tabInactive,
+              "flex min-h-14 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed",
+              "border-[color:var(--checkout-brand-accent)]/40 px-3.5 py-3",
+              "text-sm font-semibold text-[color:var(--checkout-brand-accent)]",
+              "transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-blue-50/50",
             )}
           >
-            <span
-              className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--checkout-radius)-2px)] sm:h-9 sm:w-9",
-                isActive ? "bg-white/10 text-white" : tone.iconInactive,
-              )}
-            >
-              <DoorOpen className="h-4 w-4" strokeWidth={2} />
-            </span>
-
-            <span className="min-w-0 flex-1">
-              <span
-                className={cn(
-                  "block text-[10px] font-semibold uppercase tracking-[0.14em]",
-                  isActive
-                    ? "text-white/70"
-                    : "text-[color:var(--checkout-muted-foreground)]",
-                )}
-              >
-                Room
-              </span>
-              <span
-                className={cn(
-                  "mt-0.5 block truncate text-sm font-semibold leading-tight",
-                  isActive ? "text-white" : "text-[color:var(--checkout-foreground)]",
-                )}
-              >
-                {room.room_name}
-              </span>
-            </span>
-
-            <span
-              className={cn(
-                "shrink-0 rounded-[calc(var(--checkout-radius)-4px)] px-1.5 py-1 text-xs font-bold tabular-nums leading-none sm:px-2 sm:text-sm",
-                isActive
-                  ? "border border-white/20 bg-white/10 text-white"
-                  : "text-[color:var(--checkout-brand-accent)]",
-              )}
-            >
-              {formatMoney(
-                roomSubtotals?.[room.room_id] ?? room.room_subtotal ?? 0,
-              )}
-            </span>
-          </button>
-        );
-      })}
-
-      {showAddRoom && addRoomUrl && (
-        <Link
-          href={addRoomUrl}
-          className="flex min-h-[3.25rem] items-center justify-center gap-1.5 rounded-[var(--checkout-radius)] border border-dashed border-[color:var(--checkout-brand-accent)]/35 px-3 text-xs font-semibold text-[color:var(--checkout-brand-accent)] transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-blue-50/50 min-[420px]:col-span-1 sm:col-auto"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add room
-        </Link>
-      )}
+            <Plus className="h-4 w-4" aria-hidden />
+            Add room
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }

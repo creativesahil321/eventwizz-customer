@@ -1,6 +1,9 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { adminVenuesService } from "@/services/admin/venues/venues.service";
-import type { AdminVenueItem } from "@/services/admin/venues/type";
+import type {
+  AdminVenueItem,
+  AdminVenueListStatus,
+} from "@/services/admin/venues/type";
 import type { Vendor } from "../_components/vendors-table";
 
 export const adminVenuesKeys = {
@@ -15,7 +18,7 @@ function mapVenue(item: AdminVenueItem): Vendor {
   const status =
     normalizedDomainStatus === "active" || normalizedVendorStatus === "active"
       ? "active"
-      : "disabled";
+      : "inactive";
   return {
     id: item.id,
     image: item.logo || "",
@@ -32,7 +35,7 @@ function mapVenue(item: AdminVenueItem): Vendor {
 }
 
 export interface UseAdminVenuesParams {
-  status?: string;
+  status?: AdminVenueListStatus;
   search?: string;
   page?: number;
   per_page?: number;
@@ -43,7 +46,7 @@ export interface UseAdminVenuesParams {
  */
 export function useAdminVenues(params: UseAdminVenuesParams = {}) {
   const {
-    status = "",
+    status = "all",
     search = "",
     page = 1,
     per_page = 30,
@@ -53,7 +56,7 @@ export function useAdminVenues(params: UseAdminVenuesParams = {}) {
     queryKey: adminVenuesKeys.list({ status, search, page }),
     queryFn: async () => {
       const response = await adminVenuesService.getVenues({
-        status: status || undefined,
+        status,
         search: search || undefined,
         page,
         per_page,

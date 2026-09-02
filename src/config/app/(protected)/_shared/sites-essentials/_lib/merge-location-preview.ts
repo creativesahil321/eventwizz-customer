@@ -28,6 +28,14 @@ const LOCATION_SCOPED_KEYS = [
   "event_gallery",
 ] as const;
 
+/** Layout fields default when another location's API omits them — never leak the previous city. */
+const LOCATION_LAYOUT_DEFAULTS: Partial<
+  Record<(typeof LOCATION_SCOPED_KEYS)[number], string>
+> = {
+  banner_heading_align: "center",
+  banner_heading_valign: "center",
+};
+
 /** Never replaced by per-location API — main landing review uses these from the editor. */
 const MAIN_LANDING_KEYS = [
   "main_landing_cover_image",
@@ -35,6 +43,17 @@ const MAIN_LANDING_KEYS = [
   "main_landing_banner_sub_heading",
   "main_landing_locations_list_title",
   "main_landing_locations_list_subtitle",
+] as const;
+
+/**
+ * Global site-identity fields. A slug-scoped GET must still return them, but
+ * if it omits them (or sends ""), keep the editor/global snapshot.
+ */
+const GLOBAL_IDENTITY_KEYS = [
+  "copyright",
+  "logo",
+  "favicon",
+  "footer_brand_description",
 ] as const;
 
 /** Filled from API only when the editor/preview snapshot has no value. */
@@ -56,17 +75,30 @@ function formFieldHasValue(value: unknown): boolean {
   return value != null && value !== "";
 }
 
+/**
+ * Whether the editor snapshot owns this location-scoped field for the preview
+ * slug. `null` is an intentional clear (Remove) and must beat the saved API
+ * value — otherwise Preview resurrects a removed cover video/image.
+ */
 function shouldPreferFormLocationField(
   global: SiteEssentialsFormValues,
   formVal: unknown,
   options?: MergeLocationPreviewOptions,
 ): boolean {
+  const formSlug = global.slug?.trim() ?? "";
+  const previewSlug = options?.previewSlug?.trim() ?? "";
+  const formOwnsPreviewLocation =
+    Boolean(options?.isSingleLocation) ||
+    (Boolean(previewSlug) && Boolean(formSlug) && formSlug === previewSlug);
+
+  // Explicit Remove in the editor (`null`) for the location being previewed.
+  if (formVal === null) {
+    return formOwnsPreviewLocation;
+  }
+
   if (!formFieldHasValue(formVal)) return false;
 
   if (options?.isSingleLocation) return true;
-
-  const formSlug = global.slug?.trim() ?? "";
-  const previewSlug = options?.previewSlug?.trim() ?? "";
 
   if (previewSlug && formSlug) {
     return formSlug === previewSlug;
@@ -92,6 +124,20 @@ function preserveMainLandingFields(
   return result;
 }
 
+function preserveGlobalIdentityFields(
+  merged: SiteEssentialsFormValues,
+  global: SiteEssentialsFormValues,
+): SiteEssentialsFormValues {
+  const result = { ...merged };
+  for (const key of GLOBAL_IDENTITY_KEYS) {
+    const globalVal = global[key as keyof SiteEssentialsFormValues];
+    if (formFieldHasValue(globalVal)) {
+      (result as Record<string, unknown>)[key] = globalVal;
+    }
+  }
+  return result;
+}
+
 /**
  * Builds preview form values for a location page: global branding/theme from the
  * editor snapshot, location hero/about/events from the slug-specific API response.
@@ -110,10 +156,21 @@ export function mergeGlobalWithLocationSiteEssentials(
     const formVal = global[key as keyof SiteEssentialsFormValues];
     if (shouldPreferFormLocationField(global, formVal, options)) continue;
 
+    // The editor snapshot does not own this field (we're previewing a different
+    // location), so this location's API response is the source of truth. Adopt
+    // its value even when explicitly empty ("" / null) so a previous location's
+    // inherited media/text — e.g. another location's cover video — is cleared
+    // instead of leaking across the switch. Keys the API omits entirely
+    // (`undefined`) still fall back to the inherited global value.
     const apiVal = perLocation[key as keyof SiteEssentials];
-    if (apiVal !== undefined && apiVal !== null && apiVal !== "") {
-      (apiFill as Record<string, unknown>)[key] = apiVal;
+    if (apiVal === undefined) {
+      const layoutDefault = LOCATION_LAYOUT_DEFAULTS[key];
+      if (layoutDefault !== undefined) {
+        (apiFill as Record<string, unknown>)[key] = layoutDefault;
+      }
+      continue;
     }
+    (apiFill as Record<string, unknown>)[key] = apiVal ?? "";
   }
 
   const previewSlug =
@@ -132,7 +189,10 @@ export function mergeGlobalWithLocationSiteEssentials(
     perLocation,
   );
 
-  let result = preserveMainLandingFields(merged, global);
+  let result = preserveGlobalIdentityFields(
+    preserveMainLandingFields(merged, global),
+    global,
+  );
 
   const formSlug = global.slug?.trim() ?? "";
   const usePerLocationReadonlyFields =

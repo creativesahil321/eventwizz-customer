@@ -22,6 +22,7 @@ import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
 } from "@/lib/word-count";
+import { isVendorDateCancelled } from "@/app/(protected)/vendor/events/_lib/vendor-date-cancelled";
 
 // Validation functions for event scheduler
 // Removed future time validation - only keeping sequence validation
@@ -92,7 +93,7 @@ export const stepOneSchema = z
     step: z.literal(1),
     vendor_location_id: z.number().optional(),
     event_id: z.number().optional(), // Added event_id to support editing existing events
-    event_category_id: z.number().min(1, "Event Category is required"),
+    event_category_id: z.number().min(1, "Event category is required"),
     event_name: z
       .string()
       .min(1, "Event name is required")
@@ -111,21 +112,36 @@ export const stepOneSchema = z
       ),
     event_banner_sub_heading: z
       .string()
-      .min(1, "Banner sub heading is required")
-      .max(80, "Banner sub heading must not exceed 80 characters"),
+      .min(1, "Banner subheading is required")
+      .max(80, "Banner subheading must not exceed 80 characters"),
     about_event_heading: z
       .string()
       .min(1, "About event heading is required")
       .max(50, "About event heading must not exceed 50 characters"),
     about_event_sub_heading: z
       .string()
-      .min(1, "About event sub heading is required")
-      .max(80, "About event sub heading must not exceed 80 characters"),
+      .min(1, "About event subtitle is required")
+      .max(80, "About event subtitle must not exceed 80 characters"),
     about_event_description: z
       .string()
       .min(1, "About event description is required"),
     /** Sent on step 1 create/update so persistence returns `is_rooms` on GET. */
     is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
+    event_address: z
+      .string()
+      .min(1, "Event address is required")
+      .refine((value) => value.trim().length > 0, {
+        message: "Event address is required",
+      }),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+    location: z
+      .object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        icon: z.string().optional(),
+      })
+      .optional(),
 
   })
   .superRefine((data, ctx) => {
@@ -233,8 +249,8 @@ export const stepTwoSchema = z
 
     event_schedular_title: z
       .string()
-      .min(1, "Event schedular title is required")
-      .max(40, "Event schedular title must not exceed 40 characters"),
+      .min(1, "Event schedule title is required")
+      .max(40, "Event schedule title must not exceed 40 characters"),
     event_schedule_subtitle: z
       .string()
       .max(160, "Custom copy must not exceed 160 characters"),
@@ -311,6 +327,9 @@ export type StepTwoType = z.infer<typeof stepTwoSchema>;
 
 //=== Step 3 ===//
 const validateDepositDueDate = (data: unknown) => {
+  if (isVendorDateCancelled(data as { cancelled?: boolean })) {
+    return true;
+  }
   const { booking_type, payment_type, deposit_due_date } = data as {
     booking_type: string;
     payment_type: string;
@@ -377,12 +396,24 @@ const baseDateSchema = z.object({
   event_date: z.string().min(1, "Date is required"),
   booking_type: z.enum(["tickets", "tables", "both"]),
   has_bookings: optionalBooleanFromApi,
-  /** From GET show — prefer over has_bookings for cancel vs remove */
+  /** 1 = active, 2 = cancelled, 0 = inactive */
+  status: optionalCoercedFiniteNumber,
+  is_cancelled: optionalBooleanFromApi,
+  is_readonly: optionalBooleanFromApi,
+  can_edit: optionalBooleanFromApi,
+  /**
+   * From GET show — "cancel" | "remove" for actionable dates;
+   * "cancelled" when the date is already cancelled (read-only).
+   */
+  date_action: z.enum(["cancel", "remove", "cancelled"]).optional(),
+  /** From GET show — true when vendor must cancel (not hard-delete) the date */
   use_cancel_date_action: optionalBooleanFromApi,
+  /** Legacy — ignore for cancel vs remove gating */
   cancellation_request_pending: optionalBooleanFromApi,
   has_financial_bookings: optionalBooleanFromApi,
   cancelled: optionalBooleanFromApi,
   cancel_reason: z.string().optional(),
+  cancelled_at: z.string().nullable().optional(),
   payment_type: z.enum(["deposit", "full"]).optional(),
   is_deposit_enabled: optionalBooleanFromApi,
   deposit_type: z.preprocess(
@@ -501,6 +532,8 @@ const dateSchema = baseDateSchema
   })
   .refine(validateDepositDueDate, depositDueDateMessage)
   .superRefine((data, ctx) => {
+    if (isVendorDateCancelled(data)) return;
+
     // Only validate deposit fields for tables/both when deposit is selected
     if (!["tables", "both"].includes(data.booking_type)) {
       return;
@@ -615,6 +648,7 @@ const dateSchema = baseDateSchema
   })
   .refine(
     (data) => {
+      if (isVendorDateCancelled(data)) return true;
       // Require payment_type for tables/both booking types
       if (data.booking_type === "tables" || data.booking_type === "both") {
         return (
@@ -631,6 +665,7 @@ const dateSchema = baseDateSchema
   )
   .refine(
     (data) => {
+      if (isVendorDateCancelled(data)) return true;
       if (["tickets", "both"].includes(data.booking_type)) {
         return Array.isArray(data.tickets) && data.tickets.length > 0;
       }
@@ -640,6 +675,7 @@ const dateSchema = baseDateSchema
   )
   .refine(
     (data) => {
+      if (isVendorDateCancelled(data)) return true;
       if (["tables", "both"].includes(data.booking_type)) {
         return Array.isArray(data.tables) && data.tables.length > 0;
       }
@@ -679,6 +715,7 @@ export const stepThreeSchema = z
       today.setHours(0, 0, 0, 0);
       const todayTime = today.getTime();
       for (let i = 0; i < dates.length; i++) {
+        if (isVendorDateCancelled(dates[i])) continue;
         const d = dates[i].event_date;
         if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
           const eventTime = new Date(d + "T00:00:00").getTime();
@@ -846,25 +883,27 @@ export const stepFourSchema = z
       if (!data.menu_title || data.menu_title.trim() === "")
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Menu title is required when catering option is Yes",
+          message: "Menu title is required when food choices are enabled",
           path: ["menu_title"],
         });
       if (!data.menu_description || data.menu_description.trim() === "")
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Menu description is required when catering option is Yes",
+          message:
+            "Menu description is required when food choices are enabled",
           path: ["menu_description"],
         });
       if (!data.event_menu_category_id || data.event_menu_category_id < 1)
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Menu category is required when catering option is Yes",
+          message: "Menu category is required when food choices are enabled",
           path: ["event_menu_category_id"],
         });
       if (!data.menus || data.menus.length === 0)
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "At least one menu is required when catering option is Yes",
+          message:
+            "At least one menu is required when food choices are enabled",
           path: ["menus"],
         });
     }
@@ -898,12 +937,8 @@ export const stepFiveSchema = z
     brochure_pdf_2: z
       .union([z.instanceof(File), z.string().url(), z.null()])
       .optional(),
-    event_address: z
-      .string()
-      .min(1, "Event address is required")
-      .refine((val) => val.trim().length > 0, {
-        message: "Event address is required",
-      }),
+    // Legacy location fields remain readable for old persisted events.
+    event_address: z.string().optional(),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
     location: z.object({
@@ -916,7 +951,7 @@ export const stepFiveSchema = z
         .max(160, "Location description must not exceed 160 characters")
         .optional(),
       icon: z.string().optional(),
-    }),
+    }).optional(),
     price: z
       .object({
         title: z
@@ -1040,14 +1075,14 @@ export const stepSixSchema = z.object({
   rooms: z.array(stepSixRoomEntrySchema).optional(),
   drink_title: z
     .string()
-    .min(1, "The drink title field is required")
+    .min(1, "Package section title is required")
     .max(
       DRINK_SECTION_TITLE_MAX_CHARS,
       `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`,
     ),
   drink_description: z
     .string()
-    .min(1, "The drink description field is required")
+    .min(1, "Package section description is required")
     .max(
       DRINK_SECTION_DESCRIPTION_MAX_CHARS,
       `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`,
@@ -1097,6 +1132,8 @@ export const stepEightSchema = z
     city: z.string().optional(),
     address: z.string().optional(),
     contact_number: z.string().optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.is_duplicate !== true) {

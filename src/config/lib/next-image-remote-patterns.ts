@@ -18,11 +18,16 @@ export const nextImageRemotePatterns: {
   { protocol: "https", hostname: "eventwizz-admin.socreativesupport.com" },
   { protocol: "http", hostname: "eventwizz-admin.socreativesupport.com" },
   { protocol: "http", hostname: "eventwizz.socreativesupport.com" },
+  { protocol: "https", hostname: "eventwizz.socreativesupport.com" },
   { protocol: "http", hostname: "vendor.eventwizz.socreativesupport.com" },
+  { protocol: "https", hostname: "vendor.eventwizz.socreativesupport.com" },
   { protocol: "http", hostname: "customer.eventwizz.socreativesupport.com" },
+  { protocol: "https", hostname: "customer.eventwizz.socreativesupport.com" },
   { protocol: "https", hostname: "avatar-placeholder.iran.liara.run" },
   { protocol: "https", hostname: "avatar.iran.liara.run" },
+  // Local Laravel storage (dev) — also needs images.dangerouslyAllowLocalIP
   { protocol: "http", hostname: "192.168.1.100" },
+  { protocol: "http", hostname: "192.168.1.14" },
   { protocol: "http", hostname: "127.0.0.1" },
   { protocol: "http", hostname: "localhost" },
 ];

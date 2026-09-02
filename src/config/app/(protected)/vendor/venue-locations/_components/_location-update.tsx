@@ -29,6 +29,7 @@ import { env } from "@/env";
 import GoogleLocationSearch from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/google-location-search";
 import { fetchLocationDetails } from "@/app/(on-boarding)/on-boarding/_components/steps/step-11/_lib/actions";
 import { toast } from "sonner";
+import { resolveVenueLocationCoords } from "@/lib/venue-location-address";
 
 interface UpdateLocationDialogProps {
   open: boolean;
@@ -48,6 +49,10 @@ export default function UpdateLocationDialog({
   const initialAddressRef = useRef<string>(location.address || "");
   const [isAddressValid, setIsAddressValid] = useState(true);
 
+  const existingCoords = resolveVenueLocationCoords(
+    location as Location & Record<string, unknown>,
+  );
+
   const form = useForm({
     resolver: zodResolver(locationSchema) as Resolver<LocationFormValues>,
     defaultValues: {
@@ -58,11 +63,16 @@ export default function UpdateLocationDialog({
       is_default: Boolean(location.is_default),
       contact_number: location.contact_number || "",
       email: location.email || "",
+      latitude: existingCoords?.latitude,
+      longitude: existingCoords?.longitude,
     },
   });
 
   useEffect(() => {
     initialAddressRef.current = location.address || "";
+    const coords = resolveVenueLocationCoords(
+      location as Location & Record<string, unknown>,
+    );
     form.reset({
       name: location.name || "",
       address: location.address || "",
@@ -71,6 +81,8 @@ export default function UpdateLocationDialog({
       is_default: Boolean(location.is_default),
       contact_number: location.contact_number || "",
       email: location.email || "",
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
     });
     addressPlaceIdRef.current = null;
     setIsAddressValid(true);
@@ -80,6 +92,8 @@ export default function UpdateLocationDialog({
     form.setValue("address", "");
     form.setValue("city", "");
     form.setValue("contact_number", "");
+    form.setValue("latitude", undefined);
+    form.setValue("longitude", undefined);
     addressPlaceIdRef.current = null;
     setIsAddressValid(false);
   }, [form]);
@@ -93,6 +107,20 @@ export default function UpdateLocationDialog({
       toast.error("Please select a location from the suggestions", {
         description:
           "Google didn't find that location. Type to search and choose a suggested UK address.",
+        duration: 5000,
+      });
+      return;
+    }
+
+    if (
+      data.latitude == null ||
+      data.longitude == null ||
+      !Number.isFinite(Number(data.latitude)) ||
+      !Number.isFinite(Number(data.longitude))
+    ) {
+      toast.error("Missing map coordinates for this address", {
+        description:
+          "Select the address from Google suggestions again so we can save latitude and longitude.",
         duration: 5000,
       });
       return;
@@ -143,11 +171,11 @@ export default function UpdateLocationDialog({
                     <GoogleLocationSearch
                       apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
                       value={field.value || ""}
-                      onChange={(value) => {
+                      onChange={(value: string) => {
                         field.onChange(value);
                         setIsAddressValid(false);
                       }}
-                      onSelect={(placeId) => {
+                      onSelect={(placeId: string) => {
                         addressPlaceIdRef.current = placeId;
                         setIsAddressValid(true);
                         fetchLocationDetails(form, placeId);

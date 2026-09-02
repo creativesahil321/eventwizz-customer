@@ -9,11 +9,11 @@ import { Area } from "react-easy-crop";
  * Aspect ratio presets for different image types
  */
 export const ASPECT_RATIOS = {
-  square: 1 / 1, // Logo (1:1)
-  landscape: 16 / 9, // Cover image, Event banner (16:9)
+  square: 1 / 1, // Avatar / logo (1:1)
+  landscape: 16 / 9, // Site / location hero & cover backgrounds
   cinematic: 21 / 9, // Ultra-wide event banner (21:9)
-  portrait: 3 / 4, // Package image (3:4)
-  free: undefined, // Gallery - user's choice
+  portrait: 3 / 4, // Portrait slots
+  free: undefined, // Full image / gallery — user's choice
 } as const;
 
 export type AspectRatioKey = keyof typeof ASPECT_RATIOS;
@@ -91,7 +91,7 @@ export interface ImageCropperProps {
  * Default cropper configuration
  */
 export const DEFAULT_CROPPER_CONFIG: Required<CropperConfig> = {
-  aspectRatio: undefined,
+  aspectRatio: ASPECT_RATIOS.free as unknown as number,
   minZoom: 1,
   maxZoom: 3,
   initialZoom: 1,

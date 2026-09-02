@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 const PAGE_CONFIG: Record<string, { title: string; description: string }> = {
   "/customer/support/inbox": {
     title: "Inbox",
-    description: "View and reply to your support conversations.",
+    description: "View and reply to your support enquiries.",
   },
   "/customer/support/new": {
     title: "New enquiry",
-    description: "Submit a new support request to our team.",
+    description: "Raise a support enquiry with our team.",
   },
 };
 

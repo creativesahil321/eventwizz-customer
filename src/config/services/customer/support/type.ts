@@ -88,6 +88,7 @@ export interface CustomerSupportTicketsResponse {
   };
   meta: CustomerSupportTicketsPaginationMeta;
   inbox_count: number;
+  unread_count?: number;
 }
 
 /** Payload for POST /customer/support-tickets/store */

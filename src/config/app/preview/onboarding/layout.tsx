@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/authOptions";
 import "@/assets/css/tailwind.css";
-import "./onboarding-preview.css";
 import { ServerContextProvider } from "@/lib/server-context";
 import { getRequestHost, getSubdomainFromDomain } from "@/lib/server-theme";
 import { ThemeSchema } from "@/types/theme.types";
@@ -29,7 +28,7 @@ export default async function OnboardingPreviewLayout({
   }
 
   // Note: We do NOT guard on session.user.isOnboarded here because
-  // by the time step 11 redirects to /preview/onboarding, the session
+  // by the time step 11 (Domain) redirects to /preview/onboarding, the session
   // already has isOnboarded=true. The onboarding layout itself prevents
   // going back to onboarding once isOnboarded is set.
 
@@ -44,7 +43,7 @@ export default async function OnboardingPreviewLayout({
         subdomain,
       }}
     >
-      <div className="onboarding-preview-shell min-h-screen w-full">
+      <div className="onboarding-preview-shell h-[100dvh] max-h-[100dvh] w-full overflow-hidden">
         {children}
       </div>
     </ServerContextProvider>

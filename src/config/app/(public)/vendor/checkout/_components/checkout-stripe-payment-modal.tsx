@@ -165,7 +165,7 @@ function StripeFormBody({
           </div>
           <div className="text-right">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--checkout-muted-foreground)]">
-              Due today
+              Pay today
             </p>
             <p className="text-xl font-bold tabular-nums leading-none text-[color:var(--checkout-foreground)]">
               {formatMoney(session.amount)}
@@ -306,7 +306,7 @@ function PaymentIntentForm({
   sessionSecondsLeft,
   successReturnPath,
   onPaymentComplete,
-  onClose: _onClose,
+  onClose,
 }: FormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -334,11 +334,12 @@ function PaymentIntentForm({
     }
 
     onPaymentComplete?.();
+    onClose();
     const returnUrl = buildStripeReturnUrl(session, {
       path: successReturnPath,
     });
     router.push(`${returnUrl}&verified=1`);
-  }, [onPaymentComplete, router, session, successReturnPath]);
+  }, [onClose, onPaymentComplete, router, session, successReturnPath]);
 
   const runConfirm = useCallback(
     async (
@@ -458,7 +459,7 @@ function CheckoutSessionForm({
   sessionSecondsLeft,
   successReturnPath,
   onPaymentComplete,
-  onClose: _onClose,
+  onClose,
 }: FormProps) {
   const result = useCheckoutElements();
   const router = useRouter();
@@ -488,11 +489,12 @@ function CheckoutSessionForm({
     }
 
     onPaymentComplete?.();
+    onClose();
     const returnUrl = buildStripeReturnUrl(session, {
       path: successReturnPath,
     });
     router.push(`${returnUrl}&verified=1`);
-  }, [onPaymentComplete, router, session, successReturnPath]);
+  }, [onClose, onPaymentComplete, router, session, successReturnPath]);
 
   const runConfirm = useCallback(
     async (

@@ -32,6 +32,7 @@ import { SITE_ESSENTIALS_GOOGLE_FONTS_UI } from "@/lib/site-typography-google-fo
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { markSiteEssentialsThemeCustom } from "../../_lib/mark-theme-custom";
 
 // Common web-safe fonts
 const webSafeFonts = [
@@ -84,7 +85,7 @@ export function TypographyTab() {
   }, [bodyStack]);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <SiteEssentialsGoogleFontsLoader
         linkId="site-essentials-google-fonts-typography-tab"
         headingStack={headingFont}
@@ -95,7 +96,7 @@ export function TypographyTab() {
         title="Typography"
         description="Configure your site's fonts and typography settings"
       />
-      <Separator className="my-4" />
+      <Separator className="my-3 sm:my-4" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div
@@ -193,7 +194,10 @@ export function TypographyTab() {
                 render={({ field }) => (
                   <Select
                     disabled={readOnly}
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      markSiteEssentialsThemeCustom(form);
+                      field.onChange(value);
+                    }}
                     defaultValue={field.value}
                     value={field.value || undefined}
                   >
@@ -248,6 +252,10 @@ export function TypographyTab() {
                         disabled={readOnly}
                         {...field}
                         value={field.value ?? ""}
+                        onChange={(event) => {
+                          markSiteEssentialsThemeCustom(form);
+                          field.onChange(event);
+                        }}
                       />
                     </FormControl>
                     <FormDescription className="text-xs mt-1">
@@ -295,7 +303,10 @@ export function TypographyTab() {
                 render={({ field }) => (
                   <Select
                     disabled={readOnly}
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      markSiteEssentialsThemeCustom(form);
+                      field.onChange(value);
+                    }}
                     defaultValue={field.value}
                     value={field.value || undefined}
                   >
@@ -350,6 +361,10 @@ export function TypographyTab() {
                         disabled={readOnly}
                         {...field}
                         value={field.value ?? ""}
+                        onChange={(event) => {
+                          markSiteEssentialsThemeCustom(form);
+                          field.onChange(event);
+                        }}
                       />
                     </FormControl>
                     <FormDescription className="text-xs mt-1">
@@ -393,6 +408,7 @@ export function TypographyTab() {
                     .split("\n")
                     .map((l) => l.trim())
                     .filter(Boolean);
+                  markSiteEssentialsThemeCustom(form);
                   field.onChange(lines);
                 }}
               />

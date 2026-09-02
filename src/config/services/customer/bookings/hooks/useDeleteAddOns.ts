@@ -29,7 +29,7 @@ export function useDeleteAddOns() {
         params.keyword,
         params.type
       ),
-    onSuccess: (response, variables) => {
+    onSuccess: () => {
       const invalidatePromises = [
         queryClient.invalidateQueries({
           queryKey: ["add-ons-details"],
@@ -37,18 +37,14 @@ export function useDeleteAddOns() {
         queryClient.invalidateQueries({
           queryKey: bookingsKeys.lists(),
         }),
-      ];
-
-      const bookingDetailKey = bookingsKeys.bookingDetail(variables.bookingId);
-      invalidatePromises.push(
         queryClient.invalidateQueries({
-          queryKey: bookingDetailKey,
+          queryKey: bookingsKeys.bookingDetails(),
         }),
         queryClient.refetchQueries({
-          queryKey: bookingDetailKey,
+          queryKey: bookingsKeys.bookingDetails(),
           type: "active",
-        })
-      );
+        }),
+      ];
 
       void Promise.all(invalidatePromises);
 

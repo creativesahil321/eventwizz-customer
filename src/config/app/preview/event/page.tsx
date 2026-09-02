@@ -27,11 +27,25 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/open-event-preview-tab";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
-import { useSitePreviewStore } from "@/store/site-preview.store";
 import { PreviewProvider } from "@/contexts/preview-context";
-import { useSiteEssentialsQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
+import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { useToast } from "@/components/ui/use-toast";
+
+function resolveEventPreviewLocationSlug(
+  data: EventDetailData | undefined,
+  siteEssentials: SiteEssentialsFormValues | null,
+): string | null {
+  const locationId =
+    data?.stepOne?.vendor_location_id ?? data?.vendor_location_id;
+  const locations = siteEssentials?.locations ?? [];
+  if (locationId == null || locations.length === 0) return null;
+  const idNum = Number(locationId);
+  const matched = locations.find(
+    (loc) => loc.id != null && Number(loc.id) === idNum,
+  );
+  return matched?.slug?.trim() || null;
+}
 
 function EventPreviewPageLoadingShell() {
   return (
@@ -111,30 +125,28 @@ function EventPreviewPageContent() {
   }, [eventId, isRoomsForFetch, refetch]);
 
   useEffect(() => {
-    const onPersistenceChanged = () => {
+    const onPersistenceChanged = (event: Event) => {
+      const changedEventId = (
+        event as CustomEvent<{ eventId?: string } | undefined>
+      ).detail?.eventId;
+      if (
+        changedEventId &&
+        eventId &&
+        String(changedEventId) !== String(eventId)
+      ) {
+        return;
+      }
       void refetch();
     };
     window.addEventListener("event-data-changed", onPersistenceChanged);
     return () =>
       window.removeEventListener("event-data-changed", onPersistenceChanged);
-  }, [refetch]);
+  }, [eventId, refetch]);
 
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // Get site essentials from Zustand store (populated after save or preview click)
-  const { previewData: storeSiteEssentials } = useSitePreviewStore();
-
-  // Fetch from API as a fallback for vendors who haven't interacted with the
-  // site essentials form in the current session (store would be empty)
-  const { data: apiSiteEssentials } = useSiteEssentialsQuery();
-
-  // Prefer the store (reflects unsaved in-progress edits); fall back to the
-  // API response so that already-saved colors always show in the preview
-  const siteEssentials: SiteEssentialsFormValues | null =
-    storeSiteEssentials ??
-    (apiSiteEssentials as SiteEssentialsFormValues | null) ??
-    null;
+  const siteEssentials = useEventPreviewSiteEssentials();
 
   const handleGoBack = () => {
     if (eventId && /^\d+$/.test(eventId)) {
@@ -304,14 +316,65 @@ function EventPreviewPageContent() {
     );
   }
 
+  const previewEventData = eventData.data as EventDetailData;
+  const previewLocationSlug = resolveEventPreviewLocationSlug(
+    previewEventData,
+    siteEssentials,
+  );
+  const previewLocations =
+    siteEssentials?.locations
+      ?.filter((loc) => Boolean(loc.slug?.trim()))
+      .map((loc) => ({
+        id: loc.id,
+        slug: loc.slug,
+        city: loc.city,
+        total_events: loc.total_events,
+      })) ?? [];
+
   return (
-    <PreviewProvider isPreviewMode={true}>
-      <div className="relative min-h-screen">
-        {/* Event Preview - Full screen without any wrapper controls */}
-        <EventPreview
-          data={eventData.data as EventDetailData}
-          siteEssentials={siteEssentials}
-        />
+    <PreviewProvider
+      isPreviewMode={true}
+      previewLocations={previewLocations}
+      activePreviewLocationSlug={previewLocationSlug ?? undefined}
+    >
+      {/*
+        Viewport-height shell (no device frame). Theme FX use absolute inset:0 inside
+        the scroll container — without a fixed height they stretch over the full page.
+      */}
+      <div className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--color-background)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-6">
+          <Button
+            variant="event-primary"
+            onClick={handleGoBack}
+            size="sm"
+            className="pointer-events-auto shrink-0 shadow-md ring-1 ring-black/10"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Editor
+          </Button>
+          <div className="pointer-events-auto flex shrink-0 items-center justify-end">
+            <Button
+              type="button"
+              variant="event-primary"
+              size="sm"
+              disabled={!eventPayloadRoot || isEventCancelled || isPublishing}
+              onClick={() => setPublishDialogOpen(true)}
+              className="shadow-md ring-1 ring-black/10"
+            >
+              <Rocket className="mr-2 h-4 w-4" />
+              Publish event
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col pt-14">
+          <EventPreview
+            data={previewEventData}
+            siteEssentials={siteEssentials}
+            locationSlug={previewLocationSlug}
+            embedInShell
+          />
+        </div>
 
         <AlertDialog
           open={publishDialogOpen}
@@ -346,31 +409,6 @@ function EventPreviewPageContent() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        <div className="pointer-events-none fixed left-4 right-4 top-4 z-[60] flex flex-wrap items-start justify-between gap-3 isolate sm:right-6 sm:left-6">
-          <Button
-            variant="event-primary"
-            onClick={handleGoBack}
-            size="sm"
-            className="pointer-events-auto shrink-0 shadow-md ring-1 ring-black/10"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Editor
-          </Button>
-          <div className="pointer-events-auto flex shrink-0 items-center justify-end">
-            <Button
-              type="button"
-              variant="event-primary"
-              size="sm"
-              disabled={!eventPayloadRoot || isEventCancelled || isPublishing}
-              onClick={() => setPublishDialogOpen(true)}
-              className="shadow-md ring-1 ring-black/10"
-            >
-              <Rocket className="mr-2 h-4 w-4" />
-              Publish event
-            </Button>
-          </div>
-        </div>
       </div>
     </PreviewProvider>
   );

@@ -258,7 +258,8 @@ export default function CateringTab() {
     if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
 
     return isVendorRoomMenuStepComplete({
-      catering_option: watchedCateringOption,
+      room_id: activeRoomId,
+      catering_option: normalizeCateringOptionFlag(watchedCateringOption),
       menu_title: watchedMenuTitle,
       menu_description: watchedMenuDescription,
       event_menu_category_id: watchedMenuCategoryId,
@@ -267,6 +268,7 @@ export default function CateringTab() {
   }, [
     isRoomsEnabled,
     stepTwoRooms.length,
+    activeRoomId,
     watchedCateringOption,
     watchedMenuTitle,
     watchedMenuDescription,
@@ -334,14 +336,14 @@ export default function CateringTab() {
     if (!menus?.length) return;
     const next = menus.map((m) => ({
       ...m,
-      items: m.items.map((it) => ({
+      items: (m.items ?? []).map((it) => ({
         ...it,
         title: (it.title || "").slice(0, MENU_ITEM_TITLE_MAX),
         description: (it.description || "").slice(0, MENU_DESCRIPTION_MAX),
       })),
     }));
     const changed = menus.some((m, mi) =>
-      m.items.some(
+      (m.items ?? []).some(
         (it, ii) =>
           it.title !== next[mi].items[ii].title ||
           it.description !== next[mi].items[ii].description,
@@ -377,7 +379,7 @@ export default function CateringTab() {
 
       // Check if we've reached the maximum limit of 10 items per category
       if (currentItems.length >= 10) {
-        toast.error("Maximum of 10 items allowed per category");
+        toast.error("You can add a maximum of 10 items per category");
         return;
       }
 
@@ -422,7 +424,7 @@ export default function CateringTab() {
       }
 
       if (currentMenus.length >= 4) {
-        toast.error("Maximum of 4 menu categories allowed");
+        toast.error("You can add a maximum of 4 menu categories");
         return null;
       }
 
@@ -608,27 +610,21 @@ export default function CateringTab() {
               : entry,
           );
 
-          const activeRoomIdForSave = Number(
-            stepTwoRoomsForSave[resolvedRoomIndex]?.room_id,
-          );
-          const roomsForApi = applyToAllRooms
-            ? mergedRoomsGlobal
-            : mergedRoomsGlobal.filter(
-                (entry) => entry.room_id === activeRoomIdForSave,
-              );
-
-          cleanedData = {
-            step: 4,
-            event_id: data.event_id,
-            is_rooms: 1,
-            rooms: roomsForApi,
-            catering_option: data.catering_option,
-            menu_title: data.menu_title,
-            menu_description: data.menu_description,
-            event_menu_category_id: data.event_menu_category_id,
-            menus: data.menus,
-            menu_background_image: data.menu_background_image,
-          };
+          cleanedData = applyToAllRooms
+            ? {
+                step: 4,
+                event_id: data.event_id,
+                is_rooms: 1,
+                rooms: mergedRoomsGlobal,
+                ...roomEntryToStepFourFields(activeSnapshot),
+              }
+            : {
+                step: 4,
+                event_id: data.event_id,
+                is_rooms: 1,
+                room_id: activeSnapshot.room_id,
+                ...roomEntryToStepFourFields(activeSnapshot),
+              };
         } else {
           const { rooms: _rooms, ...flatMenu } = data;
           cleanedData = {
@@ -720,7 +716,7 @@ export default function CateringTab() {
           <div className="space-y-4">
             <h2 className="text-xl font-bold title-header">Menu Options</h2>
             <p className="text-sm text-gray-500 mt-1 mb-4">
-              Configure food choices and menu details for your event
+              Set food choices and menu details for your event
             </p>
 
             <FormField
@@ -729,7 +725,7 @@ export default function CateringTab() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-lg font-medium">
-                    Are there food choices we need to add?
+                    Do you need to add food choices for this event?
                   </FormLabel>
                   <FormControl>
                     <RadioGroup
@@ -793,7 +789,7 @@ export default function CateringTab() {
                           <FormControl>
                             <Input
                               {...field}
-                              placeholder="e.g., The Menus"
+                              placeholder="e.g. Our menus"
                               className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                               maxLength={MENU_TITLE_MAX}
                               value={v}
@@ -827,7 +823,7 @@ export default function CateringTab() {
                           <FormControl>
                             <Input
                               {...field}
-                              placeholder="e.g., Select The Menus"
+                              placeholder="e.g. Choose your menu"
                               className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                               maxLength={MENU_DESCRIPTION_MAX}
                               value={v}
@@ -1002,7 +998,7 @@ export default function CateringTab() {
                                         <FormControl>
                                           <Input
                                             {...field}
-                                            placeholder="e.g., Spicy, with rice"
+                                            placeholder="e.g. Spicy, served with rice"
                                             className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                                             maxLength={MENU_DESCRIPTION_MAX}
                                             value={v}
@@ -1039,7 +1035,7 @@ export default function CateringTab() {
                             className="flex items-center gap-2"
                           >
                             <PlusCircle className="h-4 w-4" />
-                            Add Menu Item
+                            Add menu item
                           </Button>
                         </div>
                       </div>
@@ -1057,14 +1053,14 @@ export default function CateringTab() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-medium">
-                      Menu Background Image
+                      Menu background image
                     </FormLabel>
                     <FormControl>
                       {typeof field.value === "string" && field.value ? (
                         <div className="relative w-full">
                           <img
                             src={addCacheBusting(field.value)}
-                            alt="Menu Background"
+                            alt="Menu background"
                             className="max-h-60 object-contain mx-auto mb-2 w-full"
                           />
                           <Button

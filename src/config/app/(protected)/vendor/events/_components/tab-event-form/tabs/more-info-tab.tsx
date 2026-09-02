@@ -20,7 +20,6 @@ import {
 import {
   cloneVendorStepFiveRoomBrochure,
   findStepFiveBrochureForRoom,
-  isVendorBrochureApplyToAllReady,
   normalizeVendorStepFiveRooms,
   roomEntryToStepFiveBrochureFields,
   stepFiveBrochureFieldsToRoomEntry,
@@ -39,8 +38,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { FileUploader } from "@/components/ui/file-uploader";
-import AddressAutocomplete from "./_components/address-autocomplete";
-import EventLocationMap from "./_components/event-location-map";
 
 export default function MoreInfoTab() {
   const [isLoading, setIsLoading] = useState(false);
@@ -50,15 +47,10 @@ export default function MoreInfoTab() {
     setActiveField,
     readOnly,
   } = useEventFormContext();
-
   // Track if we have string URLs from backend
   const [brochurePdfUrl, setBrochurePdfUrl] = useState<string | null>(null);
   const [brochurePdfUrl2, setBrochurePdfUrl2] = useState<string | null>(null);
 
-  // Address search function ref for map integration
-  const addressSearchFunctionRef = useRef<((address: string) => void) | null>(
-    null,
-  );
   // Get event_id from global form
   const getEventId = (): number => {
     const stepOne = globalForm.getValues().stepOne;
@@ -83,8 +75,8 @@ export default function MoreInfoTab() {
   const previousRoomIndexRef = useRef<number | null>(null);
   const lastHydratedRoomIndexRef = useRef<number | null>(null);
 
-  const stepFiveDefaults = globalForm.getValues().stepFive;
   const eventId = getEventId();
+  const stepFiveDefaults = globalForm.getValues().stepFive;
 
   const resolveInitialBrochureFields = () => {
     const defaults = globalForm.getValues().stepFive;
@@ -121,14 +113,6 @@ export default function MoreInfoTab() {
       brochure_pdf_2: initialBrochure.brochure_pdf_2 ?? null,
       remove_brochure_pdf: initialBrochure.remove_brochure_pdf ?? false,
       remove_brochure_pdf_2: initialBrochure.remove_brochure_pdf_2 ?? false,
-      event_address: stepFiveDefaults?.event_address || "",
-      latitude: stepFiveDefaults?.latitude || undefined,
-      longitude: stepFiveDefaults?.longitude || undefined,
-      location: stepFiveDefaults?.location || {
-        title: "LOCATION",
-        description: "",
-        icon: "MapPin",
-      },
     } as StepFiveType,
   });
 
@@ -140,7 +124,6 @@ export default function MoreInfoTab() {
   const { control, watch, setValue, getValues, reset } = form;
   const watchedBrochurePdf = watch("brochure_pdf");
   const watchedBrochurePdf2 = watch("brochure_pdf_2");
-  const watchedEventAddress = watch("event_address");
 
   const resolveBrochureFieldsForSubmit = useCallback(
     (data: StepFiveType): StepFiveType => {
@@ -230,10 +213,6 @@ export default function MoreInfoTab() {
         is_rooms: 1,
         ...fields,
         rooms: syncedRooms,
-        event_address: globalForm.getValues().stepFive?.event_address || "",
-        latitude: globalForm.getValues().stepFive?.latitude,
-        longitude: globalForm.getValues().stepFive?.longitude,
-        location: globalForm.getValues().stepFive?.location,
       });
       lastHydratedRoomIndexRef.current = resolvedRoomIndex;
     }
@@ -252,8 +231,8 @@ export default function MoreInfoTab() {
 
   const canApplyToAllRooms = useMemo(() => {
     if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
-    return isVendorBrochureApplyToAllReady(watchedEventAddress ?? "");
-  }, [isRoomsEnabled, stepTwoRooms.length, watchedEventAddress]);
+    return true;
+  }, [isRoomsEnabled, stepTwoRooms.length]);
 
   // Handle field focus for tracking active field
   const handleFieldFocus = useCallback(
@@ -321,7 +300,10 @@ export default function MoreInfoTab() {
   useEffect(() => {
     const subscription = form.watch((value) => {
       if (value) {
-        globalForm.setValue("stepFive", value as StepFiveType);
+        globalForm.setValue("stepFive", {
+          ...globalForm.getValues().stepFive,
+          ...value,
+        } as StepFiveType);
       }
     });
 
@@ -346,65 +328,16 @@ export default function MoreInfoTab() {
         // Manually re-trigger validation on all fields to force error display
         const isValid = await form.trigger();
 
-        // Custom validation for required event address
-        if (
-          !submission.event_address ||
-          (typeof submission.event_address === "string" &&
-            submission.event_address.trim().length === 0)
-        ) {
-          toast.error("Event address is required", {
-            description: "Please provide an exact event location address.",
-            duration: 5000,
-          });
-          setActiveField("event_address");
-          // Scroll to event address field
-          const addressSection = document.querySelector(
-            "[data-event-location-section]",
-          );
-          if (addressSection) {
-            addressSection.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            });
-          }
-          // Try to focus the address input
-          const addressElement = document.querySelector(
-            '[name="event_address"]',
-          );
-          if (addressElement) {
-            (addressElement as HTMLElement).focus();
-          }
-          setIsLoading(false);
-          return;
-        }
-
         // If form is not valid, only highlight fields - no toast
         if (!isValid) {
           // Get all validation errors
           const errors = form.formState.errors;
           const errorFields = Object.keys(errors);
 
-          const priorityFields = ["event_address"];
-          const firstPriorityField = priorityFields.find((field) =>
-            errorFields.includes(field),
-          );
-          const firstErrorField = firstPriorityField || errorFields[0];
+          const firstErrorField = errorFields[0];
 
           if (firstErrorField) {
             setActiveField(firstErrorField);
-
-            // Handle scrolling based on field type
-            if (firstErrorField === "event_address") {
-              const addressSection = document.querySelector(
-                "[data-event-location-section]",
-              );
-              if (addressSection) {
-                addressSection.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
-              }
-            }
 
             // Try to find and focus the field with an error
             const errorElement = document.querySelector(
@@ -412,12 +345,10 @@ export default function MoreInfoTab() {
             );
             if (errorElement) {
               (errorElement as HTMLElement).focus();
-              if (firstErrorField !== "event_address") {
-                errorElement.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
-              }
+              errorElement.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
             }
           }
 
@@ -443,17 +374,6 @@ export default function MoreInfoTab() {
             submission,
           );
           const brochureClone = cloneVendorStepFiveRoomBrochure(activeSnapshot);
-
-          if (
-            applyToAllRooms &&
-            !isVendorBrochureApplyToAllReady(submission.event_address ?? "")
-          ) {
-            toast.error(
-              "Enter the event address before applying to all rooms.",
-            );
-            setIsLoading(false);
-            return;
-          }
 
           mergedRoomsGlobal = syncStepFiveRoomsFromStepTwo(
             stepTwoRoomsForSave,
@@ -481,10 +401,6 @@ export default function MoreInfoTab() {
             event_id: submission.event_id,
             is_rooms: 1,
             rooms: roomsForApi,
-            event_address: submission.event_address,
-            latitude: submission.latitude,
-            longitude: submission.longitude,
-            location: submission.location,
             brochure_pdf: submission.brochure_pdf,
             brochure_pdf_2: submission.brochure_pdf_2,
             remove_brochure_pdf: submission.remove_brochure_pdf,
@@ -569,11 +485,6 @@ export default function MoreInfoTab() {
       }
 
       if (applyToAllRooms) {
-        if (!isVendorBrochureApplyToAllReady(merged.event_address ?? "")) {
-          toast.error("Enter the event address before applying to all rooms.");
-          setActiveField("event_address");
-          return;
-        }
         void handleSubmit(merged as StepFiveType, { applyToAllRooms: true });
         return;
       }
@@ -582,7 +493,7 @@ export default function MoreInfoTab() {
         (data) => handleSubmit(data, { applyToAllRooms: false }),
         () => {
           toast.error(
-            "Please complete the required address field for this room.",
+            "Please complete the required address for this room.",
           );
         },
       )();
@@ -609,11 +520,15 @@ export default function MoreInfoTab() {
           {/* Document Uploads Section */}
           <div className="space-y-4">
             <h2 className="text-xl font-bold title-header">
-              Add More Information
+              Add more information
             </h2>
             <p className="text-sm text-gray-500 mt-1 mb-4">
               Upload important documents for your event
             </p>
+            <div className="rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-800">
+              Your event address and map are managed in the Event name tab.
+              Brochure uploads are saved separately here.
+            </div>
 
             <div className="space-y-6 border border-[#E5E7EB] p-6 rounded-md bg-white">
               <FormField
@@ -699,7 +614,7 @@ export default function MoreInfoTab() {
                 render={() => (
                   <FormItem>
                     <FormLabel className="text-sm font-medium">
-                      Event Flyer (PDF only) (Optional)
+                      Event flyer (PDF only, optional)
                     </FormLabel>
                     <FormControl>
                       {brochurePdfUrl2 ? (
@@ -765,111 +680,10 @@ export default function MoreInfoTab() {
                     </FormControl>
                     <FormMessage />
                     <p className="text-xs text-gray-500 mt-1">
-                      Upload your event Flyer (PDF only)
+                      Upload your event flyer (PDF only)
                     </p>
                   </FormItem>
                 )}
-              />
-            </div>
-          </div>
-
-          {/* Event Location Section */}
-          <div className="space-y-4" data-event-location-section>
-            <h2 className="text-xl font-bold title-header">Event Location</h2>
-            <p className="text-sm text-gray-500 mt-1 mb-4">
-              Provide the exact event location details
-            </p>
-
-            <div className="space-y-4 border border-[#E5E7EB] p-6 rounded-md bg-white">
-              <FormField
-                control={control}
-                name="event_address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Event Address (exact location){" "}
-                      <span className="text-red-500">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <AddressAutocomplete
-                        value={field.value}
-                        onChange={(address) => {
-                          field.onChange(address);
-                          // Update location for preview
-                          const currentStepSix =
-                            globalForm.getValues("stepFive") || {};
-                          globalForm.setValue("stepFive", {
-                            ...currentStepSix,
-                            event_address: address,
-                            location: {
-                              title: "LOCATION",
-                              description: address,
-                              icon: "MapPin",
-                            },
-                          });
-                        }}
-                        onSelect={(placeId, address) => {
-                          field.onChange(address);
-                          // Update global form
-                          const currentStepSix =
-                            globalForm.getValues("stepFive") || {};
-                          globalForm.setValue("stepFive", {
-                            ...currentStepSix,
-                            event_address: address,
-                            location: {
-                              title: "LOCATION",
-                              description: address,
-                              icon: "MapPin",
-                            },
-                          });
-
-                          // Trigger map search for the selected address
-                          if (addressSearchFunctionRef.current) {
-                            addressSearchFunctionRef.current(address);
-                          }
-                        }}
-                        onFocus={() => handleFieldFocus("event_address")}
-                        placeholder="Type to search for a UK address or location..."
-                        className="w-full"
-                      />
-                    </FormControl>
-                    <p className="text-xs text-blue-600 mt-1 font-medium">
-                      ⓘ Search for UK addresses or use the map below to set
-                      exact location
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Interactive Google Map */}
-              <EventLocationMap
-                initialAddress={form.watch("event_address")}
-                onLocationChange={(location) => {
-                  // Update form values with new location data
-                  form.setValue("event_address", location.address);
-                  form.setValue("latitude", location.latitude);
-                  form.setValue("longitude", location.longitude);
-
-                  // Update global form
-                  const currentStepFive =
-                    globalForm.getValues("stepFive") || {};
-                  globalForm.setValue("stepFive", {
-                    ...currentStepFive,
-                    event_address: location.address,
-                    latitude: location.latitude,
-                    longitude: location.longitude,
-                    location: {
-                      title: "LOCATION",
-                      description: location.address,
-                      icon: "MapPin",
-                    },
-                  });
-                }}
-                onAddressSearch={(searchFunction) => {
-                  addressSearchFunctionRef.current = searchFunction;
-                }}
-                className="mt-4"
               />
             </div>
           </div>

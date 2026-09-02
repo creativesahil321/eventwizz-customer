@@ -36,8 +36,9 @@ export const bookingsKeys = {
   details: () => [...bookingsKeys.all, "detail"] as const,
   detail: (id: number) => [...bookingsKeys.details(), id] as const,
   bookingDetails: () => [...bookingsKeys.all, "booking-details"] as const,
-  bookingDetail: (id: number) =>
-    [...bookingsKeys.bookingDetails(), id] as const,
+  /** Detail show query — keyed by booking_number (e.g. EV-080). */
+  bookingDetail: (bookingNumber: string) =>
+    [...bookingsKeys.bookingDetails(), bookingNumber] as const,
   menuItems: () => [...bookingsKeys.all, "menu-items"] as const,
   menuItem: (
     bookingId: number,
@@ -99,13 +100,13 @@ export const useBooking = (id: number, enabled = true) => {
 };
 
 /**
- * Hook to fetch booking details
+ * Hook to fetch booking details by booking_number
  */
-export const useBookingDetails = (id: number, enabled = true) => {
+export const useBookingDetails = (bookingNumber: string, enabled = true) => {
   return useQuery<BookingDetailsResponse>({
-    queryKey: bookingsKeys.bookingDetail(id),
-    queryFn: () => bookingsService.getBookingDetails(id),
-    enabled: enabled && !!id,
+    queryKey: bookingsKeys.bookingDetail(bookingNumber),
+    queryFn: () => bookingsService.getBookingDetails(bookingNumber),
+    enabled: enabled && !!bookingNumber,
     staleTime: 0,
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnMount: true,
@@ -166,9 +167,9 @@ export const useSubmitMenuSelections = () => {
       queryClient.invalidateQueries({
         queryKey: bookingsKeys.menuItem(variables.booking_id, variables.date),
       });
-      // Also invalidate booking details
+      // Also invalidate booking details (keyed by booking_number)
       queryClient.invalidateQueries({
-        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        queryKey: bookingsKeys.bookingDetails(),
       });
       // Toast notifications handled at root level by API client interceptor
     },
@@ -210,9 +211,9 @@ export const useSaveMenuChoice = () => {
           );
         },
       });
-      // Also invalidate booking details
+      // Also invalidate booking details (keyed by booking_number)
       queryClient.invalidateQueries({
-        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        queryKey: bookingsKeys.bookingDetails(),
       });
       // Toast notifications handled at root level by TanStack Query
     },
@@ -255,7 +256,7 @@ export const useRescheduleBooking = () => {
     RescheduleBookingPayload
   >({
     mutationFn: (payload) => bookingsService.rescheduleBooking(payload),
-    onSuccess: (response, variables) => {
+    onSuccess: (response) => {
       if (!response.status || !response.data) return;
 
       const action = resolveReschedulePaymentAction(response.data);
@@ -271,10 +272,10 @@ export const useRescheduleBooking = () => {
 
       // Immediate reschedule — no payment required
       queryClient.invalidateQueries({
-        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        queryKey: bookingsKeys.bookingDetails(),
       });
       queryClient.refetchQueries({
-        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        queryKey: bookingsKeys.bookingDetails(),
         type: "active",
       });
       queryClient.invalidateQueries({
@@ -300,7 +301,7 @@ export const useBookingPayment = () => {
     BookingPaymentPayload
   >({
     mutationFn: (payload) => bookingsService.processBookingPayment(payload),
-    onSuccess: (response, variables) => {
+    onSuccess: (response) => {
       if (!response.status || !response.data) return;
 
       const action = resolveBookingPaymentAction(response.data);
@@ -316,10 +317,10 @@ export const useBookingPayment = () => {
 
       // Invalidate booking details to refetch updated data
       queryClient.invalidateQueries({
-        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        queryKey: bookingsKeys.bookingDetails(),
       });
       queryClient.refetchQueries({
-        queryKey: bookingsKeys.bookingDetail(variables.booking_id),
+        queryKey: bookingsKeys.bookingDetails(),
         type: "active",
       });
       queryClient.invalidateQueries({

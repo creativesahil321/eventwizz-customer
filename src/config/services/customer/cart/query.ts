@@ -12,6 +12,7 @@ import {
 } from "./type";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
+import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
 
 /**
  * Hook for fetching event checkout data
@@ -91,7 +92,9 @@ export const useStoreEventBooking = () => {
 
 /**
  * Hook for deleting cart data for a specific date
- * 🔄 SYNC FIX: Ensures all three sources are synchronized
+ * 🔄 SYNC FIX: Ensures all three sources are synchronized.
+ * Also clears the checkout payment session — same as clear-all — so the
+ * "Payment required" / Stripe modal cannot outlive a user-removed date.
  */
 export const useDeleteCartDate = () => {
   const queryClient = useQueryClient();
@@ -119,6 +122,12 @@ export const useDeleteCartDate = () => {
         console.log("✅ Zustand localStorage cleared");
       }
 
+      // 4️⃣ Clear pending Stripe payment session (sessionStorage)
+      // Without this, deleting the last date leaves an empty cart with
+      // "Payment required" / reserved booking UI still visible.
+      useCheckoutPaymentUiStore.getState().clearPaymentSession();
+      console.log("✅ Checkout payment session cleared");
+
       console.log("🎉 Cart date deleted and all sources synchronized");
     },
     onError: (error: unknown) => {
@@ -130,6 +139,8 @@ export const useDeleteCartDate = () => {
 /**
  * Hook for clearing all cart data
  * 🔄 SYNC FIX: Ensures all three sources are cleared (DB, API cache, Zustand)
+ * Also clears the checkout payment session so the reserved-booking timer UI
+ * cannot persist via sessionStorage after the cart is gone.
  */
 export const useClearAllCart = () => {
   const queryClient = useQueryClient();
@@ -150,6 +161,10 @@ export const useClearAllCart = () => {
       // 3️⃣ Clear Zustand localStorage
       clearAllCarts();
       console.log("✅ Zustand localStorage cleared");
+
+      // 4️⃣ Clear pending Stripe payment session (sessionStorage)
+      useCheckoutPaymentUiStore.getState().clearPaymentSession();
+      console.log("✅ Checkout payment session cleared");
 
       console.log("🎉 All cart data sources synchronized and cleared");
     },

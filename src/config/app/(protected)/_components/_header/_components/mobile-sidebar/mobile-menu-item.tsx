@@ -1,7 +1,6 @@
 import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { MenuItemProps } from "@/config/menus/types";
-import { env } from "@/env";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
@@ -9,13 +8,7 @@ import { usePathname } from "next/navigation";
 import React, { memo, useMemo } from "react";
 import { useMenuPermission } from "@/components/permission/use-menu-permission";
 import { useAuthStore } from "@/store/auth.store";
-
-const isMenuActive = (menu: MenuItemProps, pathname: string): boolean => {
-  const fullUrl = `${env.NEXT_PUBLIC_APP_URL}${pathname}`;
-  if (menu.url && fullUrl === menu.url) return true;
-  if (menu.href && fullUrl === menu.href) return true;
-  return menu.menu?.some((subMenu) => isMenuActive(subMenu, fullUrl)) ?? false;
-};
+import { isMenuActive } from "@/app/(protected)/_components/_sidebar/utils";
 
 interface MobileMenuItemProps {
   menu: MenuItemProps;

@@ -1,5 +1,13 @@
-import type { ThemeSchema } from "@/types/theme.types";
+import type { SocialLinks, ThemeSchema } from "@/types/theme.types";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+
+const DEFAULT_SOCIAL_LINKS: SocialLinks = {
+  facebook: "",
+  twitter: "",
+  instagram: "",
+  linkedin: "",
+  youtube: "",
+};
 
 /**
  * Default vendor-site preview theme for onboarding (Site Essentials preset: Clean White).
@@ -28,13 +36,7 @@ export const ONBOARDING_DEFAULT_THEME: ThemeSchema = {
     customFontStylesheetUrls: [],
     headingEmphasis: "accent_tail",
   },
-  socialLinks: {
-    facebook: "",
-    twitter: "",
-    instagram: "",
-    linkedin: "",
-    youtube: "",
-  },
+  socialLinks: DEFAULT_SOCIAL_LINKS,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -45,18 +47,16 @@ function readString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
-function normalizeSocialLinks(
-  raw: unknown,
-): ThemeSchema["socialLinks"] {
-  const fallback = ONBOARDING_DEFAULT_THEME.socialLinks ?? {};
-  if (!isRecord(raw)) return { ...fallback };
+function normalizeSocialLinks(raw: unknown): SocialLinks {
+  const fallback = DEFAULT_SOCIAL_LINKS;
+  const source: Record<string, unknown> = isRecord(raw) ? raw : {};
 
   return {
-    facebook: readString(raw.facebook, fallback.facebook ?? ""),
-    twitter: readString(raw.twitter, fallback.twitter ?? ""),
-    instagram: readString(raw.instagram, fallback.instagram ?? ""),
-    linkedin: readString(raw.linkedin, fallback.linkedin ?? ""),
-    youtube: readString(raw.youtube, fallback.youtube ?? ""),
+    facebook: readString(source.facebook, fallback.facebook),
+    twitter: readString(source.twitter, fallback.twitter),
+    instagram: readString(source.instagram, fallback.instagram),
+    linkedin: readString(source.linkedin, fallback.linkedin),
+    youtube: readString(source.youtube, fallback.youtube),
   };
 }
 
@@ -66,7 +66,9 @@ function normalizeThemeColors(
   const fallback = ONBOARDING_DEFAULT_THEME.colors!;
   if (!isRecord(raw)) return { ...fallback };
 
-  const socialRaw = isRecord(raw.socialLogin) ? raw.socialLogin : {};
+  const socialRaw: Record<string, unknown> = isRecord(raw.socialLogin)
+    ? raw.socialLogin
+    : {};
   return {
     primary: readString(raw.primary, fallback.primary),
     secondary: readString(raw.secondary, fallback.secondary),
@@ -95,7 +97,9 @@ function normalizeThemeTypography(
   const fallback = ONBOARDING_DEFAULT_THEME.typography!;
   if (!isRecord(raw)) return { ...fallback };
 
-  const fontFamilyRaw = isRecord(raw.fontFamily) ? raw.fontFamily : {};
+  const fontFamilyRaw: Record<string, unknown> = isRecord(raw.fontFamily)
+    ? raw.fontFamily
+    : {};
   const customUrls = Array.isArray(raw.customFontStylesheetUrls)
     ? raw.customFontStylesheetUrls.filter(
         (url): url is string => typeof url === "string" && url.trim().length > 0,

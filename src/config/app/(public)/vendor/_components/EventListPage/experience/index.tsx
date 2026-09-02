@@ -4,6 +4,7 @@ import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 
@@ -36,10 +37,9 @@ export default function ExperienceSection({
   return (
     <section
       className={cn(
-        "w-full scroll-mt-28 bg-[color:var(--color-background)] px-4",
-        narrowPreview
-          ? "py-10 sm:py-12"
-          : "py-12 md:py-20 @max-5xl/preview:!py-12",
+        "w-full scroll-mt-28 bg-[color:var(--color-background)] px-4 md:px-6",
+        PUBLIC_SECTION_PY_CLASS,
+        "@max-5xl/preview:!py-12",
       )}
     >
       <div className="mx-auto min-w-0 max-w-7xl">

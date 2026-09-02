@@ -13,14 +13,20 @@ export function HomeContent() {
   // Get server data from context
   const { subdomain, theme } = useContext(ServerContext);
 
+  const vendorHome = (
+    <main className="min-h-screen bg-[color:var(--color-background)] text-[color:var(--color-text)]">
+      <VendorSiteHomePage />
+    </main>
+  );
+
   // First try to detect by subdomain (fastest and most reliable)
   if (subdomain === "vendor") {
-    return <VendorSiteHomePage />;
+    return vendorHome;
   }
 
   // If no subdomain match, check theme data
   if (theme?.website_role === "vendor") {
-    return <VendorSiteHomePage />;
+    return vendorHome;
   }
 
   // Default to admin homepage

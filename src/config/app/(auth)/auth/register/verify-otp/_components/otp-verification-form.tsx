@@ -34,6 +34,12 @@ export function OTPVerificationForm() {
   }, [timer]);
 
   useEffect(() => {
+    // OTP already verified — keep user on create-password (blocks Back)
+    if (getCookie("otp_verified")) {
+      router.replace("/auth/register/create-password");
+      return;
+    }
+
     // Try to get email from cookies first, fallback to localStorage
     const emailFromCookie = getCookie("verification_email") as string;
     const emailFromStorage = localStorage.getItem("verification_email");
@@ -133,9 +139,8 @@ export function OTPVerificationForm() {
         // Set cookie to indicate OTP verification success
         setCookie("otp_verified", "true", { maxAge: 60 * 15, path: "/" });
 
-        // Navigate to create password page
-        const nextPath = "/auth/register/create-password";
-        router.push(nextPath);
+        // Replace so Back cannot return to the OTP page
+        router.replace("/auth/register/create-password");
       }
     } catch (error) {
       // Error handling is done by the interceptor
@@ -207,17 +212,20 @@ export function OTPVerificationForm() {
               onPaste={handlePaste}
               autoFocus={index === 0}
               className={cn(
-                "w-14 h-14 text-center text-xl border rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none text-black",
+                "w-14 h-14 text-center text-xl border rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none",
+                "bg-[var(--color-surface)] text-[var(--color-text)]",
                 digit
-                  ? "border-[var(--color-primary)] bg-white border-2"
-                  : "border-[var(--color-border)] bg-white border"
+                  ? "border-[var(--color-primary)] border-2"
+                  : "border-[var(--color-border)] border"
               )}
             />
           ))}
         </div>
 
         <Small className="text-muted-foreground mt-2">
-          Otp: {timer > 0 ? `${timer}s` : "Expired"}
+          {timer > 0
+            ? `Code expires in ${timer}s`
+            : "Code expired — please resend"}
         </Small>
 
         <Paragraph className="text-sm mt-4">

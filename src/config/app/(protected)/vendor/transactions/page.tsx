@@ -21,7 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { TransactionsTableSkeleton } from "./_components/skeleton-loader";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
-import { LocationIndicator } from "@/components/location-indicator";
+import { LocationScopedTitle } from "@/components/location-indicator";
 import { PermissionRoute } from "@/components/permission";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
@@ -145,12 +145,15 @@ export default function TransactionsPage() {
               {/* Title and Earnings */}
               <div className="min-w-0 flex flex-col gap-3">
                 <h1 className="text-xl sm:text-2xl title-header font-bold text-black flex items-center gap-2 break-words">
-                  Transaction History
+                  <LocationScopedTitle title="Transaction History" />
                   {isFetching && (
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                   )}
                 </h1>
-                <LocationIndicator variant="card" />
+                <p className="text-sm text-muted-foreground">
+                  Payments for this venue. Switch location in the header to view
+                  another.
+                </p>
                 <div
                   className={cn(
                     "flex items-center gap-2 transition-opacity duration-200",

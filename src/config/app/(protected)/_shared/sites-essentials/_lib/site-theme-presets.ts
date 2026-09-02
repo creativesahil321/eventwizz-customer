@@ -1,6 +1,7 @@
 import type { UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import type { SiteEssentialsFormValues } from "./schema";
 import { normalizeCustomFontStylesheetUrls } from "@/lib/site-custom-font-stylesheets";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import {
   collectSiteEssentialsGoogleFamilies,
   siteEssentialsGoogleFontStack,
@@ -28,49 +29,11 @@ const SOCIAL_LOGIN_LIGHT: SocialLoginColors = {
   microsoft: PRESET_SOCIAL_FACEBOOK_BG,
 };
 
-export type SiteThemePresetId =
-  | "dark-elegant"
-  | "royal-blue"
-  | "emerald-night"
-  | "warm-sunset"
-  | "minimal-light"
-  | "onyx-teal"
-  | "rose-noir"
-  | "navy-gold"
-  | "sage-earth"
-  | "wine-rust"
-  | "arctic-frost"
-  | "slate-ember"
-  | "violet-aurora"
-  | "espresso-cream"
-  | "script-soiree"
-  | "vibes-script"
-  | "allura-garden"
-  | "pinyon-formal"
-  | "ivory-luxe"
-  | "fuchsia-velvet"
-  | "copper-forge"
-  | "indigo-depth"
-  | "crimson-eclipse"
-  | "peach-serenade"
-  | "editorial-slate"
-  | "blush-clay"
-  | "spa-mint"
-  | "golden-amber"
-  | "forest-jade"
-  | "lilac-atelier"
-  | "lovable-purple-magenta"
-  | "lovable-ocean-blue"
-  | "lovable-golden-fire"
-  | "lovable-emerald-night"
-  | "lovable-red-rose"
-  | "lovable-midnight-indigo"
-  | "lovable-lavender-light"
-  | "lovable-sky-breeze"
-  | "lovable-warm-sand"
-  | "lovable-mint-fresh"
-  | "lovable-rose-petal"
-  | "lovable-clean-white";
+export type SiteThemePresetId = string;
+
+export function isVenueThemePresetId(id: SiteThemePresetId): boolean {
+  return id.startsWith("venue-");
+}
 
 export interface SiteThemePreset {
   id: SiteThemePresetId;
@@ -80,6 +43,8 @@ export interface SiteThemePreset {
   bodyFontLabel: string;
   swatch: [string, string, string];
   colors: SiteEssentialsFormValues["colors"];
+  /** Landing / site-wide heading style this recipe is designed for. */
+  headingEmphasis?: HeadingEmphasis;
   typography: Pick<
     SiteEssentialsFormValues["typography"],
     "fontFamily" | "customFontStylesheetUrls"
@@ -1027,6 +992,330 @@ const PRESET_SHELLS: readonly PresetShell[] = [
       socialLogin: { ...SOCIAL_LOGIN_LIGHT },
     },
   },
+  // Venue recipes from the Stock Brook / customer-site brand audit.
+  // Tapping one in Try theme applies colors + fonts + heading emphasis together.
+  {
+    id: "venue-estate-green",
+    name: "Estate Green",
+    tagline: "Country club default",
+    headingFontLabel: "Fraunces",
+    bodyFontLabel: "Source Sans 3",
+    headingEmphasis: "accent_tail",
+    swatch: ["#10231B", "#1E4B3B", "#C29A3B"],
+    colors: {
+      primary: "#1E4B3B",
+      secondary: "#C29A3B",
+      header: "#10231B",
+      footer: "#0C1811",
+      background: "#F6F4EE",
+      surface: "#FFFFFF",
+      text: "#1F2A24",
+      textDimmed: "#5E6B63",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-wine-candlelight",
+    name: "Wine & Candlelight",
+    tagline: "Christmas & concerts",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "Inter",
+    headingEmphasis: "accent_tail",
+    swatch: ["#3D1F24", "#D4B896", "#FAF6F1"],
+    colors: {
+      primary: "#D4B896",
+      secondary: "#3D1F24",
+      header: "#3D1F24",
+      footer: "#3C1D1A",
+      background: "#FAF6F1",
+      surface: "#FFFFFF",
+      text: "#2A1B1E",
+      textDimmed: "#6E5A5E",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-manor-burgundy",
+    name: "Manor Burgundy",
+    tagline: "Country houses, festive dining, gold on cream",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "Inter",
+    headingEmphasis: "accent_tail",
+    swatch: ["#3D1F24", "#C4A574", "#F7F3E8"],
+    colors: {
+      primary: "#C4A574",
+      secondary: "#3D1F24",
+      header: "#3D1F24",
+      footer: "#3C1D1A",
+      background: "#F7F3E8",
+      surface: "#FFFDF8",
+      text: "#2A1816",
+      textDimmed: "#6E5A54",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-midnight-navy-brass",
+    name: "Midnight Navy",
+    tagline: "Corporate dinners",
+    headingFontLabel: "Marcellus",
+    bodyFontLabel: "Work Sans",
+    headingEmphasis: "uniform",
+    swatch: ["#0F1929", "#1C2E4A", "#C9A961"],
+    colors: {
+      primary: "#1C2E4A",
+      secondary: "#C9A961",
+      header: "#0F1929",
+      footer: "#0A111C",
+      background: "#F4F5F7",
+      surface: "#FFFFFF",
+      text: "#1B2430",
+      textDimmed: "#5B6572",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-terracotta-sage",
+    name: "Terracotta Sage",
+    tagline: "Summer garden parties",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "Public Sans",
+    headingEmphasis: "accent_tail",
+    swatch: ["#3A2A22", "#A84B25", "#4E5F45"],
+    colors: {
+      primary: "#A84B25",
+      secondary: "#4E5F45",
+      header: "#3A2A22",
+      footer: "#2A1E18",
+      background: "#FAF5EF",
+      surface: "#FFFFFF",
+      text: "#2E2620",
+      textDimmed: "#6E6259",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-rosewood-blush",
+    name: "Rosewood Blush",
+    tagline: "Weddings & afternoon tea",
+    headingFontLabel: "EB Garamond",
+    bodyFontLabel: "Jost",
+    headingEmphasis: "accent_tail",
+    swatch: ["#33141E", "#8A3B4A", "#D4A054"],
+    colors: {
+      primary: "#8A3B4A",
+      secondary: "#D4A054",
+      header: "#33141E",
+      footer: "#25101A",
+      background: "#FBF5F3",
+      surface: "#FFFFFF",
+      text: "#2E1B21",
+      textDimmed: "#6E5D66",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-slate-copper",
+    name: "Slate & Copper",
+    tagline: "Modern boathouse",
+    headingFontLabel: "Archivo",
+    bodyFontLabel: "Karla",
+    headingEmphasis: "uniform",
+    swatch: ["#171B1E", "#2F3A3F", "#C17A4F"],
+    colors: {
+      primary: "#2F3A3F",
+      secondary: "#C17A4F",
+      header: "#171B1E",
+      footer: "#101315",
+      background: "#F3F2F0",
+      surface: "#FFFFFF",
+      text: "#23282B",
+      textDimmed: "#5D6468",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-noir-champagne",
+    name: "Noir & Champagne",
+    tagline: "Black tie & NYE",
+    headingFontLabel: "Fraunces",
+    bodyFontLabel: "Source Sans 3",
+    headingEmphasis: "uniform",
+    swatch: ["#0B0D0E", "#14181A", "#C7A24B"],
+    colors: {
+      primary: "#14181A",
+      secondary: "#C7A24B",
+      header: "#0B0D0E",
+      footer: "#070808",
+      background: "#F7F6F2",
+      surface: "#FFFFFF",
+      text: "#16181A",
+      textDimmed: "#5C5F63",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  // Light-page luxury siblings of Rosewood Blush (Lovable gallery).
+  // Cream/linen page + deep family header + gold/metal accent.
+  {
+    id: "venue-olive-grove",
+    name: "Olive Grove",
+    tagline: "Country estate lawns and clubhouse dining",
+    headingFontLabel: "Cormorant Garamond",
+    bodyFontLabel: "Outfit",
+    headingEmphasis: "accent_tail",
+    swatch: ["#232B18", "#5A6B3B", "#C9AE79"],
+    colors: {
+      primary: "#5A6B3B",
+      secondary: "#C9AE79",
+      header: "#232B18",
+      footer: "#1A2011",
+      background: "#F7F4EC",
+      surface: "#FFFFFF",
+      text: "#22281B",
+      textDimmed: "#66705B",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-ink-ivory",
+    name: "Ink & Ivory",
+    tagline: "Black-tie corporate dinners and awards",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "DM Sans",
+    headingEmphasis: "accent_tail",
+    swatch: ["#151E33", "#2C3E63", "#B08D49"],
+    colors: {
+      primary: "#2C3E63",
+      secondary: "#B08D49",
+      header: "#151E33",
+      footer: "#101726",
+      background: "#F8F6F1",
+      surface: "#FFFFFF",
+      text: "#1D2436",
+      textDimmed: "#5F677A",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-fig-honey",
+    name: "Fig & Honey",
+    tagline: "Candlelit evening receptions",
+    headingFontLabel: "Fraunces",
+    bodyFontLabel: "Source Sans 3",
+    headingEmphasis: "accent_tail",
+    swatch: ["#2A1424", "#6E3550", "#D2A759"],
+    colors: {
+      primary: "#6E3550",
+      secondary: "#D2A759",
+      header: "#2A1424",
+      footer: "#1F0E1A",
+      background: "#FAF5EE",
+      surface: "#FFFFFF",
+      text: "#2B1A26",
+      textDimmed: "#6C5C66",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-cedar-sand",
+    name: "Cedar & Sand",
+    tagline: "Mediterranean courtyards and long tables",
+    headingFontLabel: "Marcellus",
+    bodyFontLabel: "Figtree",
+    headingEmphasis: "accent_tail",
+    swatch: ["#3A241A", "#A3603C", "#C2A06B"],
+    colors: {
+      primary: "#A3603C",
+      secondary: "#C2A06B",
+      header: "#3A241A",
+      footer: "#2B1A12",
+      background: "#F9F3E9",
+      surface: "#FFFFFF",
+      text: "#33231A",
+      textDimmed: "#7A6857",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-sea-glass",
+    name: "Sea Glass",
+    tagline: "Coastal hotels, spa days and slow lunches",
+    headingFontLabel: "Crimson Text",
+    bodyFontLabel: "Karla",
+    headingEmphasis: "accent_tail",
+    swatch: ["#17322F", "#3E6B62", "#C7AE84"],
+    colors: {
+      primary: "#3E6B62",
+      secondary: "#C7AE84",
+      header: "#17322F",
+      footer: "#102523",
+      background: "#F4F6F3",
+      surface: "#FFFFFF",
+      text: "#1C2E2B",
+      textDimmed: "#5E7069",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-hydrangea",
+    name: "Hydrangea",
+    tagline: "Garden weddings under a pale sky",
+    headingFontLabel: "Cormorant Garamond",
+    bodyFontLabel: "Plus Jakarta Sans",
+    headingEmphasis: "accent_tail",
+    swatch: ["#26333F", "#4E627E", "#BFB7A6"],
+    colors: {
+      primary: "#4E627E",
+      secondary: "#BFB7A6",
+      header: "#26333F",
+      footer: "#1C2731",
+      background: "#F5F6F8",
+      surface: "#FFFFFF",
+      text: "#222C36",
+      textDimmed: "#61707E",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-graphite-linen",
+    name: "Graphite Linen",
+    tagline: "Modern gallery spaces and city hotels",
+    headingFontLabel: "Libre Baskerville",
+    bodyFontLabel: "Work Sans",
+    headingEmphasis: "accent_tail",
+    swatch: ["#2A2724", "#5C5A55", "#C6B58A"],
+    colors: {
+      primary: "#5C5A55",
+      secondary: "#C6B58A",
+      header: "#2A2724",
+      footer: "#1E1C1A",
+      background: "#F6F4EF",
+      surface: "#FFFFFF",
+      text: "#26241F",
+      textDimmed: "#6F6A62",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
+  {
+    id: "venue-antique-rose",
+    name: "Antique Rose",
+    tagline: "Bridal showers and quiet celebrations",
+    headingFontLabel: "Playfair Display",
+    bodyFontLabel: "Jost",
+    headingEmphasis: "accent_tail",
+    swatch: ["#4A2B33", "#9A5F6B", "#C4A173"],
+    colors: {
+      primary: "#9A5F6B",
+      secondary: "#C4A173",
+      header: "#4A2B33",
+      footer: "#382028",
+      background: "#FAF4F2",
+      surface: "#FFFFFF",
+      text: "#332226",
+      textDimmed: "#77646A",
+      socialLogin: { ...SOCIAL_LOGIN_LIGHT },
+    },
+  },
 ];
 
 export const SITE_THEME_PRESETS: SiteThemePreset[] =
@@ -1350,9 +1639,13 @@ export function applySiteThemePreset(
       customFontStylesheetUrls: [
         ...(preset.typography.customFontStylesheetUrls ?? []) as string[],
       ],
+      ...(preset.headingEmphasis
+        ? { headingEmphasis: preset.headingEmphasis }
+        : {}),
     },
     opts,
   );
+  setValue("theme_preset_id", preset.id, opts);
 }
 
 /** Distinct heading/body pairs from presets — preview customizer font grid. */
@@ -1501,6 +1794,7 @@ export function mergeGoogleOnlyFontsIntoValues(
 ): SiteEssentialsFormValues {
   return {
     ...values,
+    theme_preset_id: null,
     typography: {
       ...values.typography,
       fontFamily: { heading: headingStack, body: bodyStack },
@@ -1515,6 +1809,7 @@ export function mergeColorPaletteIntoValues(
 ): SiteEssentialsFormValues {
   return {
     ...values,
+    theme_preset_id: null,
     colors: { ...colors },
   };
 }
@@ -1532,12 +1827,32 @@ export function mergePresetFontsIntoValues(
 ): SiteEssentialsFormValues {
   return {
     ...values,
+    theme_preset_id: null,
     typography: {
       ...values.typography,
       fontFamily: { ...preset.typography.fontFamily },
       customFontStylesheetUrls: [
         ...(preset.typography.customFontStylesheetUrls ?? []),
       ],
+    },
+  };
+}
+
+/** Full venue recipe: colors + fonts + recommended heading emphasis. */
+export function mergeFullPresetIntoValues(
+  values: SiteEssentialsFormValues,
+  preset: SiteThemePreset,
+): SiteEssentialsFormValues {
+  const withFonts = mergePresetFontsIntoValues(values, preset);
+  return {
+    ...withFonts,
+    theme_preset_id: preset.id,
+    colors: { ...preset.colors },
+    typography: {
+      ...withFonts.typography,
+      ...(preset.headingEmphasis
+        ? { headingEmphasis: preset.headingEmphasis }
+        : {}),
     },
   };
 }

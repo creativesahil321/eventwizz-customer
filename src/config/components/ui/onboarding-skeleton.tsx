@@ -5,6 +5,7 @@ import { ServerContext } from "@/lib/server-context";
 import { cn } from "@/lib/utils";
 import { useContext } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 
 interface OnboardingSkeletonProps {
   className?: string;
@@ -35,7 +36,7 @@ export function OnboardingFormSkeleton({
       />
       <div className="relative">
         <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-4 md:pl-6 z-10 pr-4 md:pr-6">
-          <img
+          <BrandLogoImage
             src={addCacheBusting(logoPath)}
             alt={theme?.name || "EventWizz"}
             className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] animate-pulse"

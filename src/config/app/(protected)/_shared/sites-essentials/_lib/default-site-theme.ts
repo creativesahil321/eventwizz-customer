@@ -5,7 +5,6 @@ import {
   SITE_THEME_PRESETS,
   type SiteThemePresetId,
 } from "./site-theme-presets";
-import { applySiteThemePreset } from "./site-theme-presets";
 
 /** Platform default — matches backend `default_theme` / Clean White preset. */
 export const SITE_ESSENTIALS_DEFAULT_PRESET_ID: SiteThemePresetId =
@@ -45,24 +44,51 @@ export function getSiteEssentialsDefaultThemeFields(): Pick<
   };
 }
 
+/**
+ * Pure merge — returns a new values object with platform-default colors/typography.
+ * Logo, copy, images, and SEO are left untouched. Use from preview store or any
+ * non-RHF host; RHF callers can still use `applySiteEssentialsDefaultTheme`.
+ */
+export function mergeSiteEssentialsDefaultTheme(
+  values: SiteEssentialsFormValues,
+): SiteEssentialsFormValues {
+  const defaults = getSiteEssentialsDefaultThemeFields();
+  const preset = SITE_THEME_PRESETS.find(
+    (item) => item.id === SITE_ESSENTIALS_DEFAULT_PRESET_ID,
+  );
+
+  return {
+    ...values,
+    colors: { ...(preset?.colors ?? defaults.colors) },
+    typography: {
+      ...values.typography,
+      fontFamily: {
+        ...(preset?.typography.fontFamily ?? defaults.typography.fontFamily),
+      },
+      customFontStylesheetUrls: [
+        ...(preset?.typography.customFontStylesheetUrls ??
+          defaults.typography.customFontStylesheetUrls ??
+          []),
+      ],
+      headingEmphasis:
+        defaults.typography.headingEmphasis ??
+        values.typography?.headingEmphasis,
+    },
+    theme_preset_id: SITE_ESSENTIALS_DEFAULT_PRESET_ID,
+  };
+}
+
 /** Resets colors + typography to platform defaults; copy, images, and SEO stay unchanged. */
 export function applySiteEssentialsDefaultTheme(
   setValue: UseFormSetValue<SiteEssentialsFormValues>,
   getValues: UseFormGetValues<SiteEssentialsFormValues>,
 ): SiteThemePresetId {
-  const preset = SITE_THEME_PRESETS.find(
-    (item) => item.id === SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-  );
-
-  if (preset) {
-    applySiteThemePreset(preset, setValue, getValues);
-  }
-
-  const defaults = getSiteEssentialsDefaultThemeFields();
+  const next = mergeSiteEssentialsDefaultTheme(getValues());
   const opts = { shouldDirty: true, shouldTouch: true } as const;
 
-  setValue("colors", defaults.colors, opts);
-  setValue("typography", defaults.typography, opts);
+  setValue("colors", next.colors, opts);
+  setValue("typography", next.typography, opts);
+  setValue("theme_preset_id", SITE_ESSENTIALS_DEFAULT_PRESET_ID, opts);
 
   return SITE_ESSENTIALS_DEFAULT_PRESET_ID;
 }

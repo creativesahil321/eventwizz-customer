@@ -13,8 +13,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { FileUploader } from "@/components/ui/file-uploader";
-import { SectionTitle } from "../ui/section-title";
-import { Separator } from "@/components/ui/separator";
+import { SectionCard } from "../ui/section-card";
 import { SiteEssentialsFormValues } from "../../_lib/schema";
 import { BANNER_SUB_HEADING_MAX_CHARS } from "../../_lib/schema";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -24,6 +23,13 @@ import {
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { useSiteEssentialsQuery } from "../../_lib/queries";
+import {
+  SITE_HERO_BACKGROUND_CROP,
+  SITE_HERO_UPLOAD_HINT,
+} from "@/lib/event-image-crop-presets";
+import { isUnsavedPreviewMedia } from "../../_lib/merge-preview-with-api";
+import { syncSitePreviewFormIfNeeded } from "../../_lib/sync-preview-form";
 
 interface MainLandingPageSectionProps {
   serverMainLandingCoverImage?: string;
@@ -34,16 +40,24 @@ export function MainLandingPageSection({
 }: MainLandingPageSectionProps) {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const form = useFormContext<SiteEssentialsFormValues>();
+  // Backend often overwrites cover at the same path — version so the editor preview refreshes.
+  const { dataUpdatedAt: siteMediaVersion } = useSiteEssentialsQuery();
 
   const [coverImageFiles, setCoverImageFiles] = useState<File[]>([]);
   const [coverImageUrl, setCoverImageUrl] = useState<string>("");
 
   const watchedCover = form.watch("main_landing_cover_image");
 
-  // Server refetch only — do not restore when the user cleared the field (form value is null).
+  // Server refetch only — do not restore when the user cleared the field (form value is null)
+  // or when Preview restored an unsaved blob:/data: URL for a new upload.
   useEffect(() => {
     const formCover = form.getValues("main_landing_cover_image");
     if (formCover instanceof File || formCover === null) return;
+    if (isUnsavedPreviewMedia(formCover)) {
+      setCoverImageFiles([]);
+      setCoverImageUrl(String(formCover).trim());
+      return;
+    }
 
     const hasServer = Boolean(serverMainLandingCoverImage?.length);
     setCoverImageFiles([]);
@@ -70,8 +84,9 @@ export function MainLandingPageSection({
       return;
     }
 
+    // Prefer form strings (incl. Preview blob URLs) over the previous API image.
     if (typeof watchedCover === "string" && watchedCover.trim()) {
-      setCoverImageUrl(watchedCover);
+      setCoverImageUrl(watchedCover.trim());
       return;
     }
 
@@ -90,6 +105,7 @@ export function MainLandingPageSection({
       files.length > 0 ? files[0] : null,
       { shouldDirty: true, shouldTouch: true },
     );
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   const handleRemoveCover = () => {
@@ -99,38 +115,30 @@ export function MainLandingPageSection({
       shouldDirty: true,
       shouldTouch: true,
     });
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-slate-50 p-0 shadow-sm dark:border-teal-600 dark:from-teal-950/50 dark:to-slate-900/50">
-      <div
-        className="absolute bottom-0 left-0 top-0 w-1.5 bg-teal-500 dark:bg-teal-400"
-        aria-hidden
-      />
-
-      <div className="flex flex-wrap items-center gap-3 border-b border-teal-200 bg-teal-100/90 px-6 py-4 dark:border-teal-700 dark:bg-teal-900/60">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white shadow-sm dark:bg-teal-600">
-            <Home className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
-              Main home page
-            </p>
-            <p className="text-sm font-bold text-teal-900 dark:text-teal-100">
-              Shown before guests pick a location — same on every city
-            </p>
-          </div>
+    <div className="min-w-0 space-y-4 sm:space-y-6">
+      <div className="flex items-start gap-3 rounded-xl border border-teal-200 bg-teal-50 p-3 dark:border-teal-800 dark:bg-teal-950/40 sm:items-center sm:p-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white sm:h-10 sm:w-10">
+          <Home className="h-4 w-4 sm:h-5 sm:w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
+            Main home page
+          </p>
+          <p className="text-sm font-bold leading-snug text-teal-900 dark:text-teal-100">
+            Shown before guests pick a location — same on every city
+          </p>
         </div>
       </div>
 
-      <div className="space-y-6 p-6">
-        <SectionTitle
-          title="Hero & background"
-          description="Headline, subline, and full-width background image on your multi-location home page."
-        />
-
-        <div className="grid gap-6 md:grid-cols-2">
+      <SectionCard
+        title="Hero & background"
+        description="Headline, subline, and full-width background image on your multi-location home page."
+      >
+        <div className="grid gap-4 md:grid-cols-2 md:gap-6">
           <FormField
             control={form.control}
             name="main_landing_banner_heading"
@@ -206,17 +214,20 @@ export function MainLandingPageSection({
           name="main_landing_cover_image"
           render={() => (
             <FormItem>
-              <FormLabel>Background image</FormLabel>
+              <FormLabel>Main home background image</FormLabel>
               <FormDescription>
-                Full-width hero background (recommended 1920×1080 or 16:9).
+                Full-width hero on the multi-location home page (before a city
+                is chosen). {SITE_HERO_UPLOAD_HINT} Separate from each
+                location’s cover image under Branding.
               </FormDescription>
               <FormControl>
                 {coverImageUrl ? (
                   <div className="space-y-2">
                     <img
-                      src={addCacheBusting(coverImageUrl)}
+                      key={`main-cover-${siteMediaVersion}`}
+                      src={addCacheBusting(coverImageUrl, siteMediaVersion)}
                       alt="Main landing background preview"
-                      className="mx-auto max-h-48 w-full rounded-lg object-cover"
+                      className="mx-auto aspect-video max-h-48 w-full rounded-lg object-cover"
                     />
                     <button
                       type="button"
@@ -242,13 +253,8 @@ export function MainLandingPageSection({
                       "image/webp": [],
                     }}
                     enableCropping
-                    aspectRatio={16 / 9}
-                    cropConfig={{
-                      maxSizeKB: 500,
-                      quality: 0.9,
-                      maxWidth: 1920,
-                      maxHeight: 1080,
-                    }}
+                    aspectRatio={SITE_HERO_BACKGROUND_CROP.aspectRatio}
+                    cropConfig={SITE_HERO_BACKGROUND_CROP}
                   />
                 )}
               </FormControl>
@@ -256,15 +262,13 @@ export function MainLandingPageSection({
             </FormItem>
           )}
         />
+      </SectionCard>
 
-        <Separator />
-
-        <SectionTitle
-          title="Locations list"
-          description="Title and subtitle above the city / location grid on the main home page."
-        />
-
-        <div className="grid gap-6 md:grid-cols-2">
+      <SectionCard
+        title="Locations list"
+        description="Title and subtitle above the city / location grid on the main home page."
+      >
+        <div className="grid gap-4 md:grid-cols-2 md:gap-6">
           <FormField
             control={form.control}
             name="main_landing_locations_list_title"
@@ -321,7 +325,7 @@ export function MainLandingPageSection({
             }}
           />
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }

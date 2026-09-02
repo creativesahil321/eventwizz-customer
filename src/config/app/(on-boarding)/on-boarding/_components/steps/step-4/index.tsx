@@ -4,6 +4,7 @@ import React, { useCallback, useState, useEffect, useRef, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Form,
   FormControl,
@@ -104,8 +105,10 @@ const StepFour = () => {
     currentRoomIndex,
     currentRoom,
     setCurrentRoomIndex,
+    roomsLoading,
   } = useRoomManager();
   const isMultiRoom = multiSpaceEnabled && rooms.length > 0;
+  const isMultiSpaceWithoutRooms = multiSpaceEnabled && rooms.length === 0;
   const scopePrefix = isMultiRoom
     ? `multiSpace.rooms.${currentRoomIndex}.package`
     : "stepFour";
@@ -763,9 +766,11 @@ const StepFour = () => {
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
-              {isMultiRoom
-                ? `Configure timeline & package for ${rooms[currentRoomIndex]?.name || "this room"}`
-                : "Multiple event spaces?"}
+              {isMultiSpaceWithoutRooms
+                ? "Set up your event spaces"
+                : isMultiRoom
+                ? `Configure timeline & packages for ${rooms[currentRoomIndex]?.name || "this room"}`
+                : "Timeline & packages"}
             </OnboardingTitle>
           </CardHeader>
 
@@ -773,6 +778,25 @@ const StepFour = () => {
             {/* Multi-space toggle + room tabs. Only Step 4 owns the toggle. */}
             <MultiSpaceHeader section="package" showToggle />
 
+            {isMultiSpaceWithoutRooms ? (
+              roomsLoading ? (
+                <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                  <Skeleton className="mx-auto h-5 w-48 bg-white/10" />
+                  <Skeleton className="mx-auto h-4 w-72 max-w-full bg-white/10" />
+                  <Skeleton className="mx-auto h-10 w-40 rounded-full bg-white/10" />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.03] px-5 py-8 text-center">
+                  <h3 className="text-sm font-semibold text-slate-200">
+                    Add a room to continue
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
+                    Create at least one event space above. Timeline and package
+                    details will appear here once a room is available.
+                  </p>
+                </div>
+              )
+            ) : (
             <Form {...form}>
               <form
                 onSubmit={(e) => {
@@ -804,7 +828,7 @@ const StepFour = () => {
                 <WholeStepGuidedShell
                   form={form}
                   sectionId="step-four-timeline-package"
-                  chipLabel="Timeline & package"
+                  chipLabel="Packages & timeline"
                   chipDescription="Schedule, package copy, image, details, and gallery."
                   persistenceHydrated={persistedProgressHydrated}
                   persistedStepApproved={stepFourPersistedApproved === true}
@@ -859,7 +883,7 @@ const StepFour = () => {
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-medium">
-                              Timeline Title
+                              Timeline title
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -904,7 +928,7 @@ const StepFour = () => {
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-medium">
-                              Timeline Subtitle (optional)
+                              Timeline subtitle (optional)
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -941,7 +965,7 @@ const StepFour = () => {
                     />
                     <div className="space-y-4">
                       <FormLabel className="text-base font-medium">
-                        Event Scheduler
+                        Event scheduler
                       </FormLabel>
                       {schedulerFields.map((item, index) => (
                         <div
@@ -1059,7 +1083,9 @@ const StepFour = () => {
                     "mb-4 w-full space-y-6",
                   )}
                 >
-                  <OnboardingFieldGroupTitle>Package</OnboardingFieldGroupTitle>
+                  <OnboardingFieldGroupTitle>
+                    Packages & Gallery
+                  </OnboardingFieldGroupTitle>
                   <div className="mt-4 space-y-6 min-w-0">
                     <FormField
                       control={form.control}
@@ -1071,12 +1097,12 @@ const StepFour = () => {
                         return (
                           <FormItem className="mb-4">
                             <FormLabel className="text-base font-medium">
-                                Event Package Main Heading
+                                Main event heading
                             </FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                placeholder="e.g., The Package"
+                                placeholder="e.g. What's included"
                                 className="h-11 bg-white/5 border-white/10"
                                 maxLength={maxLength}
                                 onFocus={() =>
@@ -1117,7 +1143,7 @@ const StepFour = () => {
                         return (
                           <FormItem className="mb-4">
                             <FormLabel className="text-base font-medium">
-                              Sub Heading
+                              Subheading
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -1169,8 +1195,8 @@ const StepFour = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-medium">
-                          Package Image
-                        </FormLabel>
+                        Highlights image
+                      </FormLabel>
                         <FormControl>
                           <div
                             onClick={() => handleFieldFocus("package_image")}
@@ -1235,7 +1261,9 @@ const StepFour = () => {
                     "mb-4 w-full space-y-6",
                   )}
                 >
-                  <OnboardingFieldGroupTitle>Package details</OnboardingFieldGroupTitle>
+                  <OnboardingFieldGroupTitle>
+                    What guests can expect
+                  </OnboardingFieldGroupTitle>
                   <div className="mt-4 space-y-4 min-w-0">
                   <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                     {fields.length < 10 && (
@@ -1380,6 +1408,7 @@ const StepFour = () => {
                 </WholeStepGuidedShell>
               </form>
             </Form>
+            )}
           </CardContent>
         </OnboardingCard>
       </div>

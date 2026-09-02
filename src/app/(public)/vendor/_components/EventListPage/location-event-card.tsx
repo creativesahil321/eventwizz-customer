@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Calendar, Clock, Loader2, MapPin, Navigation } from "lucide-react";
-import { addCacheBusting } from "@/lib/image-utils";
+import { addCacheBusting, shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
   useIsPreviewMode,
@@ -71,6 +73,11 @@ export function LocationEventCard({
     typeof event.distanceKm === "number" && Number.isFinite(event.distanceKm);
   const fromPrice = formatEventCardFromPrice(event.price);
 
+  const [imageSrc, setImageSrc] = useState(() => addCacheBusting(event.image));
+  useEffect(() => {
+    setImageSrc(addCacheBusting(event.image));
+  }, [event.image]);
+
   const cardClassName = cn(
     "group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] text-left outline-none",
     "shadow-[0_12px_28px_-24px_rgba(0,0,0,0.4)]",
@@ -85,15 +92,17 @@ export function LocationEventCard({
   const cardBody = (
     <>
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-[color:color-mix(in_srgb,var(--color-text)_8%,var(--color-surface))]">
-        <img
-          src={addCacheBusting(event.image)}
+        <Image
+          src={imageSrc || imageFallback}
           alt={event.title}
-          className={cn("h-full w-full object-cover", PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS)}
-          onError={(e) => {
-            const target = e.currentTarget;
-            if (target.dataset.fallbackApplied === "true") return;
-            target.dataset.fallbackApplied = "true";
-            target.src = imageFallback;
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 400px"
+          className={cn("object-cover", PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS)}
+          unoptimized={!shouldUseNextImageOptimization(imageSrc || imageFallback)}
+          onError={() => {
+            if (imageSrc !== imageFallback) {
+              setImageSrc(imageFallback);
+            }
           }}
         />
 

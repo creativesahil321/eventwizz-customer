@@ -11,6 +11,17 @@ const VALID_USER_TYPES: UserType[] = ["admin", "vendor", "customer"];
 // Handle authentication flow protection
 function handleAuthFlow(req: NextRequest): NextResponse | null {
   const { pathname } = req.nextUrl;
+
+  // After OTP is verified, never allow returning to the OTP page
+  if (
+    pathname === "/auth/register/verify-otp" &&
+    req.cookies.get("otp_verified")
+  ) {
+    return NextResponse.redirect(
+      new URL("/auth/register/create-password", req.url)
+    );
+  }
+
   const authRoutes: Record<
     string,
     { condition: (req: NextRequest) => boolean; redirect: string }
@@ -242,9 +253,19 @@ export async function proxy(req: NextRequest) {
     // Allow direct access to location pages without authentication
     pathname.match(/^\/[^\/]+\/?$/) || // Matches /{locationSlug} pattern
     pathname === "/" ||
+    pathname === "/about" ||
+    pathname === "/how-it-works" ||
+    pathname === "/blog" ||
+    pathname.startsWith("/blog/") ||
+    pathname === "/policies" ||
+    pathname === "/terms" ||
+    pathname === "/privacy" ||
+    pathname === "/contact" ||
     // Allow direct access to event detail pages
     pathname.match(/^\/[^\/]+\/events\/[^\/]+\/?$/) || // Matches /{locationSlug}/events/{eventSlug} pattern
-    // Allow checkout and payment page access
+    // Allow checkout and payment page access (customer `/checkout` + legacy `/vendor/checkout`)
+    pathname === "/checkout" ||
+    pathname.startsWith("/checkout/") ||
     pathname.startsWith("/vendor/checkout") ||
     pathname.startsWith("/vendor/payment")
   ) {
@@ -266,8 +287,12 @@ export async function proxy(req: NextRequest) {
   if (!subdomainRoutingEnabled) {
     // For single-domain deployments (Vercel), use simplified logic
 
-    // Allow all auth routes
+    // Still enforce auth-step cookie guards (OTP → create-password, etc.)
     if (pathname.startsWith("/auth")) {
+      const authResponse = handleAuthFlow(req);
+      if (authResponse) {
+        return authResponse;
+      }
       return NextResponse.next();
     }
 

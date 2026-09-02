@@ -72,13 +72,19 @@ import {
   MultiDateSelector,
   type DateCardViewModel,
 } from "./multi-date-selector";
-
+import PaymentGatewaySelector from "@/app/(public)/vendor/checkout/_components/payment-gateway-selector";
+import {
+  DEFAULT_STRIPE_PAYMENT_GATEWAY,
+  normalizeReschedulePaymentGateways,
+} from "@/services/customer/bookings/reschedule-utils";
 interface CheckoutDate extends BookingDateSource {
   booking_date_id: number;
   is_menu_choice?: boolean;
   has_unbooked_event_dates?: boolean;
   total: string;
   totalAmount: number;
+  /** Present only when this date has promo savings. */
+  savedAmount?: number | null;
   paidAmount: number;
   pendingAmount: number | null;
   paymentStatus?: "paid" | "pending" | "partial" | "refunded" | "cancelled";
@@ -219,6 +225,8 @@ interface BookingCheckoutPageProps {
     paid: number;
     outstanding: number;
     depositSelected: number;
+    /** Present only when booking has promo savings. */
+    savedAmount?: number | null;
   };
   dates: CheckoutDate[];
   paymentGateways?: Array<{ id: number; slug: string }>;
@@ -268,6 +276,35 @@ export default function BookingCheckoutPage({
   const [stripePaymentSession, setStripePaymentSession] =
     useState<CheckoutStripePaymentSession | null>(null);
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
+  const [selectedPaymentGatewayId, setSelectedPaymentGatewayId] = useState<
+    number | null
+  >(null);
+
+  const availablePaymentGateways = useMemo(
+    () => normalizeReschedulePaymentGateways(null, paymentGateways),
+    [paymentGateways],
+  );
+
+  useEffect(() => {
+    if (
+      availablePaymentGateways.length === 1 &&
+      selectedPaymentGatewayId == null
+    ) {
+      setSelectedPaymentGatewayId(availablePaymentGateways[0].id);
+      return;
+    }
+
+    if (
+      selectedPaymentGatewayId != null &&
+      !availablePaymentGateways.some((g) => g.id === selectedPaymentGatewayId)
+    ) {
+      setSelectedPaymentGatewayId(
+        availablePaymentGateways.length === 1
+          ? availablePaymentGateways[0].id
+          : null,
+      );
+    }
+  }, [availablePaymentGateways, selectedPaymentGatewayId]);
 
   const selectedDate = dates.find((d) => d.id === selectedDateId) ?? dates[0];
   const packageTitleFallback = useMemo(
@@ -292,6 +329,7 @@ export default function BookingCheckoutPage({
         subtitle: isRoomSystem ? d.room_name : buildDateSubtitle(d),
         amount: d.totalAmount ?? 0,
         amountFormatted: d.total,
+        savedAmount: d.savedAmount ?? null,
         paidAmount: d.paidAmount ?? 0,
         paidAmountFormatted: formatCurrency(d.paidAmount ?? 0),
         paymentStatus: d.paymentStatus ?? "pending",
@@ -307,13 +345,12 @@ export default function BookingCheckoutPage({
         | CheckoutDate
         | undefined;
       const pendingDue = dateMeta ? getDatePendingAmount(dateMeta) : 0;
-      const showDatePay =
-        dateMeta != null && isDatePayable(dateMeta) && pendingDue > 0;
 
       return {
         card,
         pendingDue,
-        showDatePay,
+        // Sticky footer owns Pay Now / Pay All (mobile-first). Date cards show due only.
+        showDatePay: false,
         isFullyPaid: isDateFullyPaid(pendingDue),
         hasRescheduleRequest: hasPendingReschedulePayment(dateMeta ?? {}),
         statusLabel: getDateDisplayStatusLabel(
@@ -371,9 +408,8 @@ export default function BookingCheckoutPage({
         canPayNow,
         bookingOutstanding,
         payableDateCount: payableDates.length,
-        hasMultipleDates,
       }),
-    [canPayNow, bookingOutstanding, payableDates.length, hasMultipleDates],
+    [canPayNow, bookingOutstanding, payableDates.length],
   );
 
   const canModifyAddOns = isBookingDateEligibleForAddOns(
@@ -475,47 +511,60 @@ export default function BookingCheckoutPage({
         return;
       }
 
-      toast.success(response.message || "Payment processed successfully!");
+      toast.success(response.message || "Payment processed successfully.");
       setPaymentModalOpen(false);
       setPaymentDateId(null);
       setRescheduleRequest(null);
-      const parsedBookingId = parseInt(bookingId, 10);
-      if (!Number.isNaN(parsedBookingId)) {
-        void queryClient.invalidateQueries({
-          queryKey: bookingsKeys.bookingDetail(parsedBookingId),
-        });
-      }
+      void queryClient.invalidateQueries({
+        queryKey: bookingsKeys.bookingDetails(),
+      });
     },
-    [bookingId, queryClient],
+    [queryClient],
   );
 
   const handleStripePaymentComplete = useCallback(() => {
-    const parsedBookingId = parseInt(bookingId, 10);
-    if (!Number.isNaN(parsedBookingId)) {
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.bookingDetail(parsedBookingId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.rescheduleDates(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: bookingsKeys.lists(),
-      });
-    }
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.bookingDetails(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.rescheduleDates(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: bookingsKeys.lists(),
+    });
     setStripePaymentSession(null);
     setIsStripePaymentOpen(false);
     setPaymentDateId(null);
     setRescheduleRequest(null);
     setRescheduleModalOpen(false);
     setSelectedDateForReschedule(null);
-  }, [bookingId, queryClient]);
+  }, [queryClient]);
+
+  const resolvePaymentGatewayId = (): number | null => {
+    if (
+      selectedPaymentGatewayId != null &&
+      availablePaymentGateways.some((g) => g.id === selectedPaymentGatewayId)
+    ) {
+      return selectedPaymentGatewayId;
+    }
+    if (availablePaymentGateways.length === 1) {
+      return availablePaymentGateways[0].id;
+    }
+    return null;
+  };
 
   const submitPayment = (targetDates: CheckoutDate[]) => {
     if (targetDates.length === 0) return;
 
+    const gatewayId = resolvePaymentGatewayId();
+    if (availablePaymentGateways.length > 1 && gatewayId == null) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
     const payload: BookingPaymentPayload = {
       booking_id: parseInt(bookingId, 10),
-      payment_gateway: paymentGateways?.[0]?.id ?? 1,
+      payment_gateway: gatewayId ?? DEFAULT_STRIPE_PAYMENT_GATEWAY.id,
       dates: targetDates.map(buildPaymentDateEntry),
     };
 
@@ -526,7 +575,7 @@ export default function BookingCheckoutPage({
 
   const handlePayAll = () => {
     if (payableDates.length === 0) {
-      toast.info("Nothing to pay right now");
+      toast.info("There’s nothing to pay at the moment.");
       return;
     }
 
@@ -548,7 +597,7 @@ export default function BookingCheckoutPage({
           "--booking-kind-package": "var(--color-success)",
           "--booking-kind-addon": "var(--color-warning)",
           paddingBottom: showPaymentFooter
-            ? "calc(8.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)))"
+            ? "calc(4.75rem + max(0.75rem, env(safe-area-inset-bottom, 0px)))"
             : "max(1rem, env(safe-area-inset-bottom, 0px))",
         } as CSSProperties
       }
@@ -740,26 +789,15 @@ export default function BookingCheckoutPage({
         )}
       </div>
 
-      {/* Payment summary + pay bar (Lovable unified block) */}
-      <section
-        className={cn(
-          "border-t border-border bg-card",
-          showPaymentFooter
-            ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:rounded-t-xl"
-            : "max-lg:static max-lg:z-auto max-lg:rounded-none max-lg:shadow-none",
-          "lg:overflow-hidden lg:border lg:rounded-b-xl",
-        )}
-        style={
-          {
-            ...(showPaymentFooter
-              ? {
-                  boxShadow:
-                    "0 -8px 24px color-mix(in srgb, var(--foreground) 10%, transparent), 0 -1px 0 var(--border)",
-                }
-              : {}),
-          } as CSSProperties
-        }
-      >
+      {/* Payment summary — scrolls with page on mobile; pay bar is separate sticky strip */}
+      <section className="overflow-hidden border-t border-border bg-card lg:border lg:rounded-b-xl">
+        {summary.savedAmount != null ? (
+          <div className="border-b border-border bg-card px-4 py-3 sm:px-6 lg:px-8">
+            <p className="text-sm font-semibold text-emerald-700">
+              You saved {formatCurrency(summary.savedAmount)}
+            </p>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-3 border-b border-border bg-card p-4 py-3 pr-14 sm:p-6 sm:pr-6 lg:p-8 lg:pr-8 sm:py-3.5">
           <p className="text-[10px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">
             Payment Summary
@@ -792,16 +830,43 @@ export default function BookingCheckoutPage({
               <PaymentBreakdownTotals
                 subTotal={summary.subTotal}
                 addOns={summary.addOns}
+                total={summary.total}
                 paid={summary.paid}
                 outstanding={summary.outstanding}
                 formatCurrency={formatCurrency}
+                savedAmount={summary.savedAmount}
               />
             </div>
           </div>
         )}
 
+        {/* Desktop: full pay bar with gateway selector */}
         {showPaymentFooter && (
-          <div className="bg-foreground text-card p-4 sm:p-6 lg:p-8 py-4 lg:rounded-b-xl">
+          <div className="hidden bg-foreground text-card p-4 sm:p-6 lg:block lg:p-8 lg:py-4 lg:rounded-b-xl">
+            {payAllVisibility.showFooterPaymentControls &&
+              availablePaymentGateways.length > 1 && (
+                <div className="mb-4 rounded-lg border border-border bg-white p-3 text-foreground sm:p-4">
+                  <PaymentGatewaySelector
+                    availableGateways={availablePaymentGateways}
+                    selectedGateway={
+                      selectedPaymentGatewayId != null
+                        ? selectedPaymentGatewayId.toString()
+                        : null
+                    }
+                    onGatewaySelect={(gatewayId) => {
+                      const parsed = Number.parseInt(gatewayId, 10);
+                      setSelectedPaymentGatewayId(
+                        Number.isFinite(parsed) ? parsed : null,
+                      );
+                    }}
+                    disabled={paymentMutation.isPending}
+                    showError={
+                      selectedPaymentGatewayId == null &&
+                      !paymentMutation.isPending
+                    }
+                  />
+                </div>
+              )}
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p
@@ -832,11 +897,16 @@ export default function BookingCheckoutPage({
                       "var(--color-primary-foreground, var(--primary-foreground))",
                   }}
                   onClick={handlePayAll}
-                  disabled={paymentMutation.isPending}
+                  disabled={
+                    paymentMutation.isPending ||
+                    (availablePaymentGateways.length > 1 &&
+                      selectedPaymentGatewayId == null)
+                  }
                 >
                   {paymentMutation.isPending ? "Processing…" : "Pay All"}
                 </Button>
-              ) : payableDates.length === 1 ? (
+              ) : payAllVisibility.showSinglePayButton &&
+                payableDates.length === 1 ? (
                 <Button
                   type="button"
                   size="lg"
@@ -847,11 +917,13 @@ export default function BookingCheckoutPage({
                       "var(--color-primary-foreground, var(--primary-foreground))",
                   }}
                   onClick={() => handlePayForDate(payableDates[0].id)}
-                  disabled={paymentMutation.isPending}
+                  disabled={
+                    paymentMutation.isPending ||
+                    (availablePaymentGateways.length > 1 &&
+                      selectedPaymentGatewayId == null)
+                  }
                 >
-                  {paymentMutation.isPending
-                    ? "Processing…"
-                    : `Pay ${formatCurrency(bookingOutstanding)}`}
+                  {paymentMutation.isPending ? "Processing…" : "Pay Now"}
                 </Button>
               ) : (
                 <StatusBadge
@@ -866,6 +938,74 @@ export default function BookingCheckoutPage({
           </div>
         )}
       </section>
+
+      {/* Mobile: compact sticky pay bar — no gateway selector (modal handles that) */}
+      {showPaymentFooter && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-foreground px-4 py-3 text-card lg:hidden"
+          style={{
+            paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))",
+            boxShadow:
+              "0 -8px 24px color-mix(in srgb, var(--foreground) 10%, transparent)",
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p
+                className="text-[10px] font-bold tracking-[0.18em] leading-none uppercase"
+                style={{
+                  color: "color-mix(in srgb, var(--card) 62%, transparent)",
+                }}
+              >
+                {footerLabel}
+              </p>
+              <p className="mt-0.5 truncate text-xl font-extrabold tabular-nums tracking-tight text-card">
+                {formatCurrency(footerAmount)}
+              </p>
+            </div>
+            {payAllVisibility.showPayAllButton ? (
+              <Button
+                type="button"
+                size="lg"
+                className="h-11 shrink-0 rounded-lg px-5 text-sm font-bold shadow-none hover:opacity-[0.92]"
+                style={{
+                  backgroundColor: "var(--color-primary)",
+                  color:
+                    "var(--color-primary-foreground, var(--primary-foreground))",
+                }}
+                onClick={handlePayAll}
+                disabled={paymentMutation.isPending}
+              >
+                {paymentMutation.isPending ? "Processing…" : "Pay All"}
+              </Button>
+            ) : payAllVisibility.showSinglePayButton &&
+              payableDates.length === 1 ? (
+              <Button
+                type="button"
+                size="lg"
+                className="h-11 shrink-0 rounded-lg px-5 text-sm font-bold shadow-none hover:opacity-[0.92]"
+                style={{
+                  backgroundColor: "var(--color-primary)",
+                  color:
+                    "var(--color-primary-foreground, var(--primary-foreground))",
+                }}
+                onClick={() => handlePayForDate(payableDates[0].id)}
+                disabled={paymentMutation.isPending}
+              >
+                {paymentMutation.isPending ? "Processing…" : "Pay Now"}
+              </Button>
+            ) : (
+              <StatusBadge
+                status={paymentStatus}
+                className={cn(
+                  "shrink-0 px-3 py-2 text-xs font-semibold [&_svg]:text-white",
+                  FOOTER_STATUS_BADGE_CLASS[getStatusThemeKey(paymentStatus)],
+                )}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {paymentDate && (
         <SingleDatePaymentModal
@@ -886,6 +1026,9 @@ export default function BookingCheckoutPage({
           }}
           rescheduleRequest={rescheduleRequest}
           isProcessing={paymentMutation.isPending}
+          paymentGateways={availablePaymentGateways}
+          selectedPaymentGatewayId={selectedPaymentGatewayId}
+          onPaymentGatewaySelect={setSelectedPaymentGatewayId}
           onConfirm={handlePaymentConfirm}
         />
       )}
@@ -905,7 +1048,7 @@ export default function BookingCheckoutPage({
             selectedDateForReschedule,
           )}
           isProcessing={rescheduleMutation.isPending}
-          bookingPaymentGateways={paymentGateways}
+          bookingPaymentGateways={availablePaymentGateways}
           onConfirm={handleRescheduleConfirm}
         />
       )}
@@ -916,7 +1059,7 @@ export default function BookingCheckoutPage({
           setIsStripePaymentOpen(open);
           if (!open && stripePaymentSession) {
             toast.message("Payment not completed", {
-              description: `Booking ${stripePaymentSession.bookingNumber} — tap Pay Now when you're ready to continue.`,
+              description: `Booking ${stripePaymentSession.bookingNumber} — select Pay now when you’re ready to continue.`,
             });
           }
           if (!open) {

@@ -1,13 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthContent } from "./_components/auth-content";
-import { ServerContext } from "@/lib/server-context";
 import { AuthSkeleton } from "./_components/auth-skeleton";
-import { addCacheBusting } from "@/lib/image-utils";
+import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
+import LocationSelectionHeader from "@/app/(public)/vendor/_components/LocationPage/location-selection-header";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
 
 export default function AuthLayout({
   children,
@@ -17,20 +18,15 @@ export default function AuthLayout({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+  const { theme } = useTheme();
+  const { settings } = useDomain();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [isSigningOutSecurity, setIsSigningOutSecurity] = useState(false);
-  const { theme } = useContext(ServerContext);
 
   const isSecurityViolation =
     searchParams.get("error") === "security_violation";
-  const logoPath =
-    theme?.logo?.startsWith("/") ||
-    theme?.logo?.startsWith("data:") ||
-    theme?.logo?.startsWith("http") ||
-    theme?.logo?.startsWith("https")
-      ? theme.logo
-      : "/assets/images/logos/eventwizz-logo.png";
-  // When login page has security_violation, clear any stale session so user must re-login (no redirect to welcome)
+  const callbackUrl = searchParams.get("callbackUrl");
+
   useEffect(() => {
     if (!isSecurityViolation || status !== "authenticated") return;
     setIsSigningOutSecurity(true);
@@ -39,7 +35,6 @@ export default function AuthLayout({
     });
   }, [isSecurityViolation, status]);
 
-  // Redirect authenticated users away from auth pages (skip when security_violation — we sign out above)
   useEffect(() => {
     if (
       status === "authenticated" &&
@@ -52,20 +47,29 @@ export default function AuthLayout({
       const account_type = session.user.account_type;
       const isOnboarded = session.user.isOnboarded;
 
-      if (account_type === "vendor" && !isOnboarded) {
-        router.push("/on-boarding");
-      } else if (account_type === "vendor") {
-        router.replace("/welcome/select-location");
-      } else {
-        router.replace(`/${account_type}/dashboard`);
-      }
+      router.replace(
+        resolvePostLoginRedirect({
+          accountType: account_type || "customer",
+          isVendorOnboarded: Boolean(isOnboarded),
+          callbackUrl,
+        }),
+      );
     }
-  }, [session, status, router, isSecurityViolation, isSigningOutSecurity]);
+  }, [
+    session,
+    status,
+    router,
+    isSecurityViolation,
+    isSigningOutSecurity,
+    callbackUrl,
+  ]);
 
-  // Show fullscreen loader when session is loading/authenticated or redirecting.
-  // Including "loading" prevents a brief flash of the login form on page load
-  // before the session resolves (e.g. browser back button, hard navigation).
-  if (status === "loading" || status === "authenticated" || isRedirecting || isSigningOutSecurity) {
+  if (
+    status === "loading" ||
+    status === "authenticated" ||
+    isRedirecting ||
+    isSigningOutSecurity
+  ) {
     return (
       <AuthSkeleton
         accountType={session?.user?.account_type}
@@ -75,36 +79,29 @@ export default function AuthLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden font-sans bg-[var(--color-background)]">
-      <header className="w-full h-16 bg-[var(--color-header)] text-[var(--color-on-header)]">
-        <div className="max-w-[1400px] h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2 shrink-0">
-            <img
-              className="h-8 w-auto object-contain"
-              alt="EventWizz"
-              src={addCacheBusting(logoPath)}
-            />
-          </Link>
-        </div>
-      </header>
+    <>
+      {/* Same solid-theme header as the public home (`--color-header` / `--color-on-header`). */}
+      <LocationSelectionHeader
+        name={theme?.name || settings?.name}
+        logo={theme?.logo || settings?.logo || undefined}
+      />
+      <div className="flex min-h-screen flex-col overflow-x-hidden bg-[var(--color-background)] pt-[60px] font-body md:flex-row">
+        <aside className="hidden flex-col border-r border-[var(--color-text)]/8 bg-[color-mix(in_srgb,var(--color-primary)_7%,var(--color-background))] md:flex md:w-[34%] lg:w-[32%]">
+          <div className="flex flex-1 flex-col justify-center px-8 py-12 lg:px-12">
+            <AuthContent callbackUrl={callbackUrl} />
+          </div>
+        </aside>
 
-      {/* Two-column layout */}
-      <main className="flex-grow flex flex-row w-full relative">
-        {/* Left column - Pink background with branding */}
-        <div className="hidden md:flex md:w-[30%] bg-[var(--color-background)] flex-col">
-          <div className="flex flex-col justify-center h-full p-8 lg:pl-24 lg:pr-12">
-            <AuthContent />
+        <div className="flex flex-1 flex-col bg-[color-mix(in_srgb,var(--color-text)_4%,var(--color-surface))]">
+          <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8 sm:py-16">
+            <div className="w-full max-w-[440px]">
+              <div className="rounded-xl border border-[var(--color-text)]/6 bg-[var(--color-surface)] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:p-8">
+                {children}
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Right column - Light background with form content */}
-        <div className="w-full md:w-[70%] bg-[#F2F0EF] flex items-center justify-center">
-          <div className="w-full max-w-[600px] px-12 py-20">
-            {/* Form content card */}
-            <div className="bg-white rounded-lg shadow-lg p-6">{children}</div>
-          </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

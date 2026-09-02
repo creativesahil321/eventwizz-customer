@@ -35,17 +35,23 @@ export interface VenueLocation {
   contact_number?: string;
   address?: string;
   city?: string;
+  latitude?: number | string;
+  longitude?: number | string;
   logo?: string;
   cover_image?: string;
   is_default: boolean;
+  /** Fixed head office — does not change when switching working location */
+  is_headquarters?: boolean;
   status?: boolean; // Dynamic status field: true = Active, false = Inactive
+  /** Live/active events currently tied to this location */
+  active_events_count?: number;
   created_at?: string;
   updated_at?: string;
 }
 
 // Type for row action handling
 export type DataTableRowAction<TData> = {
-  type: "update" | "view" | "setDefault";
+  type: "update" | "view" | "setDefault" | "delete";
   row: Row<TData>;
 };
 

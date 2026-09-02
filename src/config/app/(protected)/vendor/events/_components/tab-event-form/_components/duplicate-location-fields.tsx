@@ -27,6 +27,7 @@ import {
 } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { VenueLocation } from "@/types/api.types";
 import { StepEightType } from "../schema";
+import { formatLiveEventsLabel } from "@/components/location-selector/active-events-count";
 
 type DuplicateLocationFieldsProps = {
   form: UseFormReturn<StepEightType>;
@@ -36,7 +37,10 @@ type DuplicateLocationFieldsProps = {
 };
 
 function formatLocationOptionLabel(location: VenueLocation): string {
-  return location.city?.trim() || location.name?.trim() || `Location ${location.id}`;
+  const label =
+    location.city?.trim() || location.name?.trim() || `Location ${location.id}`;
+  const count = location.active_events_count ?? 0;
+  return `${label} · ${formatLiveEventsLabel(count)}`;
 }
 
 function applyExistingLocation(
@@ -51,6 +55,15 @@ function applyExistingLocation(
   form.setValue("contact_number", location.contact_number?.trim() || "", {
     shouldValidate: true,
   });
+  const lat = Number(location.latitude);
+  const lng = Number(location.longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    form.setValue("latitude", lat, { shouldValidate: true });
+    form.setValue("longitude", lng, { shouldValidate: true });
+  } else {
+    form.setValue("latitude", undefined, { shouldValidate: true });
+    form.setValue("longitude", undefined, { shouldValidate: true });
+  }
 }
 
 function clearExistingLocation(form: UseFormReturn<StepEightType>) {
@@ -58,6 +71,8 @@ function clearExistingLocation(form: UseFormReturn<StepEightType>) {
   form.setValue("address", "", { shouldValidate: true });
   form.setValue("city", "", { shouldValidate: true });
   form.setValue("contact_number", "", { shouldValidate: true });
+  form.setValue("latitude", undefined, { shouldValidate: true });
+  form.setValue("longitude", undefined, { shouldValidate: true });
 }
 
 export function DuplicateLocationFields({
@@ -149,6 +164,13 @@ export function DuplicateLocationFields({
     fetchLocationDetails(form, placeId);
   };
 
+  const handleNewAddressClear = () => {
+    form.setValue("vendor_location_id", undefined, { shouldValidate: true });
+    form.setValue("address", "", { shouldValidate: true });
+    form.setValue("city", "", { shouldValidate: true });
+    form.setValue("contact_number", "", { shouldValidate: true });
+  };
+
   return (
     <div className="space-y-6">
       {hasExistingLocations && (
@@ -158,7 +180,7 @@ export function DuplicateLocationFields({
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-sm font-medium">
-                Where should this duplicate go?
+                Where should the duplicated event go?
               </FormLabel>
               <FormControl>
                 <RadioGroup
@@ -166,7 +188,7 @@ export function DuplicateLocationFields({
                     handleTargetTypeChange(value as "existing" | "new")
                   }
                   value={field.value || "existing"}
-                  className="flex flex-col space-y-1"
+                  className="flex flex-col gap-2"
                 >
                   <FormItem className="flex items-center space-x-3 space-y-0">
                     <FormControl>
@@ -220,7 +242,8 @@ export function DuplicateLocationFields({
                     {availableLocations.map((location) => (
                       <SelectItem key={location.id} value={String(location.id)}>
                         {formatLocationOptionLabel(location)}
-                        {location.is_default ? " (Default)" : ""}
+                        {location.is_headquarters ? " (Head office)" : ""}
+                        {location.is_default ? " (In use)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -248,9 +271,13 @@ export function DuplicateLocationFields({
                       form.setValue("vendor_location_id", undefined, {
                         shouldValidate: true,
                       });
+                      // City only comes from a Google place selection —
+                      // clear it while the user is still typing.
+                      form.setValue("city", "", { shouldValidate: true });
                       field.onChange(value);
                     }}
                     onSelect={handleNewLocationSelect}
+                    onClear={handleNewAddressClear}
                     placeholder="Search for a location..."
                     disabled={readOnly}
                   />
@@ -272,10 +299,12 @@ export function DuplicateLocationFields({
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="Enter city name"
-                      className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
-                      onFocus={() => onFieldFocus?.("city")}
+                      placeholder="Select an address above to auto-fill"
+                      autoComplete="off"
+                      readOnly
                       disabled={readOnly}
+                      className="h-11 bg-muted border-[#E5E7EB] cursor-not-allowed"
+                      onFocus={() => onFieldFocus?.("city")}
                     />
                   </FormControl>
                   <FormMessage />
@@ -289,7 +318,7 @@ export function DuplicateLocationFields({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium">
-                    Contact Number <span className="text-red-500">*</span>
+                    Contact number <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input

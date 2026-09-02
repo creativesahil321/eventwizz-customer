@@ -59,10 +59,13 @@ const MobileSidebar: React.FC<MobileSidebarProps> = memo(({ menus = [] }) => {
           </SheetTitle>
         </SheetHeader>
 
-        {/* Add Location Selector for mobile if user has multiple locations */}
+        {/* Inline picker — DropdownMenu portals behind this Sheet (z-index). */}
         {isVendor && hasMultipleLocations && (
-          <div className="p-4 border-b">
-            <LocationSelector />
+          <div className="border-b p-4">
+            <LocationSelector
+              variant="inline"
+              onLocationSelected={() => setOpen(false)}
+            />
           </div>
         )}
 

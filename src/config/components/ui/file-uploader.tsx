@@ -396,7 +396,7 @@ export function FileUploader(props: FileUploaderProps) {
       let openedCropper = false;
 
       try {
-      if (shouldPreCompress && rejectedFiles.length > 0) {
+      if (rejectedFiles.length > 0) {
         const rejectedImageFiles: File[] = [];
         type OtherRejectionAgg = {
           message: string;
@@ -407,15 +407,14 @@ export function FileUploader(props: FileUploaderProps) {
         const otherRejections = new Map<string, OtherRejectionAgg>();
 
         rejectedFiles.forEach(({ file, errors }) => {
-          // Check if this is an image file rejected due to size
+          // Oversized images can be recovered via pre-compress (non-crop path).
           const isSizeError = errors.some(
             (error) =>
               error.message.includes("larger than") ||
               error.code === "file-too-large",
           );
 
-          if (isImageFile(file) && isSizeError) {
-            // This image was rejected for size - we'll compress it
+          if (shouldPreCompress && isImageFile(file) && isSizeError) {
             rejectedImageFiles.push(file);
           } else {
             for (const error of errors) {
@@ -457,7 +456,7 @@ export function FileUploader(props: FileUploaderProps) {
           },
         );
 
-        // Compress rejected image files
+        // Compress rejected image files (only when pre-compress path is active)
         if (rejectedImageFiles.length > 0) {
           try {
             toast.info(
@@ -558,7 +557,7 @@ export function FileUploader(props: FileUploaderProps) {
           });
         }
       } finally {
-        if (!cropDialogOpen && !enableCropping) {
+        if (!openedCropper) {
           setImageWorkflowBusyState(false);
         }
       }
@@ -572,7 +571,6 @@ export function FileUploader(props: FileUploaderProps) {
       enableCropping,
       autoCompress,
       autoCompressMaxSizeMB,
-      cropDialogOpen,
       setImageWorkflowBusyState,
     ],
   );
@@ -605,7 +603,7 @@ export function FileUploader(props: FileUploaderProps) {
     imageWorkflowBusy;
 
   const showDropzoneBusyOverlay =
-    imageWorkflowBusy && (files?.length ?? 0) === 0;
+    imageWorkflowBusy && (files?.length ?? 0) === 0 && !cropDialogOpen;
 
   return (
     <>
@@ -613,11 +611,10 @@ export function FileUploader(props: FileUploaderProps) {
         <Dropzone
           onDrop={onDrop}
           accept={accept}
-          // When autoCompress is enabled, allow very large files to pass validation
-          // We'll compress image files automatically in onDrop
-          // 100MB limit allows most images to pass, then we compress them
+          // When autoCompress or cropping is enabled, allow large images through.
+          // Crop path optimizes after crop; compress path optimizes in onDrop.
           maxSize={
-            autoCompress && !isDocumentOnlyUploader
+            (autoCompress || enableCropping) && !isDocumentOnlyUploader
               ? 100 * 1024 * 1024
               : maxSize
           }
@@ -709,7 +706,7 @@ export function FileUploader(props: FileUploaderProps) {
                             ? ` (PDF only, up to ${formatBytes(maxSize)})`
                             : ` (up to ${formatBytes(maxSize)} each)`;
                         }
-                        if (autoCompress) {
+                        if (enableCropping || autoCompress) {
                           return ` (images will be automatically optimized)`;
                         }
                         return ` (up to ${formatBytes(maxSize)} each)`;
@@ -719,11 +716,9 @@ export function FileUploader(props: FileUploaderProps) {
                       !isDocumentOnlyUploader &&
                       (enableCropping || autoCompress) && (
                         <p className="text-xs text-blue-600 font-medium mt-1">
-                          {enableCropping && autoCompress
+                          {enableCropping
                             ? "✂️ Images will be cropped & optimized automatically"
-                            : enableCropping
-                              ? "✂️ Images will be cropped automatically"
-                              : "🔄 Images will be optimized automatically"}
+                            : "🔄 Images will be optimized automatically"}
                         </p>
                       )}
                   </div>
@@ -757,7 +752,8 @@ export function FileUploader(props: FileUploaderProps) {
           onCancel={handleCropCancel}
           config={{
             ...cropConfig,
-            aspectRatio: aspectRatio,
+            // Prefer explicit prop; fall back to cropConfig so presets aren't wiped by `undefined`
+            aspectRatio: aspectRatio ?? cropConfig.aspectRatio,
           }}
         />
       )}

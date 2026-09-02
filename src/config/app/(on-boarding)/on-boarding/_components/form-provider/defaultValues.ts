@@ -23,6 +23,8 @@ export const defaultValues: OnboardingFormData = {
     domain: "",
     description: "",
     city: "",
+    latitude: undefined,
+    longitude: undefined,
   },
   stepTwo: {
     isApproved: false,
@@ -33,6 +35,7 @@ export const defaultValues: OnboardingFormData = {
     banner_sub_heading: "",
     about_title: "",
     about_description: "",
+    footer_brand_description: "",
   },
   stepThree: {
     isApproved: false,
@@ -47,7 +50,15 @@ export const defaultValues: OnboardingFormData = {
     about_event_heading: "",
     about_event_sub_heading: "",
     about_event_description: "",
-    
+    event_address: "",
+    latitude: undefined,
+    longitude: undefined,
+    location: {
+      title: "LOCATION",
+      description: "",
+      icon: "MapPin",
+    },
+
     // gallery: [],
   },
   stepFour: {
@@ -135,8 +146,6 @@ export const defaultValues: OnboardingFormData = {
     ],
   },
 
-
-
   stepNine: {
     isApproved: false,
     step: 9,
@@ -191,7 +200,9 @@ export const defaultValues: OnboardingFormData = {
     city: "",
     reminder_email_before_days: 0,
     domain: "",
+    domain_suffix: "eventwizz.com",
     confirm_domain: false,
+
   },
   isApproved: false
 };

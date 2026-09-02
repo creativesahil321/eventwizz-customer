@@ -1078,15 +1078,33 @@ export function AddExtrasSection({
     [],
   );
 
-  const handleConfirmExistingSeating = useCallback(() => {
-    if (existingFill.totalAdded <= 0) return;
-    setExistingSeatingConfirmed(true);
-  }, [existingFill.totalAdded]);
-
   const resetNewTableSeating = useCallback(() => {
     setTableSeating(EMPTY_TABLE_SEATING);
     setTablePanelResetKey((key) => key + 1);
   }, []);
+
+  const handleConfirmExistingSeating = useCallback(() => {
+    if (existingFill.totalAdded <= 0) return;
+    setExistingSeatingConfirmed(true);
+
+    const remaining = Math.max(0, guestsToAdd - existingFill.totalAdded);
+    if (
+      remaining > 0 &&
+      hasNewTablesAvailable &&
+      tableConfig &&
+      isNewTableGroupViable(remaining, tableConfig)
+    ) {
+      setNewTablePanelScope("remaining");
+      setNewTablePanelOpen(true);
+      resetNewTableSeating();
+    }
+  }, [
+    existingFill.totalAdded,
+    guestsToAdd,
+    hasNewTablesAvailable,
+    resetNewTableSeating,
+    tableConfig,
+  ]);
 
   const clearExistingFill = useCallback(() => {
     setExistingFill(EMPTY_EXISTING_FILL);
@@ -1298,6 +1316,33 @@ export function AddExtrasSection({
       setNewTablePanelOpen(false);
     }
   }, [newTableSeatingConfirmed, newTablePanelOpen]);
+
+  /** When every existing table is full, open new-table seating as soon as guest count is set. */
+  useEffect(() => {
+    if (!useAddGuestsFlow || guestsToAdd <= 0) return;
+    if (totalFreeExistingSeats > 0) return;
+    if (existingFill.totalAdded > 0 || existingSeatingConfirmed) return;
+    if (newTablePanelOpen || newTableSeatingConfirmed) return;
+    if (!hasNewTablesAvailable || !tableConfig || !canBookAllGuestsOnNewTable) {
+      return;
+    }
+
+    setNewTablePanelScope("all");
+    setNewTablePanelOpen(true);
+    resetNewTableSeating();
+  }, [
+    canBookAllGuestsOnNewTable,
+    existingFill.totalAdded,
+    existingSeatingConfirmed,
+    guestsToAdd,
+    hasNewTablesAvailable,
+    newTablePanelOpen,
+    newTableSeatingConfirmed,
+    resetNewTableSeating,
+    tableConfig,
+    totalFreeExistingSeats,
+    useAddGuestsFlow,
+  ]);
 
   useEffect(() => {
     if (awaitingMixedAutoFillSignalRef.current === null) return;

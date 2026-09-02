@@ -11,6 +11,8 @@ import {
   TableData,
   TicketData,
 } from "@/services/customer/cart/type";
+import type { PublicEventDateDiscount } from "@/components/public/date-card-offer";
+import type { CouponStripSource } from "@/lib/coupon-strip-props";
 
 // Payment System Types
 export interface PaymentInfo {
@@ -51,6 +53,12 @@ export type ApiEventCartDateBucket = {
   tables: ApiTableData[];
   tickets: ApiTicketData[];
   selected_drinks: SelectedDrink[];
+  /** Optional list-price / server subtotal for the date. */
+  date_subtotal?: number;
+  /** Automatic date offer from GET /customer/event. */
+  discount?: PublicEventDateDiscount | null;
+  event_date?: string;
+  room_id?: number;
 };
 
 export type VendorPlatformFee = {
@@ -104,6 +112,10 @@ export interface ApiEventCartData {
   event_slug: string;
   event_image: string;
   vendor_event_id: number;
+  /** Venue display name from cart GET — shown under event name on checkout. */
+  location_name?: string;
+  event_location?: string;
+  city?: string;
   payment_gateways?: PaymentGatewayData[];
   drink_title?: string;
   drinks: SelectedDrink[];
@@ -116,6 +128,10 @@ export interface ApiEventCartData {
   event_rooms?: ApiEventRoomCatalogItem[];
   /** Present when the customer has an unpaid booking — enables cross-device session restore. */
   pending_payment?: ApiPendingPayment | null;
+  /** Event-level coupon from cart GET. */
+  coupon?: CouponStripSource | null;
+  /** Duplicate of `coupon.coupon_code` on some cart payloads. */
+  coupon_code?: string | null;
   [key: string]:
     | string
     | number
@@ -128,7 +144,8 @@ export interface ApiEventCartData {
     | ApiRoomCartData[]
     | ApiEventRoomCatalogItem[]
     | ApiEventCartDateBucket
-    | ApiPendingPayment;
+    | ApiPendingPayment
+    | CouponStripSource;
 }
 
 // Professional UI Types (replacing cart store types)

@@ -20,6 +20,9 @@ export function normalizeCustomFontStylesheetUrls(urls: unknown): string[] {
     try {
       const parsed = new URL(trimmed);
       if (parsed.protocol !== "https:") continue;
+      // Google families are consolidated in `googleFontsHrefFromTheme` — skip
+      // duplicate / invalid fonts.googleapis.com links (trial fonts return HTML).
+      if (parsed.hostname.includes("fonts.googleapis.com")) continue;
       const href = parsed.href;
       if (seen.has(href)) continue;
       seen.add(href);

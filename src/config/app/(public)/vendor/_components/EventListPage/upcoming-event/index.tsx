@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  getEventCardCategoryLabel,
-  getEventCardDateLabel,
-} from "../event-card-utils";
+import { toLocationEventCardModel } from "../event-card-utils";
 import { LocationEventCard } from "../location-event-card";
 import { useMemo, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,18 +18,17 @@ const eventImages = [
 
 import { EventComponentProps } from "../event-types";
 import { useIsPreviewMode } from "@/contexts/preview-context";
-import { SitePreviewDummyEventSection } from "../site-preview-dummy-events";
-import {
-  formatMoneyCompact,
-  resolveCurrencySymbol,
-} from "@/lib/currency-format";
+import { resolveCurrencySymbol } from "@/lib/currency-format";
 import {
   eventCarouselNavButtonClass,
   eventListingManyScrollItemClass,
+  mobileEventRowPeekScrollItemClass,
 } from "../event-carousel-classes";
 import { EventListingHorizontalScroll } from "../event-listing-horizontal-scroll";
 import { SingleEventShowcase } from "../single-event-showcase";
 import { DualEventShowcase } from "../dual-event-showcase";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { EventSectionHeader } from "../event-section-header";
 import { SiteHeading } from "@/components/public/site-heading";
 
 export default function UpcomingEvents({
@@ -43,6 +39,7 @@ export default function UpcomingEvents({
 }: EventComponentProps) {
   const [pendingEventSlug, setPendingEventSlug] = useState<string | null>(null);
   const isSitePreview = useIsPreviewMode();
+  const narrowPreview = usePreviewNarrowLayout();
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
   const currencySym = resolveCurrencySymbol(vendorTheme?.currency_symbol);
@@ -53,19 +50,10 @@ export default function UpcomingEvents({
   // Use API events - no more dummy data
   const events = mapApiEventsToUI(apiEvents || []);
 
-  // Helper function to map API event format to UI format
   function mapApiEventsToUI(apiEvents: Event[]) {
-    return apiEvents.map((event) => ({
-      title: event.name || "",
-      price:
-        event.lowest_price != null && !Number.isNaN(Number(event.lowest_price))
-          ? formatMoneyCompact(Number(event.lowest_price), currencySym)
-          : null,
-      dateLabel: getEventCardDateLabel(event),
-      category: getEventCardCategoryLabel(event),
-      image: event.banner_image || eventImages[0],
-      slug: event.slug || "",
-    }));
+    return apiEvents.map((event) =>
+      toLocationEventCardModel(event, currencySym, eventImages[0]),
+    );
   }
 
   const scrollWatchKey = useMemo(
@@ -73,31 +61,20 @@ export default function UpcomingEvents({
     [events],
   );
 
-  // Empty state: Site Essentials preview shows labeled dummy cards; live site keeps coming soon
+  // Empty state: onboarding / Site Essentials preview uses the draft event
+  // when provided. Never fall back to a hardcoded sample card.
   if (events.length === 0) {
     if (isSitePreview) {
-      return (
-        <SitePreviewDummyEventSection
-          sectionTitle={sectionTitleText}
-          sectionLabel="Upcoming Events"
-        />
-      );
+      return null;
     }
 
     return (
-      <section className="w-full bg-transparent py-20 md:py-28 text-[var(--color-text)]">
+      <section className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28">
         <div className="container mx-auto max-w-7xl px-4">
-          <div className="mb-8 w-full text-left space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-              Upcoming Events
-            </p>
-            <SiteHeading
-              level={2}
-              title={sectionTitleText}
-              variant="onSurface"
-              className="!text-3xl !font-black tracking-tight md:!text-4xl"
-            />
-          </div>
+          <EventSectionHeader
+            sectionLabel="Upcoming Events"
+            sectionTitle={sectionTitleText}
+          />
 
           {/* Professional Coming Soon UI */}
           <div className="text-center py-20">
@@ -130,7 +107,12 @@ export default function UpcomingEvents({
             </div>
 
             {/* Professional Event Placeholders */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div
+              className={cn(
+                "mx-auto grid max-w-5xl grid-cols-1 gap-8",
+                !narrowPreview && "md:grid-cols-3",
+              )}
+            >
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="group relative">
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 h-80 border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
@@ -203,12 +185,12 @@ export default function UpcomingEvents({
     );
   }
 
-  // 3–4 events: static grid — no slider chrome
+  // 3–4 events: horizontal peek on mobile; grid from md up
   if (events.length > 2 && events.length <= 4) {
     return (
       <section
         id="upcoming-events"
-        className="w-full bg-transparent py-20 md:py-28 text-[var(--color-text)]"
+        className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
       >
         <div className="container mx-auto max-w-7xl px-4">
           <div className="mb-8 w-full text-left space-y-3">
@@ -223,25 +205,57 @@ export default function UpcomingEvents({
             />
           </div>
 
-          <div
-            className={cn(
-              "grid grid-cols-1 gap-5 sm:grid-cols-2",
-              events.length === 3 && "lg:grid-cols-3",
-              events.length === 4 && "lg:grid-cols-4",
-            )}
-          >
-            {events.map((event, index) => (
-              <LocationEventCard
-                key={event.slug || index}
-                event={event}
-                locationSlug={locationSlug || ""}
-                locationLabel={locationLabel}
-                isPending={pendingEventSlug === event.slug}
-                onNavigateStart={() => setPendingEventSlug(event.slug)}
-                imageFallback={eventImages[index % eventImages.length]}
-              />
-            ))}
+          <div className={cn("relative w-full", !narrowPreview && "md:hidden")}>
+            <EventListingHorizontalScroll
+              watchKey={scrollWatchKey}
+              leftButtonClassName={eventCarouselNavButtonClass(
+                "absolute left-0 top-1/2 -translate-y-1/2",
+              )}
+              rightButtonClassName={eventCarouselNavButtonClass(
+                "absolute right-0 top-1/2 -translate-y-1/2",
+              )}
+            >
+              {events.map((event, index) => (
+                <div
+                  key={event.slug || index}
+                  className={mobileEventRowPeekScrollItemClass}
+                >
+                  <div className="h-full w-full pb-1 pt-0.5">
+                    <LocationEventCard
+                      event={event}
+                      locationSlug={locationSlug || ""}
+                      locationLabel={locationLabel}
+                      isPending={pendingEventSlug === event.slug}
+                      onNavigateStart={() => setPendingEventSlug(event.slug)}
+                      imageFallback={eventImages[index % eventImages.length]}
+                    />
+                  </div>
+                </div>
+              ))}
+            </EventListingHorizontalScroll>
           </div>
+
+          {!narrowPreview ? (
+            <div
+              className={cn(
+                "hidden gap-5 md:grid",
+                events.length === 3 && "md:grid-cols-2 lg:grid-cols-3",
+                events.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+              )}
+            >
+              {events.map((event, index) => (
+                <LocationEventCard
+                  key={event.slug || index}
+                  event={event}
+                  locationSlug={locationSlug || ""}
+                  locationLabel={locationLabel}
+                  isPending={pendingEventSlug === event.slug}
+                  onNavigateStart={() => setPendingEventSlug(event.slug)}
+                  imageFallback={eventImages[index % eventImages.length]}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
     );
@@ -251,20 +265,13 @@ export default function UpcomingEvents({
   return (
     <section
       id="upcoming-events"
-      className="w-full bg-transparent py-20 md:py-28 text-[var(--color-text)]"
+      className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
     >
       <div className="container mx-auto max-w-7xl px-4">
-        <div className="mb-8 w-full text-left space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-            Upcoming Events
-          </p>
-          <SiteHeading
-            level={2}
-            title={sectionTitleText}
-            variant="onSurface"
-            className="!text-3xl !font-black tracking-tight md:!text-4xl"
-          />
-        </div>
+        <EventSectionHeader
+          sectionLabel="Upcoming Events"
+          sectionTitle={sectionTitleText}
+        />
         <div className="relative w-full">
           <EventListingHorizontalScroll
             watchKey={scrollWatchKey}

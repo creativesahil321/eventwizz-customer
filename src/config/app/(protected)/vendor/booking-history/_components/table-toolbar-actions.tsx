@@ -151,8 +151,13 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
       toast.success(`Bookings exported successfully`);
       setExportDialogOpen(false);
       table.resetRowSelection();
-    } catch (error) {
-      // Error is already handled by the mutation and API interceptor
+    } catch (error: unknown) {
+      // Export uses raw axios blob download, so apiClient toast interceptor does not run
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to export bookings";
+      toast.error(message);
       console.error("Bulk export error:", error);
     }
   };
@@ -234,9 +239,9 @@ export function TableToolbarActions({ table }: TableToolbarActionsProps) {
                 showAIButton
                 className="min-h-[200px] max-h-[40vh] overflow-y-auto"
                 aiContext={{
-                  title: "Bulk booking email",
+                  title: emailData.subject.trim() || "Bulk booking email",
                   description:
-                    "Email to customers about their booking update. Use placeholders like {name} for the customer name.",
+                    "Write a professional email body that matches this subject line. Use placeholders like {name} for the customer name.",
                 }}
               />
               <p className="text-xs text-muted-foreground">

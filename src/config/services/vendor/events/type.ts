@@ -81,6 +81,7 @@ export interface EventDetailStepOne {
   vendor_location_id?: number;
   event_name?: string;
   event_category_id?: number;
+  category_name?: string | null;
   event_banner_image?: string | null;
   event_banner_video?: string | null;
   event_banner_heading?: string;
@@ -90,6 +91,11 @@ export interface EventDetailStepOne {
   about_event_heading?: string;
   about_event_sub_heading?: string;
   about_event_description?: string;
+  event_address?: string | null;
+  lat?: string | number | null;
+  long?: string | number | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
   event_schedular_title?: string;
   event_schedular?: Array<{ time: string; title: string }>;
   event_schedular_background_image?: string | null;
@@ -118,10 +124,23 @@ export interface EventDetailStepThree {
     event_date: string;
     booking_type: "tickets" | "tables" | "both";
     has_bookings?: boolean;
+    /** 1 = active, 2 = cancelled, 0 = inactive */
+    status?: number;
+    is_cancelled?: boolean;
+    is_readonly?: boolean;
+    can_edit?: boolean;
+    /**
+     * Backend: "cancel" keeps the date (cancelled: true); "remove" allows omitting it;
+     * "cancelled" means already cancelled (read-only).
+     */
+    date_action?: "cancel" | "remove" | "cancelled";
     use_cancel_date_action?: boolean;
+    /** Legacy — do not use for cancel/remove UI gating */
     cancellation_request_pending?: boolean;
     has_financial_bookings?: boolean;
     cancelled?: boolean;
+    cancellation_reason?: string | null;
+    cancelled_at?: string | null;
     total_table_types?: number;
     tables?: Array<{
       id: number;
@@ -165,6 +184,22 @@ export interface EventDetailStepFour {
 export interface EventDetailStepFive {
   event_id: number;
   step: number;
+  /** Event pin address shown on the public brochure/map section. */
+  event_address?: string;
+  lat?: string | number | null;
+  long?: string | number | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  brochure_pdf?: string | null;
+  brochure_pdf_2?: string | null;
+  faq_pdf?: string | null;
+  price_start_from?: string;
+  price_start_from_button_text?: string;
+}
+
+export interface EventDetailStepSix {
+  event_id: number;
+  step: number;
   drink_title?: string;
   drink_description?: string;
   packages?: Array<{
@@ -174,17 +209,6 @@ export interface EventDetailStepFive {
     price: string | number;
     available_quantity?: number;
   }>;
-}
-
-export interface EventDetailStepSix {
-  event_id: number;
-  step: number;
-  brochure_pdf?: string | null;
-  brochure_pdf_2?: string | null;
-  faq_pdf?: string | null;
-  event_address?: string;
-  price_start_from?: string;
-  price_start_from_button_text?: string;
 }
 
 export interface EventDetailStepSeven {
@@ -216,9 +240,16 @@ export interface EventDetailData {
   is_rooms?: boolean | number | string;
   approval_status?: string;
   vendor_location_id?: number;
+  /** Parent location hero position (public EventResource / site-essentials event preview). */
+  banner_heading_align?: "left" | "center" | "right" | null;
+  banner_heading_valign?: "top" | "center" | "bottom" | null;
   logo?: string | null;
   email?: string;
   contact_number?: string;
+  /** Global footer blurb when event GET duplicates site identity (admin review). */
+  footer_brand_description?: string | null;
+  copyright?: string | null;
+  about_description?: string | null;
   stepOne?: EventDetailStepOne;
   stepTwo?: EventDetailStepTwo;
   stepThree?: EventDetailStepThree;
@@ -335,6 +366,10 @@ export interface EventsResponse {
   };
   errors: string[];
   filter_meta?: EventsListFilterMeta;
+  active_events_count?: number;
+  past_events_count?: number;
+  draft_events_count?: number;
+  cancelled_events_count?: number;
 }
 
 /**

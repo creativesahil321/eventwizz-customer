@@ -1,41 +1,71 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 
-export function NewsletterFormSkeleton() {
+export function NewsletterManagerSkeleton() {
   return (
-    <section className="w-full bg-background p-6 rounded-md relative">
-      <header className="w-full mb-6">
-        <Skeleton className="h-8 w-40" />
-      </header>
-      <main className="w-full relative">
-        <form className="space-y-8 space-x-8 flex flex-col md:flex-row items-center">
-          <div className="grid gap-2 w-full lg:min-w-64">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-12 w-full rounded-md" />
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="mb-4 min-w-0 rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-md">
+        <div className="flex flex-col flex-wrap items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-8 w-40" />
+            <Skeleton className="h-4 w-80 max-w-full" />
           </div>
-          <div className="grid gap-2 w-full lg:min-w-64">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-12 w-full rounded-md" />
+          <div className="flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
+            <Skeleton className="h-10 w-full sm:w-60" />
+            <Skeleton className="h-10 w-[180px]" />
+            <Skeleton className="h-9 w-28 shrink-0" />
           </div>
-          <div className="grid gap-2 w-full lg:min-w-64">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-12 w-full rounded-md" />
-          </div>
-          <div className="grid gap-2 w-full lg:min-w-64">
-            <Skeleton className="h-4 w-40" />
-            <div className="flex space-x-4">
-              <div className="flex items-center space-x-2">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <Skeleton className="h-4 w-12" />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <Skeleton className="h-4 w-12" />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[var(--color-border)] pt-4 sm:gap-4 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex min-h-[72px] items-center gap-3 rounded-lg border border-[var(--color-border)] p-3 sm:p-4"
+            >
+              <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-6 w-10" />
               </div>
             </div>
+          ))}
+        </div>
+        <div className="mt-4 rounded-lg border border-[var(--color-border)] p-4 sm:p-5">
+          <Skeleton className="h-4 w-52" />
+          <Skeleton className="mt-2 h-3 w-full max-w-md" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex gap-3 rounded-md border border-[var(--color-border)] p-3"
+              >
+                <Skeleton className="h-6 w-6 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+              </div>
+            ))}
           </div>
-          <Skeleton className="h-9 w-24 rounded-lg" />
-        </form>
-      </main>
-    </section>
+        </div>
+      </div>
+
+      <DataTableSkeleton
+        columnCount={8}
+        cellWidths={[
+          "12rem",
+          "18rem",
+          "10rem",
+          "8rem",
+          "8rem",
+          "8rem",
+          "10rem",
+          "6rem",
+        ]}
+        shrinkZero
+        withViewOptions={false}
+      />
+    </div>
   );
 }

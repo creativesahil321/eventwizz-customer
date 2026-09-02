@@ -2,9 +2,12 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import siteEssentialsService from "@/services/common/site-essentials/site-essentials.service";
+import type { SiteEssentials } from "@/services/common/site-essentials/type";
+import { getThemePresetsCatalog } from "@/services/common/theme/theme-presets.service";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { SiteEssentialsFormValues } from "./schema";
 import { toSiteEssentialsUpdatePayload } from "./payload";
+import { slimSiteEssentialsForLocationPreview } from "./slim-location-preview-essentials";
 
 // Query key for site essentials
 export const siteEssentialsKeys = {
@@ -13,6 +16,25 @@ export const siteEssentialsKeys = {
   bySlug: (slug: string) =>
     [...siteEssentialsKeys.all, "by-slug", slug] as const,
 };
+
+export const themePresetsKeys = {
+  all: ["theme-presets"] as const,
+  catalog: () => [...themePresetsKeys.all, "catalog"] as const,
+};
+
+/** Shared stale window for by-slug location preview fetches. */
+export const SITE_ESSENTIALS_BY_SLUG_STALE_MS = 1000 * 60 * 5;
+
+/**
+ * Fetch location-scoped site essentials and strip unused CMS HTML before
+ * caching — keeps `/preview/site` location switches fast.
+ */
+export async function fetchSiteEssentialsBySlugForPreview(
+  slug: string,
+): Promise<SiteEssentials> {
+  const data = await siteEssentialsService.getSiteEssentials({ slug });
+  return slimSiteEssentialsForLocationPreview(data);
+}
 
 /**
  * Hook to fetch site essentials data with TanStack Query caching
@@ -33,16 +55,28 @@ export const useSiteEssentialsBySlugQuery = (
 ) => {
   return useQuery({
     queryKey: siteEssentialsKeys.bySlug(slug ?? ""),
-    queryFn: () =>
-      siteEssentialsService.getSiteEssentials({ slug: slug! }),
+    queryFn: () => fetchSiteEssentialsBySlugForPreview(slug!),
     enabled: enabled && Boolean(slug?.trim()),
-    staleTime: 1000 * 60 * 2,
+    staleTime: SITE_ESSENTIALS_BY_SLUG_STALE_MS,
+    gcTime: 1000 * 60 * 15,
   });
 };
 
 /**
  * Hook to update site essentials with TanStack Query mutation
  */
+/** Public catalog for Try theme. Refetch on mount so a backend seed is not stuck behind a 30‑min cache. */
+export const useThemePresetsCatalogQuery = () => {
+  return useQuery({
+    queryKey: themePresetsKeys.catalog(),
+    queryFn: getThemePresetsCatalog,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+    refetchOnMount: "always",
+    retry: 1,
+  });
+};
+
 /** Reset theme (colors + typography) to platform defaults — persists via API. */
 export const useResetSiteEssentialsThemeMutation = () => {
   const queryClient = useQueryClient();
@@ -51,6 +85,22 @@ export const useResetSiteEssentialsThemeMutation = () => {
     mutationFn: () => siteEssentialsService.resetSiteEssentialsThemeToDefault(),
     onSuccess: (data) => {
       queryClient.setQueryData(siteEssentialsKeys.details(), data);
+      void queryClient.invalidateQueries({ queryKey: siteEssentialsKeys.all });
+      void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+    },
+  });
+};
+
+/** Apply a catalog recipe (tokens + theme_preset_id). Logo/copy unchanged. */
+export const useApplyThemePresetMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (themePresetId: string) =>
+      siteEssentialsService.applySiteEssentialsThemePreset(themePresetId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(siteEssentialsKeys.details(), data);
+      void queryClient.invalidateQueries({ queryKey: siteEssentialsKeys.all });
       void queryClient.invalidateQueries({ queryKey: themeKeys.all });
     },
   });
@@ -65,8 +115,11 @@ export const useSiteEssentialsMutation = () => {
         toSiteEssentialsUpdatePayload(data as SiteEssentialsFormValues),
       ),
     onSuccess: (data) => {
-      // Immediately update the cache with the new data
+      // Immediately update the cache with the new data.
+      // dataUpdatedAt changes → logo/favicon previews get a fresh ?v= cache key
+      // (backend often overwrites the same storage path).
       queryClient.setQueryData(siteEssentialsKeys.details(), data);
+      void queryClient.invalidateQueries({ queryKey: themeKeys.all });
     },
   });
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { NotificationItemComponent } from "./notification-item";
 import { Notification } from "@/services/common/notification/type";
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
@@ -15,6 +15,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { NotificationsListSkeleton } from "./skeleton-loader";
+import { groupNotificationsByDate } from "../_lib/notification-ui";
 
 interface NotificationListProps {
   notifications: Notification[];
@@ -42,12 +43,16 @@ export function NotificationListComponent({
   isLoading,
 }: NotificationListProps) {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  // If loading, show a skeleton
+
+  const groupedNotifications = useMemo(
+    () => groupNotificationsByDate(notifications),
+    [notifications],
+  );
+
   if (isLoading) {
     return <NotificationsListSkeleton />;
   }
 
-  // If no notifications or invalid data, show empty state
   if (
     !notifications ||
     !Array.isArray(notifications) ||
@@ -63,29 +68,42 @@ export function NotificationListComponent({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-lg border border-[var(--color-border)]">
-        {notifications.map((notification) => (
-          <NotificationItemComponent
-            key={notification.id}
-            notification={notification}
-            onViewDetails={onViewDetails}
-            onMarkAsRead={(id) => {
-              setUpdatingId(id);
-              onMarkAsRead(id, { onSettled: () => setUpdatingId(null) });
-            }}
-            onMarkAsUnread={(id) => {
-              setUpdatingId(id);
-              onMarkAsUnread(id, { onSettled: () => setUpdatingId(null) });
-            }}
-            isUpdating={updatingId === notification.id}
-          />
-        ))}
-      </div>
+    <div className="space-y-6">
+      {groupedNotifications.map((group) => (
+        <section key={group.key} className="space-y-3">
+          <div className="flex items-center gap-3 px-0.5">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {group.label}
+            </h3>
+            <div className="h-px flex-1 bg-[var(--color-border)]" />
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {group.items.length}
+            </span>
+          </div>
 
-      {/* Pagination */}
+          <div className="space-y-2.5">
+            {group.items.map((notification) => (
+              <NotificationItemComponent
+                key={notification.id}
+                notification={notification}
+                onViewDetails={onViewDetails}
+                onMarkAsRead={(id) => {
+                  setUpdatingId(id);
+                  onMarkAsRead(id, { onSettled: () => setUpdatingId(null) });
+                }}
+                onMarkAsUnread={(id) => {
+                  setUpdatingId(id);
+                  onMarkAsUnread(id, { onSettled: () => setUpdatingId(null) });
+                }}
+                isUpdating={updatingId === notification.id}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+
       {meta && meta.lastPage > 1 && (
-        <Pagination className="mt-4">
+        <Pagination className="mt-2">
           <PaginationContent>
             {meta.page > 1 && (
               <PaginationItem>
@@ -96,7 +114,6 @@ export function NotificationListComponent({
               </PaginationItem>
             )}
 
-            {/* First page */}
             <PaginationItem>
               <PaginationLink
                 onClick={() => onPageChange(1)}
@@ -106,14 +123,12 @@ export function NotificationListComponent({
               </PaginationLink>
             </PaginationItem>
 
-            {/* Ellipsis if needed */}
             {meta.page > 3 && (
               <PaginationItem>
                 <PaginationEllipsis />
               </PaginationItem>
             )}
 
-            {/* Pages before current */}
             {meta.page > 2 && (
               <PaginationItem>
                 <PaginationLink onClick={() => onPageChange(meta.page - 1)}>
@@ -122,7 +137,6 @@ export function NotificationListComponent({
               </PaginationItem>
             )}
 
-            {/* Current page (if not first or last) */}
             {meta.page !== 1 && meta.page !== meta.lastPage && (
               <PaginationItem>
                 <PaginationLink
@@ -134,7 +148,6 @@ export function NotificationListComponent({
               </PaginationItem>
             )}
 
-            {/* Pages after current */}
             {meta.page < meta.lastPage - 1 && (
               <PaginationItem>
                 <PaginationLink onClick={() => onPageChange(meta.page + 1)}>
@@ -143,14 +156,12 @@ export function NotificationListComponent({
               </PaginationItem>
             )}
 
-            {/* Ellipsis if needed */}
             {meta.page < meta.lastPage - 2 && (
               <PaginationItem>
                 <PaginationEllipsis />
               </PaginationItem>
             )}
 
-            {/* Last page (if not first) */}
             {meta.lastPage !== 1 && (
               <PaginationItem>
                 <PaginationLink

@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
 import {
   SUPPORT_ATTACHMENT_ACCEPT,
   SUPPORT_IMAGE_ATTACHMENT_ACCEPT,
@@ -25,13 +24,24 @@ import SupportAttachmentCards from "@/app/(protected)/_shared/support/support-at
 import SupportMessageAvatar from "@/app/(protected)/_shared/support/support-message-avatar";
 import SupportMessageScroller from "@/app/(protected)/_shared/support/support-message-scroller";
 import { useStoreVendorSupportMessage } from "@/services/vendor/support";
+import { useAuthStore } from "@/store/auth.store";
 import type { VendorSupportMessage } from "../_lib/types";
 import {
   formatSupportMessageTimestamp,
   groupMessagesByDate,
 } from "../_lib/utils";
+import {
+  buildOptimisticAttachments,
+  createOptimisticId,
+  useOptimisticSupportMessages,
+  type OptimisticStatus,
+} from "@/app/(protected)/_shared/support/use-optimistic-messages";
 
 type ComposerMode = "reply" | "internal_note";
+
+type ThreadMessage = VendorSupportMessage & {
+  optimisticStatus?: OptimisticStatus;
+};
 
 function SystemMessagePill({ message }: { message: VendorSupportMessage }) {
   return (
@@ -76,7 +86,8 @@ function CustomerMessage({ message }: { message: VendorSupportMessage }) {
   );
 }
 
-function AgentMessage({ message }: { message: VendorSupportMessage }) {
+function AgentMessage({ message }: { message: ThreadMessage }) {
+  const isSending = message.optimisticStatus === "sending";
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
@@ -86,12 +97,19 @@ function AgentMessage({ message }: { message: VendorSupportMessage }) {
             {message.senderName}
           </p>
           <p className="text-[10px] text-muted-foreground">
-            {formatSupportMessageTimestamp(message.createdAt)}
+            {isSending
+              ? "Sending…"
+              : formatSupportMessageTimestamp(message.createdAt)}
           </p>
         </div>
       </div>
       {message.content?.trim() ? (
-        <div className="max-w-[min(100%,36rem)] rounded-2xl rounded-tr-md bg-[var(--color-primary)] px-3 py-2 text-[13px] leading-snug text-white shadow-sm">
+        <div
+          className={cn(
+            "max-w-[min(100%,36rem)] rounded-2xl rounded-tr-md bg-[var(--color-primary)] px-3 py-2 text-[13px] leading-snug text-white shadow-sm transition-opacity",
+            isSending && "opacity-70"
+          )}
+        >
           <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
             {message.content}
           </p>
@@ -107,7 +125,8 @@ function AgentMessage({ message }: { message: VendorSupportMessage }) {
   );
 }
 
-function InternalNoteMessage({ message }: { message: VendorSupportMessage }) {
+function InternalNoteMessage({ message }: { message: ThreadMessage }) {
+  const isSending = message.optimisticStatus === "sending";
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex max-w-full flex-row-reverse items-center gap-1.5">
@@ -123,12 +142,19 @@ function InternalNoteMessage({ message }: { message: VendorSupportMessage }) {
             </p>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            {formatSupportMessageTimestamp(message.createdAt)}
+            {isSending
+              ? "Sending…"
+              : formatSupportMessageTimestamp(message.createdAt)}
           </p>
         </div>
       </div>
       {message.content?.trim() ? (
-        <div className="max-w-[min(100%,36rem)] rounded-2xl rounded-tr-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] leading-snug text-amber-950 shadow-sm">
+        <div
+          className={cn(
+            "max-w-[min(100%,36rem)] rounded-2xl rounded-tr-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] leading-snug text-amber-950 shadow-sm transition-opacity",
+            isSending && "opacity-70"
+          )}
+        >
           <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
             {message.content}
           </p>
@@ -192,7 +218,10 @@ export default function VendorConversationThread({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const storeMessage = useStoreVendorSupportMessage();
+  const user = useAuthStore((state) => state.user);
   const isSending = storeMessage.isPending;
+  const { messages: displayMessages, addPending, removePending } =
+    useOptimisticSupportMessages<ThreadMessage>(messages, ticketKey);
 
   useEffect(() => {
     setDraft("");
@@ -200,7 +229,7 @@ export default function VendorConversationThread({
     setComposerMode("reply");
   }, [ticketKey]);
 
-  const groupedMessages = groupMessagesByDate(messages);
+  const groupedMessages = groupMessagesByDate(displayMessages);
 
   const isInternal = composerMode === "internal_note";
 
@@ -226,35 +255,58 @@ export default function VendorConversationThread({
   const handleSend = useCallback(async () => {
     if (isComposerDisabled || isSending) return;
     const message = draft.trim();
-    if (!message && attachments.length === 0) return;
+    const sentAttachments = attachments;
+    const sentAsInternal = isInternal;
+    if (!message && sentAttachments.length === 0) return;
+
+    // Optimistic: show the reply/note instantly and clear the composer.
+    const optimisticId = addPending({
+      id: createOptimisticId(),
+      sender: "agent",
+      senderName: user?.first_name?.trim() || "You",
+      content: message,
+      createdAt: new Date().toISOString(),
+      attachments: buildOptimisticAttachments(sentAttachments),
+      isInternal: sentAsInternal,
+      optimisticStatus: "sending",
+    });
+    setDraft("");
+    setAttachments([]);
+    setStickToBottomKey((key) => key + 1);
 
     try {
       await storeMessage.mutateAsync({
         ticketKey,
         message,
-        is_internal: isInternal || undefined,
-        attachments,
+        is_internal: sentAsInternal || undefined,
+        attachments: sentAttachments,
       });
-      setDraft("");
-      setAttachments([]);
-      setStickToBottomKey((key) => key + 1);
       onMessageSent?.();
     } catch {
-      // API client already surfaces validation / network toasts
+      // Roll back so the user can retry; API client surfaces the error toast.
+      removePending(optimisticId);
+      setDraft((current) => (current ? current : message));
+      setAttachments((current) =>
+        current.length ? current : sentAttachments
+      );
+      setComposerMode(sentAsInternal ? "internal_note" : "reply");
     }
   }, [
+    addPending,
     attachments,
     draft,
     isComposerDisabled,
     isInternal,
     isSending,
     onMessageSent,
+    removePending,
     storeMessage,
     ticketKey,
+    user?.first_name,
   ]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void handleSend();
     }
@@ -273,7 +325,7 @@ export default function VendorConversationThread({
         isLoadingMore={isLoadingMore}
         onLoadMore={onLoadMore}
         emptyState={
-          messages.length === 0 ? (
+          displayMessages.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               No messages in this conversation yet.
             </p>
@@ -284,7 +336,7 @@ export default function VendorConversationThread({
           <div key={group.date} className="space-y-2.5">
             <DateSeparator label={group.date} />
             {group.messages.map((message) => {
-              const vendorMessage = message as VendorSupportMessage;
+              const vendorMessage = message as ThreadMessage;
 
               if (vendorMessage.sender === "system") {
                 return (
@@ -390,12 +442,11 @@ export default function VendorConversationThread({
               placeholder={
                 isInternal
                   ? "Write an internal note — only your team can see this..."
-                  : "Type your reply. Use @ to mention a teammate."
+                  : "Type your reply."
               }
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isSending}
               className={cn(
                 "min-h-[40px] max-h-[120px] resize-none rounded-none border-0 px-3.5 py-2.5 text-sm shadow-none focus-visible:ring-0 sm:min-h-[48px]",
                 isInternal ? "bg-amber-50" : "bg-white"
@@ -475,9 +526,6 @@ export default function VendorConversationThread({
                 </Button>
               </div>
               <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
-                <span className="hidden text-xs text-muted-foreground sm:inline">
-                  {getModKeyLabel()} + Enter to send
-                </span>
                 <Button
                   type="button"
                   variant={isInternal ? "default" : "event-primary"}

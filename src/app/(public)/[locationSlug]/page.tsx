@@ -9,6 +9,8 @@ import {
   eventKeys,
 } from "@/services/common/events/events.service";
 import { locationDisplayName } from "@/lib/slug-short-label";
+import { resolveLocationCoverHeroSrc } from "@/lib/resolve-hero-cover-image";
+import { preloadHeroImage } from "@/lib/preload-hero-image";
 
 /** Paths that must never be treated as venue location slugs. */
 const RESERVED_LOCATION_SLUGS = new Set([
@@ -111,6 +113,8 @@ export default async function LocationPage(props: {
   if (!locationData) {
     notFound();
   }
+
+  preloadHeroImage(resolveLocationCoverHeroSrc(locationData.cover_image));
 
   // Prefetch the query to populate the cache - only need to do this once
   await queryClient.prefetchQuery({

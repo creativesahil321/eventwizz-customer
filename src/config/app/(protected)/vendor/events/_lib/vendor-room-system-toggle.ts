@@ -65,7 +65,8 @@ export function mirrorLocalStepTwoFlatFieldsToGlobal(
 /** Mirror onboarding `notifyDataChanged` — refetch only, never POST on toggle. */
 export function notifyVendorEventRoomSystemChanged(
   invalidateCache?: () => Promise<unknown>,
+  eventId?: string | number,
 ): void {
-  void eventsService.notifyDataChanged();
+  void eventsService.notifyDataChanged(eventId);
   void invalidateCache?.();
 }

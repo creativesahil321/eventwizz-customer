@@ -2,38 +2,57 @@
  * Utility functions for generating event-related URLs
  */
 
+export type EventDetailsUrlOptions = {
+  /** Optional hash anchor to scroll to (e.g. '#booking') */
+  hashAnchor?: string;
+  /** Deep-link the public event page to a specific room */
+  roomId?: number | null;
+};
+
 /**
- * Generate event details page URL with optional hash anchor
+ * Generate event details page URL with optional room query + hash anchor.
  *
- * @param locationSlug - The location slug
- * @param eventSlug - The event slug
- * @param hashAnchor - Optional hash anchor to scroll to (e.g., '#booking')
- * @returns Complete event details page URL or null if slugs are missing
+ * @returns `/{location}/events/{event}?roomId={id}#booking` (parts omitted when unset)
  */
 export function generateEventDetailsUrl(
   locationSlug: string | null,
   eventSlug: string | null,
-  hashAnchor?: string
+  hashAnchorOrOptions?: string | EventDetailsUrlOptions,
 ): string | null {
   if (!locationSlug || !eventSlug) {
     return null;
   }
 
-  const baseUrl = `/${locationSlug}/events/${eventSlug}`;
-  return hashAnchor ? `${baseUrl}${hashAnchor}` : baseUrl;
+  const options: EventDetailsUrlOptions =
+    typeof hashAnchorOrOptions === "string"
+      ? { hashAnchor: hashAnchorOrOptions }
+      : (hashAnchorOrOptions ?? {});
+
+  const params = new URLSearchParams();
+  const roomId = Number(options.roomId);
+  if (Number.isFinite(roomId) && roomId > 0) {
+    params.set("roomId", String(roomId));
+  }
+
+  const query = params.toString();
+  const baseUrl = `/${locationSlug}/events/${eventSlug}${
+    query ? `?${query}` : ""
+  }`;
+  const hash = options.hashAnchor?.trim();
+  if (!hash) return baseUrl;
+  return `${baseUrl}${hash.startsWith("#") ? hash : `#${hash}`}`;
 }
 
 /**
- * Generate event booking section URL
- * Shorthand for generating URL with #booking hash
- *
- * @param locationSlug - The location slug
- * @param eventSlug - The event slug
- * @returns Event details page URL with #booking anchor or null
+ * Generate event booking section URL (`#booking`), optionally scoped to a room.
  */
 export function generateEventBookingUrl(
   locationSlug: string | null,
-  eventSlug: string | null
+  eventSlug: string | null,
+  roomId?: number | null,
 ): string | null {
-  return generateEventDetailsUrl(locationSlug, eventSlug, "#booking");
+  return generateEventDetailsUrl(locationSlug, eventSlug, {
+    hashAnchor: "#booking",
+    roomId,
+  });
 }

@@ -13,7 +13,7 @@ export function useEventDetail(slug: string, domain: string) {
   return useQuery({
     queryKey: eventKeys.eventDetail(slug, domain),
     queryFn: () => eventsService.getEventDetail(slug, domain),
-    enabled: !isPreviewMode, // Disable API calls in preview mode
+    enabled: !isPreviewMode && Boolean(slug) && Boolean(domain),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

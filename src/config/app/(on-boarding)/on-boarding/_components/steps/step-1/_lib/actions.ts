@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { UseFormReturn } from "react-hook-form";
 import { StepOneType } from "../../../form-provider/schema";
+import { cityFromGooglePlace } from "../../step-7/address-autocomplete";
 
 export const fetchPlaceDetails = (
   form: UseFormReturn<StepOneType>,
@@ -27,6 +28,7 @@ export const fetchPlaceDetails = (
         "url",
         "business_status",
         "address_components",
+        "geometry",
       ],
     },
     (place, status) => {
@@ -53,20 +55,29 @@ export const fetchPlaceDetails = (
         shouldValidate: true,
       });
 
-      // Extract city from address components if available
-      if (place.address_components) {
-        const cityComponent = place.address_components.find(
-          (component) =>
-            component.types.includes("locality") ||
-            component.types.includes("postal_town") ||
-            component.types.includes("administrative_area_level_1")
-        );
+      const city = cityFromGooglePlace({
+        address_components: place.address_components,
+        formatted_address: place.formatted_address,
+      });
+      if (city) {
+        form.setValue("city", city, {
+          shouldValidate: true,
+        });
+      }
 
-        if (cityComponent) {
-          form.setValue("city", cityComponent.long_name, {
-            shouldValidate: true,
-          });
-        }
+      const loc = place.geometry?.location;
+      if (loc) {
+        form.setValue("latitude", loc.lat(), {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+        form.setValue("longitude", loc.lng(), {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+      } else {
+        form.setValue("latitude", undefined, { shouldValidate: true });
+        form.setValue("longitude", undefined, { shouldValidate: true });
       }
 
       // Set a generic description if business is operational

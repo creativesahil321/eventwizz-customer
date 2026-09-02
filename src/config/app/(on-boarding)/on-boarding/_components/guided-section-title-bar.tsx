@@ -33,12 +33,10 @@ function shouldShowSectionEdit(
   sectionIndex: number,
   sectionId: string,
 ) {
-  // When all sections are approved the form is fully unlocked for direct editing —
-  // an explicit Edit button adds no value and creates confusion.
-  if (guided.allSectionsApproved) return false;
   const isApproved = guided.approvedSections.has(sectionId);
   const isActive = guided.currentSectionIndex === sectionIndex;
-  // Show only for approved sections that are NOT the current active one.
+  // Keep Edit available after approve-all so vendors can revise any completed
+  // section before saving. The active section is already open for editing.
   return isApproved && !isActive;
 }
 
@@ -101,7 +99,9 @@ export function GuidedSectionTitleBar({
       )}
     >
       <div className="min-w-0 flex-1">
-        <OnboardingSectionTitle className="min-w-0">{title}</OnboardingSectionTitle>
+        <OnboardingSectionTitle className="min-w-0">
+          {title}
+        </OnboardingSectionTitle>
       </div>
       <GuidedSectionUnlockButton
         sectionIndex={sectionIndex}

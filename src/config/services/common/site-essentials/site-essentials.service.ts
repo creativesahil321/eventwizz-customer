@@ -1,6 +1,7 @@
 import { api } from "@/services/core/api-client";
 import { SiteEssentials, SiteEssentialsResponse } from "./type";
 import { getEndpointsByRole } from "@/lib/utils/api-endpoints";
+import { flattenInfoPages } from "@/lib/flatten-info-pages";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 
 /**
@@ -11,6 +12,8 @@ type SiteEssentialsEndpoints = {
   GET: string;
   UPDATE: string;
   RESET_THEME_DEFAULT: string;
+  THEME_PRESETS: string;
+  APPLY_THEME_PRESET: string;
 };
 
 export type GetSiteEssentialsOptions = {
@@ -41,7 +44,7 @@ export const getSiteEssentials = async (
       returnFullResponse: true,
       params: Object.keys(params).length > 0 ? params : undefined,
     });
-    return response.data;
+    return flattenInfoPages(response.data);
   } catch (error) {
     console.error("Error fetching site essentials:", error);
     throw error;
@@ -63,7 +66,7 @@ export const resetSiteEssentialsThemeToDefault = async (): Promise<SiteEssential
         returnFullResponse: true,
       },
     );
-    return response.data;
+    return flattenInfoPages(response.data);
   } catch (error) {
     console.error("Error resetting site essentials theme:", error);
     throw error;
@@ -88,47 +91,121 @@ export const updateSiteEssentials = async (
     );
 
     if (hasFiles) {
-      // Create FormData for multipart request
+      // Laravel expects nested objects as PHP array fields
+      // (colors[primary], typography[fontFamily][heading], …) — not JSON strings.
       const formData = new FormData();
+      appendToFormData(formData, data as Record<string, unknown>);
 
-      Object.entries(data).forEach(([key, value]) => {
-        if (value instanceof File || value instanceof Blob) {
-          formData.append(key, value);
-        } else if (value !== null && value !== undefined) {
-          // Handle nested objects (like colors, typography, etc.)
-          if (typeof value === "object") {
-            formData.append(key, JSON.stringify(value));
-          } else {
-            formData.append(key, String(value));
-          }
-        }
-      });
+      if (!formData.has("_method")) {
+        formData.append("_method", "PATCH");
+      }
 
       const response = await api.post<SiteEssentialsResponse>(
         endpoints.UPDATE,
-        {
-          ...data,
-          _method: "PATCH",
-        },
+        formData,
         {
           returnFullResponse: true,
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
-      return response.data;
+      return flattenInfoPages(response.data);
     } else {
-      // No files, send as regular JSON
-      const response = await api.post<SiteEssentialsResponse>(
+      // Strip unsaved blob/data URLs — they are not valid server media paths
+      const sanitized = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => {
+          if (typeof value !== "string") return true;
+          const v = value.trim();
+          return !(v.startsWith("blob:") || v.startsWith("data:"));
+        }),
+      ) as Partial<SiteEssentialsFormValues>;
+
+      const response = await api.patch<SiteEssentialsResponse>(
         endpoints.UPDATE,
-        data as unknown as SiteEssentialsFormValues, // Type assertion to bypass strict type checking for mixed data types
-        { returnFullResponse: true }
+        sanitized as unknown as SiteEssentialsFormValues,
+        { returnFullResponse: true },
       );
-      return response.data;
+      return flattenInfoPages(response.data);
     }
   } catch (error) {
     console.error("Error updating site essentials:", error);
+    throw error;
+  }
+};
+
+/**
+ * Append nested objects/arrays using PHP/Laravel bracket notation so validators
+ * receive arrays (e.g. colors[primary]), not a JSON string.
+ */
+function appendToFormData(
+  formData: FormData,
+  value: unknown,
+  path = "",
+): void {
+  if (value === undefined) return;
+  if (value === null) {
+    // Laravel JSON PATCH needs an explicit null for theme_preset_id (custom theme).
+    // FormData cannot send JSON null — empty string is treated as clear.
+    if (path === "theme_preset_id") {
+      formData.append(path, "");
+    }
+    return;
+  }
+
+  if (value instanceof File || value instanceof Blob) {
+    if (path) formData.append(path, value);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      appendToFormData(formData, item, `${path}[${index}]`);
+    });
+    return;
+  }
+
+  if (typeof value === "object") {
+    Object.entries(value as Record<string, unknown>).forEach(([key, nested]) => {
+      const nextPath = path ? `${path}[${key}]` : key;
+      appendToFormData(formData, nested, nextPath);
+    });
+    return;
+  }
+
+  if (!path) return;
+  if (typeof value === "boolean") {
+    formData.append(path, value ? "1" : "0");
+    return;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    // Never send preview-only blob/data URLs to the API
+    if (trimmed.startsWith("blob:") || trimmed.startsWith("data:")) return;
+    formData.append(path, value);
+    return;
+  }
+  formData.append(path, String(value));
+}
+
+/**
+ * Apply a catalog recipe: writes catalog colors/typography and theme_preset_id.
+ * Does not change logo, copy, or media.
+ */
+export const applySiteEssentialsThemePreset = async (
+  themePresetId: string,
+): Promise<SiteEssentials> => {
+  try {
+    const endpoints =
+      getEndpointsByRole<SiteEssentialsEndpoints>("SITES_ESSENTIALS");
+    const response = await api.post<SiteEssentialsResponse>(
+      endpoints.APPLY_THEME_PRESET,
+      { theme_preset_id: themePresetId },
+      { returnFullResponse: true },
+    );
+    return flattenInfoPages(response.data);
+  } catch (error) {
+    console.error("Error applying site essentials theme preset:", error);
     throw error;
   }
 };
@@ -137,6 +214,7 @@ const siteEssentialsService = {
   getSiteEssentials,
   updateSiteEssentials,
   resetSiteEssentialsThemeToDefault,
+  applySiteEssentialsThemePreset,
 };
 
 export default siteEssentialsService;

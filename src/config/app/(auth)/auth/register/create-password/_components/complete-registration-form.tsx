@@ -20,6 +20,8 @@ import { AuthUser, UserType, StaffRole } from "@/types/auth.types";
 import { usePermissionStore } from "@/store/permission.store";
 import { Loader2 } from "lucide-react";
 import { RegistrationResponse } from "@/types/api.types";
+import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
+import { clearOnboardingBrowserState } from "@/lib/clear-vendor-browser-session";
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
@@ -32,6 +34,7 @@ export function CompleteRegistrationForm() {
   const [redirecting, setRedirecting] = useState(false);
   const [redirectAccountType, setRedirectAccountType] = useState<"vendor" | "customer" | "admin" | null>(null);
   const email = searchParams?.get("email") || "";
+  const callbackUrl = searchParams?.get("callbackUrl");
 
   const {
     register,
@@ -98,6 +101,8 @@ export function CompleteRegistrationForm() {
       })) as unknown as RegistrationResponse;
 
       if (response.status) {
+        clearOnboardingBrowserState();
+
         // Clear registration data
         const cookieKeys = [
           "verification_email",
@@ -206,12 +211,13 @@ export function CompleteRegistrationForm() {
           toast.error(result?.error || "Failed to sign in after registration");
           router.push("/auth/login");
         } else {
-          // Redirect based on account type
-          if (accountType === "vendor") {
-            router.push("/on-boarding");
-          } else {
-            router.push(`/${accountType}/dashboard`);
-          }
+          router.push(
+            resolvePostLoginRedirect({
+              accountType,
+              isVendorOnboarded: false,
+              callbackUrl,
+            }),
+          );
         }
       } else {
         // Error is handled by axios interceptor
@@ -240,12 +246,16 @@ export function CompleteRegistrationForm() {
         <div className="flex flex-col items-center gap-4 text-center">
           <Loader2
             className="h-10 w-10 animate-spin"
-            style={{ color: isVendor ? "#94a3b8" : "var(--color-primary, #3b82f6)" }}
+            style={{
+              color: isVendor ? "#94a3b8" : "var(--color-primary, #1e293b)",
+            }}
             aria-hidden
           />
           <p
             className="text-sm"
-            style={{ color: isVendor ? "#94a3b8" : "var(--color-text-dimmed, #64748b)" }}
+            style={{
+              color: isVendor ? "#94a3b8" : "var(--color-text-dimmed, #64748b)",
+            }}
           >
             {isVendor
               ? "Taking you to complete your setup…"
@@ -260,11 +270,11 @@ export function CompleteRegistrationForm() {
     <div className="w-full">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 ">
         <div className="space-y-2">
-          <Label>First Name</Label>
+          <Label className="text-[var(--color-text)]">First Name</Label>
           <Input
             id="firstName"
             type="text"
-            className={`h-10 ${errors.firstName ? "border-red-500" : ""}`}
+            className={`h-10 text-[var(--color-text)] ${errors.firstName ? "border-red-500" : ""}`}
             placeholder="Enter your first name"
             {...register("firstName")}
           />
@@ -274,11 +284,11 @@ export function CompleteRegistrationForm() {
         </div>
 
         <div className="space-y-2">
-          <Label>Last Name</Label>
+          <Label className="text-[var(--color-text)]">Last Name</Label>
           <Input
             id="lastName"
             type="text"
-            className={`h-10 ${errors.lastName ? "border-red-500" : ""}`}
+            className={`h-10 text-[var(--color-text)] ${errors.lastName ? "border-red-500" : ""}`}
             placeholder="Enter your last name"
             {...register("lastName")}
           />
@@ -288,11 +298,11 @@ export function CompleteRegistrationForm() {
         </div>
 
         <div className="space-y-2">
-          <Label>Email</Label>
+          <Label className="text-[var(--color-text)]">Email</Label>
           <Input
             id="email"
             type="email"
-            className="h-10 bg-gray-50"
+            className="h-10 bg-[color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))] text-[var(--color-text-dimmed)]"
             placeholder="name@example.com"
             {...register("email")}
             disabled
@@ -303,10 +313,10 @@ export function CompleteRegistrationForm() {
         </div>
 
         <div className="space-y-2">
-          <Label>Password</Label>
+          <Label className="text-[var(--color-text)]">Password</Label>
           <PasswordInput
             id="password"
-            className={`h-10 ${errors.password ? "border-red-500" : ""}`}
+            className={`h-10 text-[var(--color-text)] ${errors.password ? "border-red-500" : ""}`}
             placeholder="Create a password"
             {...register("password")}
           />
@@ -316,11 +326,11 @@ export function CompleteRegistrationForm() {
         </div>
 
         <div className="space-y-2">
-          <Label>Confirm Password</Label>
+          <Label className="text-[var(--color-text)]">Confirm Password</Label>
           <PasswordInput
             id="confirmPassword"
             ariaPasswordField="confirm password"
-            className={`h-10 ${errors.confirmPassword ? "border-red-500" : ""}`}
+            className={`h-10 text-[var(--color-text)] ${errors.confirmPassword ? "border-red-500" : ""}`}
             placeholder="Confirm your password"
             {...register("confirmPassword")}
           />

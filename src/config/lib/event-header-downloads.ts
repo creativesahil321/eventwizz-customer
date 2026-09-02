@@ -1,5 +1,6 @@
 /**
- * PDFs shown in BrochureSection — same ordering/labels for the compact header downloads menu.
+ * PDFs for the header downloads control (brochure / flyer / FAQ).
+ * Body brochure section no longer renders a DOWNLOADS tile — header is the only download UI.
  */
 export type HeaderDownloadLink = { title: string; href: string };
 

@@ -1,12 +1,12 @@
 "use client";
 import React, {
+  useCallback,
   useEffect,
   useState,
   useMemo,
   lazy,
   Suspense,
   useRef,
-  type CSSProperties,
 } from "react";
 import { useFormContext } from "../form-provider";
 import { OnboardingFormData, type StepFiveType } from "../form-provider/schema";
@@ -18,19 +18,58 @@ import {
   siteEssentialsToPreviewRootStyle,
 } from "../../_lib/onboarding-site-essentials-bridge";
 import { OnboardingPreviewHeader } from "./onboarding-preview-header";
-import { ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX } from "./preview-layout-constants";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
-import HeroBanner from "@/app/(public)/vendor/_components/EventListPage/hero-banner";
-import ExperienceSection from "@/app/(public)/vendor/_components/EventListPage/experience";
+import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
+import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview";
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 import { headerLinksFromDownloadItems } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { EventHeroBand } from "@/components/public/event-hero-band";
-import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
+import { EventRoomChooser } from "@/components/public/event-room-chooser";
+import { RoomContentTransition } from "@/components/public/room-content-transition";
+import {
+  EventSectionNav,
+  EVENT_SECTION_IDS,
+  EVENT_SECTION_NAV_HEIGHT,
+  buildEventSectionNavItems,
+} from "@/components/public/event-section-nav";
+import {
+  formatEventHeroDateRange,
+  formatEventHeroTimeRange,
+} from "@/lib/event-hero-meta";
+import {
+  formatEventLocationLabel,
+  resolveEventLocation,
+} from "@/lib/event-location";
+import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
+import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import { Image as ImageIcon } from "lucide-react";
-import { useCurrencySymbol } from "@/hooks/use-currency-format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { useEventCategories } from "@/services/vendor/events/query";
 import { normalizeSlug } from "@/lib/utils";
+import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
+import { useRoomManager } from "../rooms/use-room-manager";
+import { listOnboardingPreviewRoomSummaries } from "../rooms/list-onboarding-preview-room-summaries";
+import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
+import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
+import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "./preview-layout-constants";
+import {
+  buildEventStickyOffsetCssVar,
+  EVENT_STICKY_SCROLL_MT_FALLBACK,
+  resolveBookNowScrollOffsetPx,
+} from "@/lib/event-sticky-scroll-offset";
+import {
+  PreviewEditHit,
+  PREVIEW_SECTION_EDITOR,
+  type PreviewEditorTarget,
+  ONBOARDING_PREVIEW_EDITOR_TARGETS,
+} from "./preview-edit-hit";
+
+const HEADER_OFFSET_PX = 72;
+const PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX = resolveBookNowScrollOffsetPx({
+  headerOffsetPx: HEADER_OFFSET_PX,
+});
 
 // Lazy load components - only import what's actually used
 const BrochureSection = lazy(() => import("./_components/brochure-section"));
@@ -70,32 +109,61 @@ function minPriceFromStepFiveDate(d: StepFiveType["dates"][number]): number {
 
 function buildDatesPreviewFromStepFive(
   dates: StepFiveType["dates"] | undefined,
-): Array<{ event_date: string; price: number }> {
+): Array<{
+  event_date: string;
+  price: number;
+  booking_type?: "tickets" | "tables" | "both";
+}> {
   if (!dates?.length) return [];
   return dates.map((d) => ({
     event_date: d.event_date,
     price: minPriceFromStepFiveDate(d),
+    booking_type: d.booking_type,
   }));
 }
 
-/** String URL for vendor footer override (matches CommonHeader logo resolution). */
-function resolveOnboardingLogoUrl(
-  logo: string | File | null | undefined,
-): string | null {
-  if (logo == null) return null;
-  if (typeof logo === "string") return logo;
-  if (logo instanceof File) {
-    const preview = (logo as File & { preview?: string }).preview;
+/** Resolve a string URL or local preview object for onboarding media. */
+function resolvePreviewAssetUrl(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (value instanceof File) {
+    const preview = (value as File & { preview?: string }).preview;
     return preview ?? null;
   }
   if (
-    typeof logo === "object" &&
-    "preview" in logo &&
-    typeof (logo as { preview?: string }).preview === "string"
+    typeof value === "object" &&
+    value !== null &&
+    "preview" in value &&
+    typeof (value as { preview?: string }).preview === "string"
   ) {
-    return (logo as { preview: string }).preview;
+    return (value as { preview: string }).preview;
   }
   return null;
+}
+
+/**
+ * Onboarding catering types do not declare a menu background. Persistence / room
+ * payloads may still include one — read it without assuming the form union has it.
+ */
+function resolvePreviewMenuBackground(catering: unknown): string | undefined {
+  if (!catering || typeof catering !== "object") return undefined;
+  if (!("menu_background_image" in catering)) return undefined;
+  const raw = (catering as { menu_background_image?: unknown })
+    .menu_background_image;
+  if (!raw) return undefined;
+  if (typeof raw === "string") return raw;
+  if (raw instanceof File) {
+    return (raw as File & { preview?: string }).preview ?? undefined;
+  }
+  if (
+    typeof raw === "object" &&
+    raw !== null &&
+    "preview" in raw &&
+    typeof (raw as { preview?: string }).preview === "string"
+  ) {
+    return (raw as { preview: string }).preview;
+  }
+  return undefined;
 }
 
 /** Same steps as `form-layout` `splitLayoutSteps` — live preview with tenant theme styles. */
@@ -103,10 +171,29 @@ const ONBOARDING_THEME_PREVIEW_STEPS = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
 /** Event preview onward — room floating selector is for event pages only, not Site (step 2). */
 const EVENT_PREVIEW_ROOM_SELECTOR_STEPS = new Set([3, 4, 5, 6, 7, 8, 9]);
 
+/** Onboarding preview: no social URLs collected yet — suppress theme icons. */
+const EMPTY_ONBOARDING_FOOTER_SOCIAL_LINKS = {
+  facebook: "",
+  twitter: "",
+  instagram: "",
+  linkedin: "",
+  youtube: "",
+} as const;
+
 // Only load components needed for the current step
 export default function FormPreview() {
-  const { form, activeStep, activeField, previewTheme } = useFormContext();
-  const currencySymbol = useCurrencySymbol();
+  const {
+    form,
+    activeStep,
+    activeField,
+    previewTheme,
+    setActiveStep,
+    setActiveField,
+    requestFormFieldFocus,
+  } = useFormContext();
+  const { formatCompact: formatPriceUnit } = useCurrencyFormat();
+  const { data: categoriesResponse } = useEventCategories();
+  const eventCategories = categoriesResponse?.data ?? [];
   const [formState, setFormState] = useState<OnboardingFormData>(
     form.getValues(),
   );
@@ -114,14 +201,27 @@ export default function FormPreview() {
 
   const tryThemePreviewValues = useMemo((): SiteEssentialsFormValues | null => {
     if (!ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep)) return null;
-    return buildOnboardingStepTwoSiteEssentialsValues(formState, previewTheme);
+    const categoryName =
+      eventCategories.find(
+        (category) => category.id === formState.stepThree?.event_category_id,
+      )?.name ?? null;
+    return buildOnboardingStepTwoSiteEssentialsValues(
+      formState,
+      previewTheme,
+      categoryName,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeStep,
     formState.stepOne,
     formState.stepTwo,
+    formState.stepThree,
+    formState.stepFour,
+    formState.stepFive,
+    formState.multiSpace,
     previewTheme,
     formTick,
+    eventCategories,
   ]);
 
   const tryHeroPreviewProps = useMemo(() => {
@@ -142,6 +242,27 @@ export default function FormPreview() {
     };
   }, [tryThemePreviewValues, activeStep]);
 
+  /**
+   * Footer contact must reflect the onboarding draft (stepOne), not the logged-in
+   * vendor's saved theme — otherwise the preview footer shows the real account
+   * email/phone/address instead of what the vendor is entering.
+   */
+  const onboardingFooterContact = useMemo(
+    () => ({
+      phone: formState.stepOne?.contact_number || null,
+      email: formState.stepOne?.email || null,
+      address: formState.stepOne?.address || null,
+    }),
+    [
+      formState.stepOne?.contact_number,
+      formState.stepOne?.email,
+      formState.stepOne?.address,
+    ],
+  );
+
+  /** Onboarding does not collect social URLs — never leak live vendor theme icons. */
+  const onboardingFooterSocialLinks = EMPTY_ONBOARDING_FOOTER_SOCIAL_LINKS;
+
   const activePreviewBrochure = useMemo(() => {
     const ms = formState.multiSpace;
     const rooms = ms?.rooms ?? [];
@@ -158,34 +279,20 @@ export default function FormPreview() {
 
   const activePreviewBrochureLocation = useMemo(() => {
     const location = activePreviewBrochure?.location;
+    const eventLocation = resolveEventLocation(
+      formState.stepThree,
+      activePreviewBrochure,
+    );
     return {
-      title: location?.title || "",
-      description:
-        location?.description ||
-        String(activePreviewBrochure?.event_address ?? "").trim(),
-      icon: location?.icon || "",
-      latitude: activePreviewBrochure?.latitude,
-      longitude: activePreviewBrochure?.longitude,
+      title: location?.title || (eventLocation.address ? "LOCATION" : ""),
+      description: eventLocation.address,
+      icon: location?.icon || (eventLocation.address ? "MapPin" : ""),
+      latitude: eventLocation.latitude,
+      longitude: eventLocation.longitude,
     };
-  }, [activePreviewBrochure]);
+  }, [activePreviewBrochure, formState.stepThree]);
 
-  const activePreviewBrochurePrice = useMemo(() => {
-    const price = activePreviewBrochure?.price;
-    const startFrom = String(
-      activePreviewBrochure?.price_start_from ?? "",
-    ).trim();
-    return {
-      title: price?.title || "",
-      description:
-        price?.description ||
-        (startFrom ? `${currencySymbol}${startFrom} PP exc VAT` : ""),
-      link: price?.link || "",
-      icon: price?.icon || "",
-      price_title: price?.price_title || "",
-    };
-  }, [activePreviewBrochure, currencySymbol]);
-
-  // Brochure downloads — same data drives section + `CommonHeader` (single pill vs dropdown).
+  // Brochure downloads — drives `CommonHeader` only (section DOWNLOADS tile removed).
   const downloadsArray = useMemo(() => {
     const downloads: Array<{
       title: string;
@@ -300,39 +407,119 @@ export default function FormPreview() {
   const moreInfoRef = useRef<HTMLDivElement>(null);
   const faqRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const chooserRef = useRef<HTMLDivElement>(null);
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
 
+  /** Site preview event cards → jump to Event step (same idea as `/preview/onboarding`). */
+  const handlePreviewEventSelect = useCallback(() => {
+    void setActiveStep(3);
+    previewContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [setActiveStep]);
+
+  const jumpToEditor = useCallback(
+    (target: PreviewEditorTarget) => {
+      const go = async () => {
+        if (activeStep !== target.step) {
+          await setActiveStep(target.step);
+        }
+        // Preview scroll (right) + open/scroll the form panel to the field (left).
+        // The delay lets a step switch mount the target step's form first.
+        window.setTimeout(() => {
+          setActiveField(target.field);
+          requestFormFieldFocus(target.field, {
+            guidedSectionId: target.guidedSectionId,
+          });
+        }, 80);
+      };
+      void go();
+    },
+    [activeStep, setActiveStep, setActiveField, requestFormFieldFocus],
+  );
+
+  const {
+    enabled: roomsEnabled,
+    rooms: managedRooms,
+    currentRoomIndex,
+    setCurrentRoomIndex,
+  } = useRoomManager();
+
   const showRoomFloatingSelector = useMemo(() => {
-    const ms = formState.multiSpace;
     return (
-      Boolean(ms?.enabled) &&
-      (ms?.rooms?.length ?? 0) > 0 &&
+      roomsEnabled &&
+      managedRooms.length > 0 &&
       EVENT_PREVIEW_ROOM_SELECTOR_STEPS.has(activeStep)
     );
+  }, [activeStep, roomsEnabled, managedRooms.length]);
+
+  const roomSummaries = useMemo(() => {
+    if (!roomsEnabled || managedRooms.length < 2) return [];
+    const banner =
+      typeof formState.stepThree?.event_banner_image === "string"
+        ? formState.stepThree.event_banner_image
+        : null;
+    return listOnboardingPreviewRoomSummaries(managedRooms, banner);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeStep, formState.multiSpace, formTick]);
+  }, [
+    roomsEnabled,
+    managedRooms,
+    formState.stepThree?.event_banner_image,
+    formTick,
+  ]);
+
+  const showRoomChooser = showRoomFloatingSelector && roomSummaries.length >= 2;
+
+  const roomContentKey =
+    managedRooms[currentRoomIndex]?.id ?? `room-${currentRoomIndex}`;
+
+  const handleRoomChange = useCallback(
+    (index: number) => {
+      setCurrentRoomIndex(index);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollToElementIfNeeded(datesRef.current, {
+            headerOffsetPx: PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX,
+            scrollContainer: previewContainerRef.current,
+            trustEmbeddedScrollContainer: true,
+          });
+        });
+      });
+    },
+    [setCurrentRoomIndex],
+  );
 
   useEffect(() => {
     const container = previewContainerRef.current;
-    if (!container || !showRoomFloatingSelector) {
+    if (!container || !showRoomChooser) {
       setRoomSelectorScrollVisible(false);
       return;
     }
 
-    const threshold = Math.max(
-      ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX,
-      container.clientHeight * 0.22,
-    );
-
     const handleScroll = () => {
-      setRoomSelectorScrollVisible(container.scrollTop >= threshold);
+      const chooser = chooserRef.current;
+      if (!chooser) {
+        setRoomSelectorScrollVisible(
+          container.scrollTop > Math.min(280, container.clientHeight * 0.35),
+        );
+        return;
+      }
+      const chooserRect = chooser.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const bottomRelative = chooserRect.bottom - containerRect.top;
+      // Show sticky room bar once the in-page chooser has scrolled under the header.
+      setRoomSelectorScrollVisible(bottomRelative <= HEADER_OFFSET_PX + 24);
     };
 
     handleScroll();
     container.addEventListener("scroll", handleScroll, { passive: true });
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, [showRoomFloatingSelector, activeStep]);
+    // Device frame width changes (Desktop/Tablet/Mobile) can move chooser geometry.
+    const ro = new ResizeObserver(() => handleScroll());
+    ro.observe(container);
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      ro.disconnect();
+    };
+  }, [showRoomChooser, activeStep]);
 
   const activePreviewPackage = useMemo(() => {
     const ms = formState.multiSpace;
@@ -508,13 +695,14 @@ export default function FormPreview() {
   useEffect(() => {
     if (!activeField || !previewContainerRef.current) return;
 
+    const previewScrollOffsetPx = PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX;
+
     const scrollToElement = (ref: React.RefObject<HTMLDivElement | null>) => {
-      if (ref?.current && previewContainerRef?.current) {
-        previewContainerRef.current.scrollTo({
-          top: ref.current.offsetTop - 20,
-          behavior: "smooth",
-        });
-      }
+      scrollToElementIfNeeded(ref.current, {
+        headerOffsetPx: previewScrollOffsetPx,
+        scrollContainer: previewContainerRef.current,
+        trustEmbeddedScrollContainer: true,
+      });
     };
 
     // Map active fields to their respective sections based on step number
@@ -532,9 +720,26 @@ export default function FormPreview() {
           activeField.includes("sub_heading")
         ) {
           scrollToElement(heroRef);
+        } else if (activeField.includes("footer_brand_description")) {
+          const container = previewContainerRef.current;
+          const footer = container.querySelector("[data-preview-footer]");
+          scrollToElementIfNeeded(
+            footer instanceof HTMLElement ? footer : null,
+            {
+              headerOffsetPx: previewScrollOffsetPx,
+              scrollContainer: container,
+              trustEmbeddedScrollContainer: true,
+            },
+          );
+          if (!(footer instanceof HTMLElement)) {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: "smooth",
+            });
+          }
         } else if (
-          activeField.includes("title") ||
-          activeField.includes("description") ||
+          activeField.includes("about_title") ||
+          activeField.includes("about_description") ||
           activeField.includes("link_title")
         ) {
           scrollToElement(aboutRef);
@@ -553,10 +758,12 @@ export default function FormPreview() {
           activeField.includes("event_category")
         ) {
           scrollToElement(aboutEventRef);
+        } else if (activeField.includes("event_address")) {
+          scrollToElement(moreInfoRef);
         }
         break;
 
-      case 4: // Package details
+      case 4: // Packages and timeline
         if (activeField.includes("event_schedular")) {
           scrollToElement(timelineRef);
         } else if (activeField.includes("gallery")) {
@@ -588,12 +795,9 @@ export default function FormPreview() {
         }
         break;
 
-      case 7: // Brochure & location
+      case 7: // Brochure PDFs
         if (
           activeField.includes("brochure_pdf") ||
-          activeField.includes("event_address") ||
-          activeField.includes("price_start_from") ||
-          activeField.includes("location") ||
           activeField.includes("downloads") ||
           activeField.includes("more_info")
         ) {
@@ -601,7 +805,7 @@ export default function FormPreview() {
         }
         break;
 
-      case 8: // Other Packages
+      case 8: // Drinks and extras
         if (
           activeField.includes("drink_") ||
           activeField.includes("packages")
@@ -629,12 +833,10 @@ export default function FormPreview() {
   useEffect(() => {
     if (activeStep !== 5) return;
     const id = window.requestAnimationFrame(() => {
-      const container = previewContainerRef.current;
-      const target = datesRef.current;
-      if (!container || !target) return;
-      container.scrollTo({
-        top: Math.max(0, target.offsetTop - 24),
-        behavior: "smooth",
+      scrollToElementIfNeeded(datesRef.current, {
+        headerOffsetPx: PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX,
+        scrollContainer: previewContainerRef.current,
+        trustEmbeddedScrollContainer: true,
       });
     });
     return () => cancelAnimationFrame(id);
@@ -647,121 +849,36 @@ export default function FormPreview() {
 
   const hasPreviewFaqs = useMemo(() => {
     const faqs = formState.stepNine?.faqs ?? [];
-    return faqs.some(
-      (faq) => faq.question?.trim() || faq.answer?.trim(),
-    );
+    return faqs.some((faq) => faq.question?.trim() || faq.answer?.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formState.stepNine?.faqs, formTick]);
 
-  // Render homepage preview (step 2) — same structure as `/[locationSlug]` + Site Essentials preview
+  // Homepage preview (step 2) — same LocationPageView shell as live + Site Essentials
   const renderStepTwoPreview = () => {
     const tv = tryThemePreviewValues;
     if (!tv) return null;
 
-    const useGradientBg = Boolean(
-      tv.colors?.background?.includes("linear-gradient"),
-    );
-    const mainBandStyle: CSSProperties = useGradientBg
-      ? { background: tv.colors?.background }
-      : {};
-    const mainBandClass = useGradientBg
-      ? "bg-none text-[var(--color-text)] font-body"
-      : "bg-[var(--color-background)] text-[var(--color-text)] font-body";
-
-    const sectionPopular =
-      (typeof tv.event_title_1 === "string" && tv.event_title_1.trim()) ||
-      "Popular Events";
-    const sectionUpcoming =
-      (typeof tv.event_title_2 === "string" && tv.event_title_2.trim()) ||
-      "Upcoming Events";
-    const galleryTitle =
-      (typeof tv.event_gallery_title === "string" &&
-        tv.event_gallery_title.trim()) ||
-      "Recent Events Glimpse";
-
-    const getMediaPreviewUrl = (
-      value: string | File | null | undefined,
-    ): string | null => {
-      if (!value) return null;
-      if (typeof value === "string") return value;
-      if (value instanceof File) return URL.createObjectURL(value);
-      return null;
-    };
-
-    const venueLabel = formState.stepOne?.name?.trim() || null;
+    const heroHighlight =
+      activeField &&
+      (activeField.includes("cover_image") ||
+        activeField.includes("banner_heading") ||
+        activeField.includes("banner_sub_heading"));
+    const aboutHighlight =
+      activeField &&
+      (activeField.includes("about_title") ||
+        activeField.includes("about_description"));
 
     return (
-      <div className="event-detail-page">
-        <OnboardingPreviewHeader
-          scrollContainerRef={previewContainerRef}
-          contact_number={formState.stepOne?.contact_number || ""}
-          logo={formState.stepTwo?.logo || null}
-        />
-
-        <div
-          ref={heroRef}
-          className={`transition-all duration-300 ${
-            activeField &&
-            (activeField.includes("cover_image") ||
-              activeField.includes("banner_heading") ||
-              activeField.includes("banner_sub_heading"))
-              ? "ring-2 ring-primary ring-opacity-50"
-              : ""
-          }`}
-        >
-          <HeroBanner
-            locationName={venueLabel || undefined}
-            coverImage={getMediaPreviewUrl(formState.stepTwo?.cover_image)}
-            coverVideo={null}
-            bannerHeading={formState.stepTwo?.banner_heading ?? undefined}
-            bannerSubHeading={
-              formState.stepTwo?.banner_sub_heading ?? undefined
-            }
-            bannerHeadingAccent={tryHeroPreviewProps?.bannerHeadingAccent}
-            headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
-            bannerHeadingAlign={
-              tryHeroPreviewProps?.bannerHeadingAlign ?? undefined
-            }
-            bannerHeadingValign={
-              tryHeroPreviewProps?.bannerHeadingValign ?? undefined
-            }
-          />
-        </div>
-
-        <LocationMarketingBody
-          className={mainBandClass}
-          style={mainBandStyle}
-          experience={
-            <div
-              ref={aboutRef}
-              className={`transition-all duration-300 ${
-                activeField &&
-                (activeField.includes("about_title") ||
-                  activeField.includes("about_description"))
-                  ? "ring-2 ring-primary ring-opacity-50"
-                  : ""
-              }`}
-            >
-              <ExperienceSection
-                aboutTitle={formState.stepTwo?.about_title || ""}
-                aboutDescription={formState.stepTwo?.about_description || ""}
-              />
-            </div>
-          }
-          latestEvents={[]}
-          upcomingEvents={[]}
-          popularSectionTitle={sectionPopular}
-          upcomingSectionTitle={sectionUpcoming}
-          galleryTitle={galleryTitle}
-          galleryImages={[]}
-          locationSlug=""
-          locationLabel={venueLabel}
-        />
-
-        <FooterSection
-          copyright={tv.copyright}
-          logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
-        />
+      <div
+        className={`event-detail-page transition-all duration-300 ${
+          heroHighlight || aboutHighlight
+            ? "ring-2 ring-primary ring-opacity-50"
+            : ""
+        }`}
+      >
+        <div ref={heroRef} className="contents" />
+        <div ref={aboutRef} className="contents" />
+        <SitePreview formValues={tv} scrollContainerRef={previewContainerRef} />
       </div>
     );
   };
@@ -813,8 +930,86 @@ export default function FormPreview() {
     const showTimelineSection =
       hasTimelineTitle || hasTimelineSubtitle || hasTimelineRows;
 
+    const hasPackagePreview = Boolean(
+      activeStep === 4 ||
+      String(activePreviewPackage?.package_title ?? "").trim() ||
+      String(activePreviewPackage?.package_description ?? "").trim() ||
+      activePreviewPackage?.package_image ||
+      (activePreviewPackage?.package_details?.length ?? 0) > 0,
+    );
+
+    const showDatesPreview = activeStep === 5 || datesPreviewItems.length > 0;
+    const showGalleryPreview = galleryPreviewItems.length > 0;
+    const showMenuPreview = (activePreviewCatering?.menus?.length ?? 0) > 0;
+    const showDrinksPreview = (activePreviewDrinks?.packages?.length ?? 0) > 0;
+    const sectionNavItems = buildEventSectionNavItems({
+      about: true,
+      rooms: showRoomChooser,
+      schedule: showTimelineSection,
+      packages: hasPackagePreview,
+      dates: showDatesPreview,
+      gallery: showGalleryPreview,
+      menu: showMenuPreview,
+      drinks: showDrinksPreview,
+      drinksLabel: activePreviewDrinks?.drink_title,
+      faqs: hasPreviewFaqs,
+    });
+    const showSectionNav = sectionNavItems.length > 0;
+    const sectionNavStickyTop = ONBOARDING_PREVIEW_HEADER_OFFSET;
+    const roomSelectorStickyTop = showSectionNav
+      ? `calc(${ONBOARDING_PREVIEW_HEADER_OFFSET} + ${EVENT_SECTION_NAV_HEIGHT})`
+      : ONBOARDING_PREVIEW_HEADER_OFFSET;
+    const sectionAnchorClass = `scroll-mt-[var(--event-sticky-offset,${EVENT_STICKY_SCROLL_MT_FALLBACK})]`;
+    const heroLocationLabel = formatEventLocationLabel(
+      activePreviewBrochureLocation.description,
+    );
+    const heroEventLabel =
+      formState.stepThree?.event_name?.trim() ||
+      formState.stepThree?.event_banner_heading?.trim() ||
+      "Event";
+    const heroDateLabel = formatEventHeroDateRange(
+      datesPreviewItems.map((d) => d.event_date),
+    );
+    const heroTimeLabel = formatEventHeroTimeRange(
+      timelineRows.map((row) => row.time),
+    );
+    const heroCategoryLabel =
+      eventCategories
+        .find(
+          (category) =>
+            Number(category.id) ===
+            Number(formState.stepThree?.event_category_id),
+        )
+        ?.name?.trim() || "";
+    const brochureFromPrice = lowestBookableFromPrice({
+      datePrices: datesPreviewItems.map((date) => date.price),
+      packagePrices: (activePreviewDrinks?.packages ?? []).map(
+        (pkg) => pkg.price,
+      ),
+    });
+    const aboutHighlights = buildEventAboutHighlights({
+      occasion: heroCategoryLabel,
+      dates: heroDateLabel,
+      time: heroTimeLabel,
+      location: heroLocationLabel || null,
+      fromPrice: brochureFromPrice,
+      formatPrice: formatPriceUnit,
+    });
+
+    const menuBackgroundImage = resolvePreviewMenuBackground(
+      activePreviewCatering,
+    );
+
     return (
-      <div className="event-detail-page">
+      <div
+        className="event-detail-page"
+        style={{
+          ["--event-sticky-offset" as string]: buildEventStickyOffsetCssVar({
+            headerOffset: ONBOARDING_PREVIEW_HEADER_OFFSET,
+            showSectionNav,
+          }),
+        }}
+      >
         {/* Same header chrome as live event detail (`EventDetailClient`); non-interactive when inside PreviewProvider. */}
         <OnboardingPreviewHeader
           scrollContainerRef={previewContainerRef}
@@ -822,14 +1017,14 @@ export default function FormPreview() {
           logo={formState.stepTwo?.logo || null}
           headerDownloads={previewHeaderDownloads}
           showRoomSelector={showRoomFloatingSelector}
-          roomSelectorVisible={roomSelectorScrollVisible}
+          roomSelectorVisible={showRoomChooser && roomSelectorScrollVisible}
+          onRoomChange={handleRoomChange}
+          roomSelectorStickyTop={roomSelectorStickyTop}
         />
 
         <div
           ref={eventHeroRef}
-          className={`transition-all duration-300 ${
-            showRoomFloatingSelector && roomSelectorScrollVisible ? "-mt-12" : ""
-          } ${getHighlightClass(3, "banner")}`}
+          className={`transition-all duration-300 ${getHighlightClass(3, "banner")}`}
         >
           <EventHeroBand
             title={
@@ -848,6 +1043,28 @@ export default function FormPreview() {
             }
             accentHint={tryHeroPreviewProps?.bannerHeadingAccent ?? null}
             headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
+            breadcrumbs={[
+              { label: "Home" },
+              ...(heroLocationLabel
+                ? [{ label: heroLocationLabel }]
+                : []),
+              { label: heroEventLabel },
+            ]}
+            meta={{
+              date: heroDateLabel,
+              time: heroTimeLabel,
+              location: heroLocationLabel || null,
+            }}
+            onEditHero={() =>
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.eventBanner)
+            }
+            onEditMeta={(key) => {
+              if (key === "date" || key === "time") {
+                jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.dates);
+                return;
+              }
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.eventLocation);
+            }}
             emptyMediaSlot={
               <div className="flex flex-col items-center gap-2">
                 <ImageIcon size={40} className="text-white/40" aria-hidden />
@@ -859,231 +1076,377 @@ export default function FormPreview() {
           />
         </div>
 
+        {showSectionNav ? (
+          <EventSectionNav
+            items={sectionNavItems}
+            stickyTop={sectionNavStickyTop}
+            headerOffsetPx={HEADER_OFFSET_PX}
+            scrollContainerRef={previewContainerRef}
+            onItemClick={(id) => {
+              const target = PREVIEW_SECTION_EDITOR[id];
+              if (!target) return;
+              // Let section-nav scroll finish inside the device frame before switching the form step.
+              window.setTimeout(() => jumpToEditor(target), 400);
+            }}
+          />
+        ) : null}
+
         {/* About Event */}
         <div
           ref={aboutEventRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          id={EVENT_SECTION_IDS.about}
+          className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
             3,
             "about_event",
           )}`}
         >
-          <Suspense fallback={<SectionLoader />}>
-            <AboutEventSec
-              about_event_sub_heading={
-                formState.stepThree?.about_event_sub_heading || ""
-              }
-              about_event_heading={
-                formState.stepThree?.about_event_heading || ""
-              }
-              about_event_description={
-                formState.stepThree?.about_event_description || ""
-              }
-              headingEmphasis={
-                tryHeroPreviewProps?.headingEmphasis ?? undefined
-              }
-              aboutHeadingAccentHint={
-                tryHeroPreviewProps?.bannerHeadingAccent ?? null
-              }
-            />
-          </Suspense>
+          <PreviewEditHit
+            {...ONBOARDING_PREVIEW_EDITOR_TARGETS.eventAbout}
+            label="About"
+            onEdit={jumpToEditor}
+          >
+            <Suspense fallback={<SectionLoader />}>
+              <AboutEventSec
+                about_event_sub_heading={
+                  formState.stepThree?.about_event_sub_heading || ""
+                }
+                about_event_heading={
+                  formState.stepThree?.about_event_heading || ""
+                }
+                about_event_description={
+                  formState.stepThree?.about_event_description || ""
+                }
+                eventImage={resolvePreviewAssetUrl(
+                  formState.stepThree?.event_banner_image,
+                )}
+                imageAlt={
+                  heroEventLabel ? `${heroEventLabel} event` : "Event image"
+                }
+                highlights={aboutHighlights}
+                headingEmphasis={
+                  tryHeroPreviewProps?.headingEmphasis ?? undefined
+                }
+                aboutHeadingAccentHint={
+                  tryHeroPreviewProps?.bannerHeadingAccent ?? null
+                }
+              />
+            </Suspense>
+          </PreviewEditHit>
         </div>
+
+        {showRoomChooser ? (
+          <div
+            ref={chooserRef}
+            id={EVENT_SECTION_IDS.rooms}
+            className={sectionAnchorClass}
+          >
+            <PreviewEditHit
+              step={4}
+              field="event_schedular_title"
+              label="Rooms"
+              onEdit={jumpToEditor}
+              skipButtons
+            >
+              <EventRoomChooser
+                rooms={roomSummaries}
+                currentRoomIndex={currentRoomIndex}
+                onRoomChange={handleRoomChange}
+                headingEmphasis={
+                  tryHeroPreviewProps?.headingEmphasis ?? undefined
+                }
+              />
+            </PreviewEditHit>
+          </div>
+        ) : null}
 
         {/* Event Schedular */}
         {showTimelineSection && (
           <div
             ref={timelineRef}
-            className={`transition-all duration-300 ${getHighlightClass(
+            id={EVENT_SECTION_IDS.schedule}
+            className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
               4,
               "event_schedular",
             )}`}
           >
-            <Suspense fallback={<SectionLoader />}>
-              <Timeline
-                eventSchedularTitle={
-                  activePreviewPackage?.event_schedular_title || ""
-                }
-                eventSchedularCopy={
-                  activePreviewPackage?.event_schedule_subtitle ||
-                  activePreviewPackageLegacy?.event_schedular_custom_copy ||
-                  ""
-                }
-                eventSchedular={
-                  timelineRows as Array<{
-                    title: string;
-                    time: string;
-                  }>
-                }
-              />
-            </Suspense>
+            <PreviewEditHit
+              step={4}
+              field="event_schedular"
+              label="Schedule"
+              onEdit={jumpToEditor}
+            >
+              <Suspense fallback={<SectionLoader />}>
+                <RoomContentTransition roomKey={roomContentKey}>
+                  <Timeline
+                    eventSchedularTitle={
+                      activePreviewPackage?.event_schedular_title || ""
+                    }
+                    eventSchedularCopy={
+                      activePreviewPackage?.event_schedule_subtitle ||
+                      activePreviewPackageLegacy?.event_schedular_custom_copy ||
+                      ""
+                    }
+                    eventSchedular={
+                      timelineRows as Array<{
+                        title: string;
+                        time: string;
+                      }>
+                    }
+                  />
+                </RoomContentTransition>
+              </Suspense>
+            </PreviewEditHit>
           </div>
         )}
 
-        {/* Package */}
-        <div
-          ref={packageRef}
-          className={`transition-all duration-300 ${getHighlightClass(
-            4,
-            "package",
-          )}`}
-        >
-          <Suspense fallback={<SectionLoader />}>
-            <PackageSection
-              heading={activePreviewPackage?.package_title || ""}
-              image={
-                typeof activePreviewPackage?.package_image === "string"
-                  ? {
-                      path: activePreviewPackage.package_image,
-                      relativePath: activePreviewPackage.package_image,
-                      preview: activePreviewPackage.package_image,
+        {/* Packages — hide empty shell (matches live: only real content) */}
+        {hasPackagePreview ? (
+          <div
+            id={EVENT_SECTION_IDS.packages}
+            ref={packageRef}
+            className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
+              4,
+              "package",
+            )}`}
+          >
+            <PreviewEditHit
+              step={4}
+              field="package_title"
+              label="Packages & Gallery"
+              onEdit={jumpToEditor}
+            >
+              <Suspense fallback={<SectionLoader />}>
+                <RoomContentTransition roomKey={roomContentKey}>
+                  <PackageSection
+                    heading={activePreviewPackage?.package_title || ""}
+                    image={
+                      typeof activePreviewPackage?.package_image === "string"
+                        ? {
+                            path: activePreviewPackage.package_image,
+                            relativePath: activePreviewPackage.package_image,
+                            preview: activePreviewPackage.package_image,
+                          }
+                        : activePreviewPackage?.package_image || null
                     }
-                  : activePreviewPackage?.package_image || null
-              }
-              subHeading={activePreviewPackage?.package_description || ""}
-              packageDetails={
-                activePreviewPackage?.package_details?.map((detail) => ({
-                  title: detail.title || "",
-                  description: detail.title || "", // Use title as description since it's not in the schema
-                })) || []
-              }
-              headingEmphasis={
-                tryHeroPreviewProps?.headingEmphasis ?? undefined
-              }
-            />
-          </Suspense>
-        </div>
+                    subHeading={activePreviewPackage?.package_description || ""}
+                    packageDetails={
+                      activePreviewPackage?.package_details?.map((detail) => ({
+                        title: detail.title || "",
+                        description: detail.title || "",
+                      })) || []
+                    }
+                    headingEmphasis={
+                      tryHeroPreviewProps?.headingEmphasis ?? undefined
+                    }
+                  />
+                </RoomContentTransition>
+              </Suspense>
+            </PreviewEditHit>
+          </div>
+        ) : (
+          <div ref={packageRef} className="hidden" aria-hidden />
+        )}
 
-        {/* Event Dates */}
-        <div
-          id="booking"
-          ref={datesRef}
-          className={`${EVENT_BOOKING_SECTION_CLASSNAME} transition-all duration-300 ${getHighlightClass(
-            5,
-            "dates",
-          )}`}
-        >
-          <Suspense fallback={<SectionLoader />}>
-            <DatesSection
-              dates={datesPreviewItems}
-              eventSlug={previewEventSlug}
-              eventName={formState.stepThree?.event_name || undefined}
-              eventImage={datesEventImage}
-              roomId={activePreviewRoomScope.roomId}
-              roomIndex={activePreviewRoomScope.roomIndex}
-            />
-          </Suspense>
-        </div>
+        {/* Event Dates — real dates, or visible while editing the dates step */}
+        {showDatesPreview ? (
+          <div
+            id="booking"
+            ref={datesRef}
+            className={`${EVENT_BOOKING_SECTION_CLASSNAME} ${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
+              5,
+              "dates",
+            )}`}
+          >
+            <PreviewEditHit
+              step={5}
+              field="dates"
+              label="Dates"
+              onEdit={jumpToEditor}
+            >
+              <Suspense fallback={<SectionLoader />}>
+                <RoomContentTransition roomKey={roomContentKey}>
+                  <DatesSection
+                    dates={datesPreviewItems}
+                    eventSlug={previewEventSlug}
+                    eventName={formState.stepThree?.event_name || undefined}
+                    eventImage={datesEventImage}
+                    roomId={activePreviewRoomScope.roomId}
+                    roomIndex={activePreviewRoomScope.roomIndex}
+                  />
+                </RoomContentTransition>
+              </Suspense>
+            </PreviewEditHit>
+          </div>
+        ) : (
+          <div id="booking" ref={datesRef} className="hidden" aria-hidden />
+        )}
 
         {/* Event Gallery — optional; hidden until at least one image is uploaded */}
         <div
           ref={galleryRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          id={EVENT_SECTION_IDS.gallery}
+          className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
             4,
             "gallery",
           )}`}
         >
           {galleryPreviewItems.length > 0 && (
-            <Suspense fallback={<SectionLoader />}>
-              <EventGallery gallery={galleryPreviewItems} />
-            </Suspense>
+            <PreviewEditHit
+              step={4}
+              field="gallery"
+              label="Gallery"
+              onEdit={jumpToEditor}
+            >
+              <Suspense fallback={<SectionLoader />}>
+                <EventGallery gallery={galleryPreviewItems} />
+              </Suspense>
+            </PreviewEditHit>
           )}
         </div>
 
         {/* Catering Options — same visibility rule as live event page */}
         <div
           ref={menuRef}
-          className={`transition-all duration-300 ${getHighlightClass(6, "")}`}
+          id={EVENT_SECTION_IDS.menu}
+          className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(6, "")}`}
         >
           {(activePreviewCatering?.menus?.length ?? 0) > 0 && (
-            <Suspense fallback={<SectionLoader />}>
-              <MenuSection
-                menu_title={activePreviewCatering?.menu_title || ""}
-                menu_description={activePreviewCatering?.menu_description || ""}
-                catering_option={activePreviewCatering?.catering_option ?? 1}
-                menus={activePreviewCatering?.menus || []}
-              />
-            </Suspense>
+            <PreviewEditHit
+              step={6}
+              field="menu_title"
+              label="Menu"
+              onEdit={jumpToEditor}
+            >
+              <Suspense fallback={<SectionLoader />}>
+                <MenuSection
+                  menu_title={activePreviewCatering?.menu_title || ""}
+                  menu_description={
+                    activePreviewCatering?.menu_description || ""
+                  }
+                  catering_option={activePreviewCatering?.catering_option ?? 1}
+                  menus={activePreviewCatering?.menus || []}
+                  menu_background_image={menuBackgroundImage}
+                />
+              </Suspense>
+            </PreviewEditHit>
           )}
         </div>
 
-        {/*more_info and faqs */}
-        <div
-          ref={moreInfoRef}
-          className={`transition-all duration-300 ${getHighlightClass(
-            7,
-            "more_info",
-          )}`}
-        >
-          <BrochureSection
-            location={activePreviewBrochureLocation}
-            downloads={downloadsArray}
-            price={activePreviewBrochurePrice}
-          />
-        </div>
-        {/* Other Packages */}
+        {/* Drinks — before brochure, same order as live event page */}
         <div
           ref={drinkRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          id={showDrinksPreview ? EVENT_SECTION_IDS.drinks : undefined}
+          className={`${showDrinksPreview ? sectionAnchorClass : ""} transition-all duration-300 ${getHighlightClass(
             8,
             "other-packages",
           )}`}
         >
           {(activePreviewDrinks?.packages?.length ?? 0) > 0 && (
-            <Suspense fallback={<SectionLoader />}>
-              <DrinkSection
-                title={activePreviewDrinks?.drink_title || ""}
-                description={activePreviewDrinks?.drink_description || ""}
-                packages={
-                  activePreviewDrinks?.packages?.map((pkg) => ({
-                    title: pkg.title,
-                    description: pkg.description,
-                    price: Number(pkg.price),
-                  })) || []
-                }
-                eventSlug={previewEventSlug}
-                roomId={activePreviewRoomScope.roomId}
-                roomIndex={activePreviewRoomScope.roomIndex}
-                defaultExpanded
-              />
-            </Suspense>
+            <PreviewEditHit
+              step={8}
+              field="drink_title"
+              label="Drinks"
+              onEdit={jumpToEditor}
+            >
+              <Suspense fallback={<SectionLoader />}>
+                <DrinkSection
+                  title={activePreviewDrinks?.drink_title || ""}
+                  description={activePreviewDrinks?.drink_description || ""}
+                  packages={
+                    activePreviewDrinks?.packages?.map((pkg) => ({
+                      title: pkg.title,
+                      description: pkg.description,
+                      price: Number(pkg.price),
+                    })) || []
+                  }
+                  eventSlug={previewEventSlug}
+                  roomId={activePreviewRoomScope.roomId}
+                  roomIndex={activePreviewRoomScope.roomIndex}
+                  defaultExpanded
+                />
+              </Suspense>
+            </PreviewEditHit>
           )}
+        </div>
+
+        {/* Location / prices — event location edits Step 3; pricing edits dates/packages */}
+        <div
+          ref={moreInfoRef}
+          className={`transition-all duration-300 ${
+            activeStep === 3 &&
+            activeField?.includes("event_address")
+              ? "ring-2 ring-primary ring-opacity-50 scroll-mt-20"
+              : activeStep === 7 &&
+                  activeField &&
+                  (activeField.includes("brochure_pdf") ||
+                    activeField.includes("downloads"))
+                ? "ring-2 ring-primary ring-opacity-50 scroll-mt-20"
+                : ""
+          }`}
+        >
+          <BrochureSection
+            location={activePreviewBrochureLocation}
+            onEditLocation={jumpToEditor}
+          />
         </div>
 
         {/* FAQs — same visibility rule as live event page */}
         <div
           ref={faqRef}
-          className={`transition-all duration-300 ${getHighlightClass(
+          id={EVENT_SECTION_IDS.faqs}
+          className={`${sectionAnchorClass} transition-all duration-300 ${getHighlightClass(
             9,
             "faqs",
           )}`}
         >
           {hasPreviewFaqs && (
-            <Suspense fallback={<SectionLoader />}>
-              <FaqSection
-                faqs={formState.stepNine?.faqs || []}
-                defaultExpanded
-              />
-            </Suspense>
+            <PreviewEditHit
+              step={9}
+              field="question"
+              label="FAQs"
+              onEdit={jumpToEditor}
+            >
+              <Suspense fallback={<SectionLoader />}>
+                <FaqSection
+                  faqs={formState.stepNine?.faqs || []}
+                  defaultExpanded
+                />
+              </Suspense>
+            </PreviewEditHit>
           )}
         </div>
 
         <FooterSection
-          logo={resolveOnboardingLogoUrl(formState.stepTwo?.logo)}
+          logo={resolvePreviewAssetUrl(formState.stepTwo?.logo)}
           copyright={tryThemePreviewValues?.copyright ?? undefined}
+          contactOverride={onboardingFooterContact}
+          socialLinksOverride={onboardingFooterSocialLinks}
+          brandDescription={firstFooterBrandDescription(
+            formState.stepTwo?.footer_brand_description,
+            formState.stepTwo?.about_description,
+            formState.stepOne?.description,
+          )}
         />
       </div>
     );
   };
 
   return (
-    <PreviewProvider isPreviewMode={true}>
+    <PreviewProvider
+      isPreviewMode={true}
+      onEventSelect={handlePreviewEventSelect}
+    >
       <section className="relative isolate flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950">
-        <div
+        <div className="flex shrink-0 items-center justify-center gap-2 border-b border-white/10 bg-slate-950/90 px-3 py-2">
+          <PreviewDeviceToolbar />
+        </div>
+        <PreviewDeviceFrame
           ref={previewContainerRef}
-          className="max-w-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"
+          stageClassName="bg-slate-950 py-1 pl-8 pr-2 pt-1 sm:pl-8 sm:pr-3"
+          frameClassName="bg-[color:var(--color-background,#fff)]"
         >
-          {/* Avoid transform on this wrapper — it breaks sticky/fixed header inside the scroll panel. */}
+          {/* Avoid transform / overflow-x-hidden here — both break sticky header + room bar. */}
           <div className="w-full min-h-0 min-w-0 max-w-full">
-            {/* Room floating selector is rendered outside the scroll container (see below) */}
             {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
             tryThemePreviewValues ? (
               <div
@@ -1108,9 +1471,7 @@ export default function FormPreview() {
               renderFullSitePreview()
             )}
           </div>
-        </div>
-
-        {/* Room floating selector lives inside event preview header chrome (see OnboardingPreviewHeader). */}
+        </PreviewDeviceFrame>
       </section>
     </PreviewProvider>
   );

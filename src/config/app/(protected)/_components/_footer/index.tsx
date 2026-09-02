@@ -1,6 +1,7 @@
 "use client";
 import { cn } from "@/lib/utils";
 import { useDomainStore } from "@/store/domain.store";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import React, { memo } from "react";
 
 interface FooterProps {
@@ -11,6 +12,9 @@ interface FooterProps {
 const Footer: React.FC<FooterProps> = memo(
   ({ copyrightYear, companyName, companyWebsite }) => {
     const { sidebarCollapsed: collapsed } = useDomainStore();
+    const { theme } = useTheme();
+    const copyrightBrandName = theme?.name?.trim() || companyName;
+
     return (
       <footer
         className={cn(
@@ -21,7 +25,7 @@ const Footer: React.FC<FooterProps> = memo(
       >
         <div className="flex flex-col sm:flex-row justify-between text-[var(--color-on-footer)]/85 text-center sm:text-left">
           <div className="text-sm">
-            COPYRIGHT © {copyrightYear} {companyName}, All rights Reserved
+            COPYRIGHT © {copyrightYear} {copyrightBrandName}, All rights Reserved
           </div>
           <div className="text-sm mt-2 sm:mt-0">
             Hand-crafted & Made by{" "}

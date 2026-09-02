@@ -1,7 +1,34 @@
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { ThemeSchema } from "@/types/theme.types";
 import { env } from "@/env";
+import { flattenInfoPages } from "@/lib/flatten-info-pages";
+import { useAuthStore } from "@/store/auth.store";
 import { ApiResponse, ServiceResponse } from "./type";
+
+function themeRequestHeaders(cleanDomain: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest",
+    "X-Domain": cleanDomain,
+  };
+
+  if (typeof window === "undefined") {
+    return headers;
+  }
+
+  try {
+    const { token, tokenExpiry, account_type } = useAuthStore.getState();
+    const validToken = Boolean(token) && (!tokenExpiry || Date.now() < tokenExpiry);
+    if (validToken && account_type === "customer") {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // Auth store may be unavailable during early boot; guest fetch still works.
+  }
+
+  return headers;
+}
 
 /**
  * Service for theme-related API requests
@@ -27,20 +54,18 @@ export const themeService = {
       // Detect if running in a browser
       const isBrowser = typeof window !== "undefined";
 
+      const headers = themeRequestHeaders(cleanDomain);
+
       // Use different options for browser vs server
       const fetchOptions: RequestInit = {
         method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
+        headers,
       };
 
       // Add more headers for server-side requests
       if (!isBrowser) {
         fetchOptions.headers = {
-          ...fetchOptions.headers,
+          ...headers,
           Origin: env.NEXT_PUBLIC_APP_URL || "",
           Host: cleanDomain,
         };
@@ -72,7 +97,7 @@ export const themeService = {
       return {
         isSuccess: true,
         message: "Theme settings fetched successfully",
-        data: data.data,
+        data: flattenInfoPages(data.data),
       };
     } catch (error) {
       // Type error in a more specific way

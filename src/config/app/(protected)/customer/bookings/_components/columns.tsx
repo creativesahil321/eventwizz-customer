@@ -49,7 +49,7 @@ export function getBookingColumns({
         <DataTableColumnHeader
           className="text-foreground"
           column={column}
-          title="User Name"
+          title="Username"
         />
       ),
       cell: ({ row }) => (

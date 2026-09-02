@@ -1,9 +1,18 @@
 "use client";
 
+import { useMemo } from "react";
 import type { LocationEventCardModel } from "./location-event-card";
 import { LocationEventCard } from "./location-event-card";
-import { dualEventShowcaseFrameClass } from "./event-carousel-classes";
-import { SiteHeading } from "@/components/public/site-heading";
+import {
+  dualEventShowcaseFrameClass,
+  eventCarouselNavButtonClass,
+  mobileEventRowPeekScrollItemClass,
+} from "./event-carousel-classes";
+import { EventListingHorizontalScroll } from "./event-listing-horizontal-scroll";
+import { EventSectionHeader } from "./event-section-header";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { cn } from "@/lib/utils";
+
 type DualEventShowcaseProps = {
   sectionId: string;
   sectionLabel: string;
@@ -17,8 +26,8 @@ type DualEventShowcaseProps = {
 };
 
 /**
- * Two-event layout: same carousel frame as single-event showcase, two standard
- * cards side-by-side (not a full-width 50/50 grid).
+ * Two-event layout: horizontal peek slider on mobile (booking-first),
+ * side-by-side cards from md up.
  */
 export function DualEventShowcase({
   sectionId,
@@ -31,38 +40,70 @@ export function DualEventShowcase({
   imageFallbacks,
   footnote,
 }: DualEventShowcaseProps) {
+  const narrowPreview = usePreviewNarrowLayout();
+  const scrollWatchKey = useMemo(
+    () => events.map((e) => e.slug).join("|"),
+    [events],
+  );
+
   return (
     <section
       id={sectionId}
-      className="w-full bg-transparent py-20 text-[var(--color-text)] md:py-28"
+      className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
     >
       <div className="container mx-auto max-w-7xl px-4">
-        <div className="mb-8 w-full space-y-3 text-left">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
-            {sectionLabel}
-          </p>
-          <SiteHeading
-            level={2}
-            title={sectionTitle}
-            variant="onSurface"
-            className="!text-3xl !font-black tracking-tight md:!text-4xl"
-          />
+        <EventSectionHeader
+          sectionLabel={sectionLabel}
+          sectionTitle={sectionTitle}
+        />
+
+        {/* Mobile / narrow preview: peek slider */}
+        <div className={cn("relative w-full", !narrowPreview && "md:hidden")}>
+          <EventListingHorizontalScroll
+            watchKey={scrollWatchKey}
+            leftButtonClassName={eventCarouselNavButtonClass(
+              "absolute left-0 top-1/2 -translate-y-1/2",
+            )}
+            rightButtonClassName={eventCarouselNavButtonClass(
+              "absolute right-0 top-1/2 -translate-y-1/2",
+            )}
+          >
+            {events.map((event, index) => (
+              <div
+                key={`peek-${event.slug || index}`}
+                className={mobileEventRowPeekScrollItemClass}
+              >
+                <div className="h-full w-full pb-1 pt-0.5">
+                  <LocationEventCard
+                    event={event}
+                    locationSlug={locationSlug}
+                    isPending={pendingEventSlug === event.slug}
+                    onNavigateStart={() => onNavigateStart(event.slug)}
+                    imageFallback={imageFallbacks[index]}
+                  />
+                </div>
+              </div>
+            ))}
+          </EventListingHorizontalScroll>
         </div>
 
-        <div className={dualEventShowcaseFrameClass}>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5">
-            {events.map((event, index) => (
-              <LocationEventCard
-                key={event.slug || index}
-                event={event}
-                locationSlug={locationSlug}
-                isPending={pendingEventSlug === event.slug}
-                onNavigateStart={() => onNavigateStart(event.slug)}
-                imageFallback={imageFallbacks[index]}
-              />
-            ))}
+        {/* Desktop: side-by-side */}
+        {!narrowPreview ? (
+          <div className={cn(dualEventShowcaseFrameClass, "hidden md:block")}>
+            <div className="grid grid-cols-2 gap-4 md:gap-5">
+              {events.map((event, index) => (
+                <LocationEventCard
+                  key={`grid-${event.slug || index}`}
+                  event={event}
+                  locationSlug={locationSlug}
+                  isPending={pendingEventSlug === event.slug}
+                  onNavigateStart={() => onNavigateStart(event.slug)}
+                  imageFallback={imageFallbacks[index]}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {footnote ? (
           <p className="mx-auto mt-5 max-w-lg text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm">

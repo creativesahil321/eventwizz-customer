@@ -1,15 +1,20 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
 import {
-  CircleChevronLeft,
-  CircleChevronRight,
-} from "lucide-react";
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CHECKOUT_CONSTANTS } from "@/app/(public)/vendor/checkout/_lib/constants";
+import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
 // Professional API-only approach - no cart store needed
 import { useStoreEventBooking } from "@/services/customer/cart/query";
 import { CartRequest } from "@/services/customer/cart/type";
@@ -30,9 +35,38 @@ import {
 import { reconcileLocalCartWithApi } from "@/lib/utils/cart-sync-helper";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
+import { SiteHeading } from "@/components/public/site-heading";
+import {
+  type DateCardOffer,
+  type PublicEventDateDiscount,
+} from "@/components/public/date-card-offer";
+import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
+import {
+  bookingOptionLabel,
+  resolveDateCardBookingOption,
+  type PublicBookingType,
+} from "@/components/public/booking-type-icons";
+import { savePendingBooking } from "@/lib/booking/pending-booking";
+import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
+import {
+  CHECKOUT_HANDOFF_COUPON,
+  CHECKOUT_HANDOFF_DATES,
+  CHECKOUT_HANDOFF_PAY,
+  buildCheckoutHandoffHref,
+  clearCartClearedByUser,
+  dateHandoffSignature,
+  isDateHandoffConsumed,
+  markDateHandoffConsumed,
+  mergeCheckoutHandoffPending,
+  parseCheckoutHandoffPay,
+  replaceEventUrlWithoutDateHandoff,
+  wasCartClearedByUser,
+} from "@/lib/checkout-chat-handoff";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 // Define proper user interface for session
 interface SessionUser {
@@ -45,9 +79,36 @@ interface SessionUser {
 // New simplified date structure from optimized API
 export type DatesSectionType = {
   event_date: string;
-  price: number;
+  price: number | null;
+  /**
+   * Live public event detail: remaining bookable inventory for this date.
+   * Omitted entirely when sold out / empty inventory — do not treat as null.
+   */
+  booking_option?: "tickets" | "tables" | "both";
+  /**
+   * Preview / vendor form config. Guest date cards prefer `booking_option`.
+   */
+  booking_type?: "tickets" | "tables" | "both";
   sold_out?: boolean;
+  /** Mapped for date cards (from API `discount` via room slices). */
+  offer?: DateCardOffer | null;
+  /** Raw domain-event API field. */
+  discount?: PublicEventDateDiscount | null;
 }[];
+
+function isoDateKey(raw: string | null | undefined): string {
+  const trimmed = raw?.trim() ?? "";
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : "";
+}
+
+function parseChatHandoffDates(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((part) => isoDateKey(part.trim()))
+    .filter(Boolean);
+}
 
 type DatesSectionProps = {
   dates?: DatesSectionType;
@@ -58,6 +119,8 @@ type DatesSectionProps = {
   roomId?: number;
   /** Fallback scope when room id is not assigned yet (onboarding preview). */
   roomIndex?: number;
+  /** Site Essentials `typography.headingEmphasis` — required on platform-host previews. */
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
 
 type DateInfo = {
@@ -95,31 +158,58 @@ function resolveDateCardVisual(
   };
 }
 
-function getDateCardContainerClass(visual: DateCardVisualState): string {
-  const base =
-    "border rounded-2xl overflow-hidden text-center w-[85px] sm:w-[100px] md:w-[120px] flex-shrink-0 transition-all duration-300";
+function getDateCardContainerClass(
+  visual: DateCardVisualState,
+  narrowPreview: boolean,
+): string {
+  const base = cn(
+    "flex-shrink-0 overflow-hidden rounded-2xl border p-0 text-center transition-all duration-300",
+    "bg-black/25 backdrop-blur-sm shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]",
+    narrowPreview ? "w-[85px]" : "w-[85px] sm:w-[100px] md:w-[120px]",
+  );
 
   if (visual.isSoldOut) {
-    return `${base} border-red-500/60 cursor-not-allowed bg-slate-900/40 backdrop-blur-sm opacity-80 shadow-[0_0_25px_rgba(239,68,68,0.45)]`;
+    return `${base} border-red-500/70 cursor-not-allowed bg-slate-900/50 opacity-85 shadow-[0_0_20px_rgba(239,68,68,0.35)]`;
   }
   if (visual.isSelecting) {
-    return `${base} border-[var(--color-primary)] ring-1 ring-white/30 shadow-[0_0_22px_rgba(255,255,255,0.12)] cursor-wait bg-black/30 backdrop-blur-sm`;
+    return `${base} border-[var(--color-primary)] ring-2 ring-white/30 shadow-[0_0_22px_rgba(255,255,255,0.15)] cursor-wait bg-black/35`;
   }
   if (visual.isOtherBusy) {
-    return `${base} border-[var(--color-primary)] opacity-45 cursor-not-allowed shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent`;
+    return `${base} border-[color:color-mix(in_srgb,var(--color-primary)_35%,transparent)] opacity-45 cursor-not-allowed`;
   }
   if (visual.isInCart) {
-    return `${base} border-[var(--color-primary)] bg-black/20 backdrop-blur-sm opacity-95 cursor-pointer shadow-[0_0_20px_var(--color-primary)]/30`;
+    return `${base} border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/45 bg-black/30 cursor-pointer shadow-[0_0_24px_var(--color-primary)]/35`;
   }
-  return `${base} border-[var(--color-primary)] cursor-pointer shadow-[0_0_15px_rgba(60,70,147,0.25)] bg-transparent hover:shadow-[0_0_25px_rgba(60,70,147,0.5)] hover:border-[var(--color-primary)] hover:bg-gradient-to-b hover:from-[var(--color-primary)]/10 hover:to-transparent`;
+  return `${base} border-[color:color-mix(in_srgb,var(--color-primary)_55%,transparent)] cursor-pointer hover:border-[var(--color-primary)] hover:bg-black/35 hover:shadow-[0_0_28px_rgba(60,70,147,0.55)]`;
+}
+
+function dateCardAriaLabel(
+  dateInfo: { day: string; date: number | string; month: string; price: string },
+  visual: DateCardVisualState,
+  currencySymbol: string,
+  bookingType?: PublicBookingType | null,
+): string {
+  const when = `${dateInfo.day} ${dateInfo.date} ${dateInfo.month}`;
+  const typeLabel = bookingOptionLabel(bookingType);
+  const typeSuffix =
+    !visual.isSoldOut && typeLabel ? `, ${typeLabel.toLowerCase()}` : "";
+  if (visual.isSoldOut) return `${when}, sold out`;
+  if (visual.isSelecting) return `Adding ${when} to cart${typeSuffix}`;
+  if (visual.isInCart) return `${when}, already in cart${typeSuffix}`;
+  return `Book ${when}, from ${currencySymbol}${dateInfo.price}${typeSuffix}`;
 }
 
 function getDateCardFooterClass(
   visual: DateCardVisualState,
   inCartStyle: "primary" | "green",
+  narrowPreview: boolean,
 ): string {
-  const base =
-    "text-white text-sm sm:text-base tracking-wider py-1 sm:py-1.5 transition-all duration-300";
+  const base = cn(
+    "text-white tracking-wider transition-all duration-300",
+    narrowPreview
+      ? "py-1 text-sm"
+      : "py-1 text-sm sm:py-1.5 sm:text-base",
+  );
 
   if (visual.isSoldOut) {
     return `${base} bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide`;
@@ -161,18 +251,94 @@ function DateCardFooterContent({
   visual,
   dateInfo,
   currencySymbol,
+  listPrice,
+  offer,
+  compact,
+  bookingType,
 }: {
   visual: DateCardVisualState;
   dateInfo: DateInfo;
   currencySymbol: string;
+  listPrice: number;
+  offer?: DateCardOffer | null;
+  compact?: boolean;
+  bookingType?: PublicBookingType | null;
 }) {
-  if (visual.isSoldOut) return <>SOLD OUT</>;
-  if (visual.isSelecting) return <DateCardSelectingIndicator />;
-  if (visual.isInCart) return <>VIEW CART</>;
-  if (dateInfo.isPlaceholder && dateInfo.price === "—") {
-    return <>Set date</>;
+  const prefersReducedMotion = useReducedMotion();
+  const footerKey = visual.isSelecting
+    ? "selecting"
+    : visual.isInCart
+      ? "cart"
+      : visual.isSoldOut
+        ? "soldout"
+        : "price";
+
+  const showBookingIcons =
+    !visual.isSoldOut &&
+    !visual.isSelecting &&
+    !visual.isInCart &&
+    !(dateInfo.isPlaceholder && dateInfo.price === "—");
+
+  let content: ReactNode;
+  if (visual.isSoldOut) {
+    content = (
+      <DateCardPriceFooter
+        currencySymbol={currencySymbol}
+        listPrice={listPrice}
+        fallbackLabel="SOLD OUT"
+        compact={compact}
+      />
+    );
+  } else if (visual.isSelecting) {
+    content = <DateCardSelectingIndicator />;
+  } else if (visual.isInCart) {
+    content = (
+      <DateCardPriceFooter
+        currencySymbol={currencySymbol}
+        listPrice={listPrice}
+        fallbackLabel="VIEW CART"
+        compact={compact}
+      />
+    );
+  } else if (dateInfo.isPlaceholder && dateInfo.price === "—") {
+    content = (
+      <DateCardPriceFooter
+        currencySymbol={currencySymbol}
+        listPrice={listPrice}
+        fallbackLabel="Set date"
+        compact={compact}
+      />
+    );
+  } else {
+    content = (
+      <DateCardPriceFooter
+        currencySymbol={currencySymbol}
+        listPrice={listPrice}
+        offer={offer}
+        compact={compact}
+        bookingType={showBookingIcons ? bookingType : null}
+      />
+    );
   }
-  return <>{`${currencySymbol}${dateInfo.price}`}</>;
+
+  if (prefersReducedMotion) {
+    return content;
+  }
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={footerKey}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
+        className="flex w-full justify-center"
+      >
+        {content}
+      </motion.div>
+    </AnimatePresence>
+  );
 }
 
 type DateRowsScrollerProps = {
@@ -181,6 +347,7 @@ type DateRowsScrollerProps = {
   firstRowCount: number;
   secondRowCount: number;
   pageOffset: number;
+  narrowPreview: boolean;
   getDateRowJustifyClass: (itemCount: number) => string;
   renderCard: (
     dateItem: DatesSectionType[0],
@@ -196,6 +363,7 @@ function DateRowsScroller({
   firstRowCount,
   secondRowCount,
   pageOffset,
+  narrowPreview,
   getDateRowJustifyClass,
   renderCard,
 }: DateRowsScrollerProps) {
@@ -209,17 +377,27 @@ function DateRowsScroller({
         "pb-2",
         hasPartialRow
           ? "overflow-visible"
-          : "overflow-x-auto sm:overflow-hidden [-webkit-overflow-scrolling:touch]",
+          : cn(
+              "overflow-x-auto [-webkit-overflow-scrolling:touch]",
+              !narrowPreview && "sm:overflow-hidden",
+            ),
       )}
     >
       <div
         className={cn(
-          "flex flex-col gap-4 sm:gap-5",
-          hasPartialRow ? "w-full" : "inline-flex w-max sm:w-full",
+          "flex flex-col",
+          narrowPreview ? "gap-4" : "gap-4 sm:gap-5",
+          hasPartialRow
+            ? "w-full"
+            : cn("inline-flex w-max", !narrowPreview && "sm:w-full"),
         )}
       >
         <div
-          className={`flex flex-nowrap ${getDateRowJustifyClass(firstRowCount)} items-center gap-3 sm:gap-5`}
+          className={cn(
+            "flex flex-nowrap items-center",
+            getDateRowJustifyClass(firstRowCount),
+            narrowPreview ? "gap-3" : "gap-3 sm:gap-5",
+          )}
         >
           {Array.from({ length: firstRowCount }).map((_, i) => {
             const index = pageOffset + i;
@@ -229,7 +407,11 @@ function DateRowsScroller({
         </div>
         {secondRowCount > 0 ? (
           <div
-            className={`flex flex-nowrap ${getDateRowJustifyClass(secondRowCount)} items-center gap-3 sm:gap-5`}
+            className={cn(
+              "flex flex-nowrap items-center",
+              getDateRowJustifyClass(secondRowCount),
+              narrowPreview ? "gap-3" : "gap-3 sm:gap-5",
+            )}
           >
             {Array.from({ length: secondRowCount }).map((_, i) => {
               const index = pageOffset + itemsPerRow + i;
@@ -250,12 +432,17 @@ export default function DatesSection({
   eventImage,
   roomId,
   roomIndex,
+  headingEmphasis,
 }: DatesSectionProps) {
   const currencySymbol = useCurrencySymbol();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const chatDateHandoffRan = useRef(false);
   const { data: session, status } = useSession();
   const { isOnboarding } = useOnboarding();
   const isPreviewMode = useIsPreviewMode();
+  const narrowPreview = usePreviewNarrowLayout();
   // Professional API-only approach - no local cart state needed
   const { mutateAsync: storeEventBooking, isPending } = useStoreEventBooking();
   const selectedDrinks = useDrinkSelectionStore(selectScopedDrinks);
@@ -286,9 +473,8 @@ export default function DatesSection({
   const sessionUser = session?.user as SessionUser | undefined;
   const cartQueryEnabled =
     sessionUser?.account_type === "customer" && !isOnboarding && !isPreviewMode;
-  const { data: apiCartData, isLoading: isCartDataLoading } = useGetCartData(
-    cartQueryEnabled,
-  );
+  const { data: apiCartData, isLoading: isCartDataLoading } =
+    useGetCartData(cartQueryEnabled);
 
   useEffect(() => {
     if (!cartQueryEnabled || isCartDataLoading || apiCartData === undefined) {
@@ -320,7 +506,45 @@ export default function DatesSection({
   const getDateRowJustifyClass = (itemCount: number) =>
     itemCount > 0 && itemCount < itemsPerRow
       ? "justify-center"
-      : "justify-start sm:justify-center";
+      : cn("justify-start", !narrowPreview && "sm:justify-center");
+
+  const dateCardBodyClass = narrowPreview
+    ? "p-2"
+    : "p-2 sm:p-3";
+  const dateCardDayClass = narrowPreview
+    ? "mb-0.5 text-xs"
+    : "mb-0.5 text-xs sm:mb-1 sm:text-sm";
+  const dateCardNumberClass = narrowPreview
+    ? "py-1 text-3xl font-bold"
+    : "py-1 text-3xl font-bold sm:text-4xl md:text-5xl";
+  const dateCardMonthClass = narrowPreview
+    ? "text-xs"
+    : "text-xs sm:text-sm";
+  const sectionClass = cn(
+    "relative w-full overflow-hidden rounded-3xl text-white transition-all duration-200",
+    "bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014]",
+    narrowPreview ? "py-12" : "py-12 sm:py-16",
+  );
+  const headingClass = cn(
+    "mb-0 !block !w-full !font-black",
+    narrowPreview
+      ? "!text-3xl"
+      : "!text-3xl sm:!text-4xl md:!text-5xl",
+  );
+  const headerWrapClass = cn(
+    "relative z-10 mb-6 flex w-full flex-col items-center gap-3 px-4 text-center",
+    !narrowPreview && "sm:mb-8 sm:gap-4",
+  );
+  const cardsWrapClass = cn(
+    "relative z-10 mx-auto w-full max-w-5xl px-2",
+    !narrowPreview && "sm:px-8 md:px-12",
+  );
+  const loginCtaClass = cn(
+    "mt-2 min-h-12 shrink-0 rounded-full border-2 border-white/30 bg-white/10 px-8 font-semibold !text-white shadow-sm backdrop-blur-sm transition-colors hover:border-white/45 hover:bg-white/15",
+    narrowPreview
+      ? "text-xs"
+      : "text-xs sm:text-sm",
+  );
 
   // Setup client-side detection and window measurements
   useEffect(() => {
@@ -402,20 +626,14 @@ export default function DatesSection({
     if (isPreviewMode) return;
     if (selectingDateKey || isPending) return;
 
+    clearCartClearedByUser();
+
     const dateKey = getDateSelectionKey(dateItem.event_date);
     setSelectingDateKey(dateKey);
 
     // Resume checkout when the date is already in cart (with or without selections).
     if (shouldShowViewCartOnDate(dateItem.event_date)) {
-      router.push("/vendor/checkout");
-      return;
-    }
-
-    // Check if user is authenticated first
-    if (status !== "authenticated" || !session?.user) {
-      // User is not logged in, redirect to login with simple callback URL
-      const checkoutUrl = `/vendor/checkout`;
-      router.push(`/auth/login?callbackUrl=${encodeURIComponent(checkoutUrl)}`);
+      router.push(CUSTOMER_CHECKOUT_PATH);
       return;
     }
 
@@ -425,6 +643,23 @@ export default function DatesSection({
     const actualEventImage =
       eventImage ||
       "http://192.168.1.100:8000/storage/uploads/vendor/events/event_banner_image68bab4bb983bd.jpg";
+
+    // Guest: stash booking intent, then return to checkout after login
+    if (status !== "authenticated" || !session?.user) {
+      savePendingBooking({
+        event_slug: actualEventSlug,
+        event_name: actualEventName,
+        event_image: actualEventImage,
+        event_date: eventDate,
+        ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
+      });
+      saveAuthCallbackUrl(CUSTOMER_CHECKOUT_PATH);
+      clearDateSelection();
+      router.push(
+        `/auth/login?callbackUrl=${encodeURIComponent(CUSTOMER_CHECKOUT_PATH)}`,
+      );
+      return;
+    }
 
     const eventPayload = {
       event_slug: actualEventSlug,
@@ -493,7 +728,7 @@ export default function DatesSection({
             // Professional API-only approach - no local storage needed
 
             // Navigate directly to simple checkout page
-            router.push("/vendor/checkout");
+            router.push(CUSTOMER_CHECKOUT_PATH);
           } else {
             console.error("Failed to select event. Please try again.");
             clearDateSelection();
@@ -508,11 +743,122 @@ export default function DatesSection({
         router.push("/unauthorized");
       }
     } else {
-      // User is not logged in, redirect to login with simple callback URL
-      const checkoutUrl = `/vendor/checkout`;
-      router.push(`/auth/login?callbackUrl=${encodeURIComponent(checkoutUrl)}`);
+      savePendingBooking({
+        event_slug: eventData.event_slug,
+        event_name: eventData.event_name,
+        event_image: eventData.event_image,
+        event_date: eventData.event_date,
+        ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
+      });
+      saveAuthCallbackUrl(CUSTOMER_CHECKOUT_PATH);
+      clearDateSelection();
+      router.push(
+        `/auth/login?callbackUrl=${encodeURIComponent(CUSTOMER_CHECKOUT_PATH)}`,
+      );
     }
   };
+
+  useEffect(() => {
+    if (isPreviewMode || isOnboarding || chatDateHandoffRan.current) return;
+    const requested = parseChatHandoffDates(
+      searchParams.get(CHECKOUT_HANDOFF_DATES),
+    );
+    if (requested.length === 0) return;
+
+    const available = dates ?? [];
+    const toAdd = requested
+      .map((iso) =>
+        available.find(
+          (item) => isoDateKey(item.event_date) === iso && item.sold_out !== true,
+        ),
+      )
+      .filter((item): item is DatesSectionType[0] => Boolean(item));
+    if (toAdd.length === 0) return;
+
+    const signature = dateHandoffSignature(
+      eventSlug || "",
+      roomId,
+      toAdd.map((item) => isoDateKey(item.event_date)),
+    );
+    if (isDateHandoffConsumed(signature) || wasCartClearedByUser()) {
+      chatDateHandoffRan.current = true;
+      replaceEventUrlWithoutDateHandoff(pathname, searchParams);
+      return;
+    }
+
+    chatDateHandoffRan.current = true;
+
+    const pay = parseCheckoutHandoffPay(searchParams.get(CHECKOUT_HANDOFF_PAY));
+    const coupon = searchParams.get(CHECKOUT_HANDOFF_COUPON)?.trim() || null;
+    mergeCheckoutHandoffPending({ pay, coupon });
+    const checkoutHref = buildCheckoutHandoffHref({ pay, coupon });
+
+    const actualEventSlug = eventSlug || CHECKOUT_CONSTANTS.DEFAULT_EVENT_SLUG;
+    const actualEventName = eventName || "Festive & Fabulous";
+    const actualEventImage =
+      eventImage ||
+      "http://192.168.1.100:8000/storage/uploads/vendor/events/event_banner_image68bab4bb983bd.jpg";
+
+    const user = session?.user as SessionUser | undefined;
+    const isCustomer =
+      status === "authenticated" &&
+      user?.account_type === "customer" &&
+      user?.active_role === "customer" &&
+      Boolean(user?.token);
+
+    if (!isCustomer) {
+      savePendingBooking({
+        event_slug: actualEventSlug,
+        event_name: actualEventName,
+        event_image: actualEventImage,
+        event_date: toAdd[0].event_date,
+        extra_dates: toAdd.slice(1).map((item) => item.event_date),
+        ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
+      });
+      saveAuthCallbackUrl(checkoutHref);
+      router.push(
+        `/auth/login?callbackUrl=${encodeURIComponent(checkoutHref)}`,
+      );
+      return;
+    }
+
+    void (async () => {
+      try {
+        for (const item of toAdd) {
+          await storeEventBooking({
+            data: {
+              slug: normalizeSlug(actualEventSlug),
+              event_date: item.event_date,
+              ...(roomId != null && roomId > 0 ? { room_id: roomId } : {}),
+              drink_package: [],
+              tables: [],
+              tickets: [],
+            },
+          });
+        }
+        markDateHandoffConsumed(signature);
+        replaceEventUrlWithoutDateHandoff(pathname, searchParams);
+        router.push(checkoutHref);
+      } catch (error) {
+        console.error("Chat date handoff failed:", error);
+        chatDateHandoffRan.current = false;
+      }
+    })();
+  }, [
+    dates,
+    eventImage,
+    eventName,
+    eventSlug,
+    isOnboarding,
+    isPreviewMode,
+    pathname,
+    roomId,
+    router,
+    searchParams,
+    session?.user,
+    status,
+    storeEventBooking,
+  ]);
 
   // Professional API-only approach - no conflict resolution needed
 
@@ -565,6 +911,11 @@ export default function DatesSection({
     inCartStyle: "primary" | "green" = "primary",
   ) => {
     const dateInfo = getDateInfo(dateItem);
+    const bookingType = resolveDateCardBookingOption({
+      soldOut: dateItem.sold_out,
+      bookingOption: dateItem.booking_option,
+      bookingType: dateItem.booking_type,
+    });
     const visual = resolveDateCardVisual(
       dateItem.event_date,
       dateItem.sold_out,
@@ -575,27 +926,47 @@ export default function DatesSection({
     );
 
     return (
-      <div
-        className={getDateCardContainerClass(visual)}
+      <button
+        type="button"
+        className={getDateCardContainerClass(visual, narrowPreview)}
         key={cardKey}
         onClick={() => handleDateCardClick(dateItem, visual)}
         aria-busy={visual.isSelecting}
+        aria-label={dateCardAriaLabel(
+          dateInfo,
+          visual,
+          currencySymbol,
+          bookingType,
+        )}
+        disabled={visual.isSoldOut || visual.isOtherBusy}
       >
-        <div className="p-2 sm:p-3">
-          <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">{dateInfo.day}</p>
-          <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
-            {dateInfo.date}
-          </p>
-          <p className="text-xs sm:text-sm">{dateInfo.month}</p>
+        <div className={dateCardBodyClass}>
+          <p className={dateCardDayClass}>{dateInfo.day}</p>
+          <p className={dateCardNumberClass}>{dateInfo.date}</p>
+          <p className={dateCardMonthClass}>{dateInfo.month}</p>
         </div>
-        <div className={getDateCardFooterClass(visual, inCartStyle)}>
+        <div
+          className={getDateCardFooterClass(visual, inCartStyle, narrowPreview)}
+        >
           <DateCardFooterContent
             visual={visual}
             dateInfo={dateInfo}
             currencySymbol={currencySymbol}
+            listPrice={
+              typeof dateItem.price === "number" && !isNaN(dateItem.price)
+                ? dateItem.price
+                : 0
+            }
+            offer={
+              !visual.isSoldOut && !visual.isInCart && !visual.isSelecting
+                ? dateItem.offer
+                : null
+            }
+            compact={narrowPreview}
+            bookingType={bookingType}
           />
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -605,6 +976,11 @@ export default function DatesSection({
     animationIndex: number,
   ) => {
     const dateInfo = getDateInfo(dateItem);
+    const bookingType = resolveDateCardBookingOption({
+      soldOut: dateItem.sold_out,
+      bookingOption: dateItem.booking_option,
+      bookingType: dateItem.booking_type,
+    });
     const visual = resolveDateCardVisual(
       dateItem.event_date,
       dateItem.sold_out,
@@ -615,8 +991,9 @@ export default function DatesSection({
     );
 
     return (
-      <motion.div
-        className={getDateCardContainerClass(visual)}
+      <motion.button
+        type="button"
+        className={getDateCardContainerClass(visual, narrowPreview)}
         key={cardKey}
         initial={{ opacity: 1, y: 0 }}
         animate={{
@@ -649,37 +1026,70 @@ export default function DatesSection({
         }}
         onClick={() => handleDateCardClick(dateItem, visual)}
         aria-busy={visual.isSelecting}
+        aria-label={dateCardAriaLabel(
+          dateInfo,
+          visual,
+          currencySymbol,
+          bookingType,
+        )}
+        disabled={visual.isSoldOut || visual.isOtherBusy}
       >
-        <div className="p-2 sm:p-3">
-          <p className="text-xs sm:text-sm mb-0.5 sm:mb-1">{dateInfo.day}</p>
-          <p className="text-3xl sm:text-4xl md:text-5xl font-bold py-1">
-            {dateInfo.date}
-          </p>
-          <p className="text-xs sm:text-sm">{dateInfo.month}</p>
+        <div className={dateCardBodyClass}>
+          <p className={dateCardDayClass}>{dateInfo.day}</p>
+          <p className={dateCardNumberClass}>{dateInfo.date}</p>
+          <p className={dateCardMonthClass}>{dateInfo.month}</p>
         </div>
-        <div className={getDateCardFooterClass(visual, "primary")}>
+        <div
+          className={getDateCardFooterClass(visual, "primary", narrowPreview)}
+        >
           <DateCardFooterContent
             visual={visual}
             dateInfo={dateInfo}
             currencySymbol={currencySymbol}
+            listPrice={
+              typeof dateItem.price === "number" && !isNaN(dateItem.price)
+                ? dateItem.price
+                : 0
+            }
+            offer={
+              !visual.isSoldOut && !visual.isInCart && !visual.isSelecting
+                ? dateItem.offer
+                : null
+            }
+            compact={narrowPreview}
+            bookingType={bookingType}
           />
         </div>
-      </motion.div>
+      </motion.button>
     );
   };
 
-  // If no dates, show a default preview with dummy data
-  const displayDates = dates?.length
-    ? dates
-    : Array(10)
-        .fill({})
-        .map((_, i) => ({
-          event_date: new Date(new Date().setDate(new Date().getDate() + i))
-            .toISOString()
-            .split("T")[0],
-          price: 65,
-          sold_out: false,
-        }));
+  // Live + preview: no fake placeholder dates. While editing dates with none yet, show a light empty cue.
+  if (!dates?.length) {
+    if (!isPreviewMode) return null;
+    return (
+      <section className={cn(sectionClass, "px-4 py-10")}>
+        <div className={headerWrapClass}>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            {sectionLabel}
+          </p>
+          <SiteHeading
+            level={2}
+            title={heading}
+            variant="onDark"
+            align="center"
+            className={headingClass}
+            emphasis={headingEmphasis as HeadingEmphasis | undefined}
+          />
+          <p className="text-sm text-white/70">
+            Add dates in the form to preview them here.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  const displayDates = dates;
 
   const firstRowCount = Math.min(itemsPerRow, displayDates.length);
   const secondRowCount = Math.min(
@@ -697,43 +1107,56 @@ export default function DatesSection({
   const particles =
     isClient && !isPreviewMode
       ? Array.from({ length: 10 }, (_, i) => (
-        <motion.div
-          key={i}
-          className="absolute w-2 h-2 bg-white/20 rounded-full"
-          initial={{
-            x: Math.random() * (screenSize.width || 500),
-            y: Math.random() * (screenSize.height || 400),
-          }}
-          animate={{
-            x: Math.random() * (screenSize.width || 500),
-            y: Math.random() * (screenSize.height || 400),
-          }}
-          transition={{
-            duration: Math.random() * 15 + 10,
-            repeat: Infinity,
-            repeatType: "reverse",
-            ease: "linear",
-          }}
-        />
-      ))
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-white/20 rounded-full"
+            initial={{
+              x: Math.random() * (screenSize.width || 500),
+              y: Math.random() * (screenSize.height || 400),
+            }}
+            animate={{
+              x: Math.random() * (screenSize.width || 500),
+              y: Math.random() * (screenSize.height || 400),
+            }}
+            transition={{
+              duration: Math.random() * 15 + 10,
+              repeat: Infinity,
+              repeatType: "reverse",
+              ease: "linear",
+            }}
+          />
+        ))
       : [];
 
   // Simple non-animated fallback for SSR that matches the client layout
   if (!isClient) {
     return (
-      <section className="w-full py-12 sm:py-16 text-white rounded-3xl overflow-hidden relative bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014] transition-all duration-200">
-        <div className="w-full text-center relative z-10 mb-6 sm:mb-8 px-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+      <section className={sectionClass}>
+        <div className={headerWrapClass}>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
             {sectionLabel}
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
-            {heading}
-          </h2>
+          <SiteHeading
+            level={2}
+            title={heading}
+            variant="onDark"
+            align="center"
+            className={headingClass}
+            emphasis={headingEmphasis as HeadingEmphasis | undefined}
+          />
+          <p
+            data-book-now-hint
+            hidden
+            className="mt-1 max-w-md text-sm font-medium text-white/90"
+            role="status"
+          >
+            Choose a date below to continue booking
+          </p>
           {showAlreadyBookedLoginCta && (
             <Button
               type="button"
               variant="outline"
-              className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
+              className={loginCtaClass}
               onClick={() => {
                 if (!isPreviewMode) router.push("/auth/login");
               }}
@@ -743,18 +1166,30 @@ export default function DatesSection({
           )}
         </div>
 
-        <div className="w-full max-w-5xl mx-auto relative z-10 px-2 sm:px-8 md:px-12">
+        <div className={cardsWrapClass}>
           {/* Left arrow - Only show if pagination is needed and not on first page */}
           {needsPagination && (
-            <div className="absolute left-0 sm:left-2 top-1/2 transform -translate-y-1/2 z-20">
+            <div
+              className={cn(
+                "absolute top-1/2 z-20 -translate-y-1/2 transform left-0",
+                !narrowPreview && "sm:left-2",
+              )}
+            >
               <div
-                className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+                className={cn(
+                  "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+                  narrowPreview ? "p-1" : "p-1 sm:p-2",
                   canGoLeft
                     ? "cursor-pointer hover:bg-[#2a2b4a]"
-                    : "opacity-30 cursor-not-allowed"
-                }`}
+                    : "cursor-not-allowed opacity-30",
+                )}
               >
-                <CircleChevronLeft className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+                <CircleChevronLeft
+                  className={cn(
+                    "text-[#8f96c3]",
+                    narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+                  )}
+                />
               </div>
             </div>
           )}
@@ -766,6 +1201,7 @@ export default function DatesSection({
             firstRowCount={firstRowCount}
             secondRowCount={secondRowCount}
             pageOffset={0}
+            narrowPreview={narrowPreview}
             getDateRowJustifyClass={getDateRowJustifyClass}
             renderCard={(dateItem, cardKey) =>
               renderStaticDateCard(dateItem, cardKey, "green")
@@ -774,15 +1210,27 @@ export default function DatesSection({
 
           {/* Right arrow - Only show if pagination is needed */}
           {needsPagination && (
-            <div className="absolute right-0 sm:right-2 top-1/2 transform -translate-y-1/2 z-20">
+            <div
+              className={cn(
+                "absolute top-1/2 z-20 -translate-y-1/2 transform right-0",
+                !narrowPreview && "sm:right-2",
+              )}
+            >
               <div
-                className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+                className={cn(
+                  "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+                  narrowPreview ? "p-1" : "p-1 sm:p-2",
                   canGoRight
                     ? "cursor-pointer hover:bg-[#2a2b4a]"
-                    : "opacity-30 cursor-not-allowed"
-                }`}
+                    : "cursor-not-allowed opacity-30",
+                )}
               >
-                <CircleChevronRight className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+                <CircleChevronRight
+                  className={cn(
+                    "text-[#8f96c3]",
+                    narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+                  )}
+                />
               </div>
             </div>
           )}
@@ -794,7 +1242,7 @@ export default function DatesSection({
   // Full animated version for client-side
   return (
     <motion.section
-      className="w-full py-12 sm:py-16 text-white rounded-3xl overflow-hidden relative bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014] transition-all duration-200"
+      className={sectionClass}
       initial={{ opacity: 1 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
@@ -822,18 +1270,31 @@ export default function DatesSection({
         <AnimatePresence>{isVisible && particles}</AnimatePresence>
       </div>
 
-      <div className="w-full text-center relative z-10 mb-6 sm:mb-8 px-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+      <div className={headerWrapClass}>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
           {sectionLabel}
         </p>
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
-          {heading}
-        </h2>
+        <SiteHeading
+          level={2}
+          title={heading}
+          variant="onDark"
+          align="center"
+          className={headingClass}
+          emphasis={headingEmphasis as HeadingEmphasis | undefined}
+        />
+        <p
+          data-book-now-hint
+          hidden
+          className="mt-1 max-w-md text-sm font-medium text-white/90"
+          role="status"
+        >
+          Choose a date below to continue booking
+        </p>
         {showAlreadyBookedLoginCta && (
           <Button
             type="button"
             variant="outline"
-            className="bg-[#1a1a24] hover:bg-[#26273a] !text-white py-1 sm:py-1.5 px-6 sm:px-8 rounded-md text-xs sm:text-sm border border-white/25 shadow-sm"
+            className={loginCtaClass}
             onClick={() => {
               if (!isPreviewMode) router.push("/auth/login");
             }}
@@ -843,44 +1304,55 @@ export default function DatesSection({
         )}
       </div>
 
-      <div className="w-full max-w-5xl mx-auto relative z-10 px-2 sm:px-8 md:px-12">
-        {/* Left arrow - Only show if pagination is needed and can go left */}
+      <div className={cardsWrapClass}>
         {needsPagination && (
           <div
-            className="absolute left-0 sm:left-2 top-1/2 transform -translate-y-1/2 z-20"
+            className={cn(
+              "absolute top-1/2 z-20 -translate-y-1/2 transform left-0",
+              !narrowPreview && "sm:left-2",
+            )}
             onClick={() =>
               canGoLeft && setCurrentPage((prev) => Math.max(0, prev - 1))
             }
           >
             <div
-              className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+              className={cn(
+                "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+                narrowPreview ? "p-1" : "p-1 sm:p-2",
                 canGoLeft
                   ? "cursor-pointer hover:bg-[#2a2b4a]"
-                  : "opacity-30 cursor-not-allowed"
-              }`}
+                  : "cursor-not-allowed opacity-30",
+              )}
             >
-              <CircleChevronLeft className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+              <CircleChevronLeft
+                className={cn(
+                  "text-[#8f96c3]",
+                  narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+                )}
+              />
             </div>
           </div>
         )}
 
-        {/* Date cards — single horizontal scroller (both rows) on mobile */}
         <DateRowsScroller
           displayDates={displayDates}
           itemsPerRow={itemsPerRow}
           firstRowCount={firstRowCount}
           secondRowCount={secondRowCount}
           pageOffset={currentPage * itemsPerRow}
+          narrowPreview={narrowPreview}
           getDateRowJustifyClass={getDateRowJustifyClass}
           renderCard={(dateItem, cardKey, animationIndex) =>
             renderAnimatedDateCard(dateItem, cardKey, animationIndex)
           }
         />
 
-        {/* Right arrow - Only show if pagination is needed and can go right */}
         {needsPagination && (
           <div
-            className="absolute right-0 sm:right-2 top-1/2 transform -translate-y-1/2 z-20"
+            className={cn(
+              "absolute top-1/2 z-20 -translate-y-1/2 transform right-0",
+              !narrowPreview && "sm:right-2",
+            )}
             onClick={() => {
               if (canGoRight) {
                 setCurrentPage((prev) => Math.min(maxPages, prev + 1));
@@ -888,19 +1360,24 @@ export default function DatesSection({
             }}
           >
             <div
-              className={`bg-[#21223a] rounded-full p-1 sm:p-2 shadow-[0_0_10px_rgba(33,34,58,0.7)] ${
+              className={cn(
+                "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+                narrowPreview ? "p-1" : "p-1 sm:p-2",
                 canGoRight
                   ? "cursor-pointer hover:bg-[#2a2b4a]"
-                  : "opacity-30 cursor-not-allowed"
-              }`}
+                  : "cursor-not-allowed opacity-30",
+              )}
             >
-              <CircleChevronRight className="h-7 w-7 sm:h-10 sm:w-10 text-[#8f96c3]" />
+              <CircleChevronRight
+                className={cn(
+                  "text-[#8f96c3]",
+                  narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+                )}
+              />
             </div>
           </div>
         )}
       </div>
-
-      {/* Professional API-only approach - no conflict modal needed */}
     </motion.section>
   );
 }

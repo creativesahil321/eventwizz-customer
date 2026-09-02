@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import { useRef, useEffect, useState, useMemo, type CSSProperties } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { SiteHeading } from "@/components/public/site-heading";
+import { cn } from "@/lib/utils";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type EventScheduler = {
   id?: string;
@@ -24,18 +28,24 @@ type EventSchedulerProps = {
   eventSchedularCopy?: string;
   eventSchedular: EventScheduler[] | null | undefined;
   eventSchedularBackgroundImage?: string | null;
+  /**
+   * Calendar dates the event actually runs on (e.g. `["2026-12-20"]`).
+   * Live time-of-day progress is only shown ON one of these dates — before the
+   * event every step is "upcoming", after it every step is "completed". When
+   * omitted (editor/onboarding previews with no real date) the schedule falls
+   * back to a time-of-day demo.
+   */
+  eventDates?: Array<string | null | undefined>;
+  /** Site Essentials trailing accent — required on platform-host previews. */
+  headingEmphasis?: HeadingEmphasis | string | null;
 };
+
+/** Where "now" sits relative to the event's calendar date(s). */
+type EventDayPhase = "before" | "during" | "after" | "unknown";
 
 type ScheduleStatus = "completed" | "current" | "upcoming";
 
 const CARD_MIN_WIDTH = 210;
-
-const DEFAULT_SCHEDULES: EventScheduler[] = [
-  { time: "18:00", title: "Doors Open" },
-  { time: "19:00", title: "Live Music" },
-  { time: "20:00", title: "Dancing" },
-  { time: "22:00", title: "Event Ends" },
-];
 
 function formatTime(time: string): string {
   if (!time || time === "TBD") return "TBD";
@@ -146,13 +156,73 @@ function getScheduleIcon(title: string, index: number, total: number): LucideIco
   return defaults[index % defaults.length];
 }
 
-function resolveCurrentIndex(schedules: EventScheduler[]): {
+/** Midnight (local) timestamp for a date, or null when unparseable. */
+function startOfDayTs(date: Date): number {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ).getTime();
+}
+
+/**
+ * Compare "today" against the event's calendar date(s) so live progress only
+ * runs on the actual event day. `unknown` (no dates supplied) lets previews
+ * keep the time-of-day demo.
+ */
+function resolveEventDayPhase(
+  eventDates: Array<string | null | undefined> | undefined,
+): EventDayPhase {
+  if (!eventDates || eventDates.length === 0) return "unknown";
+
+  const dayTimestamps = eventDates
+    .map((raw) => {
+      const value = (raw ?? "").trim();
+      if (value.length < 8) return null;
+      // Anchor at midday so a plain `YYYY-MM-DD` never rolls to the previous
+      // day under a negative UTC offset before we normalize to local midnight.
+      const parsed = new Date(`${value}T12:00:00`);
+      return Number.isNaN(parsed.getTime()) ? null : startOfDayTs(parsed);
+    })
+    .filter((ts): ts is number => ts !== null);
+
+  if (dayTimestamps.length === 0) return "unknown";
+
+  const today = startOfDayTs(new Date());
+  if (dayTimestamps.includes(today)) return "during";
+  // Past the last occurrence → the schedule has fully happened. Otherwise the
+  // next occurrence is still upcoming (covers multi-date events with gaps).
+  return today > Math.max(...dayTimestamps) ? "after" : "before";
+}
+
+type ScheduleProgress = {
   currentIndex: number;
   useLiveProgress: boolean;
-} {
+  allCompleted: boolean;
+};
+
+function resolveScheduleProgress(
+  schedules: EventScheduler[],
+  phase: EventDayPhase,
+): ScheduleProgress {
+  // Before the event day: purely informational — nothing done yet.
+  if (phase === "before") {
+    return { currentIndex: -1, useLiveProgress: false, allCompleted: false };
+  }
+
+  // After the event day: the whole schedule is in the past.
+  if (phase === "after") {
+    return {
+      currentIndex: schedules.length - 1,
+      useLiveProgress: true,
+      allCompleted: true,
+    };
+  }
+
+  // On the event day (or preview with no date): track the current slot by time.
   const minutesList = schedules.map((s) => parseTimeToMinutes(s.time));
   if (minutesList.some((m) => m === null)) {
-    return { currentIndex: -1, useLiveProgress: false };
+    return { currentIndex: -1, useLiveProgress: false, allCompleted: false };
   }
 
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
@@ -160,29 +230,39 @@ function resolveCurrentIndex(schedules: EventScheduler[]): {
   const last = minutesList[minutesList.length - 1]!;
 
   if (nowMinutes < first) {
-    return { currentIndex: -1, useLiveProgress: true };
+    return { currentIndex: -1, useLiveProgress: true, allCompleted: false };
   }
 
   if (nowMinutes >= last) {
-    return { currentIndex: minutesList.length - 1, useLiveProgress: true };
+    return {
+      currentIndex: minutesList.length - 1,
+      useLiveProgress: true,
+      allCompleted: false,
+    };
   }
 
   for (let i = 0; i < minutesList.length - 1; i++) {
     const start = minutesList[i]!;
     const end = minutesList[i + 1]!;
     if (nowMinutes >= start && nowMinutes < end) {
-      return { currentIndex: i, useLiveProgress: true };
+      return { currentIndex: i, useLiveProgress: true, allCompleted: false };
     }
   }
 
-  return { currentIndex: minutesList.length - 1, useLiveProgress: true };
+  return {
+    currentIndex: minutesList.length - 1,
+    useLiveProgress: true,
+    allCompleted: false,
+  };
 }
 
 function getItemStatus(
   index: number,
   currentIndex: number,
   useLiveProgress: boolean,
+  allCompleted: boolean,
 ): ScheduleStatus {
+  if (allCompleted) return "completed";
   if (!useLiveProgress || currentIndex < 0) return "upcoming";
   if (index < currentIndex) return "completed";
   if (index === currentIndex) return "current";
@@ -193,7 +273,9 @@ function segmentIsActive(
   segmentIndex: number,
   currentIndex: number,
   useLiveProgress: boolean,
+  allCompleted: boolean,
 ): boolean {
+  if (allCompleted) return true;
   if (!useLiveProgress || currentIndex < 0) return false;
   return segmentIndex < currentIndex;
 }
@@ -274,7 +356,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-section {
+  .tl-section:not(.tl-section--preview-narrow) {
     padding: 2.5rem 1.5rem;
   }
 }
@@ -357,7 +439,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-header {
+  .tl-section:not(.tl-section--preview-narrow) .tl-header {
     margin-bottom: 1.5rem;
   }
 }
@@ -377,18 +459,7 @@ const timelineStyles = `
 }
 
 .tl-header__title {
-  font-size: 1.375rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--tl-text);
   margin: 0 0 0.375rem;
-}
-
-@media (min-width: 768px) {
-  .tl-header__title {
-    font-size: 1.5rem;
-  }
 }
 
 .tl-header__subtitle {
@@ -400,7 +471,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 768px) {
-  .tl-header__subtitle {
+  .tl-section:not(.tl-section--preview-narrow) .tl-header__subtitle {
     font-size: 0.9375rem;
   }
 }
@@ -423,7 +494,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-container {
+  .tl-section:not(.tl-section--preview-narrow) .tl-container {
     padding: 1.125rem 1rem;
   }
 }
@@ -434,7 +505,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-container--has-arrows {
+  .tl-section:not(.tl-section--preview-narrow) .tl-container--has-arrows {
     padding-left: 3.25rem;
     padding-right: 3.25rem;
   }
@@ -482,8 +553,8 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-arrow--left { left: 0.75rem; }
-  .tl-arrow--right { right: 0.75rem; }
+  .tl-section:not(.tl-section--preview-narrow) .tl-arrow--left { left: 0.75rem; }
+  .tl-section:not(.tl-section--preview-narrow) .tl-arrow--right { right: 0.75rem; }
 }
 
 .tl-arrow--disabled {
@@ -535,7 +606,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-items {
+  .tl-section:not(.tl-section--preview-narrow) .tl-items {
     gap: 0.5rem;
   }
 }
@@ -723,7 +794,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-card {
+  .tl-section:not(.tl-section--preview-narrow) .tl-card {
     min-height: 118px;
     padding: 1rem;
   }
@@ -874,7 +945,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-card__time {
+  .tl-section:not(.tl-section--preview-narrow) .tl-card__time {
     font-size: 0.75rem;
   }
 }
@@ -896,7 +967,7 @@ const timelineStyles = `
 }
 
 @media (min-width: 640px) {
-  .tl-card__title {
+  .tl-section:not(.tl-section--preview-narrow) .tl-card__title {
     font-size: 0.875rem;
   }
 }
@@ -917,7 +988,10 @@ export default function Timeline({
   eventSchedularTitle,
   eventSchedularCopy,
   eventSchedularBackgroundImage,
+  eventDates,
+  headingEmphasis,
 }: EventSchedulerProps) {
+  const narrowPreview = usePreviewNarrowLayout();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -931,21 +1005,19 @@ export default function Timeline({
       ? eventSchedular
       : [];
 
-    const filterSchedules = safeEventSchedular
+    return safeEventSchedular
       .map((item) => ({
         ...item,
         title: item.title.trim(),
         time: item.time.trim(),
       }))
       .filter((item) => item.title || item.time);
-
-    return filterSchedules.length > 0 ? filterSchedules : DEFAULT_SCHEDULES;
   }, [eventSchedular]);
 
-  const { currentIndex, useLiveProgress } = useMemo(
-    () => resolveCurrentIndex(displaySchedules),
-    [displaySchedules],
-  );
+  const { currentIndex, useLiveProgress, allCompleted } = useMemo(() => {
+    const phase = resolveEventDayPhase(eventDates);
+    return resolveScheduleProgress(displaySchedules, phase);
+  }, [displaySchedules, eventDates]);
 
   const columnStyle = useMemo(
     () =>
@@ -1063,12 +1135,19 @@ export default function Timeline({
   const subtitle =
     eventSchedularCopy?.trim() ||
     "Experience every moment of the evening";
+  const scheduleTitle = eventSchedularTitle?.trim() || "What to Expect";
+  const hasScheduleRows = displaySchedules.length > 0;
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: timelineStyles }} />
 
-      <section className="tl-section">
+      <section
+        className={cn(
+          "tl-section",
+          narrowPreview && "tl-section--preview-narrow",
+        )}
+      >
         {/* Background */}
         {eventSchedularBackgroundImage?.trim() ? (
           <div className="tl-section__bg-image" aria-hidden>
@@ -1087,15 +1166,26 @@ export default function Timeline({
 
         <div style={{ position: "relative", zIndex: 10, maxWidth: "72rem", margin: "0 auto" }}>
           {/* Header */}
-          <header className="tl-header">
-            <span className="tl-header__label">Evening Schedule</span>
-            <h2 className="tl-header__title">
-              {eventSchedularTitle || "What to Expect"}
-            </h2>
+          <header className="tl-header space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+              Schedule
+            </p>
+            <SiteHeading
+              level={2}
+              title={scheduleTitle}
+              emphasis={headingEmphasis}
+              variant="onSurface"
+              align="center"
+              className="!mx-auto !block !text-3xl !font-black tracking-tight md:!text-4xl"
+            />
             <p className="tl-header__subtitle">{subtitle}</p>
           </header>
 
-          {/* Timeline container */}
+          {!hasScheduleRows ? (
+            <p className="mx-auto max-w-md text-center text-sm text-[var(--color-text-dimmed)]">
+              Add schedule items in the form to preview them here.
+            </p>
+          ) : (
           <div
             className={`tl-container ${showArrows ? "tl-container--has-arrows" : ""}`}
           >
@@ -1146,6 +1236,7 @@ export default function Timeline({
                     index,
                     currentIndex,
                     useLiveProgress,
+                    allCompleted,
                   );
                   const Icon = getScheduleIcon(
                     item.title,
@@ -1175,6 +1266,7 @@ export default function Timeline({
                               index - 1,
                               currentIndex,
                               useLiveProgress,
+                              allCompleted,
                             )}
                           />
                         ) : (
@@ -1183,7 +1275,12 @@ export default function Timeline({
                         <ProgressMarker status={status} index={index} />
                         {!isLast ? (
                           <TimelineConnector
-                            filled={segmentIsActive(index, currentIndex, useLiveProgress)}
+                            filled={segmentIsActive(
+                              index,
+                              currentIndex,
+                              useLiveProgress,
+                              allCompleted,
+                            )}
                           />
                         ) : (
                           <span style={{ flex: 1 }} aria-hidden />
@@ -1235,6 +1332,7 @@ export default function Timeline({
               </div>
             </div>
           </div>
+          )}
         </div>
       </section>
     </>

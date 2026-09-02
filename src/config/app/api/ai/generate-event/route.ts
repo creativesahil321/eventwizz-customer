@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
-import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import { tryModelsWithFallback, AI_JSON_MAX_TOKENS, type FallbackResult } from "../lib/utils";
+import { AI_JSON_COMPLETION, extractJsonObject } from "../lib/extract-json";
+import {
+  aiRuntimeFailureMeta,
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
 import {
   BANNER_HEADING_MAX_WORDS,
   truncateToMaxWords,
@@ -15,7 +20,12 @@ import {
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/event-form-limits";
 import type { AIDate, AIRoomDates, AIRoomDrinks } from "@/app/api/ai/generate-onboarding/route";
-import { normalizeAIDatePaymentFields } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
+import {
+  applyTicketsOnlyToDates,
+  ensureOnboardingDates,
+  hasUsableOnboardingDates,
+  normalizeAIDatePaymentFields,
+} from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import {
   AI_EVENT_MAX_ROOMS,
   AI_EVENT_MIN_ROOMS,
@@ -29,6 +39,7 @@ import {
   type AIEventRoomMenu,
   type AIEventRoomPackage,
 } from "@/app/(protected)/vendor/events/_lib/ai-event-vendor-intent";
+import { fillAiEventGeneratedDefaults } from "@/app/(protected)/vendor/events/_lib/fill-ai-event-content";
 
 export interface AIEventInput {
   eventName: string;
@@ -39,10 +50,19 @@ export interface AIEventInput {
   venueName?: string;
   venueCity?: string;
   venueAddress?: string;
+  /** Parent venue location pin when API provides it */
+  venueLatitude?: number | string;
+  venueLongitude?: number | string;
   has_room_system?: boolean;
   room_names?: string[];
   /** Existing venue room ids when user picked rooms in AI create (multiselect). */
   selected_room_ids?: number[];
+  /** Optional source-to-venue room mapping used by URL imports. */
+  room_mappings?: Array<{
+    source_name: string;
+    room_id?: number;
+    target_name?: string;
+  }>;
 }
 
 export type { AIEventRoomPackage, AIEventRoomMenu, AIEventRoomBrochure };
@@ -98,6 +118,9 @@ export interface AIEventGeneratedContent {
     about_event_heading: string;
     about_event_sub_heading: string;
     about_event_description: string;
+    event_address?: string;
+    latitude?: number;
+    longitude?: number;
   };
   stepTwo: {
     package_title: string;
@@ -134,7 +157,7 @@ export interface AIEventGeneratedContent {
     rooms?: AIRoomDrinks[];
   };
   stepSix: {
-    event_address: string;
+    event_address?: string;
     price_start_from: string;
     price_start_from_button_text: string;
     rooms?: AIEventRoomBrochure[];
@@ -146,12 +169,9 @@ export interface AIEventGeneratedContent {
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = env.GROQ_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "AI service is not configured" },
-        { status: 500 }
-      );
+    const aiConfig = await resolveAiRuntimeConfig();
+    if (!aiConfig.isConfigured) {
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     const input: AIEventInput = await req.json();
@@ -198,13 +218,14 @@ export async function POST(req: NextRequest) {
       maxFaqs: STEP_NINE_MAX_FAQS,
     });
 
-    const result: FallbackResult = await tryModelsWithFallback(apiKey, {
+    const result: FallbackResult = await tryModelsWithFallback(aiConfig, {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.7,
-      max_tokens: 4500,
+      temperature: 0.4,
+      max_tokens: AI_JSON_MAX_TOKENS,
+      ...AI_JSON_COMPLETION,
     });
 
     if (!result.success || !result.data) {
@@ -216,6 +237,7 @@ export async function POST(req: NextRequest) {
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
           lastError: result.lastError,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );
@@ -230,10 +252,9 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No valid JSON found in response");
-
-      const content: AIEventGeneratedContent = JSON.parse(jsonMatch[0]);
+      const content = extractJsonObject<AIEventGeneratedContent>(rawContent, [
+        "stepOne",
+      ]);
       const truncate = (str: string, max: number) =>
         str && str.length > max ? str.substring(0, max) : str || "";
 
@@ -253,28 +274,39 @@ export async function POST(req: NextRequest) {
       if (content.stepTwo) {
         content.stepTwo.package_title = truncate(content.stepTwo.package_title, 40);
         content.stepTwo.package_description = truncate(content.stepTwo.package_description, 160);
-        if (content.stepTwo.package_details) {
+        if (Array.isArray(content.stepTwo.package_details)) {
           content.stepTwo.package_details = content.stepTwo.package_details.map((d) => ({
             title: truncate(d.title, 40),
           }));
-          content.stepTwo.event_schedular_title = truncate(content.stepTwo.event_schedular_title, 40);
-          content.stepTwo.event_schedule_subtitle = truncate(content.stepTwo.event_schedule_subtitle, 160);
-          if (content.stepTwo.event_schedular) {
-            content.stepTwo.event_schedular = content.stepTwo.event_schedular.map((s) => ({
+        }
+        content.stepTwo.event_schedular_title = truncate(content.stepTwo.event_schedular_title, 40);
+        content.stepTwo.event_schedule_subtitle = truncate(content.stepTwo.event_schedule_subtitle, 160);
+        if (Array.isArray(content.stepTwo.event_schedular)) {
+          content.stepTwo.event_schedular = content.stepTwo.event_schedular
+            .map((s) => ({
               title: truncate(s.title, 40),
               time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time) ? s.time : "12:00",
-            }));
+            }))
+            .sort((a, b) => {
+              const [ha, ma] = a.time.split(":").map(Number);
+              const [hb, mb] = b.time.split(":").map(Number);
+              return ha * 60 + ma - (hb * 60 + mb);
+            });
+          if (content.stepTwo.event_schedular.length === 0) {
+            content.stepTwo.event_schedular = [
+              { title: "Doors Open", time: "19:00" },
+            ];
           }
-          content.stepTwo.event_schedular.sort((a, b) => {
-            const [ha, ma] = a.time.split(":").map(Number);
-            const [hb, mb] = b.time.split(":").map(Number);
-            return ha * 60 + ma - (hb * 60 + mb);
-          });
+        } else {
+          content.stepTwo.event_schedular = [
+            { title: "Doors Open", time: "19:00" },
+          ];
         }
       }
 
-      // Enforce stepThree date validation
-      if (content.stepThree?.dates) {
+      // Enforce stepThree date validation. Empty arrays are truthy — only
+      // sanitize when at least one date has a usable YYYY-MM-DD (onboarding).
+      if (hasUsableOnboardingDates(content.stepThree?.dates as AIDate[])) {
         const now = new Date();
         content.stepThree.dates = content.stepThree.dates.map((date, idx) => {
           const futureDate = new Date(now);
@@ -346,7 +378,11 @@ export async function POST(req: NextRequest) {
           })
           .map((d) => normalizeAIDatePaymentFields(d as AIDate) as AIEventDate);
 
-        if (vendorHints.wantsBothTicketsAndTables) {
+        if (vendorHints.prefersTicketsOnly) {
+          content.stepThree.dates = applyTicketsOnlyToDates(
+            content.stepThree.dates as AIDate[],
+          ) as AIEventDate[];
+        } else if (vendorHints.wantsBothTicketsAndTables) {
           content.stepThree.dates = content.stepThree.dates.map((d) => {
             if (d.booking_type === "tickets") {
               return normalizeAIDatePaymentFields({
@@ -376,38 +412,27 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        const d1 = new Date();
-        d1.setMonth(d1.getMonth() + 2);
         content.stepThree = {
-          dates: [
-            {
-              event_date: d1.toISOString().split("T")[0],
-              booking_type: "both",
-              tickets: [
-                { title: "General Admission", description: "Standard entry with full access", total_capacity: "100", price: "50" },
-                { title: "VIP Pass", description: "Premium access with exclusive perks", total_capacity: "30", price: "120" },
-              ],
-              tables: [
-                { min_persons: "2", max_persons: "6", price: "150", total_tables: "15" },
-                { min_persons: "6", max_persons: "10", price: "250", total_tables: "8" },
-              ],
-              payment_type: "full",
-              is_deposit_enabled: false,
-            },
-          ],
+          ...content.stepThree,
+          dates: ensureOnboardingDates(
+            content.stepThree?.dates as AIDate[] | undefined,
+            vendorHints.bookingFacts,
+          ) as AIEventDate[],
         };
       }
 
-      if (hasRoomSystem && content.stepThree) {
-        const baseDates = (content.stepThree.dates ?? []) as AIDate[];
-        const sanitizeRoomDates = (dates: AIDate[] | undefined): AIDate[] =>
-          (dates ?? []).map((d) => normalizeAIDatePaymentFields(d));
+      content.stepThree.dates = ensureOnboardingDates(
+        content.stepThree.dates as AIDate[],
+        vendorHints.bookingFacts,
+      ) as AIEventDate[];
 
+      if (hasRoomSystem && content.stepThree) {
+        const baseDates = content.stepThree.dates as AIDate[];
         const filteredRooms = Array.isArray(content.stepThree.rooms)
           ? content.stepThree.rooms
               .map((room) => ({
                 room_name: truncate(String(room.room_name ?? "").trim(), 80),
-                dates: sanitizeRoomDates(room.dates as AIDate[]),
+                dates: Array.isArray(room.dates) ? (room.dates as AIDate[]) : [],
               }))
               .filter((room) => room.room_name.length > 0)
           : [];
@@ -417,16 +442,55 @@ export async function POST(req: NextRequest) {
           normalizedRoomNames,
           baseDates,
           vendorHints,
-          (dates, _offset) => {
-            const sanitized = sanitizeRoomDates(dates as AIDate[]);
-            return sanitized.length > 0 ? sanitized : baseDates;
-          },
-        );
+          (dates) =>
+            ensureOnboardingDates(
+              hasUsableOnboardingDates(dates as AIDate[])
+                ? (dates as AIDate[])
+                : baseDates,
+              vendorHints.bookingFacts,
+            ),
+        ).map((room) => ({
+          ...room,
+          dates: ensureOnboardingDates(
+            hasUsableOnboardingDates(room.dates as AIDate[])
+              ? (room.dates as AIDate[])
+              : baseDates,
+            vendorHints.bookingFacts,
+          ),
+        }));
       } else if (content.stepThree?.rooms) {
         content.stepThree.rooms = [];
       }
 
-      if (content.stepFour) {
+      if (vendorHints.prefersTicketsOnly && content.stepThree) {
+        content.stepThree.dates = applyTicketsOnlyToDates(
+          content.stepThree.dates as AIDate[],
+        ) as AIEventDate[];
+        if (Array.isArray(content.stepThree.rooms)) {
+          content.stepThree.rooms = content.stepThree.rooms.map((room) => ({
+            ...room,
+            dates: applyTicketsOnlyToDates(room.dates as AIDate[]),
+          }));
+        }
+      }
+
+      if (vendorHints.omitCatering) {
+        content.stepFour = {
+          catering_option: 0,
+          menu_title: "",
+          menu_description: "",
+          menus: [],
+          rooms: hasRoomSystem
+            ? normalizedRoomNames.map((room_name) => ({
+                room_name,
+                catering_option: 0,
+                menu_title: "",
+                menu_description: "",
+                menus: [],
+              }))
+            : [],
+        };
+      } else if (content.stepFour) {
         content.stepFour.menu_title = truncate(content.stepFour.menu_title, 40);
         content.stepFour.menu_description = truncate(content.stepFour.menu_description, 160);
         content.stepFour.catering_option = content.stepFour.catering_option === 0 ? 0 : 1;
@@ -434,7 +498,21 @@ export async function POST(req: NextRequest) {
         content.stepFour = { catering_option: 0, menu_title: "", menu_description: "", menus: [] };
       }
 
-      if (content.stepFive) {
+      if (vendorHints.omitDrinks) {
+        content.stepFive = {
+          drink_title: "",
+          drink_description: "",
+          packages: [],
+          rooms: hasRoomSystem
+            ? normalizedRoomNames.map((room_name) => ({
+                room_name,
+                drink_title: "",
+                drink_description: "",
+                packages: [],
+              }))
+            : [],
+        };
+      } else if (content.stepFive) {
         content.stepFive.drink_title = truncate(
           content.stepFive.drink_title,
           DRINK_SECTION_TITLE_MAX_CHARS
@@ -483,7 +561,9 @@ export async function POST(req: NextRequest) {
         content.stepFive.rooms = [];
       }
 
-      if (content.stepSeven?.faqs) {
+      if (vendorHints.omitFaqs) {
+        content.stepSeven = { faqs: [] };
+      } else if (content.stepSeven?.faqs) {
         content.stepSeven.faqs = content.stepSeven.faqs
           .slice(0, STEP_NINE_MAX_FAQS)
           .map((f) => ({
@@ -492,8 +572,10 @@ export async function POST(req: NextRequest) {
           }));
       }
 
+      const filled = fillAiEventGeneratedDefaults(content, input);
+
       return NextResponse.json({
-        content,
+        content: filled,
         model: result.model,
         modelUsed: result.modelUsed,
       });
@@ -503,6 +585,7 @@ export async function POST(req: NextRequest) {
         {
           error: "Failed to parse AI response",
           details: parseError instanceof Error ? parseError.message : "Unknown parsing error",
+          preview: rawContent.slice(0, 280),
         },
         { status: 500 }
       );

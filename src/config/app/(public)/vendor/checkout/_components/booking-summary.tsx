@@ -7,15 +7,12 @@ import { Button } from "@/components/ui/button";
 import BookingSummarySkeleton from "./booking-summary-skeleton-loader";
 import {
   CreditCard,
-  Shield,
   ChevronUp,
   ChevronDown,
   Lock,
-  Zap,
   HelpCircle,
   AlertCircle,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useGetCartData } from "@/services/customer/cart/query";
 import { useIsPreviewMode } from "@/contexts/preview-context";
@@ -30,14 +27,20 @@ import {
   getApiDateData,
   parseRoomDateKey,
   calculateEditableDateTotal,
+  calculateEditableCartDiscountableTotal,
+  calculateEditableDateDrinksTotal,
   isDepositChoiceAvailable,
   hasUnconfirmedTableSeating,
+  calculateUnconfirmedTablesTotal,
   getDateGuestCount,
+  resolveCartDateDiscounts,
 } from "../_lib/cart-calculations";
 import {
   transformCartToCheckout,
   validateCheckoutRequirements,
   calculateCheckoutSummary,
+  applyDiscountThenSplitPayment,
+  checkoutMoneyEquals,
 } from "../_lib/checkout-utils";
 import {
   useProcessCheckout,
@@ -50,9 +53,12 @@ import { buildCheckoutStripeSession, mergeStripePaymentSession } from "@/service
 import { getStripePromise } from "@/lib/stripe/stripe-loader";
 import { handleCheckoutError } from "@/services/customer/checkout/utils";
 import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
+import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.store";
-import PaymentGatewaySelector from "./payment-gateway-selector";
+import PaymentGatewaySelector, {
+  formatCheckoutGatewayContinuePrompt,
+} from "./payment-gateway-selector";
 import CheckoutStripePaymentModal from "./checkout-stripe-payment-modal";
 import { PaymentSessionCountdownPill } from "./payment-session-countdown-pill";
 import { usePaymentSessionCountdown, formatPaymentTimeRemainingVerbose } from "../_lib/use-payment-session-countdown";
@@ -60,16 +66,35 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import OrderViewBreakdown from "./order-view-breakdown";
 import PerDatePaymentSelection from "./per-date-payment-selection";
+import {
+  CheckoutPromoPanel,
+  resolveCartEventCoupon,
+  resolveCheckoutPromoTotals,
+  type CheckoutPromoApplied,
+} from "./checkout-promo-panel";
+import { focusCheckoutDate } from "../_lib/checkout-date-focus";
 import { cn } from "@/lib/utils";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { useCheckoutMobileChromeHeight } from "@/hooks/use-preview-review-chrome-height";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   assessCheckoutDatesReadiness,
+  countCheckoutDateStatuses,
+  findFirstIncompleteCheckoutDate,
+  formatCheckoutBookingMetaLine,
   resolveCheckoutCtaState,
 } from "../_lib/checkout-readiness";
 
 const checkoutPayButtonClass = (disabled: boolean) =>
   cn(
-    "rounded-xl font-bold shadow-lg transition-all duration-200",
+    "rounded-xl font-bold shadow-lg transition-all duration-200 disabled:opacity-100",
     disabled
       ? "cursor-not-allowed border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)] text-[color:var(--checkout-muted-foreground)] hover:bg-[color:var(--checkout-muted)] hover:text-[color:var(--checkout-muted-foreground)]"
       : "bg-[color:var(--checkout-brand-primary)] text-white shadow-[color:var(--checkout-brand-primary)]/20 hover:!bg-[color:var(--checkout-brand-primary)] hover:!text-white hover:brightness-110 active:scale-[0.98]",
@@ -84,6 +109,19 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showViewBreakdown, setShowViewBreakdown] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  const isMobileViewport = useMediaQuery("(max-width: 1023px)");
+
+  useEffect(() => {
+    if (!isMobileViewport) setShowMobileDrawer(false);
+  }, [isMobileViewport]);
+  const couponCode = useCheckoutPromoStore((s) => s.couponCode);
+  const setCouponCode = useCheckoutPromoStore((s) => s.setCouponCode);
+  const checkoutPromo: CheckoutPromoApplied = {
+    couponCode,
+  };
+  const setCheckoutPromo = (promo: CheckoutPromoApplied) => {
+    setCouponCode(promo.couponCode);
+  };
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
   const [justExpiredBookingNumber, setJustExpiredBookingNumber] = useState<
     string | null
@@ -179,6 +217,14 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }
   }, [stripePaymentSession?.bookingNumber]);
 
+  // Date delete / Clear all clears the payment session — close the Stripe modal
+  // so it cannot stay open over an empty cart.
+  useEffect(() => {
+    if (!stripePaymentSession) {
+      setIsStripePaymentOpen(false);
+    }
+  }, [stripePaymentSession]);
+
   const sessionSecondsLeft = usePaymentSessionCountdown(
     stripePaymentSession?.expiresAt,
     expireSession,
@@ -192,7 +238,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await resumeCheckoutMutation.mutateAsync(bookingNumber);
+        const response = await resumeCheckoutMutation.mutateAsync({
+          booking_number: bookingNumber,
+        });
         if (cancelled || !response.status || !response.data) return;
         const paymentAction = resolveCheckoutPaymentAction(response.data);
         if (paymentAction?.type !== "stripe" || !paymentAction.session.expiresAt) {
@@ -239,6 +287,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
     // Imperative read — avoids adding stripePaymentSession to deps (infinite loop)
     const store = useCheckoutPaymentUiStore.getState();
     if (store.stripePaymentSession) return;
+
+    // Don't restore onto an empty cart (e.g. user deleted the last date). The
+    // backend may still attach pending_payment briefly; showing "Payment required"
+    // over "Your cart is empty" is the bug we're fixing.
+    if (getApiCartDateKeys(currentEventApiData).length === 0) return;
 
     const pending = currentEventApiData.pending_payment as
       | import("@/lib/types/cart.types").ApiPendingPayment
@@ -298,23 +351,120 @@ export default function BookingSummary({}: BookingSummaryProps) {
     getTotalPaymentBreakdown,
   ]);
 
-  // Bug 1 fix — discard pending session when the amount the user owes today changes
-  // (e.g. switching deposit ↔ pay-in-full, adding/removing items).
-  // The backend keeps the old booking alive; calling /resume with a new bookingNumber
-  // would open the wrong intent, so we drop the session and let the user re-checkout.
+  const appliedPromoDiscount = useMemo(() => {
+    const getEditableDate = (dateKey: string) =>
+      currentEventSlug ? getDateData(currentEventSlug, dateKey) : null;
+    const dateRows = resolveCartDateDiscounts(
+      currentEventApiData,
+      getEditableDate,
+    );
+    const dateOfferSavings = dateRows.reduce(
+      (sum, row) => sum + (row.status === "applied" ? row.amount : 0),
+      0,
+    );
+    // Coupon % is on tables + tickets only (drinks excluded — matches API).
+    const discountableSubtotal = calculateEditableCartDiscountableTotal(
+      currentEventApiData,
+      getEditableDate,
+    );
+    return resolveCheckoutPromoTotals(
+      checkoutPromo,
+      resolveCartEventCoupon(currentEventApiData),
+      discountableSubtotal,
+      dateOfferSavings,
+    ).totalDiscount;
+  }, [
+    checkoutPromo,
+    currentEventApiData,
+    currentEventSlug,
+    editingData,
+    getDateData,
+  ]);
+
+  const drinksPayToday = useMemo(() => {
+    if (!currentEventSlug || !currentEventApiData) return 0;
+    return getApiCartDateKeys(currentEventApiData).reduce((sum, dateKey) => {
+      const dateData = getDateData(currentEventSlug, dateKey);
+      return sum + calculateEditableDateDrinksTotal(dateData);
+    }, 0);
+  }, [currentEventApiData, currentEventSlug, editingData, getDateData]);
+
+  const payableNowWithFee = useMemo(() => {
+    const split = applyDiscountThenSplitPayment({
+      subTotal: totalToday + totalLater,
+      discountAmount: appliedPromoDiscount,
+      payToday: totalToday,
+      payLater: totalLater,
+      nonDiscountablePayToday: drinksPayToday,
+    });
+    const feeMeta = (
+      currentEventApiData as unknown as {
+        vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
+      }
+    )?.vendor_platform_fee;
+    const platformFeeRaw =
+      split.discountedTotal > 0 && feeMeta
+        ? feeMeta.mode === "flat"
+          ? Number(feeMeta.value || 0)
+          : (split.discountedTotal * Number(feeMeta.value || 0)) / 100
+        : 0;
+    const platformFee =
+      Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
+        ? Number(platformFeeRaw.toFixed(2))
+        : 0;
+
+    return {
+      payToday: split.payToday,
+      payLater: split.payLater,
+      discountedTotal: split.discountedTotal,
+      platformFee,
+      payTodayWithFee: split.payToday + platformFee,
+    };
+  }, [
+    totalToday,
+    totalLater,
+    appliedPromoDiscount,
+    drinksPayToday,
+    currentEventApiData,
+  ]);
+
+  // Discard a pending session only when the *cart quote* changes (deposit ↔ full,
+  // items, coupon). Never compare that quote with `session.amount` — the backend
+  // charge can include a platform fee or rounding the UI does not, which used to
+  // fire "Payment option changed" immediately after a successful checkout.
   useEffect(() => {
     if (!stripePaymentSession || stripePaymentCompletedRef.current) return;
+    if (isCheckoutInProgressRef.current) return;
     // totalToday is 0 while cart data is loading — ignore transient zeros
     if (totalToday === 0) return;
 
-    if (totalToday !== stripePaymentSession.amount) {
+    const session = useCheckoutPaymentUiStore.getState().stripePaymentSession;
+    if (!session) return;
+
+    const quoted = session.clientQuotedAmount;
+    if (quoted == null || !Number.isFinite(quoted)) {
+      setStripePaymentSession({
+        ...session,
+        clientQuotedAmount: payableNowWithFee.payTodayWithFee,
+      });
+      return;
+    }
+
+    if (!checkoutMoneyEquals(quoted, payableNowWithFee.payTodayWithFee)) {
       clearPaymentSession();
       toast.info("Payment option changed", {
         description:
           "Your previous booking is still reserved. A new payment will be created for the updated amount.",
       });
     }
-  }, [totalToday, stripePaymentSession, clearPaymentSession]);
+  }, [
+    totalToday,
+    payableNowWithFee.payTodayWithFee,
+    stripePaymentSession?.bookingNumber,
+    stripePaymentSession?.clientQuotedAmount,
+    clearPaymentSession,
+    setStripePaymentSession,
+  ]);
 
   const roomMode = useMemo(
     () => isRoomBasedCart(currentEventApiData),
@@ -353,6 +503,89 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const { hasUnsavedEdits, hasValidationErrors, validationErrorMessage } =
     checkoutReadiness;
 
+  const resumePendingPayment = useCallback(
+    async (paymentGatewayId?: string | null) => {
+      if (!stripePaymentSession?.bookingNumber) return;
+
+      const gatewayId = paymentGatewayId
+        ? Number(paymentGatewayId)
+        : undefined;
+      if (
+        paymentGatewayId != null &&
+        paymentGatewayId !== "" &&
+        (!Number.isFinite(gatewayId) || (gatewayId ?? 0) <= 0)
+      ) {
+        toast.error("Select a payment method", {
+          description: formatCheckoutGatewayContinuePrompt(
+            currentEventApiData?.payment_gateways as
+              | Array<{ slug: string }>
+              | undefined,
+          ),
+        });
+        return;
+      }
+
+      try {
+        setIsProcessing(true);
+        toast.info("Loading payment...", { id: "resume-payment" });
+        const response = await resumeCheckoutMutation.mutateAsync({
+          booking_number: stripePaymentSession.bookingNumber,
+          ...(gatewayId && gatewayId > 0
+            ? { payment_gateway: gatewayId }
+            : {}),
+        });
+        toast.dismiss("resume-payment");
+
+        if (!response.status || !response.data) {
+          throw new Error(response.message || "Could not resume payment");
+        }
+
+        const paymentAction = resolveCheckoutPaymentAction(response.data);
+        if (!paymentAction) {
+          throw new Error(
+            "Payment could not be started. Please try again or contact support.",
+          );
+        }
+
+        if (paymentAction.type === "stripe") {
+          useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
+          stripePaymentCompletedRef.current = false;
+          void getStripePromise(paymentAction.session.publishableKey);
+          setStripePaymentSession(
+            mergeStripePaymentSession(
+              stripePaymentSession,
+              paymentAction.session,
+            ),
+          );
+          setIsStripePaymentOpen(true);
+          return;
+        }
+
+        // Redirect gateway (PayPal, etc.) — leave Stripe modal/session behind.
+        useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
+        setIsStripePaymentOpen(false);
+        window.location.href = paymentAction.url;
+      } catch (error) {
+        toast.dismiss("resume-payment");
+        if (error instanceof Error) {
+          handleCheckoutError(error);
+        } else {
+          toast.error("Could not resume payment", {
+            description: "Please try again or contact support.",
+          });
+        }
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [
+      resumeCheckoutMutation,
+      stripePaymentSession,
+      setStripePaymentSession,
+      currentEventApiData?.payment_gateways,
+    ],
+  );
+
   // Checkout handler
   const handleProceedToPayment = async () => {
     if (
@@ -365,14 +598,19 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
     if (stripePaymentSession) {
       // If the user changed payment type (deposit ↔ full) while a session is
-      // pending, the stored amount no longer matches the current cart total.
-      // Clear the stale session and fall through to create a fresh checkout.
-      if (stripePaymentSession.amount !== totalToday) {
+      // pending, the cart quote no longer matches what this session was created
+      // for. Clear the stale session and fall through to create a fresh checkout.
+      const quoted =
+        stripePaymentSession.clientQuotedAmount ??
+        payableNowWithFee.payTodayWithFee;
+      if (!checkoutMoneyEquals(quoted, payableNowWithFee.payTodayWithFee)) {
         clearPaymentSession();
         useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
         // fall through to fresh checkout below
       } else {
-        void resumeStripePayment();
+        // Same booking hold — resume on the currently selected gateway
+        // (allows Stripe → PayPal after closing the card modal unpaid).
+        void resumePendingPayment(selectedGateway ?? undefined);
         return;
       }
     }
@@ -414,6 +652,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
         editingData,
         apiCartData,
         selectedGateway,
+        {
+          couponCode: checkoutPromo.couponCode,
+          discountAmount: appliedPromoDiscount,
+        },
       );
       if (!checkoutData) {
         throw new Error("Failed to prepare checkout data. Please try again.");
@@ -456,7 +698,10 @@ export default function BookingSummary({}: BookingSummaryProps) {
         setStripePaymentSession(
           mergeStripePaymentSession(
             useCheckoutPaymentUiStore.getState().stripePaymentSession,
-            paymentAction.session,
+            {
+              ...paymentAction.session,
+              clientQuotedAmount: payableNowWithFee.payTodayWithFee,
+            },
           ),
         );
         setIsStripePaymentOpen(true);
@@ -513,6 +758,38 @@ export default function BookingSummary({}: BookingSummaryProps) {
     );
   }, [availableDates, currentEventSlug, editingData, getDateData]);
 
+  const unconfirmedSeatingRoomNames = useMemo(() => {
+    if (!currentEventSlug || !roomMode) return [] as string[];
+    const names = new Set<string>();
+    for (const dateKey of availableDates) {
+      if (!hasUnconfirmedTableSeating(getDateData(currentEventSlug, dateKey))) {
+        continue;
+      }
+      const { roomId } = parseRoomDateKey(dateKey);
+      if (roomId == null) continue;
+      const name = rooms.find((r) => r.room_id === roomId)?.room_name;
+      if (name) names.add(name);
+    }
+    return [...names];
+  }, [
+    availableDates,
+    currentEventSlug,
+    editingData,
+    getDateData,
+    roomMode,
+    rooms,
+  ]);
+
+  const pendingUnconfirmedSeatingTotal = useMemo(() => {
+    if (!currentEventSlug) return 0;
+    return availableDates.reduce((sum, dateKey) => {
+      return (
+        sum +
+        calculateUnconfirmedTablesTotal(getDateData(currentEventSlug, dateKey))
+      );
+    }, 0);
+  }, [availableDates, currentEventSlug, editingData, getDateData]);
+
   const totalGuests = useMemo(() => {
     if (!currentEventSlug) return 0;
     return availableDates.reduce((sum, dateKey) => {
@@ -523,15 +800,27 @@ export default function BookingSummary({}: BookingSummaryProps) {
   }, [availableDates, currentEventSlug, editingData, getDateData]);
 
   const summaryMetaLine = useMemo(() => {
-    const guestSuffix =
-      totalGuests > 0
-        ? ` · ${totalGuests} guest${totalGuests !== 1 ? "s" : ""}`
-        : "";
-    if (roomMode && rooms.length > 0) {
-      return `${rooms.length} room${rooms.length > 1 ? "s" : ""} · ${totalItems} date${totalItems !== 1 ? "s" : ""}${guestSuffix}`;
-    }
-    return `${totalItems} date${totalItems !== 1 ? "s" : ""}${guestSuffix}`;
-  }, [roomMode, rooms.length, totalItems, totalGuests]);
+    if (!currentEventSlug) return "";
+    const dateCounts = countCheckoutDateStatuses(
+      currentEventSlug,
+      availableDates,
+      getDateData,
+    );
+    return formatCheckoutBookingMetaLine({
+      roomMode: roomMode && rooms.length > 0,
+      roomCount: rooms.length,
+      dateCounts,
+      guestCount: totalGuests,
+    });
+  }, [
+    availableDates,
+    currentEventSlug,
+    editingData,
+    getDateData,
+    roomMode,
+    rooms.length,
+    totalGuests,
+  ]);
 
   const itineraryDates = useMemo(() => {
     if (!currentEventSlug) return [];
@@ -591,60 +880,26 @@ export default function BookingSummary({}: BookingSummaryProps) {
     void invalidateCustomerBookingsList(queryClient);
   }, [queryClient]);
 
-  const resumeStripePayment = useCallback(async () => {
-    if (!stripePaymentSession?.bookingNumber) return;
-
-    try {
-      setIsProcessing(true);
-      toast.info("Loading payment...", { id: "resume-payment" });
-      const response = await resumeCheckoutMutation.mutateAsync(
-        stripePaymentSession.bookingNumber,
-      );
-      toast.dismiss("resume-payment");
-
-      if (!response.status || !response.data) {
-        throw new Error(response.message || "Could not resume payment");
-      }
-
-      const paymentAction = resolveCheckoutPaymentAction(response.data);
-      if (paymentAction?.type !== "stripe") {
-        throw new Error("Stripe payment could not be resumed.");
-      }
-
-      useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
-      stripePaymentCompletedRef.current = false;
-      void getStripePromise(paymentAction.session.publishableKey);
-      setStripePaymentSession(
-        mergeStripePaymentSession(stripePaymentSession, paymentAction.session),
-      );
-      setIsStripePaymentOpen(true);
-    } catch (error) {
-      toast.dismiss("resume-payment");
-      if (error instanceof Error) {
-        handleCheckoutError(error);
-      } else {
-        toast.error("Could not resume payment", {
-          description: "Please try again or contact support.",
-        });
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [resumeCheckoutMutation, stripePaymentSession]);
-
   const stripePaymentModal = (
     <CheckoutStripePaymentModal
       open={isStripePaymentOpen}
       onOpenChange={(open) => {
         setIsStripePaymentOpen(open);
-        if (
-          !open &&
-          stripePaymentSession &&
-          !stripePaymentCompletedRef.current
-        ) {
-          toast.message("Payment not completed", {
-            description: `Booking ${stripePaymentSession.bookingNumber} is reserved. Tap "Complete payment" to continue.`,
-          });
+        if (!open && !stripePaymentCompletedRef.current) {
+          // Read imperatively — session may already be cleared by date delete /
+          // Clear all; don't toast "Payment not completed" in that case.
+          const session =
+            useCheckoutPaymentUiStore.getState().stripePaymentSession;
+          // On mobile the sticky pending banner already covers this — a toast
+          // stacks a third "payment pending" alert on top of duplicate timers.
+          const isNarrowViewport =
+            typeof window !== "undefined" &&
+            window.matchMedia("(max-width: 1023px)").matches;
+          if (session && !isNarrowViewport) {
+            toast.message("Payment not completed", {
+              description: `Booking ${session.bookingNumber} is reserved. Tap "Complete payment" to continue.`,
+            });
+          }
         }
       }}
       session={stripePaymentSession}
@@ -673,6 +928,26 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }
     return () => root.removeAttribute("data-pending-payment");
   }, [hasPendingStripePayment, showExpiredPaymentNotice]);
+
+  useEffect(() => {
+    const root = document.querySelector(".checkout-page");
+    if (!root) return;
+    if (pendingUnconfirmedSeatingTotal > 0) {
+      root.setAttribute("data-unconfirmed-seating", "true");
+    } else {
+      root.removeAttribute("data-unconfirmed-seating");
+    }
+    return () => root.removeAttribute("data-unconfirmed-seating");
+  }, [pendingUnconfirmedSeatingTotal]);
+
+  const focusPaymentMethodPicker = useCallback(() => {
+    setShowMobileDrawer(true);
+    window.setTimeout(() => {
+      document
+        .getElementById("checkout-payment-method")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 400);
+  }, []);
 
   const renderExpiredPaymentBanner = (
     variant: "card" | "mobile-sticky" = "card",
@@ -765,31 +1040,21 @@ export default function BookingSummary({}: BookingSummaryProps) {
       return (
         <div
           className={cn(
-            "border-b px-3 py-3 sm:px-4",
+            "border-b px-3 py-2.5 sm:px-4",
             isUrgent
               ? "border-red-200/80 bg-red-50/90"
               : "border-amber-200/80 bg-amber-50/90",
           )}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p
-                className={cn(
-                  "text-xs font-semibold",
-                  isUrgent ? "text-red-900" : "text-amber-900",
-                )}
-              >
-                Payment pending · {stripePaymentSession?.bookingNumber}
-              </p>
-              <p
-                className={cn(
-                  "mt-1 text-[12px] font-medium leading-snug",
-                  isUrgent ? "text-red-800" : "text-amber-900/95",
-                )}
-              >
-                {countdownMessage}
-              </p>
-            </div>
+          <div className="flex items-center justify-between gap-3">
+            <p
+              className={cn(
+                "min-w-0 truncate text-xs font-semibold",
+                isUrgent ? "text-red-900" : "text-amber-900",
+              )}
+            >
+              Payment pending · {stripePaymentSession?.bookingNumber}
+            </p>
             {timerPill}
           </div>
         </div>
@@ -828,6 +1093,15 @@ export default function BookingSummary({}: BookingSummaryProps) {
     );
   };
 
+  const isCheckoutBusy =
+    isProcessing ||
+    isPending ||
+    processCheckoutMutation.isPending ||
+    resumeCheckoutMutation.isPending;
+
+  // Do not auto-open the payment drawer when the first item is added —
+  // customers often still have other dates to fill.
+
   // Show skeleton only on first visit — never again after delete/refetch.
   const isInitialLoad =
     !hasLoadedCartRef.current && isLoadingCartData && !apiCartData;
@@ -864,29 +1138,47 @@ export default function BookingSummary({}: BookingSummaryProps) {
     );
   }
 
-  const finalTotal = totalToday;
   const bookingGrandTotal = totalToday + totalLater;
   const hasPayableTotal = bookingGrandTotal > 0;
+  const eventCoupon = resolveCartEventCoupon(currentEventApiData);
+  const getEditableDateForPromo = (dateKey: string) =>
+    currentEventSlug ? getDateData(currentEventSlug, dateKey) : null;
+  const dateDiscountRows = resolveCartDateDiscounts(
+    currentEventApiData,
+    getEditableDateForPromo,
+  );
+  const dateOfferSavings = dateDiscountRows.reduce(
+    (sum, row) => sum + (row.status === "applied" ? row.amount : 0),
+    0,
+  );
+  // Coupon % is on tables + tickets only; date offers stay per-date when no coupon.
+  const discountableBookingSubtotal = calculateEditableCartDiscountableTotal(
+    currentEventApiData,
+    getEditableDateForPromo,
+  );
+  const promoTotals = resolveCheckoutPromoTotals(
+    checkoutPromo,
+    eventCoupon,
+    discountableBookingSubtotal,
+    dateOfferSavings,
+  );
+  const couponDiscount = promoTotals.couponAmount;
+  const autoDiscount = promoTotals.autoDiscountAmount;
+  const totalPromoDiscount = promoTotals.totalDiscount;
+  const appliedCouponLabel = promoTotals.couponLabel;
 
-  // Platform fee
+  const discountedToday = payableNowWithFee.payToday;
+  const discountedLater = payableNowWithFee.payLater;
+  const discountedGrandTotal = payableNowWithFee.discountedTotal;
   const platformFeeMeta = (
     currentEventApiData as unknown as {
       vendor_platform_fee?: { mode: "flat" | "percentage"; value: number };
     }
   )?.vendor_platform_fee;
-  const platformFeeRaw =
-    hasPayableTotal && platformFeeMeta
-      ? platformFeeMeta.mode === "flat"
-        ? Number(platformFeeMeta.value || 0)
-        : (bookingGrandTotal * Number(platformFeeMeta.value || 0)) / 100
-      : 0;
-  const platformFee =
-    Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
-      ? Number(platformFeeRaw.toFixed(2))
-      : 0;
+  const platformFee = payableNowWithFee.platformFee;
 
-  const bookingGrandTotalWithFee = bookingGrandTotal + platformFee;
-  const finalTotalWithFee = finalTotal + platformFee;
+  const bookingGrandTotalWithFee = discountedGrandTotal + platformFee;
+  const finalTotalWithFee = payableNowWithFee.payTodayWithFee;
 
   if (hasPendingStripePayment && !currentEventApiData) {
     return (
@@ -904,7 +1196,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
           </p>
           <Button
             type="button"
-            onClick={resumeStripePayment}
+            onClick={() => void resumePendingPayment(selectedGateway)}
             className={cn(
               "mt-4 h-11 w-full rounded-xl text-sm font-bold",
               checkoutPayButtonClass(false),
@@ -930,7 +1222,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const fmtDate = (dateString: string) => {
     try {
       const { date: actualDate } = parseRoomDateKey(dateString);
-      return new Date(actualDate).toLocaleDateString("en-US", {
+      return new Date(actualDate).toLocaleDateString("en-GB", {
         weekday: "short",
         month: "short",
         day: "numeric",
@@ -947,19 +1239,24 @@ export default function BookingSummary({}: BookingSummaryProps) {
     return rooms.find((r) => r.room_id === roomId)?.room_name ?? null;
   };
 
+  const unconfirmedSeatingWarning =
+    unconfirmedSeatingRoomNames.length === 1
+      ? `Confirm table seating for ${unconfirmedSeatingRoomNames[0]}, or remove it using the trash icon next to Table Seating.`
+      : unconfirmedSeatingRoomNames.length > 1
+        ? `Confirm table seating for ${unconfirmedSeatingRoomNames.join(", ")}, or remove it using the trash icon next to Table Seating.`
+        : "Confirm table seating below, or remove it using the trash icon next to Table Seating.";
+
+  const payableNowWithPromo = finalTotalWithFee;
+
   const ctaState = resolveCheckoutCtaState({
-    isLoading:
-      isProcessing ||
-      isPending ||
-      processCheckoutMutation.isPending ||
-      resumeCheckoutMutation.isPending,
+    isLoading: isCheckoutBusy,
     hasPendingStripePayment,
     stripePaymentAmount: stripePaymentSession?.amount ?? null,
     hasPayableTotal,
     hasValidationErrors,
     hasUnsavedEdits,
     hasSelectedGateway: Boolean(selectedGateway),
-    finalTotalWithFee,
+    finalTotalWithFee: payableNowWithPromo,
     formatMoney,
   });
 
@@ -970,10 +1267,23 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }
     if (hasValidationErrors) {
       e.preventDefault();
+      const incompleteDate = findFirstIncompleteCheckoutDate(
+        currentEventSlug,
+        availableDates,
+        getDateData,
+      );
+      if (incompleteDate) {
+        focusCheckoutDate(incompleteDate);
+      }
       toast.error(
         validationErrorMessage ||
           "Please select at least one table or ticket for each date",
       );
+      return;
+    }
+    if (ctaState.needsGatewaySelection) {
+      e.preventDefault();
+      focusPaymentMethodPicker();
       return;
     }
     void handleProceedToPayment();
@@ -981,11 +1291,49 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
   // ──────────────────────────────────────────────
   // RENDER: ORDER SUMMARY CARD
+  // Must be a render fn (not an inner component) so timer ticks
+  // re-render without remounting PaymentGatewaySelector every second.
   // ──────────────────────────────────────────────
-  const OrderSummaryContent = () => (
+  const renderPaymentMethodSection = () =>
+    currentEventApiData?.payment_gateways &&
+    Array.isArray(currentEventApiData.payment_gateways) &&
+    currentEventApiData.payment_gateways.length > 0 ? (
+      <>
+        <PaymentGatewaySelector
+          availableGateways={
+            currentEventApiData.payment_gateways as Array<{
+              id: number;
+              slug: string;
+            }>
+          }
+          selectedGateway={selectedGateway}
+          onGatewaySelect={setSelectedGateway}
+          disabled={
+            isProcessing ||
+            processCheckoutMutation.isPending ||
+            resumeCheckoutMutation.isPending
+          }
+          showError={ctaState.showGatewayError}
+        />
+        <Separator className="bg-gray-100" />
+      </>
+    ) : null;
+
+  const renderOrderSummaryContent = (options?: {
+    /** Mobile sticky strip already shows the session timer — skip the card copy. */
+    omitSessionBanners?: boolean;
+    /** Put PayPal/card first so mobile customers see them without scrolling. */
+    prioritizePaymentMethod?: boolean;
+  }) => (
     <div className="space-y-4">
-      {renderExpiredPaymentBanner("card")}
-      {renderPendingPaymentBanner("card")}
+      {!options?.omitSessionBanners ? (
+        <>
+          {renderExpiredPaymentBanner("card")}
+          {renderPendingPaymentBanner("card")}
+        </>
+      ) : null}
+
+      {options?.prioritizePaymentMethod ? renderPaymentMethodSection() : null}
 
       {availableDates.length > 0 && hasPayableTotal && (
         <OrderViewBreakdown
@@ -1011,8 +1359,40 @@ export default function BookingSummary({}: BookingSummaryProps) {
           getDateData={getDateData}
           eventSlug={currentEventSlug ?? undefined}
           getRoomName={roomMode ? getRoomNameForKey : undefined}
+          bookingCouponDiscount={
+            promoTotals.usingCoupon ? couponDiscount : 0
+          }
+          bookingSubTotal={discountableBookingSubtotal}
         />
       )}
+
+      {hasPayableTotal &&
+      (eventCoupon?.coupon_code ||
+        dateDiscountRows.length > 0 ||
+        checkoutPromo.couponCode) ? (
+        <>
+          <Separator className="bg-gray-100" />
+          <CheckoutPromoPanel
+            formatMoney={formatMoney}
+            eventCoupon={eventCoupon}
+            dateDiscounts={dateDiscountRows}
+            couponSavingsAmount={couponDiscount}
+            drinksExcludedFromCoupon={drinksPayToday > 0}
+            value={checkoutPromo}
+            onChange={setCheckoutPromo}
+            onDateOfferClick={(dateKey) => {
+              setShowMobileDrawer(false);
+              focusCheckoutDate(dateKey);
+            }}
+            disabled={
+              isProcessing ||
+              isPending ||
+              processCheckoutMutation.isPending ||
+              resumeCheckoutMutation.isPending
+            }
+          />
+        </>
+      ) : null}
 
       {hasPayableTotal ? <Separator className="bg-gray-100" /> : null}
 
@@ -1031,35 +1411,106 @@ export default function BookingSummary({}: BookingSummaryProps) {
           )}
         </div>
 
+        {hasPayableTotal &&
+        promoTotals.usingCoupon &&
+        drinksPayToday > 0 &&
+        discountableBookingSubtotal > 0 ? (
+          <div className="space-y-1 border-l-2 border-gray-100 pl-2.5">
+            <div className="flex items-center justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
+              <span>Tables & tickets</span>
+              <span className="tabular-nums">
+                {formatMoney(discountableBookingSubtotal)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
+              <span>Drink packages</span>
+              <span className="tabular-nums">
+                {formatMoney(drinksPayToday)}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        {hasPayableTotal && autoDiscount > 0 && !promoTotals.usingCoupon ? (
+          <div className="flex items-center justify-between text-sm text-emerald-700">
+            <span className="font-medium">You saved</span>
+            <span className="font-semibold tabular-nums">
+              {formatMoney(autoDiscount)}
+            </span>
+          </div>
+        ) : null}
+
+        {hasPayableTotal && couponDiscount > 0 ? (
+          <div className="flex items-start justify-between gap-3 text-sm text-emerald-700">
+            <span className="min-w-0">
+              <span className="font-medium">
+                You saved
+                {checkoutPromo.couponCode ? (
+                  <>
+                    {" "}
+                    with{" "}
+                    <span className="font-mono text-xs tracking-wide">
+                      {checkoutPromo.couponCode}
+                    </span>
+                  </>
+                ) : null}
+              </span>
+              <span className="mt-0.5 block text-xs font-normal text-emerald-700/85">
+                {drinksPayToday > 0
+                  ? appliedCouponLabel
+                    ? `${appliedCouponLabel} on tables & tickets · drinks not included`
+                    : "On tables & tickets · drinks not included"
+                  : appliedCouponLabel
+                    ? appliedCouponLabel
+                    : "On tables & tickets"}
+              </span>
+            </span>
+            <span className="shrink-0 font-semibold tabular-nums">
+              {formatMoney(couponDiscount)}
+            </span>
+          </div>
+        ) : null}
+
+        {hasPayableTotal && totalPromoDiscount > 0 ? (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[color:var(--checkout-muted-foreground)]">
+              Booking total
+            </span>
+            <span className="font-medium tabular-nums text-[color:var(--checkout-foreground)]">
+              {formatMoney(discountedGrandTotal)}
+            </span>
+          </div>
+        ) : null}
+
         {hasPayableTotal && platformFee > 0 && (
           <div className="flex justify-between text-xs text-[color:var(--checkout-muted-foreground)]">
             <span>
               {platformFeeMeta?.mode === "percentage"
-                ? `Service fee (${platformFeeMeta.value}%)`
-                : "Service fee"}
+                ? `Booking fee (${platformFeeMeta.value}%)`
+                : "Booking fee"}
             </span>
             <span className="tabular-nums">{formatMoney(platformFee)}</span>
           </div>
         )}
 
-        {hasPayableTotal && totalLater > 0 && (
+        {hasPayableTotal && discountedLater > 0 && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-[color:var(--checkout-muted-foreground)]">
               Due later
             </span>
             <span className="text-sm font-medium tabular-nums text-[color:var(--checkout-foreground)]">
-              {formatMoney(totalLater)}
+              {formatMoney(discountedLater)}
             </span>
           </div>
         )}
 
         <div className="flex items-center justify-between pt-1">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[color:var(--checkout-foreground)]">
-            {totalLater > 0 ? "Due Today" : "Total"}
+            {discountedLater > 0 ? "Pay today" : "Total"}
           </span>
           {hasPayableTotal ? (
             <span className="text-2xl font-bold tabular-nums text-[color:var(--checkout-foreground)]">
-              {formatMoney(finalTotalWithFee)}
+              {formatMoney(payableNowWithPromo)}
             </span>
           ) : (
             <span className="text-sm text-gray-400">
@@ -1067,38 +1518,27 @@ export default function BookingSummary({}: BookingSummaryProps) {
             </span>
           )}
         </div>
+        {pendingUnconfirmedSeatingTotal > 0 ? (
+          <p className="text-[11px] leading-snug text-amber-800">
+            +{formatMoney(pendingUnconfirmedSeatingTotal)} after you confirm
+            seating
+          </p>
+        ) : null}
       </div>
 
-      <Separator className="bg-gray-100" />
-
-      {/* ── Payment Method ── */}
-      {currentEventApiData?.payment_gateways &&
-        Array.isArray(currentEventApiData.payment_gateways) &&
-        currentEventApiData.payment_gateways.length > 0 && (
-          <>
-            <PaymentGatewaySelector
-              availableGateways={
-                currentEventApiData.payment_gateways as Array<{
-                  id: number;
-                  slug: string;
-                }>
-              }
-              selectedGateway={selectedGateway}
-              onGatewaySelect={setSelectedGateway}
-              disabled={false}
-              showError={ctaState.showGatewayError}
-            />
-            <Separator className="bg-gray-100" />
-          </>
-        )}
+      {!options?.prioritizePaymentMethod ? (
+        <>
+          <Separator className="bg-gray-100" />
+          {renderPaymentMethodSection()}
+        </>
+      ) : null}
 
       {/* ── CTA Button — desktop sidebar only; mobile uses sticky footer bar ── */}
       {availableDates.length > 0 && hasUnconfirmedSeating ? (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <p className="text-xs leading-snug text-amber-800">
-            Confirm table seating below, or remove it using the trash icon
-            next to Table Seating.
+            {unconfirmedSeatingWarning}
           </p>
         </div>
       ) : null}
@@ -1120,7 +1560,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                {!ctaState.disabled && <Lock className="h-4 w-4" />}
+                {!ctaState.disabled && !ctaState.needsGatewaySelection && (
+                  <Lock className="h-4 w-4" />
+                )}
                 <span>{ctaState.label}</span>
               </div>
             )}
@@ -1149,9 +1591,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  {availableDates.length > 1 && hasPayableTotal ? (
+                  {hasPayableTotal ? (
                     <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--checkout-muted-foreground)]">
-                      Booking total
+                      {discountedLater > 0 ? "Booking total" : "Total"}
                     </p>
                   ) : null}
                   <p className="text-2xl font-bold tabular-nums tracking-tight text-[color:var(--checkout-foreground)]">
@@ -1159,11 +1601,16 @@ export default function BookingSummary({}: BookingSummaryProps) {
                       ? formatMoney(bookingGrandTotalWithFee)
                       : "—"}
                   </p>
+                  {hasPayableTotal && discountedLater > 0 ? (
+                    <p className="mt-0.5 text-[11px] font-medium tabular-nums text-[color:var(--checkout-muted-foreground)]">
+                      Pay today {formatMoney(payableNowWithPromo)}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
             <div className="px-5 py-4">
-              <OrderSummaryContent />
+              {renderOrderSummaryContent()}
             </div>
           </div>
 
@@ -1184,89 +1631,134 @@ export default function BookingSummary({}: BookingSummaryProps) {
         </div>
       </div>
 
-      {/* ── MOBILE: Fixed Bottom Bar + Expandable Drawer ── */}
-      <div className="lg:hidden">
-        {/* Fixed Bottom Bar */}
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[color:var(--checkout-border)] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-          {/* Always-visible pending / expired payment strip (not hidden in drawer) */}
-          {renderExpiredPaymentBanner("mobile-sticky")}
-          {renderPendingPaymentBanner("mobile-sticky")}
-          {/* Expandable Drawer */}
-          <AnimatePresence>
-            {showMobileDrawer && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="overflow-hidden border-b border-gray-100"
+      {/* ── MOBILE: sticky bar + summary sheet ── */}
+      {isMobileViewport ? (
+        <Sheet open={showMobileDrawer} onOpenChange={setShowMobileDrawer}>
+          <SheetContent
+            side="bottom"
+            className="checkout-page checkout-summary-sheet z-[101] gap-0 rounded-t-2xl border-[color:var(--checkout-border)] p-0 shadow-lg"
+            style={{
+              paddingBottom:
+                "calc(var(--checkout-mobile-chrome-height, 9rem) + 0.5rem)",
+            }}
+          >
+            <SheetHeader className="border-b border-[color:var(--checkout-border)] px-4 py-3 text-left">
+              <SheetTitle className="text-base font-semibold text-[color:var(--checkout-brand-primary)]">
+                Order Summary
+              </SheetTitle>
+              <SheetDescription className="sr-only">
+                Review your booking totals and choose how to pay. The cart
+                stays behind this sheet.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [-webkit-overflow-scrolling:touch]">
+              {renderOrderSummaryContent({
+                omitSessionBanners: true,
+                prioritizePaymentMethod: !hasValidationErrors,
+              })}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+
+      {/* Hide sticky chrome while Stripe modal is open — otherwise mobile shows
+          two timers / two "Complete payment" surfaces (sticky sits above dialog). */}
+      {!isStripePaymentOpen ? (
+        <div className="lg:hidden">
+          <CheckoutMobileStickyBar>
+            {renderExpiredPaymentBanner("mobile-sticky")}
+            {renderPendingPaymentBanner("mobile-sticky")}
+
+            <div className="flex flex-col gap-2.5 px-4 pt-3 pb-[max(0.75rem,var(--checkout-mobile-safe-bottom))]">
+              <button
+                type="button"
+                onClick={() => setShowMobileDrawer((open) => !open)}
+                className="flex w-full min-w-0 items-center gap-3 text-left"
+                aria-expanded={showMobileDrawer}
+                aria-label="Open order summary"
               >
-                <div className="max-h-[min(65vh,560px)] overflow-y-auto overscroll-contain p-4 pb-2 [-webkit-overflow-scrolling:touch]">
-                  <h2 className="mb-4 text-base font-semibold text-[color:var(--checkout-brand-primary)]">
-                    Order Summary
-                  </h2>
-                  <OrderSummaryContent />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-xs font-medium text-[color:var(--checkout-muted-foreground)]">
+                      {discountedLater > 0 ? "Pay today" : "Total"}
+                    </p>
+                    <p className="text-lg font-bold tabular-nums text-[color:var(--checkout-brand-primary)]">
+                      {hasPayableTotal ? formatMoney(payableNowWithPromo) : "—"}
+                    </p>
+                  </div>
+                  {discountedLater > 0 && hasPayableTotal ? (
+                    <p className="mt-0.5 text-[11px] tabular-nums text-[color:var(--checkout-muted-foreground)]">
+                      Booking total {formatMoney(bookingGrandTotalWithFee)}
+                    </p>
+                  ) : summaryMetaLine ? (
+                    <p className="mt-0.5 truncate text-[11px] text-[color:var(--checkout-muted-foreground)]">
+                      {summaryMetaLine}
+                    </p>
+                  ) : null}
+                  {pendingUnconfirmedSeatingTotal > 0 ? (
+                    <p className="mt-0.5 text-[11px] leading-snug text-amber-800">
+                      +{formatMoney(pendingUnconfirmedSeatingTotal)} after you
+                      confirm seating
+                    </p>
+                  ) : null}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {showMobileDrawer ? (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
+                )}
+              </button>
 
-          {/* Bottom Bar — total + expandable summary + CTA */}
-          <div className="flex items-center gap-2 px-3 pt-2.5 pb-[max(0.75rem,var(--checkout-mobile-safe-bottom))] sm:gap-3 sm:px-4 sm:pt-3">
-            <button
-              type="button"
-              onClick={() => setShowMobileDrawer(!showMobileDrawer)}
-              className="flex min-w-0 flex-1 items-center gap-2 text-left"
-              aria-expanded={showMobileDrawer}
-              aria-label="Toggle order summary"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-[color:var(--checkout-muted-foreground)]">
-                  {totalLater > 0 ? "Due Today" : "Total"}
+              <Button
+                onClick={handleCheckoutCtaClick}
+                disabled={ctaState.disabled}
+                className={cn(
+                  "h-12 w-full px-4 text-sm font-semibold",
+                  checkoutPayButtonClass(ctaState.disabled),
+                )}
+              >
+                {ctaState.loading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    {!ctaState.disabled && !ctaState.needsGatewaySelection && (
+                      <Lock className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                    <span>{ctaState.mobileLabel}</span>
+                  </div>
+                )}
+              </Button>
+              {ctaState.needsGatewaySelection ? (
+                <p className="text-center text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
+                  Tap Pay to choose your payment method
                 </p>
-                <p className="truncate text-base font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
-                  {hasPayableTotal ? formatMoney(finalTotalWithFee) : "—"}
+              ) : hasValidationErrors ? (
+                <p className="text-center text-[11px] leading-snug text-amber-700">
+                  Finish selections for each date above
                 </p>
-                {summaryMetaLine ? (
-                  <p className="truncate text-[10px] text-[color:var(--checkout-muted-foreground)]">
-                    {summaryMetaLine}
-                  </p>
-                ) : null}
-              </div>
-              {showMobileDrawer ? (
-                <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
-              ) : (
-                <ChevronUp className="h-4 w-4 shrink-0 text-[color:var(--checkout-muted-foreground)]" />
-              )}
-            </button>
-
-            <Button
-              onClick={handleCheckoutCtaClick}
-              disabled={ctaState.disabled}
-              className={cn(
-                "h-11 max-w-[48%] shrink-0 px-3 text-xs font-semibold min-[400px]:max-w-none min-[400px]:px-4 min-[400px]:text-sm sm:px-6",
-                checkoutPayButtonClass(ctaState.disabled),
-              )}
-            >
-              {ctaState.loading ? (
-                <div className="flex items-center gap-1.5">
-                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  <span className="hidden min-[360px]:inline">
-                    Processing...
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  {!ctaState.disabled && <Lock className="h-3.5 w-3.5 shrink-0" />}
-                  <span className="truncate">{ctaState.label}</span>
-                </div>
-              )}
-            </Button>
-          </div>
+              ) : null}
+            </div>
+          </CheckoutMobileStickyBar>
         </div>
-      </div>
+      ) : null}
 
       {stripePaymentModal}
     </>
+  );
+}
+
+function CheckoutMobileStickyBar({ children }: { children: React.ReactNode }) {
+  const ref = useCheckoutMobileChromeHeight<HTMLDivElement>();
+
+  return (
+    <div
+      ref={ref}
+      className="fixed inset-x-0 bottom-0 z-[110] border-t border-[color:var(--checkout-border)] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+    >
+      {children}
+    </div>
   );
 }

@@ -43,7 +43,12 @@ export const SITE_ESSENTIALS_GOOGLE_FONT_NAMES = [
   "Jost",
   "Archivo",
   "Baloo 2",
+  "Abril Fatface",
 ] as const;
+
+const ALLOWLISTED_GOOGLE_FONTS = new Set<string>(
+  SITE_ESSENTIALS_GOOGLE_FONT_NAMES,
+);
 
 const GENERIC_CSS_FAMILIES = new Set([
   "serif",
@@ -78,6 +83,7 @@ const SERIF_GOOGLE_FONT_NAMES = new Set<string>([
   "EB Garamond",
   "Libre Caslon Display",
   "Marcellus",
+  "Abril Fatface",
 ]);
 
 export function siteEssentialsGoogleFontStack(name: string): string {
@@ -103,18 +109,84 @@ export function primaryFontFamilyFromStack(stack: string): string {
   return part.replace(/^["']|["']$/g, "").trim();
 }
 
+/** Trial / custom vendor fonts that must not hit fonts.googleapis.com (404 HTML). */
+function isBlockedGoogleFontFamily(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return true;
+  if (/trial/i.test(trimmed)) return true;
+  if (/cameraplain/i.test(trimmed)) return true;
+  return false;
+}
+
+export function isAllowlistedGoogleFontFamily(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed || isBlockedGoogleFontFamily(trimmed)) return false;
+  return ALLOWLISTED_GOOGLE_FONTS.has(trimmed);
+}
+
+/** Families declared in a fonts.googleapis.com stylesheet URL. */
+export function extractGoogleFontFamiliesFromStylesheetUrl(url: string): string[] {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.includes("fonts.googleapis.com")) return [];
+    const families: string[] = [];
+    for (const value of parsed.searchParams.getAll("family")) {
+      const decoded = decodeURIComponent(value.replace(/\+/g, " "));
+      const name = decoded.split(":")[0]?.trim();
+      if (name) families.push(name);
+    }
+    return families;
+  } catch {
+    return [];
+  }
+}
+
+export function filterAllowlistedGoogleFontFamilies(
+  families: string[],
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const family of families) {
+    if (!isAllowlistedGoogleFontFamily(family)) continue;
+    if (seen.has(family)) continue;
+    seen.add(family);
+    out.push(family);
+  }
+  return out;
+}
+
 export function collectSiteEssentialsGoogleFamilies(
   ...stacks: (string | undefined | null)[]
 ): string[] {
-  const out = new Set<string>();
+  const out: string[] = [];
   for (const stack of stacks) {
     if (!stack) continue;
     const primary = primaryFontFamilyFromStack(stack);
     if (!primary) continue;
     if (GENERIC_CSS_FAMILIES.has(primary.toLowerCase())) continue;
-    out.add(primary);
+    out.push(primary);
   }
-  return [...out];
+  return filterAllowlistedGoogleFontFamilies(out);
+}
+
+function collectGoogleFamiliesFromThemeCustomUrls(
+  urls: unknown,
+): string[] {
+  if (!Array.isArray(urls)) return [];
+  const families: string[] = [];
+  for (const item of urls) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed = new URL(trimmed);
+      if (!parsed.hostname.includes("fonts.googleapis.com")) continue;
+      families.push(...extractGoogleFontFamiliesFromStylesheetUrl(trimmed));
+    } catch {
+      continue;
+    }
+  }
+  return filterAllowlistedGoogleFontFamilies(families);
 }
 
 /**
@@ -136,9 +208,16 @@ export function siteEssentialsGoogleFontsStylesheetHref(
 export function googleFontsHrefFromTheme(
   theme: ThemeSchema | null | undefined
 ): string | null {
-  if (!theme?.typography?.fontFamily) return null;
-  const { heading, body } = theme.typography.fontFamily;
-  const families = collectSiteEssentialsGoogleFamilies(heading, body);
+  const heading = theme?.typography?.fontFamily?.heading;
+  const body = theme?.typography?.fontFamily?.body;
+  const fromStacks = collectSiteEssentialsGoogleFamilies(heading, body);
+  const fromLegacyCustomUrls = collectGoogleFamiliesFromThemeCustomUrls(
+    theme?.typography?.customFontStylesheetUrls,
+  );
+  const families = filterAllowlistedGoogleFontFamilies([
+    ...fromStacks,
+    ...fromLegacyCustomUrls,
+  ]);
   return siteEssentialsGoogleFontsStylesheetHref(families);
 }
 

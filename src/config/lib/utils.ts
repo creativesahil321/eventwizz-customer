@@ -18,6 +18,40 @@ export function toSentenceCase(str: string) {
     .trim();
 }
 
+const TITLE_CASE_ACRONYMS = new Set([
+  "seo",
+  "uk",
+  "uri",
+  "url",
+  "id",
+  "api",
+  "vat",
+  "pdf",
+  "csv",
+]);
+
+/**
+ * Title-case for place names, roles, and other UI labels.
+ * `kangra` → `Kangra`, `stock brook` → `Stock Brook`, `seo` → `SEO`.
+ */
+export function toTitleCase(value: string): string {
+  if (!value?.trim()) return "";
+  return value
+    .trim()
+    .split(/([\s/_-]+)/)
+    .map((token) => {
+      if (/^[\s/_-]+$/.test(token)) {
+        return token.replace(/_/g, " ");
+      }
+      const lower = token.toLowerCase();
+      if (TITLE_CASE_ACRONYMS.has(lower)) return lower.toUpperCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Converts a string into a URL-friendly slug
  * @param str - The string to convert to a slug
@@ -324,6 +358,15 @@ export async function resetAllStores(): Promise<void> {
         // Silent
       }
 
+      try {
+        const { clearOnboardingBrowserState } = await import(
+          "@/lib/clear-vendor-browser-session"
+        );
+        clearOnboardingBrowserState();
+      } catch {
+        // ignore
+      }
+
       // Clear additional legacy storage items
       const legacyKeys = [
         "onboarding_data",
@@ -331,6 +374,10 @@ export async function resetAllStores(): Promise<void> {
         "vendor_location_id",
         "event_id",
         "permissions-backup",
+        "onboarding_mode",
+        "onboarding_is_rooms",
+        "ew_ai_bulk_apply_active",
+        "vendor_ai_event_draft_id",
       ];
 
       legacyKeys.forEach((key) => {
@@ -426,7 +473,7 @@ export const normalizeSlug = (slug: string) => {
 // Helper function to format date and use direct price from API
 export const getDateInfo = (dateItem: {
   event_date: string;
-  price: number;
+  price: number | null;
 }) => {
   // Create a new date object with proper timezone handling
   const dateObj = new Date(`${dateItem.event_date}T12:00:00`);
@@ -435,11 +482,15 @@ export const getDateInfo = (dateItem: {
   const day = dateObj.toLocaleString("default", { weekday: "long" });
   const month = dateObj.toLocaleString("default", { month: "long" });
   const dateNum = dateObj.getDate();
+  const priceNum =
+    typeof dateItem.price === "number" && Number.isFinite(dateItem.price)
+      ? dateItem.price
+      : NaN;
 
   return {
     day,
     month,
     date: dateNum,
-    price: dateItem.price.toFixed(0),
+    price: Number.isFinite(priceNum) ? priceNum.toFixed(0) : "—",
   };
 };

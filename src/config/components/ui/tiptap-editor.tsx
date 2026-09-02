@@ -7,8 +7,9 @@ import CharacterCount from "@tiptap/extension-character-count";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import { cn } from "@/lib/utils";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Bold,
   Italic,
@@ -19,6 +20,12 @@ import {
   Link as LinkIcon,
   Unlink,
   Sparkles,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { Button } from "./button";
 import { Toggle } from "./toggle";
@@ -31,6 +38,13 @@ import {
 } from "./dialog";
 import { Input } from "./input";
 import { toast } from "sonner";
+import {
+  clipPlainTextToLimits,
+  toPlainText,
+  wrapPlainTextAsHtml,
+} from "@/lib/plain-text-length";
+import { countWords } from "@/lib/word-count";
+import { looksLikeAiInstructionLeak } from "@/app/api/ai/lib/extract-json";
 
 interface TiptapEditorProps {
   value: string;
@@ -43,17 +57,39 @@ interface TiptapEditorProps {
     title?: string;
     sub_title?: string;
     description?: string;
+    city?: string;
     ctaText?: string;
     ctaUrl?: string;
     event_name?: string;
     event_category_name?: string;
     banner_heading?: string;
     banner_sub_heading?: string;
+    /**
+     * Selects the AI generation style:
+     * - "about": short blurb (default, used for event/onboarding sections)
+     * - "policy": structured legal/policy HTML
+     * - "contact": short contact intro
+     * - "page": full structured marketing page (About Us, How It Works)
+     */
+    contentType?: "about" | "policy" | "contact" | "page" | "footer";
+    policySection?: string;
   };
   showAIButton?: boolean;
   wrapText?: boolean;
   /** When true, the editor is view-only (no toolbar, no edits). */
   readOnly?: boolean;
+  /**
+   * Enables heading (H2/H3) and bullet/numbered list formatting plus their
+   * toolbar buttons. Off by default so short-form editors stay simple.
+   */
+  enableRichBlocks?: boolean;
+  /** Allows inserting images into the body (file picker → inline image). */
+  enableImages?: boolean;
+  /**
+   * When set, images are uploaded and inserted as URLs (never base64).
+   * Used by blog create/edit. Other editors keep the local file-reader path.
+   */
+  onUploadImage?: (file: File) => Promise<string>;
 }
 
 export function TiptapEditor({
@@ -67,28 +103,114 @@ export function TiptapEditor({
   showAIButton = true,
   wrapText = false,
   readOnly = false,
+  enableRichBlocks = false,
+  enableImages = false,
+  onUploadImage,
 }: TiptapEditorProps) {
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const onUploadImageRef = useRef(onUploadImage);
+  const onChangeRef = useRef(onChange);
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+  const uploadingImageRef = useRef(false);
+
+  onUploadImageRef.current = onUploadImage;
+  onChangeRef.current = onChange;
+
+  const insertUploadedImage = React.useCallback(
+    async (file: File, pos?: number) => {
+      const upload = onUploadImageRef.current;
+      const currentEditor = editorRef.current;
+      if (!upload || !currentEditor) return;
+
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please choose an image file");
+        return;
+      }
+      if (
+        !["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(
+          file.type.toLowerCase(),
+        ) &&
+        !/\.(jpe?g|png|webp)$/i.test(file.name)
+      ) {
+        toast.error("Use a JPG, PNG or WebP image.");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image must be 5MB or less.");
+        return;
+      }
+      if (uploadingImageRef.current) {
+        toast.info("Please wait for the current image to finish uploading");
+        return;
+      }
+
+      uploadingImageRef.current = true;
+      setIsUploadingImage(true);
+      try {
+        const src = await upload(file);
+        if (!src || src.startsWith("data:")) {
+          toast.error("Image upload did not return a valid URL");
+          return;
+        }
+
+        const size = currentEditor.state.doc.content.size;
+        const insertPos =
+          typeof pos === "number" ? Math.max(0, Math.min(pos, size)) : null;
+
+        if (insertPos == null) {
+          currentEditor
+            .chain()
+            .focus()
+            .setImage({ src, alt: file.name })
+            .run();
+        } else {
+          currentEditor
+            .chain()
+            .focus()
+            .insertContentAt(insertPos, {
+              type: "image",
+              attrs: { src, alt: file.name },
+            })
+            .run();
+        }
+      } catch (error) {
+        const axiosLike =
+          typeof error === "object" &&
+          error !== null &&
+          "isAxiosError" in error;
+        if (!axiosLike && error instanceof Error && error.message) {
+          toast.error(error.message);
+        }
+      } finally {
+        uploadingImageRef.current = false;
+        setIsUploadingImage(false);
+      }
+    },
+    [],
+  );
+
+  const insertUploadedImageRef = useRef(insertUploadedImage);
+  insertUploadedImageRef.current = insertUploadedImage;
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false,
+        heading: enableRichBlocks ? { levels: [2, 3] } : false,
         codeBlock: false,
         blockquote: false,
-        bulletList: false,
-        orderedList: false,
+        bulletList: enableRichBlocks ? {} : false,
+        orderedList: enableRichBlocks ? {} : false,
       }),
       Placeholder.configure({
         placeholder,
       }),
-      CharacterCount.configure({
-        limit: maxLength,
-      }),
+      CharacterCount,
       TextAlign.configure({
-        types: ["paragraph"],
+        types: enableRichBlocks ? ["paragraph", "heading"] : ["paragraph"],
         alignments: ["left", "center", "right"],
       }),
       Underline,
@@ -102,6 +224,17 @@ export function TiptapEditor({
         },
         validate: (href) => /^https?:\/\//.test(href),
       }),
+      ...(enableImages
+        ? [
+            Image.configure({
+              inline: false,
+              allowBase64: !onUploadImage,
+              HTMLAttributes: {
+                class: "my-4 h-auto max-w-full rounded-sm",
+              },
+            }),
+          ]
+        : []),
     ],
     content: value,
     onUpdate: ({ editor }) => {
@@ -118,15 +251,75 @@ export function TiptapEditor({
           className
         ),
       },
+      handleDOMEvents: {
+        dragover: (_view, event) => {
+          if (!onUploadImageRef.current) return false;
+          if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        },
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved || !onUploadImageRef.current) return false;
+        const file = Array.from(event.dataTransfer?.files ?? []).find((item) =>
+          item.type.startsWith("image/"),
+        );
+        if (!file) return false;
+        event.preventDefault();
+        const pos = view.posAtCoords({
+          left: event.clientX,
+          top: event.clientY,
+        })?.pos;
+        void insertUploadedImageRef.current(file, pos);
+        return true;
+      },
+      handlePaste: (_view, event) => {
+        if (!onUploadImageRef.current) return false;
+        const items = Array.from(event.clipboardData?.items ?? []);
+        const fileItem = items.find(
+          (item) => item.kind === "file" && item.type.startsWith("image/"),
+        );
+        const file = fileItem?.getAsFile();
+        if (!file) return false;
+        event.preventDefault();
+        void insertUploadedImageRef.current(file);
+        return true;
+      },
     },
   });
 
-  // Update editor content when value prop changes
+  editorRef.current = editor;
+
+  // Update editor content when value prop changes.
+  // CharacterCount.limit silently rejects setContent over the cap, so over-limit
+  // footer HTML from AI must be clipped before it is applied.
   React.useEffect(() => {
-    if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value);
+    if (!editor) return;
+
+    let nextHtml = value || "";
+    if (aiContext?.contentType === "footer") {
+      const plain = toPlainText(nextHtml);
+      if (
+        plain &&
+        (plain.length > maxLength || countWords(plain) > maxWords)
+      ) {
+        nextHtml = wrapPlainTextAsHtml(
+          clipPlainTextToLimits(plain, maxLength, maxWords),
+        );
+        if (nextHtml !== value) {
+          onChangeRef.current(nextHtml);
+        }
+      }
     }
-  }, [editor, value]);
+
+    const nextPlain = toPlainText(nextHtml);
+    const currentPlain = editor.getText().replace(/\s+/g, " ").trim();
+    if (nextPlain !== currentPlain) {
+      editor.commands.setContent(nextHtml);
+    }
+  }, [editor, value, maxLength, maxWords, aiContext?.contentType]);
 
   React.useEffect(() => {
     editor?.setEditable(!readOnly);
@@ -143,6 +336,36 @@ export function TiptapEditor({
     setIsLinkDialogOpen(false);
   };
 
+  const handleInsertImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !editor) return;
+
+    if (onUploadImageRef.current) {
+      void insertUploadedImage(file);
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be 5MB or smaller");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = typeof reader.result === "string" ? reader.result : "";
+      if (!src) return;
+      editor.chain().focus().setImage({ src, alt: file.name }).run();
+    };
+    reader.onerror = () => toast.error("Could not read that image");
+    reader.readAsDataURL(file);
+  };
+
   const handleAIGenerate = async () => {
     if (!editor) return;
 
@@ -155,15 +378,23 @@ export function TiptapEditor({
         },
         body: JSON.stringify({
           title: aiContext?.title,
-          currentDescription: editor.getHTML(),
+          currentDescription: looksLikeAiInstructionLeak(
+            toPlainText(editor.getHTML()),
+          )
+            ? ""
+            : editor.getHTML(),
           sub_title: aiContext?.sub_title,
           ctaText: aiContext?.ctaText,
           ctaUrl: aiContext?.ctaUrl,
           description: aiContext?.description,
+          city: aiContext?.city,
           event_name: aiContext?.event_name,
           event_category_name: aiContext?.event_category_name,
           banner_heading: aiContext?.banner_heading,
           banner_sub_heading: aiContext?.banner_sub_heading,
+          contentType: aiContext?.contentType,
+          policySection: aiContext?.policySection,
+          maxLength,
         }),
       });
 
@@ -174,8 +405,29 @@ export function TiptapEditor({
 
       const data = await response.json();
       if (data.summary) {
-        editor.commands.setContent(data.summary); // Update editor content
-        onChange(data.summary); // Explicitly call onChange to sync with parent
+        if (looksLikeAiInstructionLeak(String(data.summary))) {
+          toast.error("Generated copy was not usable. Please try again.");
+          return;
+        }
+        const isPlainCopy =
+          aiContext?.contentType === "footer" ||
+          aiContext?.contentType === "about" ||
+          !aiContext?.contentType;
+        const html = isPlainCopy
+          ? wrapPlainTextAsHtml(
+              clipPlainTextToLimits(
+                String(data.summary),
+                maxLength,
+                maxWords,
+              ),
+            )
+          : String(data.summary);
+        if (!html || looksLikeAiInstructionLeak(toPlainText(html))) {
+          toast.error("Generated copy was empty. Please try again.");
+          return;
+        }
+        editor.commands.setContent(html);
+        onChange(html);
         toast.success("Content generated successfully!");
       }
     } catch (error) {
@@ -187,8 +439,14 @@ export function TiptapEditor({
     }
   };
 
-  const characterCount = editor?.getText().length ?? 0;
-  const wordCount = editor?.getText().split(/\s+/).filter(Boolean).length ?? 0;
+  const characterCount =
+    aiContext?.contentType === "footer"
+      ? toPlainText(editor?.getHTML() ?? "").length
+      : (editor?.getText().length ?? 0);
+  const wordCount =
+    aiContext?.contentType === "footer"
+      ? countWords(toPlainText(editor?.getHTML() ?? ""))
+      : (editor?.getText().split(/\s+/).filter(Boolean).length ?? 0);
 
   if (!editor) {
     return null;
@@ -199,6 +457,52 @@ export function TiptapEditor({
       <div className="min-h-[120px] w-full rounded-md border border-input bg-background overflow-hidden">
         {!readOnly && (
         <div className="flex flex-wrap gap-1 p-1 border-b border-input bg-background">
+          {enableRichBlocks && (
+            <>
+              <Toggle
+                size="sm"
+                pressed={editor.isActive("heading", { level: 2 })}
+                onPressedChange={() =>
+                  editor.chain().focus().toggleHeading({ level: 2 }).run()
+                }
+                aria-label="Heading"
+              >
+                <Heading2 className="h-4 w-4" />
+              </Toggle>
+              <Toggle
+                size="sm"
+                pressed={editor.isActive("heading", { level: 3 })}
+                onPressedChange={() =>
+                  editor.chain().focus().toggleHeading({ level: 3 }).run()
+                }
+                aria-label="Subheading"
+              >
+                <Heading3 className="h-4 w-4" />
+              </Toggle>
+              <Toggle
+                size="sm"
+                pressed={editor.isActive("bulletList")}
+                onPressedChange={() =>
+                  editor.chain().focus().toggleBulletList().run()
+                }
+                aria-label="Bullet list"
+              >
+                <List className="h-4 w-4" />
+              </Toggle>
+              <Toggle
+                size="sm"
+                pressed={editor.isActive("orderedList")}
+                onPressedChange={() =>
+                  editor.chain().focus().toggleOrderedList().run()
+                }
+                aria-label="Numbered list"
+              >
+                <ListOrdered className="h-4 w-4" />
+              </Toggle>
+
+              <div className="w-px h-full bg-border mx-1" />
+            </>
+          )}
           <Toggle
             size="sm"
             pressed={editor.isActive("bold")}
@@ -295,6 +599,39 @@ export function TiptapEditor({
             </Toggle>
           )}
 
+          {enableImages && (
+            <>
+              <div className="w-px h-full bg-border mx-1" />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isUploadingImage}
+                aria-label="Insert image"
+                title="Insert image"
+              >
+                {isUploadingImage ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImageIcon className="h-4 w-4" />
+                )}
+              </Button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept={
+                  onUploadImage
+                    ? "image/png,image/jpeg,image/jpg,image/webp"
+                    : "image/png,image/jpeg,image/webp,image/gif"
+                }
+                className="hidden"
+                onChange={handleInsertImage}
+              />
+            </>
+          )}
+
           <div className="w-px h-full bg-border mx-1" />
           {showAIButton && (
             <Button
@@ -302,7 +639,10 @@ export function TiptapEditor({
               size="sm"
               variant="outline"
               onClick={handleAIGenerate}
-              disabled={isGenerating || !aiContext?.title}
+              disabled={
+                isGenerating ||
+                (!aiContext?.title && aiContext?.contentType !== "footer")
+              }
               className="gap-1"
             >
               <Sparkles className="h-4 w-4" />
@@ -313,7 +653,12 @@ export function TiptapEditor({
         )}
         <EditorContent
           editor={editor}
-          className="px-3 py-2 overflow-x-hidden max-w-full"
+          className={cn(
+            "px-3 py-2 overflow-x-hidden max-w-full",
+            enableRichBlocks &&
+              "[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:text-base [&_h3]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mb-1",
+            enableImages && "[&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-sm",
+          )}
         />
       </div>
       <div className="text-xs text-muted-foreground mt-2 flex justify-between">

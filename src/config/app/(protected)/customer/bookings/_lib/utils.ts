@@ -7,16 +7,33 @@ import { getStatusColorClass } from "@/lib/status-theme";
 import type { BookingDate } from "./types";
 
 /**
- * Stable React key for booking date rows (room bookings can share date_key).
+ * Customer booking detail path — always use booking_number (e.g. EV-080), never numeric booking_id.
+ */
+export function getCustomerBookingDetailPath(bookingNumber: string): string {
+  return `/customer/bookings/${encodeURIComponent(bookingNumber)}`;
+}
+
+/**
+ * Stable React key for booking date rows.
+ * Same calendar day can appear once per room — prefer room_name when present.
  */
 export function getBookingDateRowKey(
-  date: Pick<BookingDate, "date_key"> & { room_id?: number | null },
+  date: Pick<BookingDate, "date_key" | "room_name">,
   index: number,
 ): string {
-  if (date.room_id != null && date.room_id > 0) {
-    return `${date.room_id}:${date.date_key}`;
+  const room = date.room_name?.trim();
+  if (room) {
+    return `${date.date_key}:${room}`;
   }
   return `${date.date_key}-${index}`;
+}
+
+/** Display label for a booking date row (date + optional room). */
+export function formatBookingDateLabel(
+  date: Pick<BookingDate, "date" | "room_name">,
+): string {
+  const room = date.room_name?.trim();
+  return room ? `${date.date} · ${room}` : date.date;
 }
 
 /**

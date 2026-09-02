@@ -147,7 +147,7 @@ const EmailTemplateForm = ({
                     key={`body-${code}`}
                     type="button"
                     onClick={() => insertShortCode(code, "body")}
-                    className="inline-flex items-center gap-1.5 bg-muted hover:bg-primary hover:text-primary-foreground border border-border hover:border-primary text-foreground px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-white px-3 py-1.5 text-xs font-mono font-medium text-foreground transition-colors cursor-pointer hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground,#fff)]"
                     title={`Insert ${code} into content`}
                   >
                     <span className="opacity-70">+</span>
@@ -198,7 +198,7 @@ const EmailTemplateForm = ({
                     key={`sig-${code}`}
                     type="button"
                     onClick={() => insertShortCode(code, "signature")}
-                    className="inline-flex items-center gap-1.5 bg-muted hover:bg-primary hover:text-primary-foreground border border-border hover:border-primary text-foreground px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-white px-3 py-1.5 text-xs font-mono font-medium text-foreground transition-colors cursor-pointer hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground,#fff)]"
                     title={`Insert ${code} into signature`}
                   >
                     <span className="opacity-70">+</span>

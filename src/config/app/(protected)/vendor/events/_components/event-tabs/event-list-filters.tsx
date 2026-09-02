@@ -19,7 +19,8 @@ import type {
 type EventListFiltersProps = {
   dateRange: DateRange | undefined;
   onDateRangeChange: (range: DateRange | undefined) => void;
-  availableDates: string[];
+  /** YYYY-MM-DD values; `undefined` while filter meta is still loading */
+  availableDates: string[] | undefined;
   categoryFilter: string;
   onCategoryFilterChange: (value: string) => void;
   availableCategories: EventsListCategoryOption[];
@@ -53,7 +54,7 @@ export default function EventListFilters({
     availableRooms.length > 0;
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center mb-6">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
       <div className="w-full min-w-0 sm:w-auto sm:min-w-[280px]">
         <DateRangePicker
           date={dateRange}

@@ -30,6 +30,11 @@ export interface Location {
   address?: string;
   slug: string;
   is_default: boolean;
+  is_headquarters?: boolean;
+  latitude?: number | string;
+  longitude?: number | string;
+  /** Live/active events currently tied to this location */
+  active_events_count?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -52,6 +57,10 @@ export interface LocationCreatePayload {
   email?: string;
   contact_number?: string;
   is_default?: boolean;
+  latitude?: number;
+  longitude?: number;
+  lat?: number;
+  long?: number;
 }
 
 /**
@@ -65,6 +74,10 @@ export interface LocationUpdatePayload {
   contact_number?: string;
   slug?: string;
   is_default?: boolean;
+  latitude?: number;
+  longitude?: number;
+  lat?: number;
+  long?: number;
 }
 
 /**
@@ -140,6 +153,44 @@ export type LocationUpdateResponse = BaseApiResponse<LocationDetail>;
  * Response type for delete operation
  */
 export type LocationDeleteResponse = BaseApiResponse<null>;
+
+/**
+ * Send delete OTP — backend emails the vendor owner (not staff).
+ * Contract for backend:
+ * POST /vendor/locations/{id}/send-delete-otp
+ */
+export type LocationSendDeleteOtpResponse = BaseApiResponse<{
+  /** Masked owner email, e.g. v***r@example.com */
+  masked_email?: string;
+  /** Seconds until the OTP expires / resend is allowed */
+  expires_in?: number;
+  resend_after?: number;
+}>;
+
+/**
+ * Verify delete OTP before enabling the final confirmation phrase.
+ * Contract for backend:
+ * POST /vendor/locations/{id}/verify-delete-otp
+ * Body: { otp: string }
+ */
+export interface LocationVerifyDeleteOtpPayload {
+  otp: string;
+}
+
+export type LocationVerifyDeleteOtpResponse = BaseApiResponse<{
+  verified?: boolean;
+}>;
+
+/**
+ * Final delete after OTP + typed phrase.
+ * Contract for backend:
+ * DELETE /vendor/locations/{id}
+ * Body: { otp: string, confirmation: "delete this location" }
+ */
+export interface LocationDeletePayload {
+  otp: string;
+  confirmation: string;
+}
 
 /**
  * Response type for switch location operation

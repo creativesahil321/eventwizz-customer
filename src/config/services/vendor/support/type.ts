@@ -151,6 +151,7 @@ export interface VendorSupportTicketsResponse {
   };
   meta: VendorSupportTicketsPaginationMeta;
   inbox_count: number;
+  unread_count?: number;
   staff: VendorSupportStaff[];
 }
 

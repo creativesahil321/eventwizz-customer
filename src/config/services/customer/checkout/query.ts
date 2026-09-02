@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { checkoutService } from "./checkout.service";
-import { CheckoutRequest, CheckoutResponse } from "./type";
+import { CheckoutRequest, CheckoutResponse, CheckoutResumeRequest } from "./type";
 import {
   logCheckoutSuccess,
   logCheckoutStart,
@@ -77,8 +77,8 @@ export const useValidateCheckout = () => {
 
 export const useResumeCheckout = () => {
   return useMutation({
-    mutationFn: (bookingNumber: string) =>
-      checkoutService.resumeCheckout({ booking_number: bookingNumber }),
+    mutationFn: (data: CheckoutResumeRequest) =>
+      checkoutService.resumeCheckout(data),
     retry: false,
   });
 };

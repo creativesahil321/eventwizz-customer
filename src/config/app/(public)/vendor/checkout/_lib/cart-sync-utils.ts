@@ -9,6 +9,8 @@
  * ❌ Don't match on quantities user selected (that's meant to differ)
  */
 
+import { CART_METADATA_KEYS_SET } from "@/lib/constants/cart-meta-keys";
+
 // Types for data comparison
 interface ApiEventData {
   event_name: string;
@@ -130,15 +132,7 @@ export class CartSyncDetector {
 
     // Get date keys from both sources
     const apiDates = Object.keys(apiData).filter(
-      (key) =>
-        ![
-          "event_name",
-          "event_slug",
-          "event_image",
-          "drinks",
-          "vendor_event_id",
-          "payment_gateways",
-        ].includes(key)
+      (key) => !CART_METADATA_KEYS_SET.has(key),
     );
     const zustandDates = Object.keys(zustandData);
 

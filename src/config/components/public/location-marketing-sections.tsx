@@ -11,7 +11,7 @@ export interface LocationMarketingBodyProps {
   className: string;
   style?: CSSProperties;
   /** About / experience block — caller supplies `ExperienceSection` (optionally wrapped for onboarding highlights) */
-  experience: ReactNode;
+  experience?: ReactNode;
   latestEvents: Event[];
   upcomingEvents: Event[];
   popularSectionTitle: string;
@@ -20,6 +20,8 @@ export interface LocationMarketingBodyProps {
   galleryImages: GalleryImage[];
   locationSlug: string;
   locationLabel: string | null;
+  /** Anchor for hero search scroll target */
+  eventsSectionId?: string;
 }
 
 /**
@@ -38,22 +40,25 @@ export function LocationMarketingBody({
   galleryImages,
   locationSlug,
   locationLabel,
+  eventsSectionId = "location-events",
 }: LocationMarketingBodyProps) {
   return (
     <div className={className} style={style}>
       {experience}
-      <PopularEvents
-        events={latestEvents}
-        sectionTitle={popularSectionTitle}
-        locationSlug={locationSlug}
-        locationLabel={locationLabel}
-      />
-      <UpcomingEvents
-        events={upcomingEvents}
-        sectionTitle={upcomingSectionTitle}
-        locationSlug={locationSlug}
-        locationLabel={locationLabel}
-      />
+      <div id={eventsSectionId} className="scroll-mt-24">
+        <PopularEvents
+          events={latestEvents}
+          sectionTitle={popularSectionTitle}
+          locationSlug={locationSlug}
+          locationLabel={locationLabel}
+        />
+        <UpcomingEvents
+          events={upcomingEvents}
+          sectionTitle={upcomingSectionTitle}
+          locationSlug={locationSlug}
+          locationLabel={locationLabel}
+        />
+      </div>
       <RecentEventsGlimpse
         galleryImages={galleryImages}
         galleryTitle={galleryTitle}

@@ -2,12 +2,31 @@
 
 import { useEventDetail } from "../_lib/hooks";
 import { EventDetail } from "@/services/common/events/type";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useSearchParams } from "next/navigation";
 import { EventHeroBand } from "@/components/public/event-hero-band";
-import { EventRoomSelector } from "@/components/public/event-room-selector";
-import { ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
+import {
+  EventCouponStrip,
+  EVENT_COUPON_STRIP_HEIGHT_PX,
+  PUBLIC_EVENT_HEADER_WITH_COUPON_OFFSET,
+} from "@/components/public/event-coupon-strip";
+import {
+  couponToStripProps,
+  type CouponStripSource,
+} from "@/lib/coupon-strip-props";
+import {
+  EventRoomSelector,
+  PUBLIC_EVENT_HEADER_OFFSET,
+} from "@/components/public/event-room-selector";
+import { EventRoomChooser } from "@/components/public/event-room-chooser";
+import { RoomContentTransition } from "@/components/public/room-content-transition";
 
 import CommonHeader from "@/components/shared/common-header";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
@@ -22,21 +41,46 @@ import {
   LazyFaqSection,
   LazyMenuSection,
 } from "@/components/public/event-detail-lazy-sections";
-import { ThemeAnimationManager } from "@/components/theme-animations/theme-animation-manager";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
-import { normalizeBannerHeadingAlign } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
-import { slugToShortLabel } from "@/lib/slug-short-label";
+import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
+  formatEventHeroDateRange,
+  formatEventHeroTimeRange,
+  readEventCategoryLabel,
+} from "@/lib/event-hero-meta";
+import { formatEventLocationLabel } from "@/lib/event-location";
+import { locationDisplayName } from "@/lib/slug-short-label";
+import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
+import {
+  firstBookablePublicRoomIndex,
   isPublicEventRoomMode,
+  listPublicEventRoomSummaries,
   resolvePublicEventActiveSlices,
+  resolvePublicRoomIndexFromId,
 } from "@/lib/resolve-public-event-room-slices";
+import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
+import {
+  EventSectionNav,
+  EVENT_SECTION_IDS,
+  EVENT_SECTION_NAV_HEIGHT,
+  EVENT_SECTION_NAV_HEIGHT_PX,
+  buildEventSectionNavItems,
+} from "@/components/public/event-section-nav";
+import {
+  EVENT_STICKY_SCROLL_MT_FALLBACK,
+  buildEventStickyOffsetCssVar,
+  resolveBookNowScrollOffsetPx,
+} from "@/lib/event-sticky-scroll-offset";
+
+/** Sticky site header height — keep scroll targets / triggers clear of the header. */
+const BASE_HEADER_OFFSET_PX = 72;
 
 interface EventDetailClientProps {
   event: EventDetail;
@@ -53,28 +97,61 @@ export default function EventDetailClient({
 }: EventDetailClientProps) {
   const { formatCompact: formatPriceUnit } = useCurrencyFormat();
   const { data } = useEventDetail(eventSlug, host);
+  const searchParams = useSearchParams();
+  const roomIdParam = searchParams.get("roomId");
 
   const eventData = data?.data || initialEvent;
 
-  const [currentRoomIndex, setCurrentRoomIndex] = useState(0);
+  const [currentRoomIndex, setCurrentRoomIndex] = useState(() => {
+    const fromQuery = resolvePublicRoomIndexFromId(initialEvent, roomIdParam);
+    return fromQuery ?? firstBookablePublicRoomIndex(initialEvent);
+  });
   const [roomSelectorScrollVisible, setRoomSelectorScrollVisible] =
     useState(false);
+  /** Event-level coupon from GET /domain/{domain}/events/{slug}. */
+  const bannerCouponSource = useMemo((): CouponStripSource | null => {
+    return eventData.coupon ?? null;
+  }, [eventData]);
+
+  const couponStripProps = useMemo(
+    () => couponToStripProps(bannerCouponSource),
+    [bannerCouponSource],
+  );
+
+  const [couponStripDismissed, setCouponStripDismissed] = useState(false);
+  const showCouponStrip = Boolean(couponStripProps) && !couponStripDismissed;
+
+  const headerOffsetPx =
+    BASE_HEADER_OFFSET_PX +
+    (showCouponStrip ? EVENT_COUPON_STRIP_HEIGHT_PX : 0);
+  const roomBarStickyTop = showCouponStrip
+    ? PUBLIC_EVENT_HEADER_WITH_COUPON_OFFSET
+    : PUBLIC_EVENT_HEADER_OFFSET;
 
   const roomPreviewMode = isPublicEventRoomMode(eventData);
 
   useEffect(() => {
-    setCurrentRoomIndex(0);
-  }, [eventSlug, roomPreviewMode]);
+    const fromQuery = resolvePublicRoomIndexFromId(eventData, roomIdParam);
+    setCurrentRoomIndex(fromQuery ?? firstBookablePublicRoomIndex(eventData));
+    // Reset when event identity / room-mode / deep-linked room changes — not every refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- eventData read intentionally once per slug/mode/roomId
+  }, [eventSlug, roomPreviewMode, roomIdParam]);
 
   const slices = useMemo(
     () => resolvePublicEventActiveSlices(eventData, currentRoomIndex),
     [eventData, currentRoomIndex],
   );
 
-  const showRoomSelector = roomPreviewMode && slices.rooms.length >= 2;
+  const roomSummaries = useMemo(
+    () => (roomPreviewMode ? listPublicEventRoomSummaries(eventData) : []),
+    [roomPreviewMode, eventData],
+  );
+
+  const showRoomSelector = roomPreviewMode && roomSummaries.length >= 2;
   const roomSelectorVisible = showRoomSelector && roomSelectorScrollVisible;
 
   const heroRef = useRef<HTMLElement>(null);
+  const chooserRef = useRef<HTMLDivElement>(null);
   const aboutRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const packageRef = useRef<HTMLDivElement>(null);
@@ -83,26 +160,54 @@ export default function EventDetailClient({
   const faqRef = useRef<HTMLDivElement>(null);
   const bookingRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Any room change: update the active room, then glide to the dates/booking
+   * section when it isn't already in a comfortable viewport band.
+   * Double-rAF waits for React to paint the new room content before measuring.
+   */
+  const handleRoomChange = useCallback(
+    (index: number) => {
+      const target = roomSummaries[index];
+      if (target?.disabled) return;
+      setCurrentRoomIndex(index);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollToElementIfNeeded(bookingRef.current, {
+            headerOffsetPx: resolveBookNowScrollOffsetPx({
+              headerOffsetPx,
+            }),
+          });
+        });
+      });
+    },
+    [roomSummaries, headerOffsetPx],
+  );
+
   useEffect(() => {
     if (!showRoomSelector) {
       setRoomSelectorScrollVisible(false);
       return;
     }
 
-    const threshold = ONBOARDING_ROOM_SELECTOR_SCROLL_THRESHOLD_PX;
-
+    /** Sticky mini-bar appears only once the in-flow chooser scrolls under the header. */
     const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const height = window.innerHeight;
-      setRoomSelectorScrollVisible(
-        scrollTop >= Math.max(threshold, height * 0.22),
-      );
+      const chooser = chooserRef.current;
+      if (!chooser) {
+        setRoomSelectorScrollVisible(window.scrollY > window.innerHeight * 0.6);
+        return;
+      }
+      const { bottom } = chooser.getBoundingClientRect();
+      setRoomSelectorScrollVisible(bottom <= headerOffsetPx + 8);
     };
 
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [showRoomSelector]);
+    window.addEventListener("resize", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [showRoomSelector, headerOffsetPx]);
 
   const heroTitle =
     eventData.event_banner_heading?.trim() ||
@@ -119,9 +224,6 @@ export default function EventDetailClient({
     theme: null,
   };
   const vendorTheme = serverTheme as ThemeSchema | null;
-  const bannerAlign = normalizeBannerHeadingAlign(
-    vendorTheme?.banner_heading_align,
-  );
   const headingEmphasisFromSite =
     vendorTheme?.typography?.headingEmphasis != null
       ? normalizeHeadingEmphasis(vendorTheme.typography.headingEmphasis)
@@ -152,6 +254,13 @@ export default function EventDetailClient({
     String(slices.event_schedular_title ?? "").trim().length > 0 ||
     timelineRows.length > 0;
 
+  // The schedule is live-tracked only on the event's actual date(s); before/after
+  // it stays informational instead of showing a false daily countdown.
+  const scheduleEventDates = useMemo(
+    () => (slices.dates ?? []).map((d) => d.event_date),
+    [slices.dates],
+  );
+
   const drinkPackages = useMemo(
     () =>
       (slices.packages ?? []).map((pkg) => ({
@@ -159,6 +268,15 @@ export default function EventDetailClient({
         price: parseFloat(pkg.price) || 0,
       })),
     [slices.packages],
+  );
+
+  const brochureFromPrice = useMemo(
+    () =>
+      lowestBookableFromPrice({
+        datePrices: (slices.dates ?? []).map((date) => date.price),
+        packagePrices: drinkPackages.map((pkg) => pkg.price),
+      }),
+    [slices.dates, drinkPackages],
   );
 
   const galleryItems = useMemo(
@@ -171,154 +289,308 @@ export default function EventDetailClient({
     [slices.event_galley],
   );
 
+  const showGallery = (galleryItems?.length ?? 0) > 0;
+  const showMenu = Boolean(slices.menus && slices.menus.length > 0);
+  const showFaqs = Boolean(eventData.faqs && eventData.faqs.length > 0);
+  const showPackages = Boolean(
+    String(slices.package_title ?? "").trim() ||
+      String(slices.package_description ?? "").trim() ||
+      slices.package_image ||
+      (slices.package_details?.length ?? 0) > 0,
+  );
+  const showDrinks = drinkPackages.length > 0;
+
+  const sectionNavItems = useMemo(
+    () =>
+      buildEventSectionNavItems({
+        about: true,
+        rooms: showRoomSelector,
+        schedule: showTimeline,
+        packages: showPackages,
+        dates: true,
+        gallery: showGallery,
+        menu: showMenu,
+        drinks: showDrinks,
+        drinksLabel: slices.drink_title,
+        faqs: showFaqs,
+      }),
+    [
+      showRoomSelector,
+      showTimeline,
+      showPackages,
+      showGallery,
+      showMenu,
+      showDrinks,
+      slices.drink_title,
+      showFaqs,
+    ],
+  );
+  const showSectionNav = sectionNavItems.length > 0;
+  const sectionNavStickyTop = roomBarStickyTop;
+  const roomSelectorStickyTop = showSectionNav
+    ? `calc(${roomBarStickyTop} + ${EVENT_SECTION_NAV_HEIGHT})`
+    : roomBarStickyTop;
+  const sectionAnchorClass = `scroll-mt-[var(--event-sticky-offset,${EVENT_STICKY_SCROLL_MT_FALLBACK})]`;
+
+  const eventLocationLabel = formatEventLocationLabel(
+    slices.event_address ?? "",
+  );
+  /** Parent venue location from the URL (`/kangra-7/...`), not the event address. */
+  const parentLocationLabel = useMemo(() => {
+    const matched = vendorTheme?.locations?.find(
+      (loc) => loc.slug?.toLowerCase() === locationSlug.toLowerCase(),
+    );
+    return locationDisplayName(matched?.city, locationSlug);
+  }, [vendorTheme?.locations, locationSlug]);
+  const heroCategoryLabel = readEventCategoryLabel(eventData);
+  const heroDateLabel = formatEventHeroDateRange(
+    (slices.dates ?? []).map((d) => d.event_date),
+  );
+  const heroTimeLabel = formatEventHeroTimeRange(
+    (slices.event_schedular ?? []).map((row) => row.time),
+  );
+
+  const aboutHighlights = buildEventAboutHighlights({
+    occasion: heroCategoryLabel,
+    dates: heroDateLabel,
+    time: heroTimeLabel,
+    location: eventLocationLabel || null,
+    fromPrice: brochureFromPrice,
+    formatPrice: formatPriceUnit,
+  });
+
   const activeRoomId = slices.activeRoom?.room_id;
+  const roomContentKey = activeRoomId ?? `room-${currentRoomIndex}`;
 
   return (
     <CartConflictProvider>
-      <div className="event-detail-page">
-        <ThemeAnimationManager
-          eventData={eventData}
-          enabled={true}
-          intensity="medium"
-        />
-
+      <div
+        className="event-detail-page"
+        style={{
+          ["--event-sticky-offset" as string]: buildEventStickyOffsetCssVar({
+            headerOffset: roomBarStickyTop,
+            showSectionNav,
+          }),
+        }}
+      >
         <CommonHeader
           variant="default"
           headerDownloads={pdfDownloadLinks}
           hideHeaderPhone
           compactGuestAuth
+          topBanner={
+            showCouponStrip && couponStripProps ? (
+              <EventCouponStrip
+                {...couponStripProps}
+                position="static"
+                onDismiss={() => setCouponStripDismissed(true)}
+              />
+            ) : null
+          }
         />
 
         {showRoomSelector ? (
           <EventRoomSelector
             rooms={slices.rooms}
             currentRoomIndex={currentRoomIndex}
-            onRoomChange={setCurrentRoomIndex}
+            onRoomChange={handleRoomChange}
             visible={roomSelectorVisible}
+            stickyTop={roomSelectorStickyTop}
           />
         ) : null}
 
-        <div
-          className={cn(
-            roomSelectorVisible && "-mt-12 transition-all duration-300",
-          )}
-        >
+        <div>
           <EventHeroBand
             sectionRef={heroRef}
             title={heroTitle}
             subHeading={eventData.event_banner_sub_heading || null}
             accentHint={heroAccentHint}
             headingEmphasis={headingEmphasisFromSite}
-            bannerHeadingAlign={vendorTheme?.banner_heading_align ?? null}
-            bannerHeadingValign={vendorTheme?.banner_heading_valign ?? null}
+            bannerHeadingAlign={eventData.banner_heading_align ?? null}
+            bannerHeadingValign={eventData.banner_heading_valign ?? null}
             bannerImage={eventData.event_banner_image || null}
             bannerVideo={eventData.event_banner_video || null}
             cacheBustImage
             imageAlt={eventData.event_name || "Event banner"}
-            beforeTitle={
-              <Link
-                href={`/${locationSlug}`}
-                className={cn(
-                  "mb-6 inline-flex items-center gap-1.5 text-sm font-medium transition-all duration-200",
-                  "rounded-full px-3 py-1.5 text-white/80",
-                  "hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:shadow-md",
-                  bannerAlign === "left" && "-ml-3",
-                  bannerAlign === "center" && "mx-auto",
-                  bannerAlign === "right" && "ml-auto",
-                )}
-              >
-                <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-                Back to {slugToShortLabel(locationSlug)}
-              </Link>
-            }
+            breadcrumbs={[
+              { label: "Home", href: "/" },
+              {
+                label: parentLocationLabel,
+                href: `/${locationSlug}`,
+              },
+              {
+                label:
+                  eventData.event_name?.trim() ||
+                  eventData.event_banner_heading?.trim() ||
+                  "Event",
+              },
+            ]}
+            categoryLabel={heroCategoryLabel}
+            meta={{
+              date: heroDateLabel,
+              time: heroTimeLabel,
+              location: eventLocationLabel,
+            }}
           />
         </div>
 
-        <div ref={aboutRef}>
+        {showSectionNav ? (
+          <EventSectionNav
+            items={sectionNavItems}
+            stickyTop={sectionNavStickyTop}
+            headerOffsetPx={headerOffsetPx}
+          />
+        ) : null}
+
+        <div
+          ref={aboutRef}
+          id={EVENT_SECTION_IDS.about}
+          className={sectionAnchorClass}
+        >
           <AboutEventSec
             about_event_heading={eventData.about_event_heading}
             about_event_sub_heading={eventData.about_event_sub_heading}
             about_event_description={eventData.about_event_description}
+            eventImage={eventData.event_banner_image || null}
+            imageAlt={
+              eventData.event_name
+                ? `${eventData.event_name} event`
+                : "Event image"
+            }
+            highlights={aboutHighlights}
             headingEmphasis={headingEmphasisFromSite}
             aboutHeadingAccentHint={heroAccentHint}
           />
         </div>
 
-        {showTimeline ? (
-          <div ref={timelineRef}>
-            <Timeline
-              eventSchedular={timelineRows}
-              eventSchedularTitle={slices.event_schedular_title}
-              eventSchedularBackgroundImage={
-                typeof slices.event_schedular_background_image === "string"
-                  ? slices.event_schedular_background_image
-                  : undefined
-              }
+        {showRoomSelector ? (
+          <div
+            ref={chooserRef}
+            id={EVENT_SECTION_IDS.rooms}
+            className={sectionAnchorClass}
+          >
+            <EventRoomChooser
+              rooms={roomSummaries}
+              currentRoomIndex={currentRoomIndex}
+              onRoomChange={handleRoomChange}
+              headingEmphasis={headingEmphasisFromSite}
             />
           </div>
         ) : null}
 
-        <div ref={packageRef}>
-          <PackageSec
-            heading={slices.package_title}
-            subHeading={slices.package_description}
-            image={slices.package_image}
-            packageDetails={slices.package_details}
-            headingEmphasis={headingEmphasisFromSite}
-          />
+        {showTimeline ? (
+          <div
+            ref={timelineRef}
+            id={EVENT_SECTION_IDS.schedule}
+            className={sectionAnchorClass}
+          >
+            <RoomContentTransition roomKey={roomContentKey}>
+              <Timeline
+                eventSchedular={timelineRows}
+                eventSchedularTitle={slices.event_schedular_title}
+                eventDates={scheduleEventDates}
+                eventSchedularBackgroundImage={
+                  typeof slices.event_schedular_background_image === "string"
+                    ? slices.event_schedular_background_image
+                    : undefined
+                }
+              />
+            </RoomContentTransition>
+          </div>
+        ) : null}
+
+        <div
+          ref={packageRef}
+          id={showPackages ? EVENT_SECTION_IDS.packages : undefined}
+          className={showPackages ? sectionAnchorClass : undefined}
+        >
+          <RoomContentTransition roomKey={roomContentKey}>
+            <PackageSec
+              heading={slices.package_title}
+              subHeading={slices.package_description}
+              image={slices.package_image}
+              packageDetails={slices.package_details}
+              headingEmphasis={headingEmphasisFromSite}
+            />
+          </RoomContentTransition>
         </div>
 
         <div
           ref={bookingRef}
-          id="booking"
-          className={EVENT_BOOKING_SECTION_CLASSNAME}
+          id={EVENT_SECTION_IDS.dates}
+          className={cn(EVENT_BOOKING_SECTION_CLASSNAME, sectionAnchorClass)}
         >
-          <DatesSection
-            dates={slices.dates}
-            eventSlug={eventSlug}
-            eventName={eventData.event_name}
-            eventImage={
-              eventData.event_banner_image ||
-              eventData.event_banner_video ||
-              undefined
-            }
-            roomId={activeRoomId}
-          />
+          <RoomContentTransition roomKey={roomContentKey}>
+            <DatesSection
+              dates={slices.dates}
+              eventSlug={eventSlug}
+              eventName={eventData.event_name}
+              eventImage={
+                eventData.event_banner_image ||
+                eventData.event_banner_video ||
+                undefined
+              }
+              roomId={activeRoomId}
+              headingEmphasis={headingEmphasisFromSite}
+            />
+          </RoomContentTransition>
         </div>
 
-        <EventGallery gallery={galleryItems} />
+        {showGallery ? (
+          <div id={EVENT_SECTION_IDS.gallery} className={sectionAnchorClass}>
+            <EventGallery
+              gallery={galleryItems}
+              headingEmphasis={headingEmphasisFromSite}
+            />
+          </div>
+        ) : null}
 
         {slices.menus && slices.menus.length > 0 && (
-          <div ref={menuRef}>
-            <LazyMenuSection
-              menu_title={slices.menu_title}
-              menu_description={slices.menu_description}
-              menus={slices.menus}
-              catering_option={1}
-              menu_background_image={
-                typeof slices.menu_background_image === "string"
-                  ? slices.menu_background_image
-                  : undefined
-              }
-            />
+          <div
+            ref={menuRef}
+            id={EVENT_SECTION_IDS.menu}
+            className={sectionAnchorClass}
+          >
+            <RoomContentTransition roomKey={roomContentKey}>
+              <LazyMenuSection
+                menu_title={slices.menu_title}
+                menu_description={slices.menu_description}
+                menus={slices.menus}
+                catering_option={1}
+                menu_background_image={
+                  typeof slices.menu_background_image === "string"
+                    ? slices.menu_background_image
+                    : undefined
+                }
+                headingEmphasis={headingEmphasisFromSite}
+              />
+            </RoomContentTransition>
           </div>
         )}
 
         {drinkPackages.length > 0 && (
-          <div ref={drinkRef}>
-            <LazyDrinkSection
-              title={slices.drink_title}
-              description={slices.drink_description}
-              packages={drinkPackages}
-              eventSlug={eventSlug}
-              roomId={activeRoomId}
-            />
+          <div
+            ref={drinkRef}
+            id={EVENT_SECTION_IDS.drinks}
+            className={sectionAnchorClass}
+          >
+            <RoomContentTransition roomKey={roomContentKey}>
+              <LazyDrinkSection
+                title={slices.drink_title}
+                description={slices.drink_description}
+                packages={drinkPackages}
+                eventSlug={eventSlug}
+                roomId={activeRoomId}
+                headingEmphasis={headingEmphasisFromSite}
+              />
+            </RoomContentTransition>
           </div>
         )}
 
         <div>
           <LazyBrochureSection
             showMapImmediately
+            headingEmphasis={headingEmphasisFromSite}
             location={{
               title: "EVENT LOCATION",
               description:
@@ -327,34 +599,25 @@ export default function EventDetailClient({
               latitude: slices.lat,
               longitude: slices.long,
             }}
-            downloads={pdfDownloadLinks.map((d) => ({
-              title: d.title,
-              download_link: [d.href],
-            }))}
-            price={{
-              title: "PRICES FROM",
-              description: `${formatPriceUnit(
-                Number(slices.packages?.[0]?.price) || 45,
-              )} PP exc VAT`,
-              link: "#booking",
-              price_title: "Book Now",
-            }}
           />
         </div>
 
         {eventData.faqs && eventData.faqs.length > 0 && (
-          <div ref={faqRef}>
-            <LazyFaqSection faqs={eventData.faqs} />
+          <div
+            ref={faqRef}
+            id={EVENT_SECTION_IDS.faqs}
+            className={sectionAnchorClass}
+          >
+            <LazyFaqSection
+              faqs={eventData.faqs}
+              headingEmphasis={headingEmphasisFromSite}
+            />
           </div>
         )}
 
         <FooterSection
           locationSlug={locationSlug}
-          contactOverride={{
-            address: eventData.address,
-            email: eventData.email,
-            phone: eventData.phone,
-          }}
+          brandDescription={vendorTheme?.footer_brand_description}
         />
       </div>
     </CartConflictProvider>

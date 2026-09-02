@@ -616,6 +616,7 @@ export function FillExistingTablesPanel({
   }, [restoredAdditionsBySlot]);
 
   const autoFillCapacity = Math.min(guestsToAdd, totalFreeSeats);
+  const canAutoFillExisting = guestsToAdd > 0 && totalFreeSeats > 0;
   const unplacedGuests = Math.max(
     0,
     guestsToAdd - totalAdded - guestsPlacedOnNewTable,
@@ -679,7 +680,7 @@ export function FillExistingTablesPanel({
             </p>
           )}
         </div>
-        {guestsToAdd > 0 && (
+        {canAutoFillExisting && (
           <button
             type="button"
             className="shrink-0 mt-0.5 rounded-full px-[0.625rem] py-1 text-[10px] font-bold"
@@ -700,9 +701,11 @@ export function FillExistingTablesPanel({
         {slots.map((slot) => {
           const added = additionsBySlot[slot.key] ?? 0;
           const effectiveOccupied = slot.occupied + added;
+          const baseFreeSeats = getFreeSeats(slot);
+          const isPhysicallyFull = baseFreeSeats <= 0;
           const effectiveFree = Math.max(0, slot.capacity - effectiveOccupied);
-          const isFull = effectiveFree <= 0;
-          const maxCanAdd = getMaxCanAdd(slot);
+          const isFull = isPhysicallyFull || effectiveFree <= 0;
+          const maxCanAdd = isPhysicallyFull ? 0 : getMaxCanAdd(slot);
           const progress = Math.min(
             100,
             Math.round((effectiveOccupied / Math.max(1, slot.capacity)) * 100),
@@ -753,19 +756,27 @@ export function FillExistingTablesPanel({
                 />
               </div>
 
-              <div className="mt-[0.625rem] flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold text-muted-foreground">
-                  {added > 0
-                    ? `+${added} · ${formatCurrency(added * slot.pricePerPerson)}`
-                    : "No guests added"}
-                </span>
-                <QuantityStepper
-                  value={added}
-                  max={isFull && added === 0 ? 0 : maxCanAdd}
-                  onChange={(next) => setSlotAddition(slot.key, next)}
-                  size="sm"
-                />
-              </div>
+              {isPhysicallyFull ? (
+                added > 0 ? (
+                  <p className="mt-[0.625rem] text-[10px] font-semibold text-muted-foreground">
+                    +{added} · {formatCurrency(added * slot.pricePerPerson)}
+                  </p>
+                ) : null
+              ) : (
+                <div className="mt-[0.625rem] flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold text-muted-foreground">
+                    {added > 0
+                      ? `+${added} · ${formatCurrency(added * slot.pricePerPerson)}`
+                      : "No guests added"}
+                  </span>
+                  <QuantityStepper
+                    value={added}
+                    max={maxCanAdd}
+                    onChange={(next) => setSlotAddition(slot.key, next)}
+                    size="sm"
+                  />
+                </div>
+              )}
             </div>
           );
         })}

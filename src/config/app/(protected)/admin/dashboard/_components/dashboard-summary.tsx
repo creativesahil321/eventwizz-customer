@@ -68,28 +68,32 @@ export default function DashboardSummary({
   };
 
   return (
-    <Card className="w-full border shadow-sm">
-      <CardContent className="p-6 space-y-4">
-        <CardTitle className="text-2xl mb-0 title-header font-medium">
-          {title}
-        </CardTitle>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <Card className="w-full min-w-0 border shadow-sm">
+      <CardContent className="p-4 sm:p-6 space-y-4">
+        <div className="flex min-h-[40px] items-center">
+          <CardTitle className="text-xl sm:text-2xl mb-0 title-header font-medium">
+            {title}
+          </CardTitle>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {summaryItems.map((item) => (
             <Card
               key={item.id}
               className={`border-none shadow-sm ${getBgColorByItemId(
                 item.id
-              )} rounded-lg p-4`}
+              )} rounded-lg p-3 sm:p-4 min-w-0 overflow-hidden`}
             >
-              <div className="flex items-center justify-between">
-                <div className="bg-white/20 rounded-full p-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="bg-white/20 rounded-full p-2.5 sm:p-3 shrink-0">
                   {getIconByItemId(item.id)}
                 </div>
-                <div className="text-right">
-                  <p className="text-white text-sm mb-1">
+                <div className="min-w-0 flex-1 text-right">
+                  <p className="text-white/90 text-xs sm:text-sm mb-0.5 truncate">
                     {getCleanLabel(item.id)}
                   </p>
-                  <p className="text-white text-3xl font-bold">{item.value}</p>
+                  <p className="text-white text-xl sm:text-2xl font-bold tabular-nums leading-tight break-words">
+                    {item.value}
+                  </p>
                 </div>
               </div>
             </Card>

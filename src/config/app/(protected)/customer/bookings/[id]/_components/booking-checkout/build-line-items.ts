@@ -31,7 +31,7 @@ export function getDateCalendarParts(dateKey: string): {
 
   return {
     month: parsed
-      .toLocaleString("en-US", { month: "short" })
+      .toLocaleString("en-GB", { month: "short" })
       .toUpperCase(),
     day: parsed.getDate(),
   };
@@ -77,6 +77,9 @@ export interface BookingDateSource {
   packages?: BookingDetailsPackage[];
   tables?: BookingDetailsTable[];
   addons?: BookingDetailsAddons;
+  /** Present only when this date has promo savings. */
+  savedAmount?: number | null;
+  totalAmount?: number;
 }
 
 /** Prefer per-date `package_title` from booking API; optional booking-level fallback. */
@@ -601,12 +604,14 @@ export function buildPaymentBreakdown(
 
       const bookingSubtotal = lines.reduce((sum, line) => sum + line.amount, 0);
       const addonSubtotal = split.addonTotal;
+      const subtotal = bookingSubtotal + addonSubtotal;
 
       return {
         id: date.id,
         title: date.date,
         packageTitle: date.package_title,
-        subtotal: bookingSubtotal + addonSubtotal,
+        subtotal,
+        savedAmount: date.savedAmount ?? null,
         lines,
         addonLines: addonLines.length > 0 ? addonLines : undefined,
         addonSubtotal: addonLines.length > 0 ? addonSubtotal : undefined,

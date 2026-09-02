@@ -30,6 +30,7 @@ import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import { Receipt } from "lucide-react";
 import { TransactionsListSkeleton } from "./skeleton-loader";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { TransactionItemComponent } from "./transaction-item";
 
 interface TransactionMeta {
   total: number;
@@ -98,52 +99,61 @@ export function TransactionListComponent({
 
   return (
     <div className="space-y-4">
-      {/* Table */}
-      <div className="border rounded-md overflow-hidden bg-white">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="bg-gray-50">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead 
-                      key={header.id} 
-                      className="font-semibold text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap first:pl-4"
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell 
-                      key={cell.id}
-                      className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm first:pl-4"
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+      {/* Mobile: stacked cards (avoids horizontal scrolling a wide table) */}
+      <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-white md:hidden">
+        {table.getRowModel().rows.map((row) => (
+          <TransactionItemComponent
+            key={row.id}
+            transaction={row.original}
+            onViewDetails={onViewDetails}
+          />
+        ))}
       </div>
+
+      {/* Desktop: full table */}
+      <section className="hidden overflow-x-auto overflow-y-visible rounded-lg border border-[var(--color-border)] bg-white md:block">
+        <Table className="min-w-[900px]">
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="bg-gray-50">
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="whitespace-nowrap px-3 py-4 font-semibold first:pl-4 last:pr-4 sm:px-4"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody className="bg-background">
+            {table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                className="border-b transition-colors hover:bg-slate-100"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    key={cell.id}
+                    className="whitespace-nowrap px-3 py-4 text-xs first:pl-4 last:pr-4 sm:px-4 sm:text-sm"
+                  >
+                    {flexRender(
+                      cell.column.columnDef.cell,
+                      cell.getContext()
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </section>
 
       {/* Pagination */}
       {meta && meta.last_page > 1 && (

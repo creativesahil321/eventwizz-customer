@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** Hard cap on venue locations a vendor can create. */
+export const MAX_VENDOR_LOCATIONS = 6;
+
 // Schema for search params
 export const searchParamsCache = z.object({
   page: z.string().optional(),
@@ -27,6 +30,8 @@ export const locationSchema = z.object({
   contact_number: z.string().min(1, "Contact number is required"),
   slug: z.string().optional(),
   is_default: z.boolean().default(false),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 export type LocationFormValues = z.infer<typeof locationSchema>;

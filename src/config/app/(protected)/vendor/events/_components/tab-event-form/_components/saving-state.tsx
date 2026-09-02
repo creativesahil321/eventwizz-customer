@@ -20,7 +20,7 @@ interface SavingStateProps {
  */
 export function SavingState({
   title = "Saving your changes...",
-  description = "Please wait. You'll be notified when it's done.",
+  description = "Please wait. You will be notified when this is complete.",
   minHeight = "min-h-[320px]",
   className,
 }: SavingStateProps) {
@@ -71,7 +71,7 @@ export function SavingState({
                 />
               </div>
               <p className="mt-3 text-xs text-muted-foreground text-center">
-                Do not close this page
+                Please do not close this page
               </p>
             </div>
           </div>

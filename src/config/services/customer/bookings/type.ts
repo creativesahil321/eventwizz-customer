@@ -17,17 +17,44 @@ export interface BookingsQueryParams {
 
 /**
  * Booking date information
+ * Room bookings include optional `room_name` (no `room_id` on customer list).
  */
 export interface BookingDate {
   date_key: string;
   date: string;
-  room_id?: number | null;
   room_name?: string | null;
   table: {
     table_id: number;
     table_size: number;
   };
   status: string; // e.g., "Pending", "Confirmed", "confirmed"
+}
+
+/** Coupon / date discount already applied on a saved booking (read-only). */
+export interface BookingAppliedOffer {
+  coupon_code?: string | null;
+  discount_code?: string | null;
+  value_label?: string | null;
+  discount_label?: string | null;
+  label?: string | null;
+  discount_amount?: number | string | null;
+  amount?: number | string | null;
+  discount_type?: string | null;
+  kind?: string | null;
+  category?: string | null;
+}
+
+/** List/detail payment summary — savings only via optional `saved_amount`. */
+export interface BookingListPaymentSummary {
+  sub_total_amount?: number | null;
+  total_paid_amount?: number | null;
+  total_pending_amount?: number | null;
+  total_addons_amount?: number | null;
+  total_amount?: number | null;
+  /** Present only when > 0; omitted when no promo savings. */
+  saved_amount?: number;
+  can_pay_now?: boolean;
+  platform_fee_amount?: number;
 }
 
 /**
@@ -43,9 +70,11 @@ export interface BookingItem {
   status: string; // e.g., "pending", "Confirmed", "confirmed"
   payment_status: string; // Changed from number to string to match API
   partial_payment: string;
-  total: string;
+  total: string | number;
   created_date: string;
   booking_dates: BookingDate[];
+  /** List savings live only here — not on the booking root. */
+  payment_summary?: BookingListPaymentSummary | null;
 }
 
 /**
@@ -300,6 +329,8 @@ export interface BookingDetailsDate {
   tables: BookingDetailsTable[];
   addons?: BookingDetailsAddons;
   reschedule_requests?: BookingRescheduleRequest[];
+  /** Present only when > 0; omitted when no promo savings for this date. */
+  saved_amount?: number;
 }
 
 /** Top-level payment summary on booking details */
@@ -309,7 +340,12 @@ export interface BookingPaymentSummary {
   total_pending_amount?: number | null;
   total_addons_amount?: number | null;
   total_amount: number;
+  /** Present only when > 0; omitted when no promo savings. */
+  saved_amount?: number;
+  /** Present only when a coupon was used (vendor show). */
+  coupon_code?: string;
   can_pay_now?: boolean;
+  platform_fee_amount?: number;
   /** @deprecated use total_paid_amount */
   paid_amount?: number | null;
   /** @deprecated use total_pending_amount */
@@ -766,6 +802,13 @@ export interface BookingPaymentGatewayInfo {
   gateway: string;
   payment_id: number;
   stripe?: BookingPaymentStripeDetails;
+  /** Present when gateway is "paypal". */
+  paypal?: {
+    redirect_url: string;
+    order_id?: string;
+    expires_at?: number;
+  };
+  /** Generic redirect payload for other hosted gateways. */
   redirect_url?: string;
 }
 

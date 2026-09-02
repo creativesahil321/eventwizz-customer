@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { LoginFormInputs, loginSchema } from "./schema";
@@ -27,13 +27,18 @@ import { OAuthErrorBoundary } from "@/components/auth/OAuthErrorBoundary";
 import { OAuthSkeleton } from "@/components/auth/OAuthSkeleton";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { handleUrlErrorParams } from "@/lib/auth/url-utils";
+import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
 import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link";
+import { AuthLegalNotice } from "@/app/(auth)/_components/auth-legal-notice";
+import { clearOnboardingBrowserState } from "@/lib/clear-vendor-browser-session";
 
 export default function LoginForm() {
   const [loading, setLoading] = React.useState(false);
   const [redirecting, setRedirecting] = React.useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { website_role, parentDomain } = useDomain();
+  const callbackUrl = searchParams.get("callbackUrl");
 
   // Handle error from URL parameters (for OAuth errors)
   React.useEffect(() => {
@@ -73,6 +78,8 @@ export default function LoginForm() {
       }
 
       if (response.data.token) {
+        clearOnboardingBrowserState();
+
         // Store auth data in Zustand
         const store = useAuthStore.getState();
         const account_type = (response.data.account_type ||
@@ -182,19 +189,15 @@ export default function LoginForm() {
           throw new Error(result.error);
         }
 
-        // Redirect after successful authentication using SPA navigation
-        // (router.push avoids a full page reload that causes flash of login page)
+        // Prefer safe callbackUrl for customers (e.g. return to checkout after booking)
         try {
-          if (account_type === "vendor") {
-            if (isVendorOnboarded) {
-              router.push("/welcome/select-location");
-            } else {
-              router.push("/on-boarding");
-            }
-          } else {
-            // For non-vendor users, redirect to their dashboard
-            router.push(`/${account_type}/dashboard`);
-          }
+          router.push(
+            resolvePostLoginRedirect({
+              accountType: account_type,
+              isVendorOnboarded,
+              callbackUrl,
+            }),
+          );
         } catch (error) {
           console.error("Error redirecting:", error);
           setRedirecting(false);
@@ -242,15 +245,18 @@ export default function LoginForm() {
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-[var(--color-border,#e5e7eb)]" />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-4 text-black">
-                    Or continue with
+                <div className="relative flex justify-center text-xs uppercase tracking-wide">
+                  <span className="bg-[var(--color-surface,#fff)] px-4 text-[var(--color-text-dimmed,#6b7280)]">
+                    Or with email
                   </span>
                 </div>
               </div>
 
               <div className="grid gap-2">
-                <label htmlFor="email" className="text-black font-medium">
+                <label
+                  htmlFor="email"
+                  className="font-medium text-[var(--color-text)]"
+                >
                   Email address
                 </label>
                 <Input
@@ -260,7 +266,7 @@ export default function LoginForm() {
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect="off"
-                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
+                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] text-[var(--color-text)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
                     errors.email ? "border-red-500" : ""
                   }`}
                   {...register("email")}
@@ -274,7 +280,10 @@ export default function LoginForm() {
 
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-black font-medium">
+                  <label
+                    htmlFor="password"
+                    className="font-medium text-[var(--color-text)]"
+                  >
                     Password
                   </label>
 
@@ -291,7 +300,7 @@ export default function LoginForm() {
                   autoCapitalize="none"
                   autoComplete="current-password"
                   autoCorrect="off"
-                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
+                  className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] text-[var(--color-text)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
                     errors.password ? "border-red-500" : ""
                   }`}
                   {...register("password")}
@@ -330,6 +339,7 @@ export default function LoginForm() {
                 : "Sign in"}
             </Button>
 
+            <AuthLegalNotice variant="login" />
             <AuthAlternateLink variant="login" />
           </div>
         </form>

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useGetCartData } from "@/services/customer/cart/query";
+import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
 import {
   countEventCartDates,
   extractEventsFromApiResponse,
@@ -242,7 +243,7 @@ export function useCartConflict(): UseCartConflictReturn {
 
       clearConflictState();
 
-      router.push("/vendor/checkout");
+      router.push(CUSTOMER_CHECKOUT_PATH);
     } catch (error) {
       console.error("Error redirecting to checkout:", error);
     } finally {

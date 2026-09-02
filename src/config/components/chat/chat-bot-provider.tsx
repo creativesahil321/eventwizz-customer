@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, createContext, useContext, useEffect } from "react";
-import { ChatBot } from "./chat-bot";
+import dynamic from "next/dynamic";
+
+const ChatBot = dynamic(
+  () => import("./chat-bot").then((mod) => mod.ChatBot),
+  { ssr: false },
+);
 
 // Create context for the chat bot
 type ChatBotContextType = {

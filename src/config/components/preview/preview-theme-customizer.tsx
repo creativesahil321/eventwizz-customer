@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AlignCenter,
   AlignLeft,
@@ -9,10 +16,10 @@ import {
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
   AlertTriangle,
-  Check,
   Loader2,
   Palette,
   RotateCcw,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,23 +36,27 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import {
-  SITE_THEME_PRESETS,
-  TRY_THEME_COLOR_GRID_OPTIONS,
-  TRY_THEME_FONT_GRID_OPTIONS,
   mergeColorPaletteIntoValues,
   mergeGoogleOnlyFontsIntoValues,
   mergePresetFontsIntoValues,
+  mergeFullPresetIntoValues,
   siteEssentialsColorsMatch,
   siteEssentialsFontPairKey,
   tryThemeColorGridOptionStorageKey,
   tryThemeFontGridOptionStorageKey,
-  type SiteThemePresetId,
-  type TryThemeColorGridOption,
-  type TryThemeFontGridOption,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/site-theme-presets";
+import {
+  buildTryThemeCatalogView,
+  isRecipeColorOption,
+  type CatalogColorGridOption,
+  type CatalogFontGridOption,
+  type ThemePresetGroupKey,
+} from "@/app/(protected)/_shared/sites-essentials/_lib/theme-preset-catalog";
+import { useThemePresetsCatalogQuery } from "@/app/(protected)/_shared/sites-essentials/_lib/queries";
 import {
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
@@ -55,11 +66,9 @@ import {
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { useSiteEssentialsPresetFontsPreload } from "@/hooks/use-site-essentials-preset-fonts-preload";
-import {
-  isLightUiBackground,
-  paletteAccessibilityFlags,
-} from "@/lib/wcag-color-contrast";
+import { paletteAccessibilityFlags } from "@/lib/wcag-color-contrast";
 import { usePermission } from "@/hooks/usePermission";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 const PREVIEW_TRY_THEME_LAST_FONT_KEY = "eventwizz:preview-try-theme:last-font";
 const PREVIEW_TRY_THEME_LAST_COLOR_KEY =
@@ -91,6 +100,192 @@ const HEADING_STYLE_OPTIONS: {
   },
 ];
 
+const HERO_ALIGN_OPTIONS: {
+  v: BannerHeadingAlign;
+  Icon: LucideIcon;
+  label: string;
+}[] = [
+  { v: "left", Icon: AlignLeft, label: "Left" },
+  { v: "center", Icon: AlignCenter, label: "Center" },
+  { v: "right", Icon: AlignRight, label: "Right" },
+];
+
+const HERO_VALIGN_OPTIONS: {
+  v: BannerHeadingValign;
+  Icon: LucideIcon;
+  label: string;
+}[] = [
+  { v: "top", Icon: AlignVerticalJustifyStart, label: "Top" },
+  { v: "center", Icon: AlignVerticalJustifyCenter, label: "Middle" },
+  { v: "bottom", Icon: AlignVerticalJustifyEnd, label: "Bottom" },
+];
+
+const COLOR_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "dark", label: "Dark" },
+  { id: "light", label: "Light" },
+] as const;
+
+/** Consistent section label used across every panel group. */
+const SECTION_LABEL_CLASS =
+  "text-[11px] font-semibold uppercase tracking-wide text-slate-500";
+/** Consistent one-line helper text used under section labels. */
+const SECTION_HINT_CLASS = "text-[11px] leading-snug text-slate-400";
+
+function ColorPresetCard({
+  opt,
+  active,
+  showRecent,
+  layout,
+  fontLabel,
+  onSelect,
+}: {
+  opt: CatalogColorGridOption;
+  active: boolean;
+  showRecent: boolean;
+  layout: "recipe" | "compact";
+  fontLabel?: string;
+  onSelect: () => void;
+}) {
+  const [a, b, c] = opt.swatch;
+  const acc = paletteAccessibilityFlags(opt.colors);
+  const contrastWarn = !(acc.bodyTextAa && acc.primaryOnSurfaceUi);
+
+  const statusChip =
+    active ? (
+      <span className="shrink-0 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-medium text-white">
+        In use
+      </span>
+    ) : showRecent ? (
+      <span className="shrink-0 rounded-full border border-slate-200 px-1.5 py-0.5 text-[9px] font-medium text-slate-500">
+        Recent
+      </span>
+    ) : null;
+
+  const swatches = (
+    <div className="flex shrink-0 gap-0.5" aria-hidden>
+      {[a, b, c].map((hex) => (
+        <span
+          key={hex}
+          className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
+          style={{ backgroundColor: hex }}
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <button
+      type="button"
+      aria-current={active ? "true" : undefined}
+      onClick={onSelect}
+      title={`${opt.name}${fontLabel ? ` · ${fontLabel}` : ""}\n${opt.tagline}`}
+      className={cn(
+        "relative rounded-xl border text-left transition-all duration-200",
+        layout === "recipe"
+          ? "flex items-start gap-3 p-3"
+          : "flex flex-col items-center gap-1 p-2 pt-2.5",
+        active
+          ? "border-slate-900/20 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2)] ring-1 ring-slate-900/10"
+          : "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-sm",
+      )}
+    >
+      {layout === "recipe" ? (
+        <>
+          {swatches}
+          <span className="min-w-0 flex-1">
+            <span className="flex items-start justify-between gap-2">
+              <span className="text-[13px] font-semibold leading-snug text-slate-800">
+                {opt.name}
+              </span>
+              {statusChip}
+            </span>
+            {fontLabel ? (
+              <span className="mt-0.5 block text-[10px] text-slate-500">
+                {fontLabel}
+              </span>
+            ) : null}
+            <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
+              {opt.tagline}
+            </span>
+          </span>
+          {contrastWarn ? (
+            <AlertTriangle
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600"
+              aria-label="Contrast may be tight"
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          {statusChip ? (
+            <span className="absolute right-1.5 top-1.5 z-10">{statusChip}</span>
+          ) : null}
+          {contrastWarn ? (
+            <AlertTriangle
+              className="absolute left-1.5 top-1.5 h-3 w-3 text-amber-600"
+              aria-label="Contrast may be tight"
+            />
+          ) : null}
+          <div className={cn("flex gap-0.5", statusChip || contrastWarn ? "mt-4" : "mt-1")}>
+            {[a, b, c].map((hex) => (
+              <span
+                key={hex}
+                className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
+                style={{ backgroundColor: hex }}
+              />
+            ))}
+          </div>
+          <span className="line-clamp-1 w-full text-center text-[11px] font-medium text-slate-700">
+            {opt.name}
+          </span>
+          <span className="line-clamp-2 w-full text-center text-[10px] leading-snug text-slate-500">
+            {opt.tagline}
+          </span>
+        </>
+      )}
+    </button>
+  );
+}
+
+function SegmentGroup<T extends string>({
+  ariaLabel,
+  value,
+  options,
+  onChange,
+}: {
+  ariaLabel: string;
+  value: T;
+  options: { v: T; Icon: LucideIcon; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div
+      className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1"
+      role="group"
+      aria-label={ariaLabel}
+    >
+      {options.map(({ v, Icon, label }) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={value === v}
+          onClick={() => onChange(v)}
+          className={cn(
+            "flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:px-2 sm:text-xs",
+            value === v
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900",
+          )}
+        >
+          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function sortTryThemeOptionsFirst<T>(
   items: readonly T[],
   pinnedKey: string | null,
@@ -114,21 +309,52 @@ type PreviewThemeCustomizerProps = {
   /** Event preview: write Try theme → Site Essentials (API). Renders “Save theme” in this panel. */
   onSaveTheme?: () => void | Promise<void>;
   isSavingTheme?: boolean;
+  /**
+   * Location-page hero align/valign only — hide on multi-location main Home.
+   * Default true so single-location / event previews keep the controls.
+   */
+  showHeroLayoutControls?: boolean;
+  /** Rendered at the bottom of the panel — e.g. the editor injects Restore default theme here. */
+  footerSlot?: ReactNode;
+  /**
+   * Optional action rendered near the top of the panel (under Save theme) — e.g.
+   * the site preview injects an "Import from website" control here. Kept as a
+   * slot so this component stays free of react-hook-form / import dependencies.
+   */
+  importSlot?: ReactNode;
+  /**
+   * When set, shows a clear “Discard changes” control so vendors can undo an
+   * import / theme try and return the live preview to the session baseline.
+   */
+  onDiscardChanges?: () => void;
+  /** Gates the Discard control (typically `previewRequiresSave`). */
+  showDiscardChanges?: boolean;
 };
 
-function presetById(
-  id: SiteThemePresetId,
-): (typeof SITE_THEME_PRESETS)[number] {
-  const p = SITE_THEME_PRESETS.find((x) => x.id === id);
-  if (!p) {
-    throw new Error(`Unknown theme preset: ${id}`);
+function groupLabelForColors(key: ThemePresetGroupKey): string {
+  switch (key) {
+    case "venue":
+      return "Venue recipes";
+    case "modern":
+      return "Marketing palettes";
+    case "classic":
+      return "More palettes";
+    default:
+      return "Extra palettes";
   }
-  return p;
 }
 
-/** Preset ids prefixed `lovable-` are legacy internal keys; UI groups use neutral labels. */
-function presetGroupKeyFromId(id: SiteThemePresetId) {
-  return id.startsWith("lovable-") ? "modern" : "classic";
+function groupLabelForFonts(key: ThemePresetGroupKey): string {
+  switch (key) {
+    case "venue":
+      return "Venue font pairs";
+    case "modern":
+      return "Marketing font pairs";
+    case "classic":
+      return "More font pairs";
+    default:
+      return "Extra font pairs";
+  }
 }
 
 export function PreviewThemeCustomizer({
@@ -138,9 +364,23 @@ export function PreviewThemeCustomizer({
   sheetDescription,
   onSaveTheme,
   isSavingTheme = false,
+  showHeroLayoutControls = true,
+  footerSlot,
+  importSlot,
+  onDiscardChanges,
+  showDiscardChanges = false,
 }: PreviewThemeCustomizerProps) {
   const canPersistSiteEssentials = usePermission("update-site-essential");
-  useSiteEssentialsPresetFontsPreload();
+  const catalogQuery = useThemePresetsCatalogQuery();
+  const catalogView = useMemo(() => {
+    if (catalogQuery.isPending && !catalogQuery.data) return null;
+    return buildTryThemeCatalogView(catalogQuery.data);
+  }, [catalogQuery.data, catalogQuery.isPending]);
+  useSiteEssentialsPresetFontsPreload(
+    catalogView?.googleFamilies ?? [],
+    catalogView?.cdnStylesheetUrls ?? [],
+  );
+  const isCompactViewport = useMediaQuery("(max-width: 767px)");
   const [open, setOpen] = useState(false);
   const [colorFilter, setColorFilter] = useState<"all" | "dark" | "light">(
     "all",
@@ -175,10 +415,28 @@ export function PreviewThemeCustomizer({
   };
 
   const applyColorGridOption = useCallback(
-    (opt: TryThemeColorGridOption) => {
-      onValuesChange(
-        mergeColorPaletteIntoValues(valuesRef.current, opt.colors),
-      );
+    (opt: CatalogColorGridOption) => {
+      const cur = valuesRef.current;
+      if (isRecipeColorOption(opt)) {
+        const preset = catalogView?.recipesById.get(opt.id);
+        if (!preset) return;
+        const next = mergeFullPresetIntoValues(cur, preset);
+        const sameColors = siteEssentialsColorsMatch(cur.colors, next.colors);
+        const sameFonts =
+          siteEssentialsFontPairKey(cur.typography) ===
+          siteEssentialsFontPairKey(next.typography);
+        const sameEmphasis =
+          (cur.typography?.headingEmphasis ?? "") ===
+          (next.typography?.headingEmphasis ?? "");
+        const samePreset = cur.theme_preset_id === next.theme_preset_id;
+        if (sameColors && sameFonts && sameEmphasis && samePreset) return;
+        onValuesChange(next);
+      } else {
+        if (siteEssentialsColorsMatch(cur.colors, opt.colors)) {
+          return;
+        }
+        onValuesChange(mergeColorPaletteIntoValues(cur, opt.colors));
+      }
       const k = tryThemeColorGridOptionStorageKey(opt);
       setLastColorKey(k);
       try {
@@ -187,19 +445,28 @@ export function PreviewThemeCustomizer({
         /* private mode */
       }
     },
-    [onValuesChange],
+    [catalogView, onValuesChange],
   );
 
   const applyFonts = useCallback(
-    (id: SiteThemePresetId) => {
-      const preset = presetById(id);
-      onValuesChange(mergePresetFontsIntoValues(valuesRef.current, preset));
+    (id: string) => {
+      const preset = catalogView?.recipesById.get(id);
+      if (!preset) return;
+      const cur = valuesRef.current;
+      const next = mergePresetFontsIntoValues(cur, preset);
+      if (
+        siteEssentialsFontPairKey(cur.typography) ===
+        siteEssentialsFontPairKey(next.typography)
+      ) {
+        return;
+      }
+      onValuesChange(next);
     },
-    [onValuesChange],
+    [catalogView, onValuesChange],
   );
 
   const applyFontGridOption = useCallback(
-    (opt: TryThemeFontGridOption) => {
+    (opt: CatalogFontGridOption) => {
       if (opt.source === "preset") {
         applyFonts(opt.id);
       } else {
@@ -224,8 +491,12 @@ export function PreviewThemeCustomizer({
 
   const applyHeroAlign = useCallback(
     (align: BannerHeadingAlign) => {
+      const cur = valuesRef.current;
+      if (normalizeBannerHeadingAlign(cur.banner_heading_align) === align) {
+        return;
+      }
       onValuesChange({
-        ...valuesRef.current,
+        ...cur,
         banner_heading_align: align,
       });
     },
@@ -234,8 +505,12 @@ export function PreviewThemeCustomizer({
 
   const applyHeroValign = useCallback(
     (valign: BannerHeadingValign) => {
+      const cur = valuesRef.current;
+      if (normalizeBannerHeadingValign(cur.banner_heading_valign) === valign) {
+        return;
+      }
       onValuesChange({
-        ...valuesRef.current,
+        ...cur,
         banner_heading_valign: valign,
       });
     },
@@ -245,8 +520,14 @@ export function PreviewThemeCustomizer({
   const applyHeadingEmphasisStyle = useCallback(
     (emphasis: HeadingEmphasis) => {
       const cur = valuesRef.current;
+      if (
+        normalizeHeadingEmphasis(cur.typography?.headingEmphasis) === emphasis
+      ) {
+        return;
+      }
       onValuesChange({
         ...cur,
+        theme_preset_id: null,
         typography: {
           ...cur.typography,
           headingEmphasis: emphasis,
@@ -272,70 +553,66 @@ export function PreviewThemeCustomizer({
   const orderedFontGridOptions = useMemo(
     () =>
       sortTryThemeOptionsFirst(
-        TRY_THEME_FONT_GRID_OPTIONS,
+        catalogView?.fontOptions ?? [],
         lastFontKey,
         tryThemeFontGridOptionStorageKey,
       ),
-    [lastFontKey],
+    [catalogView, lastFontKey],
   );
 
   const groupedFontGridOptions = useMemo(() => {
     const groups: Record<
-      string,
-      { key: string; label: string; items: typeof orderedFontGridOptions }
+      ThemePresetGroupKey,
+      { key: ThemePresetGroupKey; label: string; items: typeof orderedFontGridOptions }
     > = {
-      modern: { key: "modern", label: "Marketing font pairs", items: [] },
-      classic: { key: "classic", label: "Core font pairs", items: [] },
-      extra: { key: "extra", label: "Extra font pairs", items: [] },
+      venue: { key: "venue", label: groupLabelForFonts("venue"), items: [] },
+      modern: { key: "modern", label: groupLabelForFonts("modern"), items: [] },
+      classic: { key: "classic", label: groupLabelForFonts("classic"), items: [] },
+      extra: { key: "extra", label: groupLabelForFonts("extra"), items: [] },
     };
 
     for (const opt of orderedFontGridOptions) {
-      if (opt.source === "preset") {
-        const k = presetGroupKeyFromId(opt.id);
-        groups[k].items.push(opt);
-      } else {
-        groups.extra.items.push(opt);
-      }
+      groups[opt.group].items.push(opt);
     }
 
     return Object.values(groups).filter((g) => g.items.length > 0);
   }, [orderedFontGridOptions]);
 
   const orderedColorGridOptions = useMemo(() => {
-    let list = TRY_THEME_COLOR_GRID_OPTIONS;
+    let list = catalogView?.colorOptions ?? [];
     if (colorFilter === "dark") {
-      list = list.filter((o) => !isLightUiBackground(o.colors.background));
+      list = list.filter((o) => !o.isLight);
     } else if (colorFilter === "light") {
-      list = list.filter((o) => isLightUiBackground(o.colors.background));
+      list = list.filter((o) => o.isLight);
     }
     return sortTryThemeOptionsFirst(
       list,
       lastColorKey,
       tryThemeColorGridOptionStorageKey,
     );
-  }, [colorFilter, lastColorKey]);
+  }, [catalogView, colorFilter, lastColorKey]);
 
   const groupedColorGridOptions = useMemo(() => {
     const groups: Record<
-      string,
+      ThemePresetGroupKey,
       {
-        key: string;
+        key: ThemePresetGroupKey;
         label: string;
         items: typeof orderedColorGridOptions;
       }
     > = {
-      modern: { key: "modern", label: "Marketing palettes", items: [] },
-      classic: { key: "classic", label: "Core palettes", items: [] },
-      extra: { key: "extra", label: "Extra palettes", items: [] },
+      venue: { key: "venue", label: groupLabelForColors("venue"), items: [] },
+      modern: { key: "modern", label: groupLabelForColors("modern"), items: [] },
+      classic: {
+        key: "classic",
+        label: groupLabelForColors("classic"),
+        items: [],
+      },
+      extra: { key: "extra", label: groupLabelForColors("extra"), items: [] },
     };
 
     for (const opt of orderedColorGridOptions) {
-      if (opt.source === "preset") {
-        const k = presetGroupKeyFromId(opt.id);
-        groups[k].items.push(opt);
-      } else {
-        groups.extra.items.push(opt);
-      }
+      groups[opt.group].items.push(opt);
     }
 
     return Object.values(groups).filter((g) => g.items.length > 0);
@@ -361,170 +638,168 @@ export function PreviewThemeCustomizer({
         aria-expanded={open}
         aria-controls="preview-theme-customizer-sheet"
         className={cn(
-          "group fixed right-0 top-1/2 z-[70] flex -translate-y-1/2 flex-row-reverse items-center gap-2.5",
-          "rounded-l-xl border border-r-0 border-slate-200 bg-white py-2.5 pl-4 pr-2.5",
+          "group fixed right-0 top-1/2 z-[70] flex -translate-y-1/2 items-center gap-0",
+          "rounded-l-xl border border-r-0 border-slate-200 bg-white py-2.5 pl-3 pr-2.5",
           "text-sm font-semibold text-slate-800 shadow-md",
-          "translate-x-[calc(100%-2.875rem)] transition-[transform,box-shadow,background-color] duration-300 ease-out",
-          "hover:translate-x-0 hover:bg-slate-50 hover:shadow-lg",
-          "focus-visible:translate-x-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
-          "motion-reduce:translate-x-0",
+          // Collapsed: icon-only peek. Expanded on hover/focus: slide in + show label.
+          "translate-x-[calc(100%-2.75rem)] transition-[transform,box-shadow,background-color,padding] duration-300 ease-out",
+          "hover:translate-x-0 hover:bg-slate-50 hover:pl-4 hover:shadow-lg",
+          "focus-visible:translate-x-0 focus-visible:pl-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
+          "motion-reduce:translate-x-0 motion-reduce:pl-4",
           open && "pointer-events-none opacity-0",
         )}
       >
+        <span
+          className={cn(
+            "max-w-0 overflow-hidden whitespace-nowrap text-xs leading-none opacity-0 transition-[max-width,opacity,margin] duration-300 ease-out sm:text-sm",
+            "group-hover:mr-2.5 group-hover:max-w-[6.5rem] group-hover:opacity-100",
+            "group-focus-visible:mr-2.5 group-focus-visible:max-w-[6.5rem] group-focus-visible:opacity-100",
+            "motion-reduce:mr-2.5 motion-reduce:max-w-[6.5rem] motion-reduce:opacity-100",
+          )}
+        >
+          Try theme
+        </span>
         <Palette
           className="h-5 w-5 shrink-0 text-slate-700 transition-transform duration-300 ease-out group-hover:scale-110 motion-reduce:group-hover:scale-100"
           aria-hidden
         />
-        <span className="whitespace-nowrap text-right text-xs leading-none sm:text-sm">
-          Try theme
-        </span>
       </button>
 
       {/* modal={false}: avoid Radix RemoveScroll / body lock so the preview page stays scrollable */}
       <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
           id="preview-theme-customizer-sheet"
-          side="right"
-          className="z-[110] flex h-full max-h-[100dvh] w-full max-w-[380px] flex-col border-l border-slate-200 bg-white p-0 shadow-xl sm:max-w-[380px]"
+          side={isCompactViewport ? "bottom" : "right"}
+          // Sit above the preview review chrome (2-row fixed bar ≈ 9rem) so the
+          // pinned Restore footer is never covered. Inline zIndex beats any
+          // competing utility / stacking-context quirks from the portal.
+          style={{ zIndex: 200 }}
+          overlayClassName="bg-transparent pointer-events-none"
+          className={cn(
+            "z-[200] flex flex-col gap-0 overflow-hidden bg-white p-0 shadow-xl",
+            isCompactViewport
+              ? "!inset-x-0 !top-auto !bottom-[var(--preview-review-chrome-height,9rem)] !h-[min(70dvh,34rem)] !max-h-[calc(100dvh-var(--preview-review-chrome-height,9rem)-env(safe-area-inset-top))] w-full max-w-none rounded-t-2xl border-t border-slate-200"
+              : "!inset-y-auto !top-0 !bottom-[var(--preview-review-chrome-height,9rem)] !h-auto !max-h-none w-full max-w-[380px] border-l border-slate-200 sm:max-w-[380px]",
+          )}
           onPointerDownOutside={(e) => e.preventDefault()}
         >
-          <SheetHeader className="border-b border-slate-100 px-4 pb-4 pt-5 text-left">
-            <SheetTitle className="text-lg text-slate-900">
+          <SheetHeader
+            className={cn(
+              "border-b border-slate-100 text-left",
+              isCompactViewport ? "px-4 pb-2 pt-3 pr-12" : "px-4 pb-4 pt-5",
+            )}
+          >
+            <SheetTitle
+              className={cn(
+                "text-slate-900",
+                isCompactViewport ? "text-base" : "text-lg",
+              )}
+            >
               {brandName}
             </SheetTitle>
-            <SheetDescription className="text-xs leading-relaxed text-slate-600">
+            <SheetDescription
+              className={cn(
+                "text-xs leading-relaxed text-slate-600",
+                isCompactViewport && "line-clamp-2",
+              )}
+            >
               {sheetDescription ?? DEFAULT_SHEET_DESCRIPTION}
             </SheetDescription>
           </SheetHeader>
 
-          {onSaveTheme ? (
-            <div className="shrink-0 border-b border-slate-100 px-4 py-3">
-              <Button
-                type="button"
-                className="w-full border border-slate-200 bg-white font-medium text-slate-900 shadow-sm hover:bg-slate-50"
-                disabled={isSavingTheme || !canPersistSiteEssentials}
-                onClick={() => void onSaveTheme()}
-              >
-                {isSavingTheme ? (
-                  <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
-                ) : null}
-                {canPersistSiteEssentials ? "Save theme" : "View only"}
-              </Button>
-              <p className="mt-2 text-[10px] leading-snug text-slate-500">
-                {canPersistSiteEssentials ? (
-                  <>
-                    Writes colors, fonts, and hero layout to Site Essentials
-                    (same as Save on the Site Essentials page).
-                  </>
-                ) : (
-                  <>
-                    Saving requires the{" "}
-                    <span className="font-medium text-slate-600">
-                      update-site-essential
-                    </span>{" "}
-                    permission. You can still try fonts and colors in this
-                    preview; they are not saved until someone with access saves
-                    from here or Site Essentials.
-                  </>
-                )}
-              </p>
-            </div>
+          {showHeroLayoutControls ? (
+            <section className="shrink-0 space-y-2 border-b border-slate-100 px-4 py-3">
+              <h3 className={SECTION_LABEL_CLASS}>Hero position</h3>
+              <div className="space-y-2">
+                <span className="block text-[11px] font-medium text-slate-500">
+                  Horizontal
+                </span>
+                <SegmentGroup
+                  ariaLabel="Hero text alignment"
+                  value={currentHeroAlign}
+                  options={HERO_ALIGN_OPTIONS}
+                  onChange={applyHeroAlign}
+                />
+                <span className="block pt-0.5 text-[11px] font-medium text-slate-500">
+                  Vertical
+                </span>
+                <SegmentGroup
+                  ariaLabel="Hero vertical position"
+                  value={currentHeroValign}
+                  options={HERO_VALIGN_OPTIONS}
+                  onChange={applyHeroValign}
+                />
+              </div>
+            </section>
           ) : null}
 
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="space-y-6 px-4 py-4 pb-8">
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Hero horizontal
-                </h3>
-                <div
-                  className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
-                  role="group"
-                  aria-label="Hero text alignment"
-                >
-                  {(
-                    [
-                      { v: "left" as const, Icon: AlignLeft, label: "Left" },
-                      {
-                        v: "center" as const,
-                        Icon: AlignCenter,
-                        label: "Center",
-                      },
-                      { v: "right" as const, Icon: AlignRight, label: "Right" },
-                    ] as const
-                  ).map(({ v, Icon, label }) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => applyHeroAlign(v)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        currentHeroAlign === v
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-600 hover:text-slate-900",
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      {label}
-                    </button>
-                  ))}
+          <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+            <div className="space-y-5 px-4 py-4 pb-8">
+              {onSaveTheme || importSlot || (showDiscardChanges && onDiscardChanges) ? (
+                <div className="space-y-3">
+                  {onSaveTheme ? (
+                    <div className="space-y-1.5">
+                      {/*
+                        Must not use the default/event-primary variants — those bind to
+                        preview CSS vars (--color-primary*). On some themes hover sets
+                        white text on a light/white fill and the label vanishes.
+                      */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full border-slate-300 !bg-white !font-medium !text-slate-900 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
+                        disabled={isSavingTheme || !canPersistSiteEssentials}
+                        onClick={() => void onSaveTheme()}
+                      >
+                        {isSavingTheme ? (
+                          <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
+                        ) : null}
+                        {canPersistSiteEssentials ? "Save theme" : "View only"}
+                      </Button>
+                      <p
+                        className={cn(
+                          SECTION_HINT_CLASS,
+                          isCompactViewport && "hidden",
+                        )}
+                      >
+                        {canPersistSiteEssentials
+                          ? "Publishes colors, fonts & hero layout to Site Essentials."
+                          : "Read-only — needs the update-site-essential permission to save."}
+                      </p>
+                    </div>
+                  ) : null}
+                  {importSlot}
+                  {showDiscardChanges && onDiscardChanges ? (
+                    <div className="space-y-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full border-slate-300 !bg-white !font-medium !text-slate-700 shadow-sm hover:!bg-slate-100 hover:!text-slate-900"
+                        disabled={isSavingTheme}
+                        onClick={onDiscardChanges}
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4 shrink-0" />
+                        Discard changes
+                      </Button>
+                      <p
+                        className={cn(
+                          SECTION_HINT_CLASS,
+                          isCompactViewport && "hidden",
+                        )}
+                      >
+                        Undo import and theme tries — restores this preview to how
+                        it looked when you opened it.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
+              ) : null}
 
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Hero vertical
-                </h3>
-                <div
-                  className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1"
-                  role="group"
-                  aria-label="Hero vertical position"
-                >
-                  {(
-                    [
-                      {
-                        v: "top" as const,
-                        Icon: AlignVerticalJustifyStart,
-                        label: "Top",
-                      },
-                      {
-                        v: "center" as const,
-                        Icon: AlignVerticalJustifyCenter,
-                        label: "Middle",
-                      },
-                      {
-                        v: "bottom" as const,
-                        Icon: AlignVerticalJustifyEnd,
-                        label: "Bottom",
-                      },
-                    ] as const
-                  ).map(({ v, Icon, label }) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => applyHeroValign(v)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        currentHeroValign === v
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-600 hover:text-slate-900",
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Heading style
-                </h3>
-                <p className="mb-2 text-[10px] leading-snug text-slate-500">
-                  Trailing accent uses the last words of your banner title
-                  automatically (same idea as Site Essentials). Set a custom
-                  phrase there if you need an exact match.
+              <div className="space-y-2.5">
+                <h3 className={SECTION_LABEL_CLASS}>Heading style</h3>
+                <p className={SECTION_HINT_CLASS}>
+                  Trailing accent styles the last words of your banner title
+                  automatically.
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {HEADING_STYLE_OPTIONS.map(({ id, label, description }) => (
@@ -543,7 +818,7 @@ export function PreviewThemeCustomizer({
                       <span className="font-semibold">{label}</span>
                       <span
                         className={cn(
-                          "mt-0.5 block text-[10px] leading-snug",
+                          "mt-0.5 block text-[11px] leading-snug",
                           currentHeadingEmphasis === id
                             ? "text-white/85"
                             : "text-slate-500",
@@ -556,27 +831,143 @@ export function PreviewThemeCustomizer({
                 </div>
               </div>
 
-              <div>
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Try other fonts
-                  </h3>
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className={SECTION_LABEL_CLASS}>Colors</h3>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-slate-500"
+                    className="-mr-1 h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700"
                     onClick={handleReset}
-                    title="Reset to when you opened this panel"
+                    title="Undo all changes made since you opened this panel"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <Accordion
-                  type="multiple"
-                  defaultValue={["modern", "classic"]}
-                  className="w-full"
+                <div
+                  className="flex flex-wrap gap-1"
+                  role="group"
+                  aria-label="Filter palettes by brightness"
                 >
+                  {COLOR_FILTERS.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={colorFilter === id}
+                      onClick={() => setColorFilter(id)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                        colorFilter === id
+                          ? "border-slate-900 bg-slate-900 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className={SECTION_HINT_CLASS}>
+                  Start with a venue recipe — it sets colors, fonts, and
+                  heading style together. Gold/brass is for badges, not body
+                  text. More palettes are collapsed below.
+                </p>
+                {!catalogView ? (
+                  <div className="space-y-2" aria-hidden>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <Accordion
+                    type="multiple"
+                    defaultValue={["venue"]}
+                    className="w-full"
+                  >
+                  {groupedColorGridOptions.map((group) => (
+                    <AccordionItem
+                      key={group.key}
+                      value={group.key}
+                      className="border-slate-200/80"
+                    >
+                      <AccordionTrigger className="py-2 text-xs text-slate-700 hover:no-underline">
+                        <span className="flex w-full items-center justify-between gap-3">
+                          <span className="font-semibold">{group.label}</span>
+                          <span className="shrink-0 text-[10px] font-medium text-slate-500">
+                            {group.items.length}
+                          </span>
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-0 pb-3">
+                        <div
+                          className={cn(
+                            "grid gap-2",
+                            group.key === "venue"
+                              ? "grid-cols-1"
+                              : "grid-cols-2",
+                          )}
+                        >
+                          {group.items.map((opt) => {
+                            const active = isRecipeColorOption(opt)
+                              ? values.theme_preset_id === opt.id
+                              : !values.theme_preset_id &&
+                                siteEssentialsColorsMatch(
+                                  values.colors,
+                                  opt.colors,
+                                );
+                            const pinned =
+                              tryThemeColorGridOptionStorageKey(opt) ===
+                              lastColorKey;
+                            return (
+                              <ColorPresetCard
+                                key={
+                                  opt.source === "preset"
+                                    ? opt.id
+                                    : `extra-${opt.key}`
+                                }
+                                opt={opt}
+                                active={active}
+                                showRecent={pinned && !active}
+                                layout={
+                                  group.key === "venue" ? "recipe" : "compact"
+                                }
+                                fontLabel={
+                                  group.key === "venue" &&
+                                  opt.headingFontLabel &&
+                                  opt.bodyFontLabel
+                                    ? `${opt.headingFontLabel} / ${opt.bodyFontLabel}`
+                                    : undefined
+                                }
+                                onSelect={() => applyColorGridOption(opt)}
+                              />
+                            );
+                          })}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                  </Accordion>
+                )}
+              </div>
+
+              <div className="space-y-2.5">
+                <h3 className={SECTION_LABEL_CLASS}>Fonts</h3>
+                <p className={SECTION_HINT_CLASS}>
+                  Venue recipes already include a font pair. Change this only
+                  if you want a different heading/body mix.
+                </p>
+                {!catalogView ? (
+                  <div className="grid grid-cols-2 gap-2" aria-hidden>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Skeleton key={i} className="h-24 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <Accordion
+                    type="multiple"
+                    defaultValue={["venue"]}
+                    className="w-full"
+                  >
                   {groupedFontGridOptions.map((group) => (
                     <AccordionItem
                       key={group.key}
@@ -592,7 +983,7 @@ export function PreviewThemeCustomizer({
                         </span>
                       </AccordionTrigger>
                       <AccordionContent className="pt-0 pb-3">
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-2">
                           {group.items.map((opt) => {
                             const active =
                               currentFontKey ===
@@ -670,171 +1061,19 @@ export function PreviewThemeCustomizer({
                       </AccordionContent>
                     </AccordionItem>
                   ))}
-                </Accordion>
-              </div>
-
-              <div>
-                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Try other colors
-                  </h3>
-                  <div
-                    className="flex flex-wrap gap-1"
-                    role="group"
-                    aria-label="Filter palettes by brightness"
-                  >
-                    {(
-                      [
-                        { id: "all" as const, label: "All" },
-                        { id: "dark" as const, label: "Dark" },
-                        { id: "light" as const, label: "Light" },
-                      ] as const
-                    ).map(({ id, label }) => (
-                      <button
-                        key={id}
-                        type="button"
-                        aria-pressed={colorFilter === id}
-                        onClick={() => setColorFilter(id)}
-                        className={cn(
-                          "rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors",
-                          colorFilter === id
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <p className="mb-3 text-[10px] leading-snug text-slate-500">
-                  Three dots: page background, primary accent, and a key tone
-                  (usually body text). Checkmark = body-on-background AA plus
-                  primary-on-surface for cards; triangle = double-check in Site
-                  Essentials.
-                </p>
-                <Accordion
-                  type="multiple"
-                  defaultValue={["modern", "classic"]}
-                  className="w-full"
-                >
-                  {groupedColorGridOptions.map((group) => (
-                    <AccordionItem
-                      key={group.key}
-                      value={group.key}
-                      className="border-slate-200/80"
-                    >
-                      <AccordionTrigger className="py-2 text-xs text-slate-700 hover:no-underline">
-                        <span className="flex w-full items-center justify-between gap-3">
-                          <span className="font-semibold">{group.label}</span>
-                          <span className="shrink-0 text-[10px] font-medium text-slate-500">
-                            {group.items.length}
-                          </span>
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="pt-0 pb-3">
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                          {group.items.map((opt) => {
-                            const [a, b, c] = opt.swatch;
-                            const active = siteEssentialsColorsMatch(
-                              values.colors,
-                              opt.colors,
-                            );
-                            const pinned =
-                              tryThemeColorGridOptionStorageKey(opt) ===
-                              lastColorKey;
-                            const showRecent = pinned && !active;
-                            const acc = paletteAccessibilityFlags(opt.colors);
-                            const contrastOk =
-                              acc.bodyTextAa && acc.primaryOnSurfaceUi;
-                            return (
-                              <button
-                                key={
-                                  opt.source === "preset"
-                                    ? opt.id
-                                    : `extra-${opt.key}`
-                                }
-                                type="button"
-                                aria-current={active ? "true" : undefined}
-                                onClick={() => applyColorGridOption(opt)}
-                                className={cn(
-                                  "relative flex flex-col items-center gap-1 rounded-xl border p-2 pt-2.5 transition-all duration-200",
-                                  active
-                                    ? "border-slate-300/90 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.05)] before:pointer-events-none before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-slate-800 before:content-[''] hover:border-slate-400"
-                                    : "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-sm",
-                                )}
-                                title={`${opt.name}\n\n${opt.tagline}`}
-                              >
-                                {active ? (
-                                  <span className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-1.5 py-0.5 text-[8px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-                                    <span
-                                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
-                                      aria-hidden
-                                    />
-                                    In use
-                                  </span>
-                                ) : null}
-                                {showRecent ? (
-                                  <span
-                                    className="absolute right-1.5 top-1.5 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
-                                    title="Last picked this session"
-                                  >
-                                    Recent
-                                  </span>
-                                ) : null}
-                                <span
-                                  className={cn(
-                                    "absolute left-1.5 top-1.5 z-[1] flex h-4 w-4 items-center justify-center rounded-full border shadow-sm",
-                                    contrastOk
-                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                      : "border-amber-200 bg-amber-50 text-amber-700",
-                                  )}
-                                  title={
-                                    contrastOk
-                                      ? "Body text and primary on surface meet common WCAG targets"
-                                      : "Contrast may be tight — verify in Site Essentials"
-                                  }
-                                >
-                                  {contrastOk ? (
-                                    <Check
-                                      className="h-2.5 w-2.5"
-                                      strokeWidth={3}
-                                    />
-                                  ) : (
-                                    <AlertTriangle className="h-2.5 w-2.5" />
-                                  )}
-                                </span>
-                                <div className="mt-2 flex gap-0.5">
-                                  <span
-                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                                    style={{ backgroundColor: a }}
-                                  />
-                                  <span
-                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                                    style={{ backgroundColor: b }}
-                                  />
-                                  <span
-                                    className="h-5 w-5 rounded-full border border-black/10 shadow-inner"
-                                    style={{ backgroundColor: c }}
-                                  />
-                                </div>
-                                <span className="line-clamp-1 w-full text-center text-[9px] font-medium text-slate-700">
-                                  {opt.name}
-                                </span>
-                                <span className="line-clamp-2 w-full text-center text-[8px] leading-snug text-slate-500">
-                                  {opt.tagline}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
+                  </Accordion>
+                )}
               </div>
             </div>
           </ScrollArea>
+
+          {/* Pinned outside ScrollArea so Restore stays visible without scrolling
+              past the palette grid, and sits above the preview review chrome. */}
+          {footerSlot ? (
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+              {footerSlot}
+            </div>
+          ) : null}
         </SheetContent>
       </Sheet>
     </>

@@ -3,6 +3,7 @@ import { ThemeSchema } from "@/types/theme.types";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { env } from "@/env";
 import { headers } from "next/headers";
+import { flattenInfoPages } from "@/lib/flatten-info-pages";
 import {
   generateThemeCSS,
   getDefaultThemeCSS,
@@ -104,6 +105,7 @@ export async function fetchServerTheme(
         Accept: "application/json",
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
+        "X-Domain": cleanDomain,
         Origin: env.NEXT_PUBLIC_APP_URL || "",
         Host: cleanDomain,
       },
@@ -122,7 +124,7 @@ export async function fetchServerTheme(
       return null;
     }
 
-    return data.data as ThemeSchema;
+    return flattenInfoPages(data.data) as ThemeSchema;
   } catch {
     return null;
   } finally {

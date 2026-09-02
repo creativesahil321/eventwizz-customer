@@ -39,7 +39,11 @@ import {
   canShowApplyToAllButton,
   useRoomManager,
 } from "../../rooms/use-room-manager";
-import { isOnboardingCateringRoomReady } from "../../../_lib/onboarding-catering-ready";
+import {
+  getOnboardingCateringValidationMessage,
+  isOnboardingCateringRoomReady,
+  sanitizeOnboardingMenusForSubmit,
+} from "../../../_lib/onboarding-catering-ready";
 import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
@@ -61,6 +65,12 @@ import {
   menuItemTitlePlaceholder,
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/event-form-limits";
+import {
+  dedupeMenuCategoriesById,
+  ensureEventMenuCategoriesForRoom,
+  findMenuCategoryIdForMenus,
+  toPositiveId,
+} from "@/lib/event-menu-categories";
 
 // Define a type for the menu structure based on the schema
 type MenuType = {
@@ -70,19 +80,6 @@ type MenuType = {
 
 // Empty initial menus - moved outside component to prevent recreation on each render
 const emptyMenus: MenuType[] = [];
-
-/** Menu categories are event-level — dedupe by id so the dropdown never lists duplicates. */
-function dedupeMenuCategoriesById(
-  categories: EventMenuCategory[],
-): EventMenuCategory[] {
-  const byId = new Map<number, EventMenuCategory>();
-  for (const cat of categories) {
-    const id = Number(cat.id);
-    if (!Number.isFinite(id)) continue;
-    if (!byId.has(id)) byId.set(id, cat);
-  }
-  return Array.from(byId.values());
-}
 
 export default function StepSix() {
   const {
@@ -103,6 +100,7 @@ export default function StepSix() {
     useRoomManager();
   const previousRoomIndexRef = useRef(currentRoomIndex);
   const isRoomSwitchHydratingRef = useRef(false);
+  const linkingMenuCategoryRef = useRef<string | null>(null);
   const stepSixPersistedApproved = roomScope.isMultiRoom
     ? roomScope.persistedApproved
     : stepSixPersistedApprovedSingle === true;
@@ -116,8 +114,7 @@ export default function StepSix() {
 
   const activeRoomId = useMemo(() => {
     if (!roomScope.isMultiRoom) return undefined;
-    const id = Number(rooms[currentRoomIndex]?.id);
-    return Number.isFinite(id) && id > 0 ? id : undefined;
+    return toPositiveId(rooms[currentRoomIndex]?.id);
   }, [roomScope.isMultiRoom, rooms, currentRoomIndex]);
 
   const eventId = useEventId(globalForm, "stepSix");
@@ -142,10 +139,16 @@ export default function StepSix() {
       setLocalMenuCategories(dedupeMenuCategoriesById(eventMenuCategories));
       return;
     }
+    if (isMenuCategoriesLoading) return;
     if (roomScope.isMultiRoom) {
       setLocalMenuCategories([]);
     }
-  }, [eventMenuCategories, roomScope.isMultiRoom, activeRoomId]);
+  }, [
+    eventMenuCategories,
+    isMenuCategoriesLoading,
+    roomScope.isMultiRoom,
+    activeRoomId,
+  ]);
 
   const initialEventId = useEventId(globalForm, "stepSix");
   const activeScopedCatering = roomScope.isMultiRoom
@@ -183,10 +186,9 @@ export default function StepSix() {
       catering_option: globalForm.getValues("stepSix.catering_option") ?? 0,
       menu_title: globalForm.getValues("stepSix.menu_title"),
       menu_description: globalForm.getValues("stepSix.menu_description"),
-      event_menu_category_id: (() => {
-        const savedId = globalForm.getValues("stepSix.event_menu_category_id");
-        return savedId && !isNaN(Number(savedId)) ? Number(savedId) : undefined;
-      })(),
+      event_menu_category_id: toPositiveId(
+        globalForm.getValues("stepSix.event_menu_category_id"),
+      ),
       menus: filteredMenus.length > 0 ? filteredMenus : emptyMenus,
     },
     mode: "onChange",
@@ -258,6 +260,7 @@ export default function StepSix() {
       co: scoped.catering_option,
       mt: scoped.menu_title,
       md: scoped.menu_description,
+      cat: toPositiveId(scoped.event_menu_category_id) ?? 0,
     });
   }, [activeScopedCatering]);
 
@@ -288,10 +291,9 @@ export default function StepSix() {
           menu_title: outgoing.menu_title ?? "",
           menu_description: outgoing.menu_description ?? "",
           menus: (outgoing.menus as MenuType[]) ?? [],
-          event_menu_category_id:
-            typeof outgoing.event_menu_category_id === "number"
-              ? outgoing.event_menu_category_id
-              : undefined,
+          event_menu_category_id: toPositiveId(
+            outgoing.event_menu_category_id,
+          ),
         },
         { shouldValidate: false, shouldDirty: true },
       );
@@ -306,10 +308,7 @@ export default function StepSix() {
       catering_option: normalizeOnboardingCateringOption(scoped.catering_option),
       menu_title: scoped.menu_title ?? "",
       menu_description: scoped.menu_description ?? "",
-      event_menu_category_id:
-        typeof scoped.event_menu_category_id === "number"
-          ? scoped.event_menu_category_id
-          : undefined,
+      event_menu_category_id: toPositiveId(scoped.event_menu_category_id),
       menus:
         Array.isArray(scoped.menus) && scoped.menus.length > 0
           ? (scoped.menus as MenuType[])
@@ -336,25 +335,6 @@ export default function StepSix() {
       currentRoomIndex,
     ],
   );
-
-  const clearCateringMenuDetails = useCallback(() => {
-    form.setValue("menu_title", "", { shouldValidate: false });
-    form.setValue("menu_description", "", { shouldValidate: false });
-    form.setValue("menus", [], { shouldValidate: false });
-    form.setValue("event_menu_category_id", undefined, {
-      shouldValidate: false,
-    });
-    setScopedCateringField("menu_title", "");
-    setScopedCateringField("menu_description", "");
-    setScopedCateringField("menus", []);
-    setScopedCateringField("event_menu_category_id", undefined);
-    form.clearErrors([
-      "event_menu_category_id",
-      "menu_title",
-      "menu_description",
-      "menus",
-    ]);
-  }, [form, setScopedCateringField]);
 
   // Set showMenuSection based on catering_option value
   const cateringOption = form.watch("catering_option");
@@ -504,7 +484,7 @@ export default function StepSix() {
       showMenuSection
     ) {
       const selectedCategory = localMenuCategories.find(
-        (cat) => cat.id === Number(categoryId),
+        (cat) => Number(cat.id) === Number(categoryId),
       );
 
       if (selectedCategory) {
@@ -568,8 +548,11 @@ export default function StepSix() {
       return [...prev, category];
     });
 
-    form.setValue("event_menu_category_id", newCategory.id);
-    setScopedCateringField("event_menu_category_id", newCategory.id);
+    form.setValue("event_menu_category_id", toPositiveId(newCategory.id));
+    setScopedCateringField(
+      "event_menu_category_id",
+      toPositiveId(newCategory.id),
+    );
 
     const existingMenuIndex = (form.getValues("menus") || []).findIndex(
       (menu) =>
@@ -583,9 +566,92 @@ export default function StepSix() {
     }
   };
 
+  // AI onboarding hydrates menus (Starters/Mains/…) but can drop the backend
+  // category id (string ids, room-scoped GET). Relink so save is not blocked.
+  useEffect(() => {
+    if (!showMenuSection || isMenuCategoriesLoading) return;
+    if (roomScope.isMultiRoom && !activeRoomId) return;
+
+    const menus = form.getValues("menus") ?? [];
+    const hasNamedMenus = menus.some(
+      (menu) => String(menu?.name ?? "").trim().length > 0,
+    );
+    if (!hasNamedMenus) return;
+
+    const currentId = toPositiveId(form.getValues("event_menu_category_id"));
+    if (currentId != null) return;
+
+    const matchedId = findMenuCategoryIdForMenus(localMenuCategories, menus);
+    if (matchedId != null) {
+      form.setValue("event_menu_category_id", matchedId, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      setScopedCateringField("event_menu_category_id", matchedId);
+      return;
+    }
+
+    const eventIdForLink = getCurrentEventId();
+    if (eventIdForLink <= 0) return;
+
+    const healKey = `${eventIdForLink}:${activeRoomId ?? "event"}:${menus
+      .map((menu) => String(menu?.name ?? "").trim().toLowerCase())
+      .filter(Boolean)
+      .join("|")}`;
+    if (linkingMenuCategoryRef.current === healKey) return;
+    linkingMenuCategoryRef.current = healKey;
+
+    let cancelled = false;
+    void (async () => {
+      const createdId = await ensureEventMenuCategoriesForRoom(
+        eventIdForLink,
+        activeRoomId,
+        menus,
+      );
+      const linkedId = toPositiveId(createdId);
+      if (cancelled) return;
+      if (linkedId == null) {
+        linkingMenuCategoryRef.current = null;
+        return;
+      }
+
+      form.setValue("event_menu_category_id", linkedId, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      setScopedCateringField("event_menu_category_id", linkedId);
+      await queryClient.invalidateQueries({
+        queryKey: eventKeys.menuCategories(eventIdForLink, activeRoomId),
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    showMenuSection,
+    isMenuCategoriesLoading,
+    localMenuCategories,
+    roomScope.isMultiRoom,
+    activeRoomId,
+    form,
+    setScopedCateringField,
+    getCurrentEventId,
+    queryClient,
+  ]);
+
   const onSubmit = async (data: StepSixType, applyToAllRooms = false) => {
     setLoading(true);
     try {
+      if (data.catering_option === 1) {
+        const cateringError = getOnboardingCateringValidationMessage(data);
+        if (cateringError) {
+          toast.error(cateringError);
+          setLoading(false);
+          return;
+        }
+      }
+
       // Validate the form
       const isValid = await form.trigger();
       if (!isValid) {
@@ -602,6 +668,11 @@ export default function StepSix() {
           if (errors.menu_description) {
             errorMessages.push(errors.menu_description.message as string);
           }
+          if (errors.event_menu_category_id) {
+            errorMessages.push(
+              errors.event_menu_category_id.message as string,
+            );
+          }
           if (errors.menus) {
             errorMessages.push(errors.menus.message as string);
           }
@@ -610,8 +681,12 @@ export default function StepSix() {
         // Collect other field errors
         const otherErrorFields = Object.keys(errors).filter(
           (key) =>
-            !["menu_title", "menu_description", "menus"].includes(key) ||
-            data.catering_option !== 1,
+            ![
+              "menu_title",
+              "menu_description",
+              "menus",
+              "event_menu_category_id",
+            ].includes(key) || data.catering_option !== 1,
         );
 
         if (otherErrorFields.length > 0) {
@@ -638,6 +713,11 @@ export default function StepSix() {
         catering_option: data.catering_option,
       };
 
+      const sanitizedMenus =
+        data.catering_option === 1
+          ? sanitizeOnboardingMenusForSubmit(data.menus ?? [])
+          : [];
+
       // Only include menu data if catering option is Yes (1)
       if (data.catering_option === 1) {
         globalForm.setValue("stepSix", {
@@ -645,7 +725,7 @@ export default function StepSix() {
           menu_title: data.menu_title,
           menu_description: data.menu_description,
           event_menu_category_id: data.event_menu_category_id,
-          menus: data.menus || [],
+          menus: sanitizedMenus,
         });
       } else {
         // If No, only include the basic fields (no menu category)
@@ -662,7 +742,7 @@ export default function StepSix() {
               catering_option: data.catering_option,
               menu_title: data.menu_title,
               menu_description: data.menu_description,
-              menus: data.menus || [],
+              menus: sanitizedMenus,
               event_menu_category_id: data.event_menu_category_id,
               isApproved: true as const,
             }
@@ -728,7 +808,7 @@ export default function StepSix() {
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
-              Now Tell Us About Your Menu Options
+              Tell us about your menu options
             </OnboardingTitle>
           </CardHeader>
 
@@ -818,10 +898,17 @@ export default function StepSix() {
                                       "catering_option",
                                       numValue,
                                     );
-                                    // Only clear menu payload when the user explicitly chooses "No".
-                                    // Never auto-clear during hydration or room tab switches.
+                                    // Choosing "No" hides the menu section and the
+                                    // submit payload omits menus (see onSubmit). We keep
+                                    // the menu data in the form so toggling back to
+                                    // "Yes" restores it — only clear stale validation.
                                     if (numValue === 0) {
-                                      clearCateringMenuDetails();
+                                      form.clearErrors([
+                                        "event_menu_category_id",
+                                        "menu_title",
+                                        "menu_description",
+                                        "menus",
+                                      ]);
                                     }
                                   }}
                                   value={String(
@@ -871,7 +958,7 @@ export default function StepSix() {
                       {showMenuSection && (
                         <div className="my-6 border-t border-white/10 pt-6">
                           <OnboardingFieldGroupTitle className="mb-4">
-                            Menu Details
+                            Menu details
                           </OnboardingFieldGroupTitle>
 
                           <FormField
@@ -883,12 +970,12 @@ export default function StepSix() {
                               return (
                                 <FormItem>
                                   <FormLabel className="text-base font-medium">
-                                    Menu Title
+                                    Menu title
                                   </FormLabel>
                                   <FormControl>
                                     <Input
                                       {...field}
-                                      placeholder="e.g., The Menus"
+                                      placeholder="e.g. Our Menus"
                                       className="h-10 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
@@ -933,12 +1020,12 @@ export default function StepSix() {
                               return (
                                 <FormItem className="mt-4">
                                   <FormLabel className="text-base font-medium">
-                                    Menu Description
+                                    Menu description
                                   </FormLabel>
                                   <FormControl>
                                     <Input
                                       {...field}
-                                      placeholder="e.g., Select The Menus"
+                                      placeholder="e.g. Select from our menus"
                                       className="h-10 bg-white/5 border-white/10"
                                       maxLength={maxLength}
                                       onChange={(e) => {
@@ -977,8 +1064,12 @@ export default function StepSix() {
                           {/* Menu Category field */}
                           <FormItem className="mt-4">
                             <FormLabel className="text-base font-medium">
-                              Menu Category
+                              Menu category
                             </FormLabel>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              Create or select a category (e.g. Starters, Mains)
+                              first — menu items are saved under it.
+                            </p>
                             <Controller
                               control={form.control}
                               name="event_menu_category_id"
@@ -996,7 +1087,8 @@ export default function StepSix() {
                                       // Add the selected category to the menu items if it doesn't exist
                                       const selectedCategory =
                                         localMenuCategories.find(
-                                          (cat) => cat.id === Number(value),
+                                          (cat) =>
+                                            Number(cat.id) === Number(value),
                                         );
 
                                       if (selectedCategory) {
@@ -1020,11 +1112,7 @@ export default function StepSix() {
                                       }
                                     }}
                                     isLoading={isMenuCategoriesLoading}
-                                    initialValue={
-                                      typeof field.value === "number"
-                                        ? field.value
-                                        : undefined
-                                    }
+                                    initialValue={toPositiveId(field.value)}
                                     onCategoryCreated={
                                       handleMenuCategoryCreated
                                     }
@@ -1049,6 +1137,16 @@ export default function StepSix() {
                               </p>
                             )}
                           </FormItem>
+
+                          {menuFields.length > 0 &&
+                            toPositiveId(watchedMenuCategoryId) == null && (
+                              <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-500">
+                                These menu items aren&apos;t linked to a category
+                                yet. Create or select a menu category above
+                                before saving, otherwise they won&apos;t be
+                                stored.
+                              </p>
+                            )}
 
                           {menuFields.length === 0 &&
                             form.formState.errors.menus && (
@@ -1202,7 +1300,7 @@ export default function StepSix() {
                                                   <FormControl>
                                                     <Input
                                                       {...field}
-                                                      placeholder="e.g., Spicy chicken with basmati rice"
+                                                      placeholder="e.g. Spicy chicken with basmati rice"
                                                       className="h-10 bg-white/5 border-white/10"
                                                       maxLength={maxLen}
                                                       value={v}

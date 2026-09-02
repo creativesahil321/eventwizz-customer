@@ -1,24 +1,44 @@
 "use client";
 
-import { useContext } from "react";
+import { useContext, type ReactNode } from "react";
 import { motion } from "framer-motion";
+import { MapPin, Phone, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { SiteHeading } from "@/components/public/site-heading";
+import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
+import { useIsPreviewMode } from "@/contexts/preview-context";
+import {
+  usePreviewDeviceFramesEnabled,
+  usePreviewMobileLayout,
+} from "@/hooks/use-preview-narrow-layout";
 import {
   heroBandContentPadClass,
+  heroBandCopyPlacementClass,
+  heroBandCopyPlacementStyle,
   heroBandHeightClass,
   heroBandMediaOverlayClass,
-  heroBandVerticalClass,
+  heroBannerBodyClass,
+  heroBannerEyebrowClass,
+  heroBannerHeadingTypeClass,
   heroBannerStackClass,
-  heroBannerSubheadingClass,
+  heroBannerVenueContactClass,
+  heroBannerVenueContactLinksClass,
+  heroFooterDockClass,
+  heroHeadingMeasureClass,
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
+  previewMobileHeroHeightClass,
+  previewMobileHeroPadClass,
   type BannerHeadingAlign,
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
+import {
+  previewFlexOnlyUntilMd,
+} from "@/lib/preview-container-layout";
 // Default fallback media
 // const FALLBACK_VIDEO_URL =
 //   "https://www.bestpartiesever.com/wp-content/uploads/2025/03/Website-video-combined-edit-online-video-cutter.com-1.mp4";
@@ -38,7 +58,9 @@ const FALLBACK_VIDEO_URL =
 
 interface HeroBannerProps {
   locationName?: string;
+  /** `null` = cleared in editor Preview; `undefined` = use theme fallback */
   coverImage?: string | null;
+  /** `null` = cleared in editor Preview; `undefined` = use theme fallback */
   coverVideo?: string | null;
   bannerHeading?: string | null;
   bannerSubHeading?: string | null;
@@ -50,6 +72,20 @@ interface HeroBannerProps {
   bannerHeadingAlign?: BannerHeadingAlign | null;
   /** When set, overrides theme `banner_heading_valign` */
   bannerHeadingValign?: BannerHeadingValign | null;
+  /**
+   * Fixed chrome at the bottom of the hero (e.g. search).
+   * Rendered outside the heading stack so left/center/right + top/middle/bottom
+   * alignment never moves it.
+   */
+  heroFooter?: ReactNode;
+  /** Small-caps city / region above the title — never the brand/site name. */
+  eyebrow?: string | null;
+  /** Address, email, and phone under the description (location covers). */
+  heroContact?: {
+    address?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
 }
 
 export default function HeroBanner({
@@ -62,6 +98,9 @@ export default function HeroBanner({
   headingEmphasis,
   bannerHeadingAlign: bannerHeadingAlignProp,
   bannerHeadingValign: bannerHeadingValignProp,
+  heroFooter,
+  eyebrow,
+  heroContact,
 }: HeroBannerProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
   const vendorTheme = theme as ThemeSchema | null;
@@ -87,20 +126,38 @@ export default function HeroBanner({
         ? vendorTheme.banner_heading_accent.trim()
         : null;
 
-  // Media sources with priority: API cover_video > API cover_image > theme video > theme image > fallback video
-  const apiVideoUrl = coverVideo || null;
-  const apiImageUrl = coverImage || null;
+  // Media priority: explicit cover video → explicit cover image → theme video → theme image → fallback.
+  // `null` = intentional clear from Site Essentials Preview (do not resurrect theme media).
+  // `undefined` = prop omitted; theme may fill in (public site pages).
+  const videoExplicitlyCleared = coverVideo === null;
+  const imageExplicitlyCleared = coverImage === null;
+  const apiVideoUrl =
+    typeof coverVideo === "string" && coverVideo.trim() ? coverVideo : null;
+  const apiImageUrl =
+    typeof coverImage === "string" && coverImage.trim() ? coverImage : null;
   const themeVideoUrl = vendorTheme?.cover_video || null;
   const themeImageUrl = vendorTheme?.cover_image || null;
 
-  // Priority order: API video > API image > theme video > theme image > fallback video
-  const finalVideoUrl = apiVideoUrl || themeVideoUrl || FALLBACK_VIDEO_URL;
-  const finalImageUrl = apiImageUrl || themeImageUrl || DEFAULT_IMAGE_URL;
-  // Use video if API video exists, theme video exists, or no custom content at all
+  const hasApiVideo = Boolean(apiVideoUrl);
+  const hasApiImage = Boolean(apiImageUrl);
+  const hasThemeVideo = Boolean(themeVideoUrl) && !videoExplicitlyCleared;
+  const hasThemeImage = Boolean(themeImageUrl) && !imageExplicitlyCleared;
+
+  // Unsaved preview images must beat the live theme video (common Site Essentials case).
   const useVideo =
-    !!apiVideoUrl ||
-    !!themeVideoUrl ||
-    (!apiVideoUrl && !apiImageUrl && !themeVideoUrl && !themeImageUrl);
+    hasApiVideo ||
+    (!hasApiImage && hasThemeVideo) ||
+    (!hasApiVideo &&
+      !hasApiImage &&
+      !hasThemeVideo &&
+      !hasThemeImage &&
+      !videoExplicitlyCleared &&
+      !imageExplicitlyCleared);
+
+  const finalVideoUrl = apiVideoUrl || themeVideoUrl || FALLBACK_VIDEO_URL;
+  // LCP hero: deterministic URL (no time-based `?v=`) so SSR and client match and the
+  // <img>/preload is not re-downloaded after hydration (that swap is the flash).
+  const finalImageUrl = apiImageUrl || themeImageUrl || DEFAULT_IMAGE_URL;
 
   const textAlign = normalizeBannerHeadingAlign(
     bannerHeadingAlignProp !== undefined && bannerHeadingAlignProp !== null
@@ -112,21 +169,36 @@ export default function HeroBanner({
       ? bannerHeadingValignProp
       : vendorTheme?.banner_heading_valign,
   );
-  const stackClass = heroBannerStackClass(textAlign);
+  const hasContact = Boolean(
+    heroContact?.address?.trim() ||
+    heroContact?.email?.trim() ||
+    heroContact?.phone?.trim(),
+  );
+  /**
+   * Keep the search dock independent from hero copy placement. This prevents
+   * mobile and short-desktop previews from moving the search bar with the copy.
+   */
+  const isPreviewMobile = usePreviewMobileLayout();
+  const isPreview = useIsPreviewMode();
+  const previewFrames = usePreviewDeviceFramesEnabled();
+  /** Stack contact details in narrow device frames. */
+  const stackHeroContact = isPreviewMobile || (isPreview && previewFrames);
+  const showHeadingContact = hasContact && !heroFooter;
+  const showDockContact = hasContact && Boolean(heroFooter);
+  const previewAlign: BannerHeadingAlign = isPreviewMobile
+    ? "center"
+    : textAlign;
+  const previewAlignScope = { fromMd: !isPreviewMobile };
+  const copyValign =
+    isPreviewMobile && heroFooter ? "top" : heroValign;
 
   return (
     <section
       id="hero"
       className={cn(
-        "relative mx-auto flex w-full justify-center overflow-hidden",
+        "relative mx-auto w-full overflow-hidden",
         heroBandHeightClass,
-        heroBandVerticalClass(heroValign),
-        /*
-         * Left + center: stretch cross-axis so the block is full-width (row flex-col hero
-         * would otherwise shrink-wrap and center the column). Do NOT stretch for top/bottom
-         * valign — that overrides items-start/items-end and pins copy to the top of a tall box.
-         */
-        textAlign === "left" && heroValign === "center" && "!items-stretch",
+        isPreviewMobile && previewMobileHeroHeightClass,
       )}
     >
       {/* Video background if video URL exists and should be used */}
@@ -148,70 +220,213 @@ export default function HeroBanner({
         </div>
       )}
 
-      {/* Image background — slight scale for edge bleed */}
-      {!useVideo && (
+      {/* Image background — slight scale for edge bleed; optimized LCP cover */}
+      {!useVideo && finalImageUrl ? (
         <div className="absolute inset-0 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <HeroCoverImage
+            key={finalImageUrl}
             src={finalImageUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full scale-105 object-cover"
+            className="scale-105"
           />
           <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
         </div>
-      )}
-
-      {/* Soft brand gradient orbs */}
-      <div
-        className="pointer-events-none absolute left-1/4 top-20 h-96 w-96 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] blur-[120px]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute bottom-20 right-1/4 h-96 w-96 rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_12%,transparent)] blur-[100px]"
-        aria-hidden
-      />
+      ) : null}
 
       <div
         className={cn(
-          "relative z-10 max-w-7xl mx-auto w-full overflow-visible px-4",
-          heroBandContentPadClass(heroValign),
+          heroBandCopyPlacementClass(copyValign),
+          "max-w-7xl px-3 sm:px-4",
+          heroHeadingMeasureClass,
+          "@max-md/preview:!px-3",
+          heroBandContentPadClass(copyValign, {
+            withBottomChrome: Boolean(heroFooter),
+          }),
+          isPreviewMobile && heroFooter && previewMobileHeroPadClass,
         )}
+        style={heroBandCopyPlacementStyle(copyValign)}
       >
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className={cn(stackClass, "overflow-visible")}
+          className={cn(
+            heroBannerStackClass(previewAlign, previewAlignScope),
+            "min-h-0 max-h-full",
+          )}
         >
+          {eyebrow?.trim() &&
+          eyebrow.trim().toLowerCase() !==
+            bannerHeading.trim().toLowerCase() ? (
+            <p
+              className={heroBannerEyebrowClass(
+                previewAlign,
+                previewAlignScope,
+              )}
+            >
+              {eyebrow.trim()}
+            </p>
+          ) : null}
+
           <SiteHeading
             level={1}
             title={bannerHeading}
             accentHint={bannerAccentHint}
             emphasis={headingEmphasis}
             variant="onDark"
-            align={textAlign}
+            align={previewAlign}
+            alignFromMd={!isPreviewMobile}
             className={cn(
-              "mb-4 font-black !text-3xl !leading-[0.95] tracking-tight sm:!text-4xl md:!text-5xl lg:!text-6xl",
-              textAlign === "left"
-                ? "max-w-[min(100%,30rem)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl"
-                : "max-w-4xl",
+              "font-black tracking-tight",
+              heroBannerHeadingTypeClass,
+              previewAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
             )}
           />
 
-          {/* Sub-heading: wide-tracking small caps */}
           {bannerSubheading ? (
-            <p
-              className={cn(
-                "text-[11px] font-semibold uppercase tracking-[0.22em] text-white/65 sm:text-xs",
-                heroBannerSubheadingClass(textAlign),
-                "max-w-sm sm:max-w-md",
-              )}
-            >
+            <p className={heroBannerBodyClass(previewAlign, previewAlignScope)}>
               {bannerSubheading}
             </p>
           ) : null}
+
+          {showHeadingContact ? (
+            <div>
+              <HeroBannerContactMeta
+                contact={heroContact}
+                align={previewAlign}
+                stacked={stackHeroContact}
+                linksInline={!isPreviewMobile}
+              />
+            </div>
+          ) : null}
         </motion.div>
       </div>
+      {heroFooter ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
+          <div
+            className={cn(
+              "mx-auto w-full max-w-7xl px-3 pb-3 sm:px-4 sm:pb-5 md:pb-6",
+              "@max-md/preview:!px-2.5 @max-md/preview:!pb-3",
+              isPreviewMobile && "!px-2.5 !pb-3",
+            )}
+          >
+            <div
+              className={cn(
+                heroFooterDockClass(previewAlign),
+                "flex flex-col gap-3 sm:gap-3.5",
+                isPreviewMobile && "!gap-2.5",
+              )}
+            >
+              {showDockContact ? (
+                <div
+                  className={
+                    isPreviewMobile ? undefined : previewFlexOnlyUntilMd
+                  }
+                >
+                  <HeroBannerContactMeta
+                    contact={heroContact}
+                    align={previewAlign}
+                    stacked={stackHeroContact}
+                    linksInline={!isPreviewMobile}
+                  />
+                </div>
+              ) : null}
+              {heroFooter}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function HeroBannerContactMeta({
+  contact,
+  align,
+  stacked = false,
+  linksInline = false,
+}: {
+  contact?: HeroBannerProps["heroContact"];
+  align: BannerHeadingAlign;
+  stacked?: boolean;
+  /** When stacked, keep email + phone on one row (desktop/tablet preview). */
+  linksInline?: boolean;
+}) {
+  const address = contact?.address?.trim() || null;
+  const email = contact?.email?.trim() || null;
+  const phone = contact?.phone?.trim() || null;
+  if (!address && !email && !phone) return null;
+
+  return (
+    <div
+      className={cn(
+        heroBannerVenueContactClass(align, { fromMd: true }),
+        stacked &&
+          "!flex !w-fit !max-w-xl !flex-col !items-center !justify-center !gap-2 sm:!max-w-2xl",
+      )}
+    >
+      {address ? (
+        <HeroContactLine
+          href={buildMapsDirectionsUrl(address)}
+          external
+          icon={MapPin}
+          label={address}
+          block
+        />
+      ) : null}
+      {email || phone ? (
+        <div
+          className={cn(
+            heroBannerVenueContactLinksClass(align, { fromMd: true }),
+            stacked &&
+              (linksInline
+                ? "!flex !w-fit !max-w-full !flex-row !flex-wrap !items-center !justify-center !gap-x-5 !gap-y-1.5"
+                : "!flex !w-fit !max-w-full !flex-col !flex-nowrap !items-center !justify-center !gap-2"),
+          )}
+        >
+          {email ? (
+            <HeroContactLine
+              href={`mailto:${email}`}
+              icon={Mail}
+              label={email}
+            />
+          ) : null}
+          {phone ? (
+            <HeroContactLine href={`tel:${phone}`} icon={Phone} label={phone} />
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function HeroContactLine({
+  href,
+  icon: Icon,
+  label,
+  external = false,
+  block = false,
+}: {
+  href: string;
+  icon: typeof MapPin;
+  label: string;
+  external?: boolean;
+  block?: boolean;
+}) {
+  return (
+    <a
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      className={cn(
+        "inline-flex min-w-0 items-start gap-2 text-[13px] leading-snug text-white/90 transition-colors hover:text-white sm:text-sm @max-md/preview:!text-[13px]",
+        block
+          ? "max-w-full justify-center text-pretty"
+          : "w-auto max-w-full shrink-0",
+      )}
+    >
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
+      <span className="min-w-0 text-pretty [overflow-wrap:anywhere]">
+        {label}
+      </span>
+    </a>
   );
 }

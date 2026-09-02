@@ -25,9 +25,13 @@ import {
 } from "@/lib/event-form-limits";
 import {
   cleanVendorStepThreeDatesForForm,
+  cloneDateRowForDuplicate,
   findStepThreeDatesForRoom,
   hasMeaningfulVendorDates,
+  isVendorDateCancelled,
+  isVendorDateReadonlyCancelled,
   normalizeVendorStepThreeRooms,
+  shouldUseCancelDateAction,
   syncStepThreeRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
 import { eventKeys as vendorEventDetailKeys } from "../../../_lib/hooks/useEventData";
@@ -40,15 +44,9 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   PlusCircle,
   Trash2,
@@ -417,6 +415,8 @@ export default function DatesTab() {
   const requestCancelDate = useCallback(
     (dateIndex: number) => {
       if (readOnly) return;
+      const dateRow = watch(`dates.${dateIndex}`);
+      if (isVendorDateReadonlyCancelled(dateRow)) return;
       const existingReason = watch(`dates.${dateIndex}.cancel_reason`) || "";
       setTargetCancelDateIndex(dateIndex);
       setCancelReasonText(existingReason);
@@ -445,85 +445,62 @@ export default function DatesTab() {
     toast.info("Date marked as cancelled. Save the form to apply.");
   }, [targetCancelDateIndex, cancelReasonText, setValue]);
 
-  // Update dates when booking type changes for a specific date
+  // Update the selected booking options without discarding the inactive option.
   const updateDate = useCallback(
     (dateIndex: number, bookingType: "tickets" | "tables" | "both") => {
       const currentDate = watch(`dates.${dateIndex}`);
+      const ticketsEnabled = bookingType === "tickets" || bookingType === "both";
+      const tablesEnabled = bookingType === "tables" || bookingType === "both";
 
-      // Update tickets/tables arrays based on the booking type
-      if (bookingType === "tickets") {
+      const currentTickets = currentDate.tickets ?? [];
+      const currentTables = currentDate.tables ?? [];
+
+      if (ticketsEnabled) {
         setValue(
           `dates.${dateIndex}.total_ticket_types`,
-          currentDate.tickets?.length || 1,
+          currentTickets.length || 1,
         );
-        setValue(`dates.${dateIndex}.total_table_types`, 0);
 
-        // Make sure we have at least one ticket
-        if (!currentDate.tickets || currentDate.tickets.length === 0) {
+        if (currentTickets.length === 0) {
           setValue(`dates.${dateIndex}.tickets`, [
             { title: "", description: "", total_capacity: "", price: "" },
           ]);
         }
-
-        // Clear tables and payment fields for tickets-only
-        setValue(`dates.${dateIndex}.tables`, []);
-        setValue(`dates.${dateIndex}.payment_type`, undefined);
-        setValue(`dates.${dateIndex}.is_deposit_enabled`, undefined);
-        setValue(`dates.${dateIndex}.deposit_type`, undefined);
-        setValue(`dates.${dateIndex}.deposit_value`, undefined);
-        setValue(`dates.${dateIndex}.deposit_due_date`, undefined);
-      } else if (bookingType === "tables") {
-        setValue(`dates.${dateIndex}.total_ticket_types`, 0);
-        setValue(
-          `dates.${dateIndex}.total_table_types`,
-          currentDate.tables?.length || 1,
-        );
-
-        // Make sure we have at least one table
-        if (!currentDate.tables || currentDate.tables.length === 0) {
-          setValue(`dates.${dateIndex}.tables`, [
-            { min_persons: "", max_persons: "", price: "", total_tables: "" },
-          ]);
-        }
-
-        // Clear tickets and set default payment fields for tables
-        setValue(`dates.${dateIndex}.tickets`, []);
-        setValue(`dates.${dateIndex}.payment_type`, "full");
-        setValue(`dates.${dateIndex}.is_deposit_enabled`, false);
-        setValue(`dates.${dateIndex}.deposit_type`, "amount");
-        setValue(`dates.${dateIndex}.deposit_value`, "");
-        setValue(`dates.${dateIndex}.deposit_due_date`, "");
       } else {
-        // both
         setValue(
           `dates.${dateIndex}.total_ticket_types`,
-          currentDate.tickets?.length || 1,
+          currentTickets.length,
         );
+      }
+
+      if (tablesEnabled) {
         setValue(
           `dates.${dateIndex}.total_table_types`,
-          currentDate.tables?.length || 1,
+          currentTables.length || 1,
         );
 
-        // Make sure we have at least one ticket
-        if (!currentDate.tickets || currentDate.tickets.length === 0) {
-          setValue(`dates.${dateIndex}.tickets`, [
-            { title: "", description: "", total_capacity: "", price: "" },
-          ]);
-        }
-
-        // Make sure we have at least one table
-        if (!currentDate.tables || currentDate.tables.length === 0) {
+        if (currentTables.length === 0) {
           setValue(`dates.${dateIndex}.tables`, [
             { min_persons: "", max_persons: "", price: "", total_tables: "" },
           ]);
         }
 
-        // Set default payment fields for both
-        setValue(`dates.${dateIndex}.payment_type`, "full");
-        setValue(`dates.${dateIndex}.is_deposit_enabled`, false);
-        setValue(`dates.${dateIndex}.deposit_type`, "amount");
-        setValue(`dates.${dateIndex}.deposit_value`, "");
-        setValue(`dates.${dateIndex}.deposit_due_date`, "");
+        if (!currentDate.payment_type) {
+          setValue(`dates.${dateIndex}.payment_type`, "full");
+          setValue(`dates.${dateIndex}.is_deposit_enabled`, false);
+          setValue(`dates.${dateIndex}.deposit_type`, "amount");
+          setValue(`dates.${dateIndex}.deposit_value`, "");
+          setValue(`dates.${dateIndex}.deposit_due_date`, "");
+        }
+      } else {
+        setValue(
+          `dates.${dateIndex}.total_ticket_types`,
+          currentTickets.length,
+        );
+        setValue(
+          `dates.${dateIndex}.total_table_types`,
+          currentTables.length,
+        );
       }
     },
     [watch, setValue],
@@ -582,7 +559,7 @@ export default function DatesTab() {
 
   // Create custom field arrays for tickets - now checks individual date's booking type
   const createTicketFields = useCallback(
-    (dateIndex: number) => {
+    (dateIndex: number, locked = false) => {
       const dateBookingType = watch(`dates.${dateIndex}.booking_type`);
 
       if (dateBookingType !== "tickets" && dateBookingType !== "both")
@@ -592,30 +569,33 @@ export default function DatesTab() {
         <>
           <div className="text-lg font-semibold mb-4">Ticket Information</div>
           <div className="mt-6 bg-gray-50 rounded-lg p-4 sm:p-5">
-            <div className="flex justify-end items-center">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const tickets = watch(`dates.${dateIndex}.tickets`) || [];
-                  setValue(`dates.${dateIndex}.tickets`, [
-                    ...tickets,
-                    {
-                      title: "",
-                      description: "",
-                      total_capacity: "",
-                      price: "",
-                      status: true,
-                    },
-                  ]);
-                }}
-                className="bg-white hover:bg-gray-100 w-full sm:w-auto"
-              >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add Ticket
-              </Button>
-            </div>
+            {!locked && (
+              <div className="flex justify-end items-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={readOnly}
+                  onClick={() => {
+                    const tickets = watch(`dates.${dateIndex}.tickets`) || [];
+                    setValue(`dates.${dateIndex}.tickets`, [
+                      ...tickets,
+                      {
+                        title: "",
+                        description: "",
+                        total_capacity: "",
+                        price: "",
+                        status: true,
+                      },
+                    ]);
+                  }}
+                  className="bg-white hover:bg-gray-100 w-full sm:w-auto"
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Add Ticket
+                </Button>
+              </div>
+            )}
 
             <div className="mt-4 space-y-4">
               {watch(`dates.${dateIndex}.tickets`)?.map(
@@ -645,6 +625,7 @@ export default function DatesTab() {
                                 <Switch
                                   checked={field.value ?? true}
                                   onCheckedChange={field.onChange}
+                                  disabled={locked || readOnly}
                                   className="data-[state=checked]:bg-green-500"
                                 />
                               </FormControl>
@@ -652,32 +633,35 @@ export default function DatesTab() {
                           )}
                         />
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => {
-                          const tickets =
-                            watch(`dates.${dateIndex}.tickets`) || [];
-                          if (tickets.length > 1) {
-                            const updatedTickets = tickets.filter(
-                              (_: unknown, i: number) => i !== ticketIndex,
-                            );
-                            setValue(
-                              `dates.${dateIndex}.tickets`,
-                              updatedTickets,
-                            );
-                            setValue(
-                              `dates.${dateIndex}.total_ticket_types`,
-                              updatedTickets.length,
-                            );
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Remove</span>
-                      </Button>
+                      {!locked && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={readOnly}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            const tickets =
+                              watch(`dates.${dateIndex}.tickets`) || [];
+                            if (tickets.length > 1) {
+                              const updatedTickets = tickets.filter(
+                                (_: unknown, i: number) => i !== ticketIndex,
+                              );
+                              setValue(
+                                `dates.${dateIndex}.tickets`,
+                                updatedTickets,
+                              );
+                              setValue(
+                                `dates.${dateIndex}.total_ticket_types`,
+                                updatedTickets.length,
+                              );
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          <span className="hidden sm:inline">Remove</span>
+                        </Button>
+                      )}
                     </div>
 
                     <FormField
@@ -738,7 +722,7 @@ export default function DatesTab() {
                               Total Tickets
                               {soldTickets > 0 && (
                                 <span className="text-xs text-gray-500 ml-2">
-                                  (Min: {soldTickets} sold)
+                                  (Minimum: {soldTickets} sold)
                                 </span>
                               )}
                             </FormLabel>
@@ -805,7 +789,7 @@ export default function DatesTab() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-md font-medium">
-                            Price/Person
+                            Price per person
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -847,12 +831,12 @@ export default function DatesTab() {
         </>
       );
     },
-    [control, watch, setValue, setError, trigger],
+    [control, watch, setValue, setError, trigger, readOnly],
   );
 
   // Create custom field arrays for tables - now checks individual date's booking type
   const createTableFields = useCallback(
-    (dateIndex: number) => {
+    (dateIndex: number, locked = false) => {
       const dateBookingType = watch(`dates.${dateIndex}.booking_type`);
 
       if (dateBookingType !== "tables" && dateBookingType !== "both")
@@ -862,28 +846,31 @@ export default function DatesTab() {
         <div className="mt-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
             <div className="text-lg font-semibold">Table Information</div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-              onClick={() => {
-                const tables = watch(`dates.${dateIndex}.tables`) || [];
-                setValue(`dates.${dateIndex}.tables`, [
-                  ...tables,
-                  {
-                    min_persons: "",
-                    max_persons: "",
-                    price: "",
-                    total_tables: "",
-                    status: true,
-                  },
-                ]);
-              }}
-            >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Add Table
-            </Button>
+            {!locked && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={readOnly}
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  const tables = watch(`dates.${dateIndex}.tables`) || [];
+                  setValue(`dates.${dateIndex}.tables`, [
+                    ...tables,
+                    {
+                      min_persons: "",
+                      max_persons: "",
+                      price: "",
+                      total_tables: "",
+                      status: true,
+                    },
+                  ]);
+                }}
+              >
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Add Table
+              </Button>
+            )}
           </div>
 
           <div className="mt-4">
@@ -913,6 +900,7 @@ export default function DatesTab() {
                               <Switch
                                 checked={field.value ?? true}
                                 onCheckedChange={field.onChange}
+                                disabled={locked || readOnly}
                                 className="data-[state=checked]:bg-green-500"
                               />
                             </FormControl>
@@ -920,28 +908,31 @@ export default function DatesTab() {
                         )}
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        const tables = watch(`dates.${dateIndex}.tables`) || [];
-                        if (tables.length > 1) {
-                          const updatedTables = tables.filter(
-                            (_: unknown, i: number) => i !== tableIndex,
-                          );
-                          setValue(`dates.${dateIndex}.tables`, updatedTables);
-                          setValue(
-                            `dates.${dateIndex}.total_table_types`,
-                            updatedTables.length,
-                          );
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      <span className="hidden sm:inline">Remove</span>
-                    </Button>
+                    {!locked && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={readOnly}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          const tables = watch(`dates.${dateIndex}.tables`) || [];
+                          if (tables.length > 1) {
+                            const updatedTables = tables.filter(
+                              (_: unknown, i: number) => i !== tableIndex,
+                            );
+                            setValue(`dates.${dateIndex}.tables`, updatedTables);
+                            setValue(
+                              `dates.${dateIndex}.total_table_types`,
+                              updatedTables.length,
+                            );
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Remove</span>
+                      </Button>
+                    )}
                   </div>
 
                   <FormField
@@ -949,7 +940,7 @@ export default function DatesTab() {
                     name={`dates.${dateIndex}.tables.${tableIndex}.min_persons`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Min People/Table</FormLabel>
+                        <FormLabel>Minimum people per table</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -1023,7 +1014,7 @@ export default function DatesTab() {
                     name={`dates.${dateIndex}.tables.${tableIndex}.max_persons`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Max People/Table</FormLabel>
+                        <FormLabel>Maximum people per table</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -1097,7 +1088,7 @@ export default function DatesTab() {
                     name={`dates.${dateIndex}.tables.${tableIndex}.price`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Price/Person</FormLabel>
+                        <FormLabel>Price per person</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -1150,7 +1141,7 @@ export default function DatesTab() {
                             Total Tables
                             {soldTables > 0 && (
                               <span className="text-xs text-gray-500 ml-2">
-                                (Min: {soldTables} sold)
+                                (Minimum: {soldTables} sold)
                               </span>
                             )}
                           </FormLabel>
@@ -1218,16 +1209,26 @@ export default function DatesTab() {
         </div>
       );
     },
-    [control, watch, setValue, setError, trigger],
+    [control, watch, setValue, setError, trigger, readOnly],
   );
 
   const renderDateFields = useCallback(
     (dateIndex: number, dateRowId: string) => {
       const isOpen = openDateRowIds.includes(dateRowId);
+      const dateRow = watch(`dates.${dateIndex}`);
+      const isCancelled = isVendorDateCancelled(dateRow);
+      const isReadonlyCancelled = isVendorDateReadonlyCancelled(dateRow);
+      const dateLocked = isCancelled || readOnly;
+      const cancelReason = String(dateRow?.cancel_reason ?? "").trim();
+
       return (
         <div
           key={dateRowId}
-          className="border border-gray-200 rounded-lg mb-6 bg-white shadow-sm hover:shadow-md transition-all"
+          className={`border rounded-lg mb-6 bg-white shadow-sm hover:shadow-md transition-all ${
+            isCancelled
+              ? "border-red-200 bg-red-50/30"
+              : "border-gray-200"
+          }`}
         >
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 p-4 sm:p-5 border-b border-gray-100">
             <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
@@ -1252,14 +1253,9 @@ export default function DatesTab() {
                   <span className="truncate">
                     {formatDateDisplay(watch(`dates.${dateIndex}.event_date`))}
                   </span>
-                  {watch(`dates.${dateIndex}.cancelled`) && (
+                  {isCancelled && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200 shrink-0">
                       Cancelled
-                    </span>
-                  )}
-                  {watch(`dates.${dateIndex}.cancellation_request_pending`) && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
-                      Pending admin
                     </span>
                   )}
                 </span>
@@ -1267,42 +1263,29 @@ export default function DatesTab() {
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
               {(() => {
-                const cancellationPending = watch(
-                  `dates.${dateIndex}.cancellation_request_pending`,
-                );
-                const useCancelAction =
-                  watch(`dates.${dateIndex}.use_cancel_date_action`) === true;
-                const hasFinancial =
-                  watch(`dates.${dateIndex}.has_financial_bookings`) === true;
-                const hasBookings =
-                  watch(`dates.${dateIndex}.has_bookings`) === true;
-                const showCancelDateFlow =
-                  useCancelAction || hasFinancial || hasBookings;
-
-                if (cancellationPending) {
+                // Persisted cancelled dates: no remove / cancel / reactivate.
+                if (isReadonlyCancelled) {
                   return null;
                 }
 
-                if (showCancelDateFlow) {
+                if (shouldUseCancelDateAction(dateRow)) {
                   return (
                     <Button
                       type="button"
                       variant="outline"
                       disabled={readOnly}
                       className={
-                        watch(`dates.${dateIndex}.cancelled`)
+                        isCancelled
                           ? "border-gray-400 text-gray-500 hover:bg-gray-50 w-full sm:w-auto"
                           : "border-red-500 text-red-600 hover:bg-red-50 w-full sm:w-auto"
                       }
                       size="sm"
                       onClick={() => {
-                        const isCancelled = watch(
-                          `dates.${dateIndex}.cancelled`,
-                        );
                         if (!isCancelled) {
                           requestCancelDate(dateIndex);
                           return;
                         }
+                        // Pending cancel only — never reactivate server-cancelled dates.
                         setValue(`dates.${dateIndex}.cancelled`, false);
                         setValue(`dates.${dateIndex}.cancel_reason`, "");
                         toast.info("Date cancellation undone.");
@@ -1310,9 +1293,7 @@ export default function DatesTab() {
                     >
                       <XCircle className="h-4 w-4 mr-2" />
                       <span>
-                        {watch(`dates.${dateIndex}.cancelled`)
-                          ? "Undo Cancel"
-                          : "Cancel Date"}
+                        {isCancelled ? "Undo cancellation" : "Cancel date"}
                       </span>
                     </Button>
                   );
@@ -1322,7 +1303,7 @@ export default function DatesTab() {
                   <Button
                     type="button"
                     variant="destructive"
-                    disabled={readOnly}
+                    disabled={readOnly || isCancelled}
                     className="text-destructive hover:text-white bg-destructive/10 w-full sm:w-auto"
                     size="sm"
                     onClick={() => {
@@ -1341,8 +1322,17 @@ export default function DatesTab() {
             </div>
           </div>
 
+          {isCancelled && cancelReason && (
+            <div className="px-4 sm:px-5 pt-3 text-sm text-red-700/90">
+              Reason: {cancelReason}
+            </div>
+          )}
+
           {isOpen && (
-            <div className="p-4 sm:p-5">
+            <fieldset
+              disabled={dateLocked}
+              className="p-4 sm:p-5 disabled:opacity-80 min-w-0 border-0 m-0"
+            >
               <div className="grid grid-cols-1 gap-4 sm:gap-5 mb-4">
                 <FormField
                   control={control}
@@ -1360,6 +1350,7 @@ export default function DatesTab() {
                             ref={field.ref}
                             value={field.value ?? ""}
                             min={getTodayDateString()}
+                            disabled={dateLocked}
                             className="w-full h-10 sm:h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                             onValueCommit={(newDate) =>
                               commitEventDate(dateIndex, newDate)
@@ -1380,45 +1371,138 @@ export default function DatesTab() {
                   )}
                 />
 
-                {/* Booking type dropdown for each date */}
+                {/* Booking options for each date */}
                 <FormField
                   control={control}
                   name={`dates.${dateIndex}.booking_type`}
-                  render={({ field }) => (
-                    <FormItem className="w-full">
-                      <FormLabel className="text-sm sm:text-md font-medium">
-                        Is it a ticketed or seated event?
-                      </FormLabel>
-                      <FormControl>
-                        <Select
-                          value={field.value}
-                          onValueChange={(
-                            value: "tickets" | "tables" | "both",
-                          ) => {
-                            field.onChange(value);
-                            // Update the date structure based on the new booking type
-                            updateDate(dateIndex, value);
-                          }}
-                        >
-                          <SelectTrigger className="w-full h-10 sm:h-12 bg-[#F9FAFB] border-[#E5E7EB] text-sm sm:text-base">
-                            <SelectValue placeholder="Select booking type" />
-                          </SelectTrigger>
-                          <SelectContent className="w-full">
-                            <SelectItem value="tickets">Tickets</SelectItem>
-                            <SelectItem value="tables">Tables</SelectItem>
-                            <SelectItem value="both">Both</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const ticketsSelected =
+                      field.value === "tickets" || field.value === "both";
+                    const tablesSelected =
+                      field.value === "tables" || field.value === "both";
+                    const soldTickets = (dateRow.tickets ?? []).reduce(
+                      (total, ticket) => total + Number(ticket.sold_tickets ?? 0),
+                      0,
+                    );
+                    const soldTables = (dateRow.tables ?? []).reduce(
+                      (total, table) => total + Number(table.sold_tables ?? 0),
+                      0,
+                    );
+
+                    const toggleBookingOption = (
+                      option: "tickets" | "tables",
+                      checked: boolean,
+                    ) => {
+                      const nextTicketsSelected =
+                        option === "tickets" ? checked : ticketsSelected;
+                      const nextTablesSelected =
+                        option === "tables" ? checked : tablesSelected;
+
+                      if (!nextTicketsSelected && !nextTablesSelected) {
+                        toast.error(
+                          "Select Tickets, Tables, or both booking options.",
+                        );
+                        return;
+                      }
+
+                      const nextBookingType =
+                        nextTicketsSelected && nextTablesSelected
+                          ? "both"
+                          : nextTicketsSelected
+                            ? "tickets"
+                            : "tables";
+                      field.onChange(nextBookingType);
+                      updateDate(dateIndex, nextBookingType);
+                    };
+
+                    return (
+                      <FormItem className="w-full">
+                        <FormLabel className="text-sm sm:text-md font-medium">
+                          Booking options
+                        </FormLabel>
+                        <FormControl>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {[
+                              {
+                                id: `booking-tickets-${dateIndex}`,
+                                label: "Tickets",
+                                description: "Sell individual guest tickets",
+                                checked: ticketsSelected,
+                                soldCount: soldTickets,
+                                option: "tickets" as const,
+                              },
+                              {
+                                id: `booking-tables-${dateIndex}`,
+                                label: "Tables",
+                                description: "Sell table bookings",
+                                checked: tablesSelected,
+                                soldCount: soldTables,
+                                option: "tables" as const,
+                              },
+                            ].map((bookingOption) => (
+                              <label
+                                key={bookingOption.option}
+                                htmlFor={bookingOption.id}
+                                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                                  bookingOption.checked
+                                    ? "border-blue-500 bg-blue-50"
+                                    : "border-gray-200 bg-white hover:border-blue-300"
+                                } ${
+                                  dateLocked
+                                    ? "cursor-not-allowed opacity-70"
+                                    : ""
+                                }`}
+                              >
+                                <Checkbox
+                                  id={bookingOption.id}
+                                  checked={bookingOption.checked}
+                                  disabled={dateLocked}
+                                  onCheckedChange={(checked) =>
+                                    toggleBookingOption(
+                                      bookingOption.option,
+                                      checked === true,
+                                    )
+                                  }
+                                  aria-label={bookingOption.label}
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold text-gray-800">
+                                    {bookingOption.label}
+                                  </span>
+                                  <span className="block text-xs text-gray-500">
+                                    {bookingOption.description}
+                                  </span>
+                                  {bookingOption.soldCount > 0 && (
+                                    <span className="mt-1 block text-xs font-medium text-amber-700">
+                                      {bookingOption.soldCount} already booked
+                                    </span>
+                                  )}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </FormControl>
+                        {(soldTickets > 0 || soldTables > 0) && (
+                          <p className="text-xs text-amber-700">
+                            Existing bookings are preserved when you change
+                            visibility. Check the selected option before
+                            saving a live event.
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          Select one or both. Existing ticket and table settings
+                          are preserved when you change these options.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 
               {/* Tickets/Tables based on booking type */}
-              {createTicketFields(dateIndex)}
-              {createTableFields(dateIndex)}
+              {createTicketFields(dateIndex, isCancelled)}
+              {createTableFields(dateIndex, isCancelled)}
 
               {/* Payment & Display Settings section - only show for tables/both booking types */}
               {(watch(`dates.${dateIndex}.booking_type`) === "tables" ||
@@ -1446,6 +1530,7 @@ export default function DatesTab() {
                               <FormControl>
                                 <RadioGroup
                                   value={field.value}
+                                  disabled={dateLocked}
                                   onValueChange={(
                                     value: "full" | "deposit",
                                   ) => {
@@ -1465,22 +1550,14 @@ export default function DatesTab() {
                                   }}
                                   className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-4 pt-2"
                                 >
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <RadioGroupItem value="full" />
-                                    </FormControl>
-                                    <Label className="font-normal cursor-pointer">
-                                      Full Payment
-                                    </Label>
-                                  </FormItem>
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <RadioGroupItem value="deposit" />
-                                    </FormControl>
-                                    <Label className="font-normal cursor-pointer">
-                                      Deposit
-                                    </Label>
-                                  </FormItem>
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <RadioGroupItem value="full" />
+                                    <span className="font-normal">Full payment</span>
+                                  </label>
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <RadioGroupItem value="deposit" />
+                                    <span className="font-normal">Deposit</span>
+                                  </label>
                                 </RadioGroup>
                               </FormControl>
                               <FormMessage />
@@ -1505,6 +1582,7 @@ export default function DatesTab() {
                                 <FormControl>
                                   <RadioGroup
                                     value={field.value ?? "amount"}
+                                    disabled={dateLocked}
                                     onValueChange={(
                                       value: "amount" | "percentage",
                                     ) => {
@@ -1519,22 +1597,14 @@ export default function DatesTab() {
                                     }}
                                     className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-4 pt-2"
                                   >
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                      <FormControl>
-                                        <RadioGroupItem value="amount" />
-                                      </FormControl>
-                                      <Label className="font-normal cursor-pointer">
-                                        Fixed Amount
-                                      </Label>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                      <FormControl>
-                                        <RadioGroupItem value="percentage" />
-                                      </FormControl>
-                                      <Label className="font-normal cursor-pointer">
-                                        Percentage
-                                      </Label>
-                                    </FormItem>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                      <RadioGroupItem value="amount" />
+                                      <span className="font-normal">Fixed amount</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                      <RadioGroupItem value="percentage" />
+                                      <span className="font-normal">Percentage</span>
+                                    </label>
                                   </RadioGroup>
                                 </FormControl>
                                 <FormMessage />
@@ -1553,8 +1623,8 @@ export default function DatesTab() {
                                     {watch(
                                       `dates.${dateIndex}.deposit_type`,
                                     ) === "amount"
-                                      ? "Deposit Amount/Person"
-                                      : "Deposit Percentage (%)"}
+                                      ? "Deposit amount per person"
+                                      : "Deposit percentage (%)"}
                                   </FormLabel>
                                   <FormControl>
                                     <Input
@@ -1671,32 +1741,30 @@ export default function DatesTab() {
                 </>
               )}
 
-              {/* Duplicate Date Button */}
-              <div className="flex justify-end mt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={readOnly}
-                  className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
-                  onClick={() => {
-                    const currentDate = watch(`dates.${dateIndex}`);
-                    const duplicable = { ...currentDate };
-                    delete (duplicable as { id?: number }).id;
-                    append({
-                      ...duplicable,
-                      event_date: "",
-                    });
-                    toast.success(
-                      "Date duplicated! Please set a new event date.",
-                    );
-                  }}
-                >
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Duplicate
-                </Button>
-              </div>
-            </div>
+              {/* Duplicate Date Button — not for cancelled dates */}
+              {!isCancelled && (
+                <div className="flex justify-end mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={readOnly}
+                    className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
+                    onClick={() => {
+                      append(
+                        cloneDateRowForDuplicate(watch(`dates.${dateIndex}`)),
+                      );
+                      toast.success(
+                        "Date duplicated. Please set a new event date.",
+                      );
+                    }}
+                  >
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Duplicate
+                  </Button>
+                </div>
+              )}
+            </fieldset>
           )}
         </div>
       );
@@ -1735,7 +1803,7 @@ export default function DatesTab() {
         globalForm.getValues().stepOne?.vendor_location_id;
       if (!vendor_location_id || vendor_location_id < 1) {
         toast.error(
-          "Select a venue location in event basics (step 1) before saving dates.",
+          "Select a venue location in the Event name step before saving dates.",
         );
         return;
       }
@@ -2036,7 +2104,7 @@ export default function DatesTab() {
                   setCancelReasonError(null);
                 }
               }}
-              placeholder="Example: Venue maintenance issue, weather advisory, or operational constraint."
+              placeholder="Example: Venue maintenance, weather warning, or operational constraint."
               rows={4}
               disabled={readOnly}
             />

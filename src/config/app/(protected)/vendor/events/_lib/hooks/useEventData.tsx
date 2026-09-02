@@ -29,14 +29,26 @@ const EVENT_DATA_CHANGED = "event-data-changed";
 
 /** One listener for the whole app — avoids N refetches when N components use `useEventData`. */
 let eventDataChangedSubscribers = 0;
-let eventDataChangedHandler: (() => void) | null = null;
+let eventDataChangedHandler: ((event: Event) => void) | null = null;
 
 function attachEventDataChangedListener(qc: QueryClient) {
   eventDataChangedSubscribers++;
   if (eventDataChangedSubscribers !== 1) return;
 
-  eventDataChangedHandler = () => {
-    void qc.invalidateQueries({ queryKey: eventKeys.all });
+  eventDataChangedHandler = (event: Event) => {
+    const changedEventId = (
+      event as CustomEvent<{ eventId?: string } | undefined>
+    ).detail?.eventId;
+
+    // Prefer scoped invalidation so editing event A cannot rehydrate/wipe event B
+    // (e.g. original vs location-duplicate open in another tab/cache).
+    if (changedEventId) {
+      void qc.invalidateQueries({
+        queryKey: eventKeys.data(changedEventId),
+      });
+    } else {
+      void qc.invalidateQueries({ queryKey: eventKeys.all });
+    }
     void qc.invalidateQueries({ queryKey: vendorEventsListKeys.lists() });
   };
   window.addEventListener(EVENT_DATA_CHANGED, eventDataChangedHandler);

@@ -2,9 +2,37 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   KNOWLEDGE_BASE,
   CHAT_INSTRUCTIONS,
+  getVendorStorefrontChatInstructions,
+  VENDOR_STOREFRONT_KNOWLEDGE,
+  PLATFORM_VENDOR_CUSTOMER_TRAINING,
 } from "@/services/common/ai/knowledge-base";
+import { buildCurrentPagePromptBlock } from "@/lib/chat-page-context";
+import { getAllowedNavLinksForPrompt } from "@/lib/chat-nav-links";
+import {
+  buildVendorLiveStatsPromptBlock,
+  type VendorChatLiveStats,
+} from "@/lib/chat-vendor-live-stats";
+import { buildCompactLiveEventsPromptBlock, buildLiveEventsPromptBlock } from "@/lib/chat-live-events";
+import type { LiveEvent } from "@/types/theme.types";
+import {
+  buildBookingConciergeInstructions,
+  buildEventBookingPromptBlock,
+  type ChatEventBookingBrief,
+} from "@/lib/chat-event-booking";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import {
+  AI_HIDE_REASONING,
+  toUserFacingChatReply,
+} from "../lib/extract-json";
+import {
+  aiRuntimeFailureMeta,
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
+import {
+  buildChatSafetyReply,
+  classifyChatSafetyIntent,
+} from "@/lib/chat-safety";
 
 /**
  * Get condensed knowledge base to reduce token count
@@ -27,6 +55,7 @@ function getCondensedKnowledgeBase(): string {
     "Checkout & Booking System",
     "Onboarding Process",
     "Common User Questions & Solutions",
+    "Site Essentials",
   ];
 
   let condensed = "";
@@ -41,65 +70,194 @@ function getCondensedKnowledgeBase(): string {
     }
   }
 
-  // Add condensed versions of other important info
+  // Authoritative training (prefer when older sections conflict)
   condensed += `
+## Authoritative product training (prefer this)
+${PLATFORM_VENDOR_CUSTOMER_TRAINING}
+
 ## Quick Reference
-- Roles: admin (platform management), vendor (venue/event management), customer (booking)
-- Partner: White-label deployment (same code, custom branding via 4 env vars)
-- Admin after login: Straight to Dashboard (no welcome step). Sidebar: Dashboard, All Venues, Transaction History, Notifications, Commission Overview, Manage Roles, Staff Management, Email Template, Site Essentials, Marketing Analytics, System Logs, Support, Referrals, Sales & Marketing, Seo Tools, Dispute Resolution Centre. Payment Settings = profile (top right) → Settings → Payment Settings. Manage a venue: All Venues → click venue → venue detail (domain approval, login as venue, reset password, edit, comments).
-- Onboarding: 11 steps — Venue, Site, Event, Package, Dates, Catering, Other Packages, Brochure info, FAQs, Payment, Publish. AI option generates steps 2–9; vendor reviews then does Payment (Stripe etc.) and Publish (domain).
-- Deposit: Per event date, for tables (or both); set in Step 5 (Dates). Payment (Step 10): Stripe, PayPal, TrueLayer, WorldPay, Klarna. Domain: Step 11 (Publish).
-- Vendor after login: Welcome — Select Location (/welcome/select-location); pick venue → Continue to Dashboard. Dashboard sidebar: Dashboard, Events, Customers, Bookings, Email Templates, Menu Choice, Transactions, Sites Essentials, Event Locations, Marketing, Newsletter, Email Logs, System Logs, Manage Roles, Staff Management, Seo Tools, Notifications, Support, Dispute Resolution, Payment Settings. Create Event = header button. Domain Settings = profile dropdown → Settings → Domain Settings (72h verify). Bookings = booking history; Transactions = payment history; Payment Settings = connect Stripe/PayPal.
-- Site Essentials: Branding, colors, typography, social, SEO (per location). Event location & brochure: Step 8.
-- Customer: Book on vendor subdomain: event page → pick a date (adds date to cart) → /vendor/checkout. Ticket/table/drink selection is on checkout (per date: ticket types + quantity, table types + quantity + guest allocation if multiple tables, drink packages + quantity). Login required at checkout. If payment fails at checkout, same booking appears in Bookings → open it → pay balance on booking detail. From booking detail: pay balance, Reschedule (pick new date; add-ons for that date may be removed), Add-ons tab (add tables/tickets/drinks per date). After login → /customer/dashboard. Sidebar: Dashboard, Profile, Bookings, Notifications, Transactions.
+- Roles: admin (platform), vendor (venue), customer (booking)
+- Onboarding (exact order): Venue → Site → Event → Timeline & Package → Dates → Catering → Brochure info → Other Packages → FAQs → Domain → Payment. AI option generates content; vendor finishes Domain + Payment.
+- Dates: Tickets / Tables / Both; deposits for tables (or both) + balance due date.
+- Rooms: optional Multiple event spaces (up to 3) — packages/dates/menus per room. Public: Choose Your Room.
+- Vendor after login: Welcome — Select Location only when on that page; then Dashboard. Sidebar includes Table Assignment, Sites Essentials, Payment Settings, Support. Create Event = header. Domain Settings = profile → Settings → Domain Settings.
+- Sites Essentials: Presets, Branding (Site identity, Main home page if multi-location, Location/Home page, Info pages), Colors, Typography, Social, SEO. Preview before Save. Not for tickets/domain.
+- Logged-in vendors may receive LIVE VENDOR STATS for the period they asked about (today, last month, this week, etc.). Always answer with those figures first. Optional Dashboard/Bookings links only after the number — never instead of it.
+- Customer book: location → event → optional room → Select a Date → Checkout (tickets/tables/drinks + guest allocation) → Pay in Full or Table deposit. Login at checkout. **Add room** only on Checkout before payment.
+- Customer after login: Dashboard, Profile, Bookings, Support, Notifications, Transactions. Booking detail: Pay Now, Reschedule, **Add extras for this date** (tickets/tables/drinks), menu choices on booking page.
+- **CRITICAL**: After booking, customers **cannot** add or change rooms. Never invent “Additional Rooms” / “Add room” on the booking page. Different room = new booking on the venue site.
 `;
 
-  return condensed.length < KNOWLEDGE_BASE.length ? condensed : KNOWLEDGE_BASE; // Fallback to full if condensed is larger
+  return condensed.length < KNOWLEDGE_BASE.length + PLATFORM_VENDOR_CUSTOMER_TRAINING.length
+    ? condensed
+    : `${PLATFORM_VENDOR_CUSTOMER_TRAINING}\n\n${KNOWLEDGE_BASE}`;
 }
 
-// Define the message type
 type Message = {
   role: "user" | "assistant" | "system";
   content: string;
 };
 
-export async function POST(req: NextRequest) {
-  try {
-    // Get API key from environment variable
-    const apiKey = env.GROQ_API_KEY;
+type ChatContext = {
+  /** "vendor" = venue storefront; anything else = main platform assistant */
+  websiteRole?: string | null;
+  siteName?: string | null;
+  isLoggedInCustomer?: boolean;
+  /** Session account type when authenticated: vendor | customer | admin */
+  accountType?: string | null;
+  userName?: string | null;
+  isAuthenticated?: boolean;
+  /** Browser pathname, e.g. /vendor/dashboard */
+  pathname?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  contactAddress?: string | null;
+  /** Live dashboard + booking summary for logged-in vendors */
+  vendorLiveStats?: VendorChatLiveStats | null;
+  /** Theme live_events for public venue storefront booking redirects */
+  liveEvents?: LiveEvent[] | null;
+  /** Compact public event detail (dates, rooms, drinks, coupon) for concierge booking */
+  eventBookingBrief?: ChatEventBookingBrief | null;
+};
 
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "GROQ API key is not configured" },
-        { status: 500 }
-      );
-    }
+function buildLoggedInUserContextBlock(context: ChatContext): string {
+  if (!context.isAuthenticated || !context.accountType) {
+    return `
+CURRENT VISITOR (MUST FOLLOW):
+- This person is a **guest** (not logged in).
+- You may ask briefly whether they need help as a venue owner, a customer booking events, or something else — only if their message is vague (e.g. just “hi”).
+- Keep it professional and UK English. Do not mention EventWizz SaaS branding unnecessarily.
+`;
+  }
 
-    // Get the messages from the request
-    const { messages } = await req.json();
+  const roleLabel =
+    context.accountType === "vendor"
+      ? "a logged-in **venue vendor**"
+      : context.accountType === "admin"
+        ? "a logged-in **platform admin**"
+        : context.accountType === "customer"
+          ? "a logged-in **customer**"
+          : `a logged-in user (${context.accountType})`;
 
-    // Validate input
-    if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json(
-        { error: "Invalid messages format" },
-        { status: 400 }
-      );
-    }
+  const namePart = context.userName?.trim()
+    ? ` Their first name is **${context.userName.trim()}**.`
+    : "";
 
-    // Optimize: Only include recent conversation context (last 5 messages)
-    // This reduces token count while maintaining context
-    const recentMessages = messages.slice(-5);
+  const roleFocus =
+    context.accountType === "vendor"
+      ? `
+- Help them with the vendor experience using the **CURRENT PAGE** below. Do not invent which screen they are on.
+- If LIVE VENDOR STATS are present, answer booking/payment/event count questions from those figures.
+- Keep stats answers short and bold every number with markdown (**16**). Only include metrics they asked for.
+- Never tell them to open Dashboard and change the date filter when LIVE VENDOR STATS already cover the period they asked about — give the number first.
+`
+      : context.accountType === "admin"
+        ? `
+- Help them with the admin experience using the **CURRENT PAGE** below.
+`
+        : `
+- Help them with the customer experience using the **CURRENT PAGE** below.
+`;
 
-    // Use condensed knowledge base to reduce token count
-    const condensedKB = getCondensedKnowledgeBase();
+  const nameInstruction = context.userName?.trim()
+    ? `
+- **MUST** address them by first name (e.g. “Hello, ${context.userName.trim()}”). Use the name on greetings — do not announce that they are “signed in” or explain their account type unless they ask.
+- Do not overuse the name in every sentence.
+`
+    : `
+- No first name is available — greet politely without inventing a name.
+- Do not announce that they are “signed in” or explain their account type unless they ask.
+`;
 
-    // Use the knowledge base and chat instructions from the imported constants
-    const systemMessage = {
-      role: "system",
-      content: `${CHAT_INSTRUCTIONS}
+  return `
+CURRENT USER SESSION (MUST FOLLOW — CRITICAL):
+- This person is already signed in as ${roleLabel}.${namePart}
+- **NEVER** ask if they are a vendor, customer, or admin. You already know.
+- **NEVER** treat them like a guest or ask them to “identify themselves”.
+- **NEVER** say things like “You’re signed in to your venue account” or “You’re logged in as a vendor” — that sounds odd and confuses users. Just help them professionally.
+${nameInstruction}
+- Answer helpfully for their role straight away.
+${roleFocus}
+`;
+}
+
+function buildSystemPrompt(context: ChatContext): string {
+  const isVendorStorefront = context.websiteRole === "vendor";
+  const siteName = context.siteName?.trim() || "";
+  const pageBlock = buildCurrentPagePromptBlock(context.pathname);
+  const navBlock = getAllowedNavLinksForPrompt({
+    accountType: context.accountType,
+    isAuthenticated: Boolean(context.isAuthenticated),
+    isVendorStorefront,
+  });
+  const liveStatsBlock =
+    context.accountType === "vendor"
+      ? buildVendorLiveStatsPromptBlock(context.vendorLiveStats)
+      : "";
+  const liveEventsBlock = isVendorStorefront
+    ? context.eventBookingBrief
+      ? buildCompactLiveEventsPromptBlock(context.liveEvents)
+      : buildLiveEventsPromptBlock(context.liveEvents)
+    : "";
+  const eventBookingBlock = isVendorStorefront
+    ? buildEventBookingPromptBlock(context.eventBookingBrief)
+    : "";
+  const conciergeBlock = isVendorStorefront
+    ? buildBookingConciergeInstructions(Boolean(context.isLoggedInCustomer))
+    : "";
+
+  if (isVendorStorefront) {
+    return `${getVendorStorefrontChatInstructions({
+      siteName,
+      isLoggedInCustomer: Boolean(context.isLoggedInCustomer),
+      isLoggedInVendor: context.accountType === "vendor",
+      userName: context.userName,
+      contactPhone: context.contactPhone,
+      contactEmail: context.contactEmail,
+      contactAddress: context.contactAddress,
+    })}
+
+      ${pageBlock}
+
+      ${navBlock}
+
+      ${liveStatsBlock}
+
+      ${liveEventsBlock}
+
+      ${eventBookingBlock}
+
+      ${conciergeBlock}
+      
+      Use this knowledge to answer questions about the venue site:
+      ${
+        context.eventBookingBrief
+          ? "Guests book in chat (room → date → party size → tables/tickets → drinks → coupon), or visit the event page. After a booking exists, rooms cannot be changed. Ticket/table quantities are confirmed on Checkout."
+          : VENDOR_STOREFRONT_KNOWLEDGE
+      }
+      
+      If you don't know the answer, politely say you don't have that specific information and follow the SUPPORT & CONTACT rules for this user (logged-in → New enquiry link; guest → Contact page + contact details).
+      
+      When giving answers, don't explicitly reference a knowledge base. Incorporate information naturally.
+      
+      Use plain, everyday UK English. Include the required markdown navigation links when directing someone to a page.
+
+      OUTPUT (MUST FOLLOW): Reply with ONLY the message the visitor should read. Never append planning notes, policy checks, or lines like "User asks", "We need to respond", "This is disallowed", or "Must refuse".
+      `;
+  }
+
+  return `${CHAT_INSTRUCTIONS}
+
+      ${buildLoggedInUserContextBlock(context)}
+
+      ${pageBlock}
+
+      ${navBlock}
+
+      ${liveStatsBlock}
       
       Use this knowledge base to answer questions:
-      ${condensedKB}
+      ${getCondensedKnowledgeBase()}
       
       If you don't know the answer to a question that is not covered in the knowledge base, 
       politely explain that you don't have that specific information yet.
@@ -107,30 +265,93 @@ export async function POST(req: NextRequest) {
       When giving answers based on the knowledge base, don't explicitly reference the knowledge base itself.
       Just incorporate the information naturally into your responses.
       
-      When helping vendors, customers, or admins: use only plain, everyday language. Do not use URLs, paths, routes, or any technical or coding terms. Give directions by page names, menu names, and button names (e.g. "Go to Bookings in the left menu", "All Venues → click the venue", "Click View Details", "Open the Add-ons tab").
-      `,
+      Use plain UK English. Prefer page and button names. When sending someone to a section, include a markdown link from the NAVIGATION LINKS list (e.g. [Open Payment Settings](/vendor/payment-settings)).
+
+      OUTPUT (MUST FOLLOW): Reply with ONLY the message the user should read. Never append planning notes, policy checks, or lines like "User asks", "We need to respond", "This is disallowed", or "Must refuse".
+      `;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { messages, context } = (await req.json()) as {
+      messages: Message[];
+      context?: ChatContext;
     };
 
-    // Prepare the messages for the API call
-    // Use recent messages only to reduce token count
+    if (!messages || !Array.isArray(messages)) {
+      return NextResponse.json(
+        { error: "Invalid messages format" },
+        { status: 400 }
+      );
+    }
+
+    const lastUser = [...messages]
+      .reverse()
+      .find((m) => m?.role === "user" && typeof m.content === "string");
+    const safetyKind = classifyChatSafetyIntent(lastUser?.content ?? "", {
+      allowFinancial: context?.accountType === "vendor",
+    });
+    if (safetyKind) {
+      return NextResponse.json({
+        message: buildChatSafetyReply(safetyKind, {
+          userName: context?.userName,
+        }),
+      });
+    }
+
+    const aiConfig = await resolveAiRuntimeConfig();
+
+    if (!aiConfig.isConfigured) {
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
+    }
+
+    // GROQ only accepts role + content — drop any UI-only fields (e.g. supportCta)
+    const sanitizedMessages: Message[] = messages
+      .filter(
+        (m): m is Message =>
+          Boolean(m) &&
+          (m.role === "user" || m.role === "assistant") &&
+          typeof m.content === "string"
+      )
+      .map(({ role, content }) => ({
+        role,
+        content: role === "assistant" ? toUserFacingChatReply(content) : content,
+      }));
+
+    const isVendorStorefront = context?.websiteRole === "vendor";
+
+    // Optimize: keep the prompt small on venue booking (small models reject long context).
+    const recentMessages = sanitizedMessages.slice(isVendorStorefront ? -6 : -10);
+
+    const systemMessage = {
+      role: "system" as const,
+      content: buildSystemPrompt(context ?? {}),
+    };
+
     const apiMessages: Message[] = [systemMessage, ...recentMessages];
 
-    // Use the fallback system to try models in sequence
-    const result: FallbackResult = await tryModelsWithFallback(apiKey, {
+    const result: FallbackResult = await tryModelsWithFallback(aiConfig, {
       messages: apiMessages,
-      max_tokens: 800,
+      max_tokens: isVendorStorefront ? 500 : 1100,
       temperature: 0.7,
+      ...AI_HIDE_REASONING,
     });
 
     if (!result.success) {
+      const raw = String(result.error ?? "");
+      const isLength =
+        /reduce the length|request too large|context length|maximum context|too many tokens/i.test(
+          raw,
+        );
       return NextResponse.json(
         {
-          error: "Error from GROQ API",
-          details: result.error,
+          error: "Error from AI provider",
+          code: isLength ? "context_too_long" : "provider_error",
           status: result.status || 500,
           modelsTried: result.modelsTried,
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );
@@ -143,9 +364,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const assistantMessage = result.data.choices[0].message.content;
+    const assistantMessage =
+      toUserFacingChatReply(result.data.choices[0].message.content ?? "") ||
+      "Sorry, I didn’t catch that. Could you say it another way?";
 
-    // Return the AI response with model info
     return NextResponse.json({
       message: assistantMessage,
       model: result.model,

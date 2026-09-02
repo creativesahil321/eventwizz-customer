@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import { tryModelsWithFallback, AI_JSON_MAX_TOKENS, type FallbackResult } from "../lib/utils";
+import { AI_JSON_COMPLETION, extractJsonObject } from "../lib/extract-json";
+import {
+  aiRuntimeFailureMeta,
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import {
   BANNER_HEADING_MAX_WORDS,
   truncateToMaxWords,
 } from "@/lib/word-count";
+import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
 import {
   DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
   DRINK_PACKAGE_PRICE_MAX,
@@ -17,8 +23,12 @@ import {
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/event-form-limits";
 import {
+  fillOnboardingContentDefaults,
   buildAiOnboardingSystemPrompt,
   buildAiOnboardingUserPrompt,
+  buildAiOnboardingJsonSchemaBlock,
+  coerceAiStepFiveRooms,
+  coerceAiDateList,
   ensureStepFiveRooms,
   ensureStepSevenRooms,
   normalizeAIDatePaymentFields,
@@ -45,6 +55,9 @@ export interface AIOnboardingInput {
   guestCount?: string;
   priceRange?: string;
   description?: string;
+  /** Venue pin from collect form / map picker */
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface AITicket {
@@ -96,9 +109,13 @@ export interface AIGeneratedContent {
     banner_sub_heading: string;
     about_title: string;
     about_description: string;
+    footer_brand_description: string;
   };
   stepThree: {
     event_name: string;
+    event_address?: string;
+    latitude?: number;
+    longitude?: number;
     event_banner_heading: string;
     event_banner_sub_heading: string;
     about_event_heading: string;
@@ -126,6 +143,16 @@ export interface AIGeneratedContent {
       name: string;
       items: Array<{ title: string; description: string }>;
     }>;
+    rooms?: Array<{
+      room_name: string;
+      catering_option?: 0 | 1;
+      menu_title?: string;
+      menu_description?: string;
+      menus?: Array<{
+        name: string;
+        items: Array<{ title: string; description: string }>;
+      }>;
+    }>;
   };
   stepSeven: {
     drink_title: string;
@@ -139,7 +166,8 @@ export interface AIGeneratedContent {
     rooms?: AIRoomDrinks[];
   };
   stepEight: {
-    event_address: string;
+    /** Legacy brochure/location shape retained for older AI responses. */
+    event_address?: string;
     price_start_from: string;
     price_start_from_button_text: string;
     location: { title: string; description: string };
@@ -151,12 +179,9 @@ export interface AIGeneratedContent {
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = env.GROQ_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "AI service is not configured" },
-        { status: 500 }
-      );
+    const aiConfig = await resolveAiRuntimeConfig();
+    if (!aiConfig.isConfigured) {
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     const input: AIOnboardingInput = await req.json();
@@ -174,154 +199,7 @@ export async function POST(req: NextRequest) {
     }
 
     const systemPrompt = buildAiOnboardingSystemPrompt(STEP_NINE_MAX_FAQS);
-
-    const jsonSchemaBlock = `Generate this EXACT JSON structure:
-
-{
-  "stepTwo": {
-    "banner_heading": "string (max 30 words, compelling headline for landing page)",
-    "banner_sub_heading": "string (max 80 chars, engaging tagline)",
-    "about_title": "string (max 40 chars, title for about section)",
-    "about_description": "string (max 340 chars / 50 words, professional about text, no HTML)"
-  },
-  "stepThree": {
-    "event_name": "string (max 40 chars, name for the main event)",
-    "event_banner_heading": "string (max 30 words, event page banner heading)",
-    "event_banner_sub_heading": "string (max 80 chars, event page banner subheading)",
-    "about_event_heading": "string (max 50 chars, about event section heading)",
-    "about_event_sub_heading": "string (max 80 chars, about event section subheading)",
-    "about_event_description": "string (max 340 chars, event description, no HTML)"
-  },
-  "stepFour": {
-    "package_title": "string (max 40 chars, packages section title)",
-    "package_description": "string (max 160 chars, packages section description)",
-    "package_button_name": "string (max 18 chars, package CTA button)",
-    "package_details": [
-      {"title": "string (max 40 chars, package feature)"},
-      {"title": "string (max 40 chars, package feature)"},
-      {"title": "string (max 40 chars, package feature)"},
-      {"title": "string (max 40 chars, package feature)"},
-      {"title": "string (max 40 chars, package feature)"}
-    ],
-    "event_schedular_title": "string (max 40 chars, timeline section title)",
-    "event_schedule_subtitle": "string (optional, max 160 chars)",
-    "event_schedular": [
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"},
-      {"title": "string (max 40 chars)", "time": "HH:mm"}
-    ]
-  },
-  "stepFive": {
-    "dates": [
-      {
-        "event_date": "YYYY-MM-DD (a date 2 months from now)",
-        "booking_type": "both",
-        "tickets": [
-          {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "total_capacity": "string (number)", "price": "string"},
-          {"title": "string (e.g. 'VIP Pass')", "description": "string", "total_capacity": "string", "price": "string"}
-        ],
-        "tables": [
-          {"min_persons": "string", "max_persons": "string", "price": "string", "total_tables": "string"},
-          {"min_persons": "string", "max_persons": "string", "price": "string", "total_tables": "string"}
-        ],
-        "payment_type": "full or deposit",
-        "is_deposit_enabled": false,
-        "deposit_type": "amount or percentage (only when payment_type is deposit)",
-        "deposit_value": "string (e.g. 50 for £50 or 25 for 25%, only when deposit enabled)",
-        "deposit_due_date": "YYYY-MM-DD (before event_date, only when deposit enabled)"
-      },
-      {
-        "event_date": "YYYY-MM-DD (later than first date; no duplicates)",
-        "booking_type": "tickets",
-        "tickets": [
-          {"title": "string (e.g. 'Early Bird')", "description": "string", "total_capacity": "string", "price": "string"},
-          {"title": "string (e.g. 'Standard')", "description": "string", "total_capacity": "string", "price": "string"}
-        ],
-        "tables": [],
-        "payment_type": "full"
-      }
-    ],
-    "rooms": [
-      {
-        "room_name": "string (must match one of provided room names exactly)",
-        "dates": [
-          {
-            "event_date": "YYYY-MM-DD",
-            "booking_type": "tickets | tables | both",
-            "tickets": [
-              {"title": "string", "description": "string", "total_capacity": "string", "price": "string"}
-            ],
-            "tables": [
-              {"min_persons": "string", "max_persons": "string", "price": "string", "total_tables": "string"}
-            ],
-            "payment_type": "full or deposit"
-          }
-        ]
-      }
-    ]
-  },
-  "stepSix": {
-    "menu_title": "string (max 40 chars, menu section title)",
-    "menu_description": "string (max 160 chars, menu section description)",
-    "menus": [
-      {
-        "name": "string (max 40 chars, category name like 'Starters')",
-        "items": [
-          {"title": "Item Title 1 (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "Item Title 2 (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "Item Title 3 (max 40 chars)", "description": "string (max 160 chars)"}
-        ]
-      },
-      {
-        "name": "string (max 40 chars, category name like 'Main Course')",
-        "items": [
-          {"title": "Item Title 1 (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "Item Title 2 (max 40 chars)", "description": "string (max 160 chars)"},
-          {"title": "Item Title 3 (max 40 chars)", "description": "string (max 160 chars)"}
-        ]
-      }
-    ]
-  },
-  "stepSeven": {
-    "drink_title": "string (max 40 chars, drinks section title)",
-    "drink_description": "string (max 160 chars, drinks section description)",
-    "packages": "array of drink packages, OR empty array [] if venue has no drink packages",
-    "packages item": {"title": "string (max 25 chars)", "description": "string (max 160 chars)", "price": number, "available_quantity": number},
-    "rooms": [
-      {
-        "room_name": "string (must match provided room name exactly)",
-        "drink_title": "string",
-        "drink_description": "string",
-        "packages": [
-          {"title": "string", "description": "string", "price": number, "available_quantity": number}
-        ]
-      }
-    ]
-  },
-  "stepEight": {
-    "event_address": "${input.address || input.city}",
-    "price_start_from": "string (realistic starting price number as string, e.g. '50')",
-    "price_start_from_button_text": "Book Now",
-    "location": {
-      "title": "string (max 40 chars, location section title)",
-      "description": "string (max 160 chars, location section description)"
-    }
-  },
-  "stepNine": {
-    "faqs": [
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"},
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"},
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"},
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"},
-      {"question": "string (max 160 chars)", "answer": "string (max 500 chars)"}
-    ]
-  }
-}
-
-The stepNine.faqs array MUST contain at most ${STEP_NINE_MAX_FAQS} items (hard cap). Prefer 5–8 strong FAQs rather than many weak ones.
-
-Make times chronologically ascending. Make prices realistic for the venue type and location.`;
+    const jsonSchemaBlock = buildAiOnboardingJsonSchemaBlock(STEP_NINE_MAX_FAQS);
 
     const userPrompt = buildAiOnboardingUserPrompt(
       input,
@@ -330,15 +208,14 @@ Make times chronologically ascending. Make prices realistic for the venue type a
       STEP_NINE_MAX_FAQS,
     );
 
-    const result: FallbackResult = await tryModelsWithFallback(apiKey, {
+    const result: FallbackResult = await tryModelsWithFallback(aiConfig, {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.7,
-      // Keep this lower to reduce Groq TPM/TPD failures across models.
-      // The output JSON is large, but 2500 is typically enough while materially reducing quota pressure.
-      max_tokens: 2500,
+      temperature: 0.4,
+      max_tokens: AI_JSON_MAX_TOKENS,
+      ...AI_JSON_COMPLETION,
     });
 
     if (!result.success || !result.data) {
@@ -350,6 +227,7 @@ Make times chronologically ascending. Make prices realistic for the venue type a
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
           lastError: result.lastError,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );
@@ -364,12 +242,9 @@ Make times chronologically ascending. Make prices realistic for the venue type a
     }
 
     try {
-      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No valid JSON found in response");
-      }
-
-      const content: AIGeneratedContent = JSON.parse(jsonMatch[0]);
+      const content = extractJsonObject<AIGeneratedContent>(rawContent, [
+        "stepTwo",
+      ]);
 
       const truncate = (str: string, max: number) =>
         str && str.length > max ? str.substring(0, max) : str || "";
@@ -383,6 +258,9 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         content.stepTwo.banner_sub_heading = truncate(content.stepTwo.banner_sub_heading, 80);
         content.stepTwo.about_title = truncate(content.stepTwo.about_title, 40);
         content.stepTwo.about_description = truncate(content.stepTwo.about_description, 340);
+        content.stepTwo.footer_brand_description = clipFooterBrandDescription(
+          content.stepTwo.footer_brand_description ?? "",
+        );
       }
 
       if (content.stepThree) {
@@ -495,7 +373,7 @@ Make times chronologically ascending. Make prices realistic for the venue type a
           }
 
           const tickets = (date.tickets || []).map((t) => ({
-            title: truncate(t.title || "General Admission", 25),
+            title: truncate(t.title || "Event ticket", 25),
             description: truncate(t.description || "Standard entry ticket", 160),
             total_capacity: String(
               Math.max(1, Math.min(100000, parseInt(t.total_capacity) || 100)),
@@ -521,7 +399,7 @@ Make times chronologically ascending. Make prices realistic for the venue type a
                 : bookingType !== "tables"
                   ? [
                       {
-                        title: "General Admission",
+                        title: "Event ticket",
                         description: "Standard entry ticket",
                         total_capacity: "100",
                         price: "50",
@@ -570,7 +448,11 @@ Make times chronologically ascending. Make prices realistic for the venue type a
       };
 
       // Enforce stepFive validation
-      if (content.stepFive?.dates) {
+      content.stepFive = {
+        ...content.stepFive,
+        dates: coerceAiDateList(content.stepFive?.dates),
+      };
+      if ((content.stepFive?.dates?.length ?? 0) > 0) {
         content.stepFive.dates = sanitizeAIDates(content.stepFive.dates, 2);
       } else {
         // Fallback: generate default dates if AI missed stepFive
@@ -584,7 +466,7 @@ Make times chronologically ascending. Make prices realistic for the venue type a
               event_date: d1.toISOString().split("T")[0],
               booking_type: "both",
               tickets: [
-                { title: "General Admission", description: "Standard entry with full event access", total_capacity: "100", price: "50" },
+                { title: "Event ticket", description: "Standard entry with full event access", total_capacity: "100", price: "50" },
                 { title: "VIP Pass", description: "Premium access with exclusive perks", total_capacity: "30", price: "120" },
               ],
               tables: [
@@ -612,14 +494,15 @@ Make times chronologically ascending. Make prices realistic for the venue type a
       }
 
       if (input.has_room_system === true) {
-        const filteredRooms = Array.isArray(content.stepFive?.rooms)
-          ? content.stepFive.rooms
-              .map((room, roomIdx) => ({
-                room_name: truncate(String(room.room_name || "").trim(), 80),
-                dates: sanitizeAIDates(room.dates, 2 + roomIdx),
-              }))
-              .filter((room) => room.room_name.length > 0)
-          : [];
+        const filteredRooms = coerceAiStepFiveRooms(content.stepFive?.rooms)
+          .map((room, roomIdx) => ({
+            room_name: truncate(String(room.room_name || "").trim(), 80),
+            dates: sanitizeAIDates(
+              room.dates.length > 0 ? room.dates : content.stepFive?.dates,
+              2 + roomIdx,
+            ),
+          }))
+          .filter((room) => room.room_name.length > 0);
 
         content.stepFive.rooms = ensureStepFiveRooms(
           filteredRooms,
@@ -712,7 +595,7 @@ Make times chronologically ascending. Make prices realistic for the venue type a
         }
       } else {
         content.stepSeven = {
-          drink_title: "Drinks & Packages",
+          drink_title: "",
           drink_description: "",
           packages: [],
         };
@@ -727,8 +610,13 @@ Make times chronologically ascending. Make prices realistic for the venue type a
           }));
       }
 
+      const filled = fillOnboardingContentDefaults(content, {
+        ...input,
+        bookingFacts: vendorHints.bookingFacts,
+      });
+
       return NextResponse.json({
-        content,
+        content: filled,
         model: result.model,
         modelUsed: result.modelUsed,
       });

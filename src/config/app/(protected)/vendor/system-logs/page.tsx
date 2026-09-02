@@ -1,7 +1,7 @@
 "use client";
 
 import { Shell } from "@/components/shell";
-import { LocationIndicator } from "@/components/location-indicator";
+import { LocationScopedTitle } from "@/components/location-indicator";
 import { PermissionRoute } from "@/components/permission";
 import { SystemLogsTable } from "./_components/system-logs-table";
 
@@ -18,12 +18,10 @@ export default function VendorSystemLogsPage() {
               <div className="flex flex-col gap-4">
                 <div className="min-w-0 flex flex-col gap-3">
                   <h1 className="text-xl sm:text-2xl title-header font-bold text-black break-words">
-                    System Logs
+                    <LocationScopedTitle title="System Logs" />
                   </h1>
-                  <LocationIndicator variant="card" />
                   <p className="text-muted-foreground break-words">
-                    View system activity and events for your account. This data
-                    is for reference only.
+                    System activity for this venue. For reference only.
                   </p>
                 </div>
             </div>

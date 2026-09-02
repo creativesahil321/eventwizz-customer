@@ -52,7 +52,7 @@ const collectInfoSchema = z
     eventName: z
       .string()
       .min(2, "Event name must be at least 2 characters")
-      .max(40, "Event name max 40 characters"),
+      .max(40, "Event name must be 40 characters or fewer"),
     eventType: z.string().min(1, "Please select an event type"),
     eventCategoryId: z.string().min(1, "Please select a category"),
     venueAddress: z
@@ -64,7 +64,7 @@ const collectInfoSchema = z
       ),
     eventDescription: z
       .string()
-      .max(2000, "Description max 2000 characters")
+      .max(2000, "Description must be 2000 characters or fewer")
       .optional(),
     guestCount: z.string().optional(),
     priceRange: z.string().optional(),
@@ -98,7 +98,7 @@ const collectInfoSchema = z
       if (count > AI_EVENT_MAX_ROOMS) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Maximum ${AI_EVENT_MAX_ROOMS} rooms allowed`,
+          message: `You can select a maximum of ${AI_EVENT_MAX_ROOMS} rooms`,
           path: ["selectedRoomIds"],
         });
       }
@@ -116,7 +116,7 @@ const collectInfoSchema = z
     if (count > AI_EVENT_MAX_ROOMS) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Maximum 3 rooms allowed",
+        message: "You can add a maximum of 3 rooms",
         path: ["rooms"],
       });
     }
@@ -129,7 +129,13 @@ interface AICollectInfoProps {
   onSwitchToManual: () => void;
   isLoading: boolean;
   initialData?: AIEventInput | null;
-  venueInfo?: { name?: string; city?: string; address?: string };
+  venueInfo?: {
+    name?: string;
+    city?: string;
+    address?: string;
+    latitude?: number | string;
+    longitude?: number | string;
+  };
 }
 
 const GUEST_OPTIONS = [
@@ -383,6 +389,8 @@ export default function AIEventCollectInfo({
       venueName: venueInfo?.name,
       venueCity: venueInfo?.city,
       venueAddress: addr,
+      venueLatitude: venueInfo?.latitude,
+      venueLongitude: venueInfo?.longitude,
       has_room_system: data.hasRoomSystem === "yes",
       room_names: roomNames,
       selected_room_ids:
@@ -418,12 +426,11 @@ export default function AIEventCollectInfo({
           </motion.div>
 
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">
-            Create Event with <span style={accent.gradient}>AI</span>
+            Create event with <span style={accent.gradient}>AI</span>
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm max-w-sm mx-auto px-1">
-            Tell us about your event and our AI will generate professional
-            content for all sections — descriptions, packages, menus, FAQs and
-            more.
+            Tell us about your event and we will generate professional content
+            for every section — descriptions, packages, menus, FAQs and more.
           </p>
         </div>
 
@@ -444,7 +451,7 @@ export default function AIEventCollectInfo({
                 render={({ field }) => (
                   <FormItem className={formItemClass}>
                     <FormLabel className={labelClass}>
-                      Event Name <span className="text-red-400">*</span>
+                      Event name <span className="text-red-400">*</span>
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -522,7 +529,7 @@ export default function AIEventCollectInfo({
                   render={({ field }) => (
                     <FormItem className={formItemClass}>
                       <FormLabel className={labelClass}>
-                        Event Type <span className="text-red-400">*</span>
+                        Event type <span className="text-red-400">*</span>
                       </FormLabel>
                       <Select
                         onValueChange={field.onChange}
@@ -574,13 +581,19 @@ export default function AIEventCollectInfo({
                           void form.trigger("venueAddress");
                         }}
                         onBlur={field.onBlur}
-                        placeholder="Start typing — search UK addresses & places"
+                        biasCity={venueInfo?.city ?? venueInfo?.name ?? null}
+                        biasLatitude={venueInfo?.latitude ?? null}
+                        biasLongitude={venueInfo?.longitude ?? null}
+                        placeholder="Start typing — search nearby UK addresses"
                         variant="dark"
                       />
                     </FormControl>
                     <p className="text-xs text-slate-500 leading-relaxed">
-                      Choose a suggestion so we save a full formatted address.
-                      You can fine-tune on the map in the event editor.
+                      Restricted to{" "}
+                      {venueInfo?.city || venueInfo?.name || "your selected location"}{" "}
+                      (~50km). Choose a suggestion so we can save a full
+                      formatted address. You can adjust the pin on the map in
+                      the event editor.
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -594,7 +607,7 @@ export default function AIEventCollectInfo({
                   name="guestCount"
                   render={({ field }) => (
                     <FormItem className={formItemClass}>
-                      <FormLabel className={labelClass}>Guest Count</FormLabel>
+                      <FormLabel className={labelClass}>Guest count</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
@@ -621,7 +634,7 @@ export default function AIEventCollectInfo({
                   name="priceRange"
                   render={({ field }) => (
                     <FormItem className={formItemClass}>
-                      <FormLabel className={labelClass}>Price Range</FormLabel>
+                      <FormLabel className={labelClass}>Price range</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
@@ -677,8 +690,8 @@ export default function AIEventCollectInfo({
                       </RadioGroup>
                     </FormControl>
                     <p className="text-xs text-slate-500">
-                      If enabled, AI will create room-wise setup and content
-                      flow.
+                      If enabled, packages, dates, menus and brochure details
+                      can differ by room.
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -813,7 +826,7 @@ export default function AIEventCollectInfo({
                 render={({ field }) => (
                   <FormItem className={formItemClass}>
                     <FormLabel className={labelClass}>
-                      Additional Details{" "}
+                      Additional details{" "}
                       <span className="text-slate-500 font-normal">
                         (optional)
                       </span>
@@ -868,7 +881,7 @@ export default function AIEventCollectInfo({
                     </>
                   ) : (
                     <>
-                      Generate Event
+                      Generate event
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </>
                   )}

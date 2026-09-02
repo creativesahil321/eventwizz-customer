@@ -5,6 +5,7 @@ export type PreviewLocationItem = {
   id?: number;
   slug: string;
   city: string;
+  total_events?: number;
 };
 
 export function previewLocationItemsToLocationData(
@@ -14,6 +15,7 @@ export function previewLocationItemsToLocationData(
     id: loc.id,
     slug: loc.slug,
     city: loc.city,
+    total_events: loc.total_events,
   }));
 }
 
@@ -37,6 +39,8 @@ export function toPreviewLocationList(
       id: loc.id,
       slug: loc.slug.trim(),
       city: loc.city?.trim() || loc.slug,
+      total_events:
+        typeof loc.total_events === "number" ? loc.total_events : undefined,
     }));
 }
 

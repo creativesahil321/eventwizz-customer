@@ -12,6 +12,7 @@ import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { setCookie } from "cookies-next";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link";
+import { AuthLegalNotice } from "@/app/(auth)/_components/auth-legal-notice";
 
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -115,7 +116,7 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
         localStorage.setItem("verification_parentDomain", data.parentDomain);
       }
 
-      router.push("/auth/register/verify-otp");
+      router.replace("/auth/register/verify-otp");
     } catch {
       // Error handling is done by the interceptor
     } finally {
@@ -139,15 +140,18 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-[var(--color-border,#e5e7eb)]" />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-4 text-black">
-                  Or continue with
+              <div className="relative flex justify-center text-xs uppercase tracking-wide">
+                <span className="bg-[var(--color-surface,#fff)] px-4 text-[var(--color-text-dimmed,#6b7280)]">
+                  Or with email
                 </span>
               </div>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-black font-medium">
+              <Label
+                htmlFor="email"
+                className="font-medium text-[var(--color-text)]"
+              >
                 {accountType === "vendor"
                   ? "Business Email address"
                   : "Email address"}
@@ -163,7 +167,7 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
                 autoCapitalize="none"
                 autoComplete="email"
                 autoCorrect="off"
-                className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
+                className={`h-11 px-3 border-0 border-b-2 border-[var(--color-primary,#019ead)] text-[var(--color-text)] focus:border-[var(--color-primary-dark,#018795)] focus:outline-none focus:ring-0 ${
                   errors.email ? "border-red-500" : ""
                 }`}
                 {...register("email")}
@@ -182,9 +186,9 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
 
           <Button variant="event-primary" type="submit" disabled={loading}>
             {loading ? "Verifying..." : "Verify email"}
-            {!loading && <span className="ml-1">⟩</span>}
           </Button>
 
+          <AuthLegalNotice variant="register" />
           <AuthAlternateLink variant="register" />
         </div>
       </form>

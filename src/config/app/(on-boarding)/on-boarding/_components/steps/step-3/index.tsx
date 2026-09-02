@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -9,6 +9,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ import {
 } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import { useOnboardingPreviewFieldFocus } from "../../../_lib/onboarding-preview-field-focus";
 import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
 import {
   GuidedSectionActionFooter,
@@ -46,6 +48,13 @@ import {
 } from "../../guided-sticky-approval-bar";
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
+import AddressAutocomplete from "@/app/(protected)/vendor/events/_components/tab-event-form/tabs/_components/address-autocomplete";
+import EventLocationMap from "@/app/(protected)/vendor/events/_components/tab-event-form/tabs/_components/event-location-map";
+import { useLocationStore } from "@/store/location.store";
+import {
+  resolveVenueLocationAddress,
+  resolveVenueLocationCoords,
+} from "@/lib/venue-location-address";
 
 function resolveStepThreeErrorIndex(keys: string[]) {
   if (keys.some((k) => k === "__extra_validation__")) return 0;
@@ -62,6 +71,7 @@ function resolveStepThreeErrorIndex(keys: string[]) {
   )
     return 0;
   if (keys.some((k) => k.startsWith("about_event"))) return 1;
+  if (keys.some((k) => k === "event_address")) return 3;
   return 0;
 }
 
@@ -79,6 +89,29 @@ export default function StepThree() {
     name: "stepThree.isApproved",
   });
   const [loading, setLoading] = useState(false);
+  const selectedLocation = useLocationStore((state) => state.selectedLocation);
+  const venueAddress = useMemo(
+    () =>
+      globalForm.getValues("stepOne.address")?.trim() ||
+      resolveVenueLocationAddress(selectedLocation),
+    [globalForm, selectedLocation],
+  );
+  const venueCoords = useMemo(() => {
+    const selectedCoords = resolveVenueLocationCoords(
+      selectedLocation as
+        | (NonNullable<typeof selectedLocation> & Record<string, unknown>)
+        | null,
+    );
+    if (selectedCoords) return selectedCoords;
+    const latitude = Number(globalForm.getValues("stepOne.latitude"));
+    const longitude = Number(globalForm.getValues("stepOne.longitude"));
+    return Number.isFinite(latitude) && Number.isFinite(longitude)
+      ? { latitude, longitude }
+      : null;
+  }, [globalForm, selectedLocation]);
+  const addressSearchFunctionRef = useRef<((address: string) => void) | null>(
+    null,
+  );
 
   // Get session data and update function
   const { data: session, update: updateSession } = useSession();
@@ -134,6 +167,28 @@ export default function StepThree() {
         globalForm.getValues("stepThree.about_event_sub_heading") || "",
       about_event_description:
         globalForm.getValues("stepThree.about_event_description") || "",
+      event_address:
+        globalForm.getValues("stepThree.event_address") ||
+        globalForm.getValues("stepSeven.event_address") ||
+        venueAddress ||
+        "",
+      latitude:
+        globalForm.getValues("stepThree.latitude") ??
+        globalForm.getValues("stepSeven.latitude") ??
+        venueCoords?.latitude,
+      longitude:
+        globalForm.getValues("stepThree.longitude") ??
+        globalForm.getValues("stepSeven.longitude") ??
+        venueCoords?.longitude,
+      location: {
+        title: "LOCATION",
+        description:
+          globalForm.getValues("stepThree.event_address") ||
+          globalForm.getValues("stepSeven.event_address") ||
+          venueAddress ||
+          "",
+        icon: "MapPin",
+      },
       remove_event_banner_image: false,
       remove_event_banner_video: false,
     },
@@ -151,6 +206,42 @@ export default function StepThree() {
     );
     return selectedCategory?.name || "";
   }, [eventCategories, selectedCategoryId]);
+
+  useEffect(() => {
+    const currentAddress =
+      globalForm.getValues("stepThree.event_address")?.trim() ||
+      form.getValues("event_address")?.trim();
+    if (currentAddress && !globalForm.getValues("stepThree.event_address")) {
+      globalForm.setValue("stepThree.event_address", currentAddress, {
+        shouldDirty: false,
+      });
+    } else if (!currentAddress && venueAddress) {
+      form.setValue("event_address", venueAddress, { shouldDirty: false });
+      globalForm.setValue("stepThree.event_address", venueAddress, {
+        shouldDirty: false,
+      });
+    }
+
+    const currentLatitude =
+      globalForm.getValues("stepThree.latitude") ?? form.getValues("latitude");
+    const currentLongitude =
+      globalForm.getValues("stepThree.longitude") ??
+      form.getValues("longitude");
+    if (
+      venueCoords &&
+      (!Number.isFinite(Number(currentLatitude)) ||
+        !Number.isFinite(Number(currentLongitude)))
+    ) {
+      form.setValue("latitude", venueCoords.latitude, { shouldDirty: false });
+      form.setValue("longitude", venueCoords.longitude, { shouldDirty: false });
+      globalForm.setValue("stepThree.latitude", venueCoords.latitude, {
+        shouldDirty: false,
+      });
+      globalForm.setValue("stepThree.longitude", venueCoords.longitude, {
+        shouldDirty: false,
+      });
+    }
+  }, [form, globalForm, venueAddress, venueCoords]);
 
   const [headerBannerFile, setHeaderBannerFile] = useState<File[]>([]);
   // Track if we have a string URL from backend
@@ -209,7 +300,12 @@ export default function StepThree() {
         id: "event-hero",
         label: "Banner",
         description: "Cover image or video and banner headings.",
-        fields: ["event_banner_heading", "event_banner_sub_heading"],
+        fields: [
+          "event_banner_heading",
+          "event_banner_sub_heading",
+          "event_banner_image",
+          "event_banner_video",
+        ],
         validate: async () => {
           const img = form.getValues("event_banner_image");
           const vid = form.getValues("event_banner_video");
@@ -245,8 +341,14 @@ export default function StepThree() {
       {
         id: "event-details",
         label: "Event details",
-        description: "Backend event identifier and category.",
+        description: "Event name for your account, and category.",
         fields: ["event_name", "event_category_id"],
+      },
+      {
+        id: "event-location",
+        label: "Event location",
+        description: "Set the exact event address near your venue.",
+        fields: ["event_address"],
       },
     ];
   }, [
@@ -274,6 +376,8 @@ export default function StepThree() {
     persistenceHydrated: persistedProgressHydrated,
     persistedStepApproved: stepThreePersistedApproved === true,
   });
+
+  useOnboardingPreviewFieldFocus(3, guided.focusGuidedSection);
 
   // Handle banner image change
   const handleHeaderBannerFileChange = useCallback(
@@ -436,9 +540,7 @@ export default function StepThree() {
         : 0;
 
       if (storedEventId) {
-        // Add event_id to data if available
-        (data as StepThreeType & { event_id?: number }).event_id =
-          storedEventId;
+        data.event_id = storedEventId;
       }
 
       // Validate header banner with user-friendly error
@@ -464,6 +566,7 @@ export default function StepThree() {
         "about_event_heading",
         "about_event_sub_heading",
         "about_event_description",
+        "event_address",
       ];
 
       const missingFields = requiredFields.filter(
@@ -493,6 +596,7 @@ export default function StepThree() {
         about_event_heading: "About Event Heading",
         about_event_sub_heading: "About Event Sub Heading",
         about_event_description: "About Event Description",
+        event_address: "Event Address",
         gallery: "Gallery Images",
       };
 
@@ -640,7 +744,7 @@ export default function StepThree() {
       <OnboardingCard>
         <CardHeader>
           <OnboardingTitle>
-            Awesome! Let’s Create Your First Event
+            Let’s create your first event
           </OnboardingTitle>
         </CardHeader>
         <CardContent>
@@ -659,8 +763,7 @@ export default function StepThree() {
                 data-guided-section="event-hero"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 0,
+                  guided.currentSectionIndex === 0,
                   "space-y-6 order-1",
                 )}
               >
@@ -671,14 +774,10 @@ export default function StepThree() {
                   title="Banner"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 0
-                  }
+                  disabled={guided.currentSectionIndex !== 0}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 0 &&
+                    guided.currentSectionIndex !== 0 &&
                       "pointer-events-none",
                   )}
                 >
@@ -692,13 +791,13 @@ export default function StepThree() {
                       return (
                         <FormItem>
                           <FormLabel className="text-sm font-medium">
-                            Banner Heading{" "}
+                            Banner heading{" "}
                             <span className="text-red-400">*</span>
                           </FormLabel>
                           <FormControl>
                             <Input
                               className="h-11 bg-white/5 border-white/10"
-                              placeholder="Enter banner heading"
+                              placeholder="Enter a banner heading (max 30 words)"
                               {...field}
                               value={
                                 typeof field.value === "string"
@@ -721,6 +820,10 @@ export default function StepThree() {
                               }}
                             />
                           </FormControl>
+                          <FormDescription>
+                            Shown on the hero banner. Keep it to 30 words or
+                            fewer and no more than 500 characters.
+                          </FormDescription>
                           <div className="text-xs text-muted-foreground mt-1">
                             <span>
                               {headingWordCount}/{BANNER_HEADING_MAX_WORDS}{" "}
@@ -741,13 +844,13 @@ export default function StepThree() {
                       return (
                         <FormItem>
                           <FormLabel className="text-sm font-medium">
-                            Banner Subheading{" "}
+                            Banner subheading{" "}
                             <span className="text-red-400">*</span>
                           </FormLabel>
                           <FormControl>
                             <Input
                               className="h-11 bg-white/5 border-white/10"
-                              placeholder="Enter banner subheading"
+                              placeholder="Enter a short banner supporting line"
                               {...field}
                               value={
                                 typeof field.value === "string"
@@ -767,6 +870,10 @@ export default function StepThree() {
                               }}
                             />
                           </FormControl>
+                          <FormDescription>
+                            Appears over the banner beneath the main heading.
+                            Use a short line that supports the hero message.
+                          </FormDescription>
                           <div className="text-xs text-muted-foreground mt-1">
                             <span
                               className={
@@ -785,7 +892,7 @@ export default function StepThree() {
                   />
 
                   <OnboardingFieldGroupTitle>
-                    Banner Image <span className="text-red-400">*</span>
+                    Banner image <span className="text-red-400">*</span>
                   </OnboardingFieldGroupTitle>
 
                   <Tabs
@@ -804,7 +911,7 @@ export default function StepThree() {
                         render={({ field }) => (
                           <FormItem>
                             <OnboardingFieldGroupTitle>
-                              Add a Cover Photo
+                              Add a cover photo
                               <span className="text-red-400">*</span>
                             </OnboardingFieldGroupTitle>
                             <FormControl>
@@ -884,7 +991,7 @@ export default function StepThree() {
                         render={({ field }) => (
                           <FormItem>
                             <OnboardingFieldGroupTitle>
-                              Add a Cover Video
+                              Add a cover video
                               <span className="text-red-400">*</span>
                             </OnboardingFieldGroupTitle>
                             <FormControl>
@@ -981,8 +1088,7 @@ export default function StepThree() {
                 data-guided-section="about-event"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 1,
+                  guided.currentSectionIndex === 1,
                   "space-y-4 order-2",
                 )}
               >
@@ -993,19 +1099,16 @@ export default function StepThree() {
                   title="About the event"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 1
-                  }
+                  disabled={guided.currentSectionIndex !== 1}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-4",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 1 &&
+                    guided.currentSectionIndex !== 1 &&
                       "pointer-events-none",
                   )}
                 >
                   <p className="-mt-2 mb-4 text-sm text-muted-foreground">
-                    Tell guests what your event is about.
+                    This content appears below the banner in the event details
+                    section. It is separate from the short banner subheading.
                   </p>
 
                   {/* Title */}
@@ -1070,7 +1173,7 @@ export default function StepThree() {
                       return (
                         <FormItem>
                           <FormLabel className="text-sm font-medium">
-                            Sub Title
+                            Subtitle
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -1166,8 +1269,7 @@ export default function StepThree() {
                 data-guided-section="event-details"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 2,
+                  guided.currentSectionIndex === 2,
                   "mb-6 order-3 border border-white/10 bg-white/[0.03] rounded-lg p-4",
                 )}
               >
@@ -1178,14 +1280,10 @@ export default function StepThree() {
                   title="How shall we categorise this event for you?"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 2
-                  }
+                  disabled={guided.currentSectionIndex !== 2}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 2 &&
+                    guided.currentSectionIndex !== 2 &&
                       "pointer-events-none",
                   )}
                 >
@@ -1199,12 +1297,12 @@ export default function StepThree() {
                         return (
                           <FormItem>
                             <FormLabel className="text-md font-medium">
-                              What is the unique event identifier?{" "}
+                              What should we call this event?{" "}
                               <span className="text-red-400">*</span>
                             </FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="Ie Christmas Events 2026"
+                                placeholder="Enter your event name (max 40 characters)"
                                 {...field}
                                 value={
                                   typeof field.value === "string"
@@ -1224,7 +1322,8 @@ export default function StepThree() {
                             </FormControl>
                             <div className="text-xs text-muted-foreground mt-1">
                               <p className="mb-1">
-                                Example helper text: Ie Christmas Events 2026
+                                This is the event title customers will see
+                                throughout the booking journey.
                               </p>
                               <span
                                 className={
@@ -1247,7 +1346,7 @@ export default function StepThree() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-md font-medium">
-                            Event Category
+                            Event category
                           </FormLabel>
                           <FormControl>
                             <CategoryDropdown
@@ -1281,12 +1380,153 @@ export default function StepThree() {
                   </GuidedSectionActionFooter>
                 </fieldset>
               </section>
+              <section
+                data-guided-section="event-location"
+                tabIndex={-1}
+                className={guidedSectionSurfaceClass(
+                  guided.currentSectionIndex === 3,
+                  "mb-6 order-4 border border-white/10 bg-white/[0.03] rounded-lg p-4",
+                )}
+              >
+                <GuidedSectionTitleBar
+                  sectionIndex={3}
+                  sectionId="event-location"
+                  guided={guided}
+                  title="Where will this event take place?"
+                />
+                <fieldset
+                  disabled={guided.currentSectionIndex !== 3}
+                  className={cn(
+                    "min-w-0 border-0 p-0 m-0 space-y-4",
+                    guided.currentSectionIndex !== 3 &&
+                      "pointer-events-none",
+                  )}
+                >
+                  <FormField
+                    control={form.control}
+                    name="event_address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          Event address (exact location){" "}
+                          <span className="text-red-400">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <div className="relative isolate z-[100]">
+                            <AddressAutocomplete
+                              variant="dark"
+                              value={field.value}
+                            biasCity={
+                              selectedLocation?.city ??
+                              selectedLocation?.name ??
+                              null
+                            }
+                            biasLatitude={venueCoords?.latitude ?? null}
+                            biasLongitude={venueCoords?.longitude ?? null}
+                            onChange={(address) => {
+                              field.onChange(address);
+                              globalForm.setValue(
+                                "stepThree.event_address",
+                                address,
+                              );
+                              globalForm.setValue("stepThree.location", {
+                                title: "LOCATION",
+                                description: address,
+                                icon: "MapPin",
+                              });
+                            }}
+                            onSelect={(_placeId, address) => {
+                              field.onChange(address);
+                              globalForm.setValue(
+                                "stepThree.event_address",
+                                address,
+                              );
+                              globalForm.setValue("stepThree.location", {
+                                title: "LOCATION",
+                                description: address,
+                                icon: "MapPin",
+                              });
+                              addressSearchFunctionRef.current?.(address);
+                            }}
+                            onFocus={() => handleFieldFocus("event_address")}
+                            placeholder="Type to search for a UK address or location..."
+                            className="w-full"
+                          />
+                          </div>
+                        </FormControl>
+                        <p className="text-xs font-medium text-[var(--color-primary,#38bdf8)]">
+                          Restricted to{" "}
+                          {selectedLocation?.city ||
+                            selectedLocation?.name ||
+                            "your selected venue"}{" "}
+                          (~50km). Search nearby addresses, or drag the pin
+                          inside that area.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <EventLocationMap
+                    initialAddress={form.watch("event_address")}
+                    initialLatitude={form.watch("latitude")}
+                    initialLongitude={form.watch("longitude")}
+                    restrictLatitude={venueCoords?.latitude ?? null}
+                    restrictLongitude={venueCoords?.longitude ?? null}
+                    restrictLabel={
+                      selectedLocation?.city ?? selectedLocation?.name ?? null
+                    }
+                    onLocationChange={(location) => {
+                      form.setValue("event_address", location.address, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      form.setValue("latitude", location.latitude, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      form.setValue("longitude", location.longitude, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      globalForm.setValue(
+                        "stepThree.event_address",
+                        location.address,
+                      );
+                      globalForm.setValue(
+                        "stepThree.latitude",
+                        location.latitude,
+                      );
+                      globalForm.setValue(
+                        "stepThree.longitude",
+                        location.longitude,
+                      );
+                      globalForm.setValue("stepThree.location", {
+                        title: "LOCATION",
+                        description: location.address,
+                        icon: "MapPin",
+                      });
+                    }}
+                    onAddressSearch={(searchFunction) => {
+                      addressSearchFunctionRef.current = searchFunction;
+                    }}
+                    className="mt-4"
+                  />
+                  <GuidedSectionActionFooter
+                    isActive={guided.currentSectionIndex === 3}
+                    hideSectionMeta
+                  >
+                    <GuidedSectionCoreActions guided={guided} />
+                  </GuidedSectionActionFooter>
+                </fieldset>
+              </section>
               <GuidedMultiSectionBottomActions
                 onApproveAll={guided.handleApproveAllSections}
                 allSectionsApproved={guided.allSectionsApproved}
+                hasInput={guided.currentSectionHasInput}
                 loading={loading}
+                onEditAll={() => guided.handleUnlockSection(0)}
                 onContinue={() => void handleContinue()}
-                className="order-4"
+                className="order-5"
               />
             </form>
           </Form>

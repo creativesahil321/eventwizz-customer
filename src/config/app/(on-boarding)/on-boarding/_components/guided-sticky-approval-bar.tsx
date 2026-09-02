@@ -10,6 +10,7 @@ export type GuidedActionsSlice = {
   currentSectionIndex: number;
   sectionFlow: readonly { id: string }[];
   approvedSections: Set<string>;
+  currentSectionHasInput: boolean;
   handleApproveSection: () => void | Promise<void>;
   handleChipClick: (index: number) => void;
 };
@@ -154,10 +155,14 @@ export function GuidedWholeStepApproveButton({
   guided,
   sectionId,
 }: {
-  guided: Pick<GuidedActionsSlice, "approvedSections" | "handleApproveSection">;
+  guided: Pick<
+    GuidedActionsSlice,
+    "approvedSections" | "handleApproveSection" | "currentSectionHasInput"
+  >;
   sectionId: string;
 }) {
   if (guided.approvedSections.has(sectionId)) return null;
+  if (!guided.currentSectionHasInput) return null;
   return (
     <Button
       type="button"
@@ -165,12 +170,12 @@ export function GuidedWholeStepApproveButton({
       className={guidedOnboardingApproveStepButtonClass}
       onClick={() => void guided.handleApproveSection()}
     >
-      Approve step
+      Approve section
     </Button>
   );
 }
 
-/** Approve step + Next section — same styling as whole-step Approve (outline). */
+/** Approve section + Next section — same styling as whole-step Approve (outline). */
 export function GuidedSectionCoreActions({ guided }: CoreActionsProps) {
   const allSectionsApproved =
     guided.sectionFlow.length > 0 &&
@@ -182,6 +187,8 @@ export function GuidedSectionCoreActions({ guided }: CoreActionsProps) {
     !!guided.currentSection &&
     guided.approvedSections.has(guided.currentSection.id);
 
+  if (!approved && !guided.currentSectionHasInput) return null;
+
   return (
     <div className="inline-flex max-w-full flex-none flex-row flex-nowrap items-center gap-3">
       {!approved && (
@@ -192,7 +199,7 @@ export function GuidedSectionCoreActions({ guided }: CoreActionsProps) {
           disabled={!guided.currentSection}
           onClick={() => void guided.handleApproveSection()}
         >
-          Approve step
+          Approve section
         </Button>
       )}
       {guided.currentSectionIndex < guided.sectionFlow.length - 1 &&

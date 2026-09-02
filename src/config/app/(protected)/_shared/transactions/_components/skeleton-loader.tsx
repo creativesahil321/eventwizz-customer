@@ -6,11 +6,11 @@ import { pageCardClassName } from "@/app/(protected)/_components/page-header-car
 export function TransactionsListSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="border rounded-md overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-white">
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="flex items-center justify-between p-4 border-b border-border last:border-0"
+            className="flex items-center justify-between border-b border-border p-4 last:border-0"
           >
             <div className="flex items-center gap-4 flex-1">
               <Skeleton className="h-10 w-10 rounded-full" />
@@ -39,7 +39,7 @@ export function TransactionsTableSkeleton() {
           <Skeleton className="h-9 w-full sm:w-[180px]" />
           <Skeleton className="h-9 w-full sm:w-[180px]" />
         </div>
-        <div className={pageCardClassName("overflow-hidden !py-0")}>
+        <div className={pageCardClassName("mt-4 overflow-hidden")}>
           <TransactionsListSkeleton />
         </div>
       </div>

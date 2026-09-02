@@ -10,7 +10,7 @@ import {
   Info,
   HelpCircle,
   CreditCard,
-  UploadCloud,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FaSitemap } from "react-icons/fa";
@@ -19,6 +19,8 @@ import Link from "next/link";
 import { ServerContext } from "@/lib/server-context";
 import { useContext, useMemo } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
+import { appConfig } from "@/config/app";
 import {
   Tooltip,
   TooltipContent,
@@ -30,28 +32,28 @@ const steps = [
   { id: 1, label: "Venue", icon: <MapPin size={16} /> },
   { id: 2, label: "Site", icon: <FaSitemap size={16} /> },
   { id: 3, label: "Event", icon: <PartyPopper size={16} /> },
-  { id: 4, label: "Timeline & Package", icon: <Package size={16} /> },
+  { id: 4, label: "Packages & Gallery", icon: <Package size={16} /> },
   { id: 5, label: "Dates", icon: <CalendarDays size={16} /> },
   { id: 6, label: "Catering", icon: <Utensils size={16} /> },
   { id: 7, label: "Brochure info", icon: <Info size={16} /> },
-  { id: 8, label: "Other Packages", icon: <Wine size={16} /> },
+  { id: 8, label: "Drinks & extras", icon: <Wine size={16} /> },
   { id: 9, label: "FAQs", icon: <HelpCircle size={16} /> },
   { id: 10, label: "Payment", icon: <CreditCard size={16} /> },
-  { id: 11, label: "Publish", icon: <UploadCloud size={16} /> },
+  { id: 11, label: "Domain", icon: <Globe size={16} /> },
 ];
 
 const stepTooltips: Record<number, string> = {
   1: "Core venue details and contact information.",
   2: "Site branding, hero banner, and about section.",
   3: "Event identity, banner media, and story.",
-  4: "Timeline setup, package content, image, details, and gallery.",
+  4: "Timeline, packages, event details, and gallery.",
   5: "Dates, tickets, tables, and payment rules.",
   6: "Catering and menu information.",
-  7: "Brochure and location for collateral.",
-  8: "Drinks and add-on packages.",
+  7: "Brochure and pricing for collateral.",
+  8: "Drinks and extras.",
   9: "Frequently asked questions.",
   10: "Payment provider connections.",
-  11: "Final review and publish.",
+  11: "Choose your booking website subdomain and reminders.",
 };
 
 export default function Stepper({ activeStep }: { activeStep: number }) {
@@ -71,18 +73,14 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
     [activeStep],
   );
 
-  const logoPath =
-    theme?.logo?.startsWith("/") ||
-    theme?.logo?.startsWith("data:") ||
-    theme?.logo?.startsWith("http") ||
-    theme?.logo?.startsWith("https") ||
-    theme?.logo?.startsWith("blob")
-      ? theme.logo
-      : "/assets/images/logos/eventwizz-logo.png";
+  const faviconPath =
+    typeof theme?.favicon === "string" && theme.favicon.trim()
+      ? theme.favicon
+      : appConfig.mini_logo;
 
   return (
     <TooltipProvider delayDuration={300}>
-    <div className="relative bg-slate-950/80 backdrop-blur-xl border-b border-white/[0.06] py-5">
+    <div className="relative border-b border-white/[0.06] bg-slate-950/80 py-3 backdrop-blur-xl">
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{
@@ -90,21 +88,25 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
         }}
       />
       <div className="relative">
-        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 pl-4 md:pl-6 z-10 pr-4 md:pr-6">
-          <Link href="/" aria-label="Home">
-            <img
-              src={addCacheBusting(logoPath as string)}
+        <div className="absolute left-0 top-1/2 z-10 flex -translate-y-1/2 items-center pl-4 pr-4 md:pl-6 md:pr-6">
+          <Link
+            href="/"
+            aria-label="Home"
+            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5 p-0.5 shadow-[0_2px_10px_rgba(0,0,0,0.2)] transition-[transform,box-shadow] duration-200 hover:scale-105 hover:shadow-[0_4px_14px_rgba(0,0,0,0.3)]"
+          >
+            <BrandLogoImage
+              src={addCacheBusting(faviconPath, theme?.media_updated_at)}
               alt={theme?.name || "EventWizz"}
-              width={110}
-              height={30}
-              className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] cursor-pointer hover:opacity-80 transition-opacity [filter:drop-shadow(0_0_1px_white)_drop-shadow(0_0_5px_rgba(255,255,255,0.6))_drop-shadow(0_0_12px_rgba(255,255,255,0.3))]"
+              width={32}
+              height={32}
+              className="h-8 w-8 scale-[1.15] rounded-md object-contain"
             />
           </Link>
         </div>
 
         <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto pl-28 md:pl-32 lg:pl-36 xl:pl-40 pr-4">
           <div className="relative flex-1 overflow-x-auto overflow-y-visible no-scrollbar">
-            <div className="relative flex justify-center items-start space-x-2 md:space-x-3 lg:space-x-4 min-w-max px-4 md:px-6 mt-2">
+            <div className="relative mt-1 flex min-w-max items-start justify-center space-x-1.5 px-3 md:space-x-2.5 md:px-4 lg:space-x-3">
               <div className="absolute top-[22px] left-4 md:left-6 right-4 md:right-6 h-[2px] bg-white/[0.08] z-0 rounded-full" />
 
               <div
@@ -136,7 +138,7 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                 return (
                   <div
                     key={step.id}
-                    className="flex flex-col items-center relative z-20 min-w-[70px] md:min-w-[80px] flex-shrink-0"
+                    className="relative z-20 flex min-w-[58px] flex-shrink-0 flex-col items-center md:min-w-[68px]"
                   >
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -203,10 +205,10 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
                         </p>
                       </TooltipContent>
                     </Tooltip>
-                    <div className="text-center mt-2 w-20">
+                    <div className="mt-1.5 w-[4.5rem] text-center md:w-20">
                       <p
                         className={cn(
-                          "text-xs font-medium leading-snug transition-colors",
+                          "text-[10px] font-medium leading-snug transition-colors md:text-xs",
                           isCurrent &&
                             "font-semibold text-[var(--color-primary,#93c5fd)] drop-shadow-[0_0_8px_color-mix(in_srgb,var(--color-primary,#3b82f6)_40%,transparent)]",
                           !isCurrent &&

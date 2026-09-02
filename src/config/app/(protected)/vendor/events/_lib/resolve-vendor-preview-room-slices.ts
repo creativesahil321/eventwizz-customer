@@ -10,17 +10,26 @@ import type {
   EventDetailStepSix,
   EventDetailStepThree,
 } from "@/services/vendor/events/type";
+import {
+  lowestBookableFromPrice,
+  pickRoomHighlights,
+  resolveRoomThumbnailUrl,
+  type EventRoomChooserItem,
+} from "@/lib/event-room-chooser-item";
+import { resolveEventLocation } from "@/lib/event-location";
 
 export type VendorPreviewRoomRef = {
   room_id: number;
   name: string;
+  /** True when the room has no bookable dates — shown but not selectable. */
+  disabled?: boolean;
 };
 
 type RoomKeyedStep = { rooms?: Record<string, unknown> };
 
 function pickRoomPayload(
   step: RoomKeyedStep | undefined,
-  room: VendorPreviewRoomRef,
+  room: Pick<VendorPreviewRoomRef, "room_id" | "name">,
 ): Record<string, unknown> | undefined {
   const rooms = step?.rooms;
   if (!rooms || typeof rooms !== "object") return undefined;
@@ -40,6 +49,14 @@ function pickRoomPayload(
   return undefined;
 }
 
+function roomHasBookableDates(
+  stepThree: RoomKeyedStep | undefined,
+  room: Pick<VendorPreviewRoomRef, "room_id" | "name">,
+): boolean {
+  const payload = pickRoomPayload(stepThree, room);
+  return Array.isArray(payload?.dates) && payload.dates.length > 0;
+}
+
 export function isVendorEventRoomPreviewMode(data: EventDetailData): boolean {
   const rooms = listVendorPreviewRooms(data);
   if (rooms.length >= 2) {
@@ -56,14 +73,132 @@ export function isVendorEventRoomPreviewMode(data: EventDetailData): boolean {
 export function listVendorPreviewRooms(
   data: EventDetailData,
 ): VendorPreviewRoomRef[] {
+  const stepThree = data.stepThree as RoomKeyedStep | undefined;
   return normalizeVendorStepTwoRooms(
     (data.stepTwo as { rooms?: unknown })?.rooms,
   )
     .filter((room) => Number(room.room_id) > 0)
-    .map((room, index) => ({
-      room_id: Number(room.room_id),
-      name: String(room.name || "").trim() || `Room ${index + 1}`,
-    }));
+    .map((room, index) => {
+      const ref = {
+        room_id: Number(room.room_id),
+        name: String(room.name || "").trim() || `Room ${index + 1}`,
+      };
+      return {
+        ...ref,
+        disabled: !roomHasBookableDates(stepThree, ref),
+      };
+    });
+}
+
+/** First room that still has dates; falls back to 0 when none are bookable. */
+export function firstBookableVendorPreviewRoomIndex(
+  data: EventDetailData,
+): number {
+  const rooms = listVendorPreviewRooms(data);
+  const idx = rooms.findIndex((room) => !room.disabled);
+  return idx >= 0 ? idx : 0;
+}
+
+/**
+ * Card summaries for the vendor event preview "Choose Your Room" section.
+ * Mirrors the public event page model (thumbnail, from-price, highlights).
+ */
+export function listVendorPreviewRoomSummaries(
+  data: EventDetailData,
+): EventRoomChooserItem[] {
+  const rooms = listVendorPreviewRooms(data);
+  const stepTwoRooms = normalizeVendorStepTwoRooms(
+    (data.stepTwo as { rooms?: unknown })?.rooms,
+  );
+
+  const bannerFallback = resolveRoomThumbnailUrl(
+    typeof data.stepOne?.event_banner_image === "string"
+      ? data.stepOne.event_banner_image
+      : null,
+  );
+
+  return rooms.map((room, index) => {
+    const pkg =
+      stepTwoRooms.find((entry) => Number(entry.room_id) === room.room_id) ??
+      stepTwoRooms[index];
+
+    const drinksPayload = pickRoomPayload(
+      data.stepSix as RoomKeyedStep,
+      room,
+    );
+    const drinkPackages = Array.isArray(drinksPayload?.packages)
+      ? (drinksPayload.packages as Array<{
+          title?: string;
+          price?: string | number;
+        }>)
+      : [];
+
+    const galleryUrl = (() => {
+      const gallery = pkg?.gallery;
+      if (!Array.isArray(gallery)) return null;
+      for (const item of gallery) {
+        if (typeof item === "object" && item && "url" in item) {
+          const url = resolveRoomThumbnailUrl(
+            (item as { url?: string }).url,
+          );
+          if (url) return url;
+        }
+      }
+      return null;
+    })();
+
+    const inclusionHighlights = pickRoomHighlights(
+      (pkg?.package_details ?? []).map((detail) => detail.title),
+      3,
+    );
+    const highlights =
+      inclusionHighlights.length > 0
+        ? inclusionHighlights
+        : pickRoomHighlights(
+            drinkPackages.map((drink) => drink.title),
+            3,
+          );
+
+    const datesPayload = pickRoomPayload(
+      data.stepThree as RoomKeyedStep,
+      room,
+    );
+    const datePrices: Array<string | number | null | undefined> = [];
+    if (Array.isArray(datesPayload?.dates)) {
+      for (const row of datesPayload.dates) {
+        if (!row || typeof row !== "object") continue;
+        const date = row as {
+          price?: string | number;
+          tickets?: Array<{ price?: string | number }>;
+          tables?: Array<{ price?: string | number }>;
+        };
+        if (date.price != null) datePrices.push(date.price);
+        for (const ticket of date.tickets ?? []) {
+          if (ticket?.price != null) datePrices.push(ticket.price);
+        }
+        for (const table of date.tables ?? []) {
+          if (table?.price != null) datePrices.push(table.price);
+        }
+      }
+    }
+
+    return {
+      room_id: room.room_id,
+      name: room.name,
+      index,
+      thumbnail:
+        resolveRoomThumbnailUrl(pkg?.package_image) ||
+        galleryUrl ||
+        bannerFallback,
+      fromPrice: lowestBookableFromPrice({
+        datePrices,
+        packagePrices: drinkPackages.map((drink) => drink.price),
+      }),
+      packageCount: drinkPackages.length,
+      highlights,
+      disabled: room.disabled,
+    };
+  });
 }
 
 type PreviewMenuSlice = Pick<
@@ -76,12 +211,12 @@ type PreviewMenuSlice = Pick<
 >;
 
 type PreviewDrinksSlice = Pick<
-  EventDetailStepFive,
+  EventDetailStepSix,
   "drink_title" | "drink_description" | "packages"
 >;
 
 type PreviewBrochureSlice = Pick<
-  EventDetailStepSix,
+  EventDetailStepFive,
   "brochure_pdf" | "brochure_pdf_2" | "event_address"
 >;
 
@@ -95,6 +230,8 @@ export type VendorPreviewActiveSlices = {
   drinks: PreviewDrinksSlice | null;
   brochure: PreviewBrochureSlice | null;
   eventAddress: string;
+  eventLatitude: number | null;
+  eventLongitude: number | null;
 };
 
 export function resolveVendorPreviewActiveSlices(
@@ -103,10 +240,15 @@ export function resolveVendorPreviewActiveSlices(
 ): VendorPreviewActiveSlices {
   const rooms = listVendorPreviewRooms(data);
   const roomMode = isVendorEventRoomPreviewMode(data);
-  const safeIndex = Math.min(
+  const requestedIndex = Math.min(
     Math.max(roomIndex, 0),
     Math.max(rooms.length - 1, 0),
   );
+  // Never activate a date-less room — snap to the first bookable one.
+  const safeIndex =
+    rooms[requestedIndex]?.disabled
+      ? firstBookableVendorPreviewRoomIndex(data)
+      : requestedIndex;
   const activeRoom = roomMode ? (rooms[safeIndex] ?? null) : null;
 
   const stepTwoRooms = normalizeVendorStepTwoRooms(
@@ -122,8 +264,11 @@ export function resolveVendorPreviewActiveSlices(
   if (!roomMode || !activeRoom) {
     const s3 = data.stepThree;
     const s4 = data.stepFour;
+    // Vendor form + API: step 1 = location, step 5 = brochures, step 6 = drinks.
+    const s1 = data.stepOne;
     const s5 = data.stepFive;
     const s6 = data.stepSix;
+    const eventLocation = resolveEventLocation(s1, s5, data.stepEight);
     return {
       roomMode: false,
       rooms: [],
@@ -139,24 +284,23 @@ export function resolveVendorPreviewActiveSlices(
             menu_background_image: s4.menu_background_image,
           }
         : null,
-      drinks: s5
+      drinks: s6
         ? {
-            drink_title: s5.drink_title,
-            drink_description: s5.drink_description,
-            packages: s5.packages,
+            drink_title: s6.drink_title,
+            drink_description: s6.drink_description,
+            packages: s6.packages,
           }
         : null,
-      brochure: s6
+      brochure: s5
         ? {
-            brochure_pdf: s6.brochure_pdf,
-            brochure_pdf_2: s6.brochure_pdf_2,
-            event_address: s6.event_address,
+            brochure_pdf: s5.brochure_pdf,
+            brochure_pdf_2: s5.brochure_pdf_2,
+            event_address: eventLocation.address,
           }
         : null,
-      eventAddress:
-        String(s6?.event_address ?? "").trim() ||
-        String((data.stepFive as { event_address?: string })?.event_address ?? "")
-          .trim(),
+      eventAddress: eventLocation.address,
+      eventLatitude: eventLocation.latitude,
+      eventLongitude: eventLocation.longitude,
     };
   }
 
@@ -171,7 +315,22 @@ export function resolveVendorPreviewActiveSlices(
   );
   const drinksPayload = pickRoomPayload(data.stepSix as RoomKeyedStep, activeRoom);
 
+  const stepOneRoot = data.stepOne as
+    | {
+        event_address?: string;
+        latitude?: number | string | null;
+        longitude?: number | string | null;
+        lat?: number | string | null;
+        long?: number | string | null;
+      }
+    | undefined;
   const stepFiveRoot = data.stepFive as { event_address?: string } | undefined;
+  const eventLocation = resolveEventLocation(
+    stepOneRoot,
+    brochurePayload,
+    stepFiveRoot,
+    data.stepEight,
+  );
 
   return {
     roomMode: true,
@@ -227,9 +386,11 @@ export function resolveVendorPreviewActiveSlices(
             typeof brochurePayload.brochure_pdf_2 === "string"
               ? brochurePayload.brochure_pdf_2
               : null,
-          event_address: String(stepFiveRoot?.event_address ?? "").trim(),
+          event_address: eventLocation.address,
         }
       : null,
-    eventAddress: String(stepFiveRoot?.event_address ?? "").trim(),
+    eventAddress: eventLocation.address,
+    eventLatitude: eventLocation.latitude,
+    eventLongitude: eventLocation.longitude,
   };
 }

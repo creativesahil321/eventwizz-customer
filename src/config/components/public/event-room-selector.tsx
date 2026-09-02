@@ -12,6 +12,8 @@ type EventRoomSelectorProps = {
   currentRoomIndex: number;
   onRoomChange: (index: number) => void;
   visible?: boolean;
+  /** Override when a top strip (e.g. coupon banner) sits above the header. */
+  stickyTop?: string;
   className?: string;
 };
 
@@ -21,6 +23,7 @@ export function EventRoomSelector({
   currentRoomIndex,
   onRoomChange,
   visible = true,
+  stickyTop = PUBLIC_EVENT_HEADER_OFFSET,
   className,
 }: EventRoomSelectorProps) {
   return (
@@ -28,13 +31,16 @@ export function EventRoomSelector({
       rooms={rooms.map((room, index) => ({
         key: `${room.room_id}-${index}`,
         label: room.name || `Room ${index + 1}`,
+        disabled: room.disabled,
       }))}
       activeIndex={currentRoomIndex}
       onSelect={onRoomChange}
       visible={visible}
       minRooms={2}
       layout="sticky"
-      stickyTop={PUBLIC_EVENT_HEADER_OFFSET}
+      stickyTop={stickyTop}
+      label="Choose Room"
+      size="sm"
       className={cn("mx-auto max-w-7xl sm:px-6", className)}
     />
   );

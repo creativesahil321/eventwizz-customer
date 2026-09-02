@@ -130,9 +130,9 @@ export function TransactionDetailsComponent({
     transaction.date ||
     (createdDate
       ? formatDistanceToNow(createdDate, { addSuffix: true })
-      : "N/A");
+      : "—");
 
-  const fullDate = createdDate ? format(createdDate, "PPP p") : "N/A";
+  const fullDate = createdDate ? format(createdDate, "PPP p") : "—";
   const paidDateFormatted = paidDate ? format(paidDate, "PPP p") : null;
 
   const numericAmount =
@@ -228,7 +228,7 @@ export function TransactionDetailsComponent({
                 Payment Method
               </p>
               <p className="text-sm font-medium text-black break-words">
-                {payment_method || "N/A"}
+                {payment_method || "—"}
               </p>
             </div>
 
@@ -237,7 +237,7 @@ export function TransactionDetailsComponent({
                 Gateway
               </p>
               <p className="text-sm font-medium text-black break-words">
-                {payment_method_key || "N/A"}
+                {payment_method_key || "—"}
               </p>
             </div>
 

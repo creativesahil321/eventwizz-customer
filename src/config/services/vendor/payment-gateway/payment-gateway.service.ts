@@ -6,16 +6,29 @@ export interface PaymentGatewayAccount {
   id: number;
   account_status?: "pending" | "active" | "under_review" | "restricted";
   account_id?: string;
+  /** Masked publishable / client key (credentials connect) */
+  key?: string;
+  client_secret?: string;
   is_enabled?: boolean;
+  webhook_url?: string | null;
+  manual_webhook?: boolean;
+  public_key?: string | null;
   bank?: {
     bank_name?: string;
     account_masked?: string;
   };
 }
 
+export type PaymentGatewayCanAdd = {
+  stripe?: boolean;
+  paypal?: boolean;
+  truelayer?: boolean;
+};
+
 /** Response shape for GET /vendor/payment-gateway - keyed by gateway name, value is array of accounts */
 export interface PaymentGatewaysResponse {
   payment_gateways: Record<string, PaymentGatewayAccount[]>;
+  can_add?: PaymentGatewayCanAdd;
 }
 
 /**
@@ -71,6 +84,11 @@ export const vendorPaymentGatewayService = {
   ): Promise<{
     status: boolean;
     message: string;
+    data?: {
+      id: number;
+      gateway: string;
+      is_enabled: boolean;
+    };
     errors: string[];
   }> => {
     try {
@@ -81,6 +99,11 @@ export const vendorPaymentGatewayService = {
       const response = await api.patch<{
         status: boolean;
         message: string;
+        data?: {
+          id: number;
+          gateway: string;
+          is_enabled: boolean;
+        };
         errors: string[];
       }>(url, { is_enabled: isEnabled }, { returnFullResponse: true });
       return response;
@@ -102,66 +125,89 @@ export const vendorPaymentGatewayService = {
   },
 
   /**
-   * Connect a payment gateway (initiates OAuth/onboarding).
-   * POST /vendor/payment-gateway/connect
-   * Payload: { payment_gateway, source, replace_id (optional) }
-   * @param gateway Payment gateway to connect
-   * @param source Where the connection is initiated from ("settings" or "onboarding")
-   * @param replaceId Optional ID of existing account to replace
+   * Connect a payment gateway via POST /vendor/onboarding/payment-gateway-connect.
+   * Stripe / PayPal / TrueLayer require credentials `{ key, secret }`.
    */
   connectPaymentGateway: async (
     gateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna",
-    source: "settings" | "onboarding" = "settings",
-    replaceId?: number
+    credentials: { key: string; secret: string },
   ): Promise<{
     status: boolean;
     message: string;
     data?: {
-      status?: string;
-      charges_enabled?: boolean;
-      payouts_enabled?: boolean;
-      connection_status?: string;
-      details_submitted?: boolean;
-      stripe_account_id?: string;
-      onboarding_url?: string;
-      auth_url?: string;
-      account_id?: string;
       gateway: string;
-      return_url?: string;
-      refresh_url?: string;
+      account?: {
+        id: number;
+        account_status?: "pending" | "active" | "under_review" | "restricted";
+        is_enabled?: boolean;
+        key?: string;
+        client_secret?: string;
+        account_id?: string;
+      };
+      webhook_url?: string | null;
+      manual_webhook?: boolean;
+      webhook_setup_hint?: string | null;
+      public_key?: string | null;
+      verification?: {
+        stripe_account_verified_at?: string | null;
+        paypal_oauth_verified_at?: string | null;
+        truelayer_oauth_verified_at?: string | null;
+        truelayer_env?: string | null;
+        charges_enabled?: boolean;
+        payouts_enabled?: boolean;
+        manual_webhook?: boolean;
+        signing_key_generated?: boolean;
+      };
+      account_id?: string;
+      connection_status?: string;
     };
-    errors: string[];
+    errors: string[] | Record<string, string[]>;
   }> => {
     try {
-      const payload: {
-        payment_gateway: string;
-        source: string;
-        replace_id?: number;
-      } = {
+      const payload = {
         payment_gateway: gateway,
-        source,
+        credentials: {
+          key: credentials.key.trim(),
+          secret: credentials.secret.trim(),
+        },
       };
-      if (replaceId != null) payload.replace_id = replaceId;
 
       const response = await api.post<{
         status: boolean;
         message: string;
         data?: {
-          status?: string;
-          charges_enabled?: boolean;
-          payouts_enabled?: boolean;
-          connection_status?: string;
-          details_submitted?: boolean;
-          stripe_account_id?: string;
-          onboarding_url?: string;
-          auth_url?: string;
-          account_id?: string;
           gateway: string;
-          return_url?: string;
-          refresh_url?: string;
+          account?: {
+            id: number;
+            account_status?:
+              | "pending"
+              | "active"
+              | "under_review"
+              | "restricted";
+            is_enabled?: boolean;
+            key?: string;
+            client_secret?: string;
+            account_id?: string;
+          };
+          webhook_url?: string | null;
+          manual_webhook?: boolean;
+          webhook_setup_hint?: string | null;
+          public_key?: string | null;
+          verification?: {
+            stripe_account_verified_at?: string | null;
+            paypal_oauth_verified_at?: string | null;
+            truelayer_oauth_verified_at?: string | null;
+            truelayer_env?: string | null;
+            charges_enabled?: boolean;
+            payouts_enabled?: boolean;
+            manual_webhook?: boolean;
+            signing_key_generated?: boolean;
+          };
+          account_id?: string;
+          connection_status?: string;
         };
-        errors: string[];
-      }>(API_ENDPOINTS.VENDOR.PAYMENT_GATEWAYS.CONNECT_PAYMENT_GATEWAY, payload, {
+        errors: string[] | Record<string, string[]>;
+      }>(API_ENDPOINTS.VENDOR.ONBOARDING.PAYMENT_GATEWAYS, payload, {
         returnFullResponse: true,
       });
 

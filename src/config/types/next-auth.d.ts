@@ -10,6 +10,8 @@ declare module "next-auth" {
       token?: string;
       uuid?: string;
       name?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
       email?: string | null;
       image?: string | null;
       id?: string;
@@ -17,6 +19,9 @@ declare module "next-auth" {
       event_id?: number | string;
       on_boarding_step?: number;
       last_completed_step?: number;
+      permissions?: string[];
+      /** From login/profile — true when at least one payment gateway is connected. */
+      has_payment_provider?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -28,6 +33,8 @@ declare module "next-auth" {
     event_id?: number | string;
     on_boarding_step?: number;
     last_completed_step?: number;
+    permissions?: string[];
+    has_payment_provider?: boolean;
   }
 
   interface JWT {
@@ -38,5 +45,7 @@ declare module "next-auth" {
     event_id?: number | string;
     on_boarding_step?: number;
     last_completed_step?: number;
+    permissions?: string[];
+    has_payment_provider?: boolean;
   }
 }

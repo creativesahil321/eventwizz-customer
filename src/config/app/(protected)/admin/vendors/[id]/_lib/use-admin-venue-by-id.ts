@@ -95,7 +95,7 @@ function mapApiToVenueDetail(data: AdminVenueByIdData): VenueDetail {
     venueId: venue.venue_id,
     name: venue.venue_name,
     image: venue.logo,
-    status: venue.status === "active" ? "active" : "disabled",
+    status: venue.status === "active" ? "active" : "inactive",
     subdomain: venue.subdomain,
     locations,
     contact: {

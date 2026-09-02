@@ -314,6 +314,43 @@ export async function getCroppedAndCompressedImage(
 }
 
 /**
+ * Optimize the full original image (no crop) — resize + compress only.
+ * Use when the user wants to keep the entire uploaded frame.
+ */
+export async function getOptimizedFullImage(
+  originalFile: File,
+  config: CropperConfig = {}
+): Promise<CroppedImage> {
+  const mergedConfig = { ...DEFAULT_CROPPER_CONFIG, ...config };
+  const maxWidth = mergedConfig.maxWidth ?? DEFAULT_CROPPER_CONFIG.maxWidth;
+  const maxHeight = mergedConfig.maxHeight ?? DEFAULT_CROPPER_CONFIG.maxHeight;
+
+  const { width, height } = await getImageDimensions(originalFile);
+  const { blob: sizedBlob, width: outWidth, height: outHeight } =
+    await resizeBlobToFit(originalFile, width, height, maxWidth, maxHeight);
+
+  const compressedFile = await compressImageBlob(
+    sizedBlob,
+    originalFile.name,
+    mergedConfig,
+  );
+
+  const previewUrl = URL.createObjectURL(compressedFile);
+  const originalSize = originalFile.size;
+  const croppedSize = compressedFile.size;
+
+  return {
+    file: compressedFile,
+    previewUrl,
+    originalSize,
+    croppedSize,
+    compressionRatio: 1 - croppedSize / originalSize,
+    width: outWidth,
+    height: outHeight,
+  };
+}
+
+/**
  * Format file size for display
  */
 export function formatFileSize(bytes: number): string {

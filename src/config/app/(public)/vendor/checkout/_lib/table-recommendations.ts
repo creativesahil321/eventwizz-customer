@@ -299,6 +299,37 @@ export function isViableTableRecommendation(
   return false;
 }
 
+/**
+ * Group size for table matching. Never invents a party of 20.
+ * Prefer an explicit count, then ticket qty, then the smallest table minimum.
+ */
+export function resolveCheckoutGroupSize(dateData: {
+  peopleCount?: number;
+  tickets?: Array<{ quantity: number }>;
+  tables?: EditableItem[];
+}): number {
+  if (dateData.peopleCount != null && dateData.peopleCount >= 1) {
+    return Math.min(500, Math.floor(dateData.peopleCount));
+  }
+
+  const ticketQty = (dateData.tickets ?? []).reduce(
+    (sum, ticket) => sum + Math.max(0, ticket.quantity || 0),
+    0,
+  );
+  if (ticketQty >= 1) {
+    return Math.min(500, ticketQty);
+  }
+
+  const lowest = dateData.tables?.length
+    ? getLowestTableMinimum(dateData.tables)
+    : null;
+  if (lowest != null && lowest >= 1) {
+    return lowest;
+  }
+
+  return 1;
+}
+
 /** Smallest minimum capacity across all table types. */
 export function getLowestTableMinimum(tables: EditableItem[]): number | null {
   const mins: number[] = [];

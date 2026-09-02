@@ -82,13 +82,14 @@ export default function StepEight() {
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
 
-  // Predefined package as per the specified format
+  // Start with one blank package row — placeholders guide input so nothing
+  // dummy (title, price, or a stock number) can be published as-is.
   const predefinedPackage = [
     {
-      title: "Package 1",
-      description: "This is a premium service package",
-      price: 20,
-      available_quantity: 100,
+      title: "",
+      description: "",
+      price: 0,
+      available_quantity: undefined as unknown as number,
     },
   ];
 
@@ -230,33 +231,33 @@ export default function StepEight() {
           errorMessages.push(errors.drink_description.message as string);
         }
 
-        // Check for package errors
+        // Check for drinks and extras errors
         if (errors.packages) {
           if (Array.isArray(errors.packages)) {
             errors.packages.forEach((pkgError, idx) => {
               if (pkgError && typeof pkgError === "object") {
                 if (pkgError.title) {
                   errorMessages.push(
-                    `Package ${idx + 1} title: ${pkgError.title.message}`,
+                    `Extra option ${idx + 1} title: ${pkgError.title.message}`,
                   );
                 }
                 if (pkgError.description) {
                   errorMessages.push(
-                    `Package ${idx + 1} description: ${
+                    `Extra option ${idx + 1} description: ${
                       pkgError.description.message
                     }`,
                   );
                 }
                 if (pkgError.available_quantity) {
                   errorMessages.push(
-                    `Package ${idx + 1} available quantity: ${
+                    `Extra option ${idx + 1} available quantity: ${
                       pkgError.available_quantity.message
                     }`,
                   );
                 }
                 if (pkgError.price) {
                   errorMessages.push(
-                    `Package ${idx + 1} price: ${pkgError.price.message}`,
+                    `Extra option ${idx + 1} price: ${pkgError.price.message}`,
                   );
                 }
               }
@@ -412,7 +413,7 @@ export default function StepEight() {
       <div className="w-full min-w-0 max-w-none mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
-            <OnboardingTitle>Do You Want To Add Any Packages?</OnboardingTitle>
+            <OnboardingTitle>Do you want to add drinks & extras?</OnboardingTitle>
           </CardHeader>
 
           <CardContent className="px-6 py-2 pb-8">
@@ -426,8 +427,8 @@ export default function StepEight() {
                 <WholeStepGuidedShell
                   form={form}
                   sectionId="step-eight-packages"
-                  chipLabel="Other packages"
-                  chipDescription="Optional add-on packages and pricing."
+                  chipLabel="Drinks & extras"
+                  chipDescription="Optional drinks, add-ons, and pricing."
                   persistenceHydrated={persistedProgressHydrated}
                   persistedStepApproved={stepEightPersistedApproved === true}
                   renderFooter={({ guided }) => (
@@ -488,7 +489,7 @@ export default function StepEight() {
                                 <FormControl>
                                   <Input
                                     {...field}
-                                    placeholder="e.g. VIP Packages, Premium Access, etc."
+                                    placeholder="e.g. Drinks packages, premium extras, etc."
                                     className="h-10 bg-white/5 border-white/10"
                                     maxLength={maxLength}
                                     onChange={(e) => {
@@ -580,7 +581,7 @@ export default function StepEight() {
                         )}
                       >
                         <OnboardingFieldGroupTitle>
-                          Packages Deals
+                          Drinks & extras
                         </OnboardingFieldGroupTitle>
 
                         <div className="space-y-6 mt-4">
@@ -600,12 +601,12 @@ export default function StepEight() {
                                   return (
                                     <FormItem>
                                       <FormLabel className="text-sm font-medium">
-                                        Package {index + 1}
+                                        Extra option {index + 1}
                                       </FormLabel>
                                       <FormControl>
                                         <Input
                                           {...field}
-                                          placeholder={`Package ${index + 1}`}
+                                          placeholder={`Extra option ${index + 1}`}
                                           className="h-10 bg-white/5 border-white/10"
                                           maxLength={maxLength}
                                           onChange={(e) => {
@@ -663,7 +664,7 @@ export default function StepEight() {
                                   return (
                                     <FormItem>
                                       <FormLabel className="text-sm font-medium">
-                                        Package Description
+                                        Extra description
                                       </FormLabel>
                                       <FormControl>
                                         <Input
@@ -711,7 +712,7 @@ export default function StepEight() {
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel className="text-sm font-medium">
-                                      Package Price{" "}
+                                      Extra price{" "}
                                       <span className="text-red-500">*</span>
                                     </FormLabel>
                                     <FormControl>
@@ -794,7 +795,7 @@ export default function StepEight() {
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel className="text-sm font-medium">
-                                      Available Quantity{" "}
+                                      Available quantity{" "}
                                       <span className="text-red-500">*</span>
                                     </FormLabel>
                                     <FormControl>
@@ -863,7 +864,7 @@ export default function StepEight() {
                                 onClick={() => {
                                   if (fields.length <= 1) {
                                     toast.error(
-                                      "At least one package is required",
+                                      "At least one drink or extra is required",
                                     );
                                     return;
                                   }
@@ -880,7 +881,7 @@ export default function StepEight() {
                                 }}
                                 disabled={fields.length <= 1}
                               >
-                                Remove Package
+                                Remove extra
                               </Button>
                             </div>
                           ))}
@@ -891,10 +892,10 @@ export default function StepEight() {
                               variant="outline"
                               onClick={() => {
                                 const newPackage = {
-                                  title: `Package ${fields.length + 1}`,
+                                  title: "",
                                   description: "",
                                   price: 0,
-                                  available_quantity: 100,
+                                  available_quantity: undefined as unknown as number,
                                 };
                                 const currentPackages =
                                   form.getValues("packages") || [];
@@ -906,7 +907,7 @@ export default function StepEight() {
                               }}
                               className="mt-4 border-white/20 bg-white/[0.04] text-sm hover:bg-white/[0.08]"
                             >
-                              Add More Package
+                              Add another extra
                             </Button>
                           )}
                         </div>

@@ -70,7 +70,7 @@ export default function VendorConversationHeader({
   const isSentToAdmin = conversation.direction === "sent";
   // Assign / Transfer / Close visibility from can_manage (API).
   const canTransfer = canManage && !isSentToAdmin;
-  const canAssign = canManage && !isSentToAdmin;
+  const canAssign = canManage && !isSentToAdmin && !assignee;
   const canPin = canPinProp ?? false;
   // Admin-queue tickets: close is main-vendor only.
   const canClose =
@@ -114,7 +114,7 @@ export default function VendorConversationHeader({
               <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                 {VENDOR_CATEGORY_LABELS[conversation.category]}
               </span>
-              {canAssign && assignee ? (
+              {assignee ? (
                 <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                   {assignee.name.split(" ")[0]}
                 </span>
@@ -156,9 +156,7 @@ export default function VendorConversationHeader({
                 onClick={onAssignClick}
               >
                 <UserPlus className="size-4 shrink-0" />
-                <span className="hidden truncate sm:inline">
-                  {assignee ? "Reassign" : "Assign"}
-                </span>
+                <span className="hidden truncate sm:inline">Assign</span>
               </Button>
             ) : null}
             {canTransfer ? (

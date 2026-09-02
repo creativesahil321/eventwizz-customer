@@ -64,7 +64,7 @@ export default function StripeReturnPage() {
 
       if (accountStatus === "active") {
         message =
-          "Your Stripe account is now active! You can accept payments from customers.";
+          "Your Stripe account is now active! You can accept payments from guests.";
         toast.success("Stripe account activated!");
       } else if (accountStatus === "under_review") {
         message =
@@ -231,7 +231,7 @@ export default function StripeReturnPage() {
               </>
             )}
             {!accountStatus && (
-              <>You can now accept payments from customers through Stripe.</>
+              <>You can now accept payments from guests through Stripe.</>
             )}
             <br />
             <br />

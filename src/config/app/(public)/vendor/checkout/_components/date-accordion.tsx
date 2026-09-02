@@ -36,9 +36,11 @@ import {
 } from "@/lib/security/price-validation";
 import {
   buildDateSelectionSummary,
+  calculateEditableDateDiscountableTotal,
   calculateEditableDateTotal,
   getDateGuestCount,
 } from "../_lib/cart-calculations";
+import { isCheckoutDateEmpty } from "../_lib/checkout-readiness";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { getCheckoutRoomTone } from "../_lib/checkout-room-tones";
 import { cn } from "@/lib/utils";
@@ -63,10 +65,54 @@ interface DateAccordionProps {
   embedded?: boolean;
   /** Accent index for room-colored calendar icon. */
   roomAccentIndex?: number;
+  /** Shown inline under the date for single-room checkout (no room tab bar). */
+  roomName?: string;
   /** Event-level drink section label from cart API. */
   drinkTitle?: string;
   /** Server cart event payload for price validation on save. */
   serverEventData?: Record<string, unknown> | null;
+  /** Automatic date discount label from cart API (`discount.value_label`). */
+  discountLabel?: string | null;
+  /** Monetary saving when the date offer is currently eligible. */
+  discountAmount?: number | null;
+  /**
+   * Pre-discount base shown as strikethrough.
+   * Per-person table offers → table total; percentage → tables + tickets.
+   */
+  discountStrikeAmount?: number | null;
+  /** Why the offer is locked (e.g. min guests) — shown instead of “applied”. */
+  discountLockedHint?: string | null;
+}
+
+function cartSavePayloadKey(cartData: {
+  event_date: string;
+  room_id?: number;
+  people_quantity?: number;
+  tables?: unknown[];
+  tickets?: unknown[];
+  drink_package?: unknown[];
+}): string {
+  return JSON.stringify({
+    event_date: cartData.event_date,
+    room_id: cartData.room_id ?? null,
+    people_quantity: cartData.people_quantity ?? null,
+    tables: cartData.tables ?? [],
+    tickets: cartData.tickets ?? [],
+    drink_package: cartData.drink_package ?? [],
+  });
+}
+
+function getErrorHttpStatus(error: unknown): number | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof (error as { response?: { status?: unknown } }).response?.status ===
+      "number"
+  ) {
+    return (error as { response: { status: number } }).response.status;
+  }
+  return undefined;
 }
 
 function CheckoutAvailabilityHint({
@@ -106,8 +152,13 @@ export default function DateAccordion({
   roomId,
   embedded = false,
   roomAccentIndex = 0,
+  roomName,
   drinkTitle = "Drinks",
   serverEventData = null,
+  discountLabel = null,
+  discountAmount = null,
+  discountStrikeAmount = null,
+  discountLockedHint = null,
 }: DateAccordionProps) {
   const { format: formatMoney, formatCompact: formatMoneyUnit } =
     useCurrencyFormat();
@@ -117,6 +168,7 @@ export default function DateAccordion({
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
   const pendingFollowUpSaveRef = useRef(false);
+  const lastFailedSaveKeyRef = useRef<string | null>(null);
   const isPreviewMode = useIsPreviewMode();
   const { mutateAsync: storeEventBooking } = useStoreEventBooking();
 
@@ -158,6 +210,11 @@ export default function DateAccordion({
     ) {
       autoSaveTimerRef.current = setTimeout(async () => {
         if (isSavingRef.current) return;
+        const pendingKey = cartSavePayloadKey(
+          getItemsForAPI(eventSlug, date, roomId),
+        );
+        // Same payload already saved or failed — wait until the cart changes.
+        if (lastFailedSaveKeyRef.current === pendingKey) return;
         try {
           setIsAutoSaving(true);
           await handleSaveDate();
@@ -178,6 +235,16 @@ export default function DateAccordion({
   }, [isExpanded, hasChanges, isSaving, isAutoSaving, isPreviewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAmount = calculateEditableDateTotal(dateData);
+  const discountableTotal = calculateEditableDateDiscountableTotal(dateData);
+  const appliedDiscount =
+    typeof discountAmount === "number" && discountAmount > 0
+      ? discountAmount
+      : 0;
+  const strikeBase =
+    typeof discountStrikeAmount === "number" && discountStrikeAmount > 0
+      ? discountStrikeAmount
+      : discountableTotal;
+  const payableAmount = Math.max(0, totalAmount - appliedDiscount);
 
   const handleSaveDate = async (): Promise<boolean> => {
     if (isSavingRef.current || isSaving) {
@@ -240,10 +307,6 @@ export default function DateAccordion({
       }
 
       if (canPersist) {
-        if (!hasItems) {
-          toast.info(`Removing all items for ${formatDateMobile(date)}`);
-        }
-
         if (process.env.NODE_ENV === "development") {
           console.log(`🔍 Saving ${formatDateMobile(date)}:`, cartData);
         }
@@ -270,10 +333,16 @@ export default function DateAccordion({
               skipInvalidation: true,
             });
             if (response?.status === true) {
+              lastFailedSaveKeyRef.current = cartSavePayloadKey(
+                sanitizedCartData,
+              );
               markDateAsSaved(eventSlug, date);
               await new Promise((resolve) => setTimeout(resolve, 150));
               succeeded = true;
             } else {
+              lastFailedSaveKeyRef.current = cartSavePayloadKey(
+                sanitizedCartData,
+              );
               console.error("API Error Response:", response);
             }
           }
@@ -283,15 +352,20 @@ export default function DateAccordion({
             skipInvalidation: true,
           });
           if (response?.status === true) {
+            lastFailedSaveKeyRef.current = cartSavePayloadKey(cartData);
             markDateAsSaved(eventSlug, date);
             await new Promise((resolve) => setTimeout(resolve, 150));
             succeeded = true;
           } else {
+            lastFailedSaveKeyRef.current = cartSavePayloadKey(cartData);
             console.error("API Error Response:", response);
           }
         }
       }
     } catch (error) {
+      lastFailedSaveKeyRef.current = cartSavePayloadKey(
+        getItemsForAPI(eventSlug, date, roomId),
+      );
       console.error("Error saving date cart data:", {
         error,
         eventSlug,
@@ -299,7 +373,11 @@ export default function DateAccordion({
         timestamp: new Date().toISOString(),
       });
 
-      if (error instanceof Error) {
+      const httpStatus = getErrorHttpStatus(error);
+      // 400/422 are already toasted by the API interceptor with the server message.
+      if (httpStatus === 400 || httpStatus === 422) {
+        // no extra toast
+      } else if (error instanceof Error) {
         if (
           error.message.includes("Network Error") ||
           error.message.includes("Failed to fetch")
@@ -315,14 +393,12 @@ export default function DateAccordion({
             "Session expired. Please refresh the page and log in again.",
           );
         } else if (
-          error.message.includes("400") ||
-          error.message.includes("Bad Request")
+          error.message.includes("500") ||
+          error.message.includes("Internal Server Error")
         ) {
-          toast.error(
-            "Invalid data. Please check your selections and try again.",
-          );
-        } else if (error.message.includes("500")) {
+          toast.error("Couldn't save your cart. Please try again.");
         } else {
+          toast.error("Couldn't save your cart. Please try again.");
         }
       } else {
         toast.error(
@@ -336,8 +412,13 @@ export default function DateAccordion({
 
       if (pendingFollowUpSaveRef.current) {
         pendingFollowUpSaveRef.current = false;
-        const followUpSucceeded = await handleSaveDate();
-        succeeded = followUpSucceeded || succeeded;
+        const followUpKey = cartSavePayloadKey(
+          getItemsForAPI(eventSlug, date, roomId),
+        );
+        if (lastFailedSaveKeyRef.current !== followUpKey) {
+          const followUpSucceeded = await handleSaveDate();
+          succeeded = followUpSucceeded || succeeded;
+        }
       }
     }
 
@@ -379,6 +460,7 @@ export default function DateAccordion({
   };
 
   const selectionSummary = buildDateSelectionSummary(dateData);
+  const isDateEmpty = isCheckoutDateEmpty(dateData);
   const roomTone = getCheckoutRoomTone(roomAccentIndex);
   const metaParts: string[] = [];
   const ticketQty = dateData.tickets
@@ -401,7 +483,11 @@ export default function DateAccordion({
     metaParts.push(`${tableQty} table${tableQty !== 1 ? "s" : ""}`);
   if (guestQty > 0)
     metaParts.push(`${guestQty} guest${guestQty !== 1 ? "s" : ""}`);
-  const metaLine = metaParts.join(" · ");
+  const itemsMeta = metaParts.join(" · ");
+  const trimmedRoomName = roomName?.trim() || "";
+  const fallbackItemsMeta =
+    itemsMeta || selectionSummary || "No items selected yet";
+  const metaLine = itemsMeta;
 
   const hasTicketsSection = dateData.tickets.length > 0;
   const hasTablesSection = dateData.tables.length > 0;
@@ -430,22 +516,21 @@ export default function DateAccordion({
         "bg-white",
         isExpanded ? "overflow-visible" : "overflow-hidden",
         embedded
-          ? ""
+          ? "overflow-hidden rounded-xl border border-[color:var(--checkout-border)] shadow-sm"
           : "rounded-2xl border border-[color:var(--checkout-border)] shadow-sm",
       )}
     >
       <div
         className={cn(
           "flex w-full items-start justify-between gap-3 px-3 py-3.5 transition-colors sm:items-center sm:gap-3 sm:px-5 sm:py-3",
-          isExpanded ? "bg-white" : "hover:bg-[color:var(--checkout-muted)]/50",
+          isExpanded
+            ? "bg-white"
+            : embedded
+              ? "bg-white hover:bg-[color:var(--checkout-muted)]/35"
+              : "hover:bg-[color:var(--checkout-muted)]/50",
         )}
       >
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-start gap-2.5 text-left sm:items-center sm:gap-3"
-          onClick={onToggle}
-          aria-expanded={isExpanded}
-        >
+        <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:items-center sm:gap-3">
           <div
             className={cn(
               "mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg sm:mt-0",
@@ -457,20 +542,62 @@ export default function DateAccordion({
             <Calendar className="h-4 w-4" strokeWidth={2.25} />
           </div>
           <div className="min-w-0 flex-1 text-left">
-            <h3 className="text-[15px] font-bold leading-snug text-[color:var(--checkout-brand-primary)] sm:text-base">
-              <span className="hidden sm:inline">{formatDate(date)}</span>
-              <span className="sm:hidden">{formatDateMobile(date)}</span>
-            </h3>
-            <p className="mt-0.5 truncate text-[11px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:text-xs">
-              {metaLine || selectionSummary || "No items selected yet"}
-            </p>
-            {hasValidationError && (
-              <span className="mt-1.5 inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold leading-none text-amber-700 sm:hidden">
-                Action needed
-              </span>
-            )}
+            <button
+              type="button"
+              className="w-full text-left"
+              onClick={onToggle}
+              aria-expanded={isExpanded}
+            >
+              <h3 className="text-[15px] font-bold leading-snug text-[color:var(--checkout-brand-primary)] sm:text-base">
+                <span className="hidden sm:inline">{formatDate(date)}</span>
+                <span className="sm:hidden">{formatDateMobile(date)}</span>
+              </h3>
+              <p
+                className={cn(
+                  "mt-0.5 line-clamp-2 text-[12px] font-medium leading-relaxed sm:line-clamp-1 sm:text-xs",
+                  isDateEmpty
+                    ? "text-amber-700"
+                    : "text-[color:var(--checkout-muted-foreground)]",
+                )}
+              >
+                {trimmedRoomName ? (
+                  <>
+                    <span className="font-semibold text-[color:var(--checkout-brand-accent)]">
+                      {trimmedRoomName}
+                    </span>
+                    <span
+                      className={
+                        isDateEmpty
+                          ? "text-amber-700"
+                          : "text-[color:var(--checkout-muted-foreground)]"
+                      }
+                    >
+                      {" · "}
+                      {fallbackItemsMeta}
+                    </span>
+                  </>
+                ) : (
+                  metaLine || selectionSummary || "No items selected yet"
+                )}
+              </p>
+              {hasValidationError && (
+                <span className="mt-1.5 inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold leading-none text-amber-700 sm:hidden">
+                  Action needed
+                </span>
+              )}
+            </button>
+            {!isExpanded && isDateEmpty ? (
+              <button
+                type="button"
+                onClick={onToggle}
+                className="mt-1.5 inline-flex items-center gap-0.5 text-xs font-semibold text-[color:var(--checkout-brand-accent)] transition-colors hover:text-[color:var(--checkout-brand-primary)]"
+              >
+                Add items
+                <span aria-hidden>→</span>
+              </button>
+            ) : null}
           </div>
-        </button>
+        </div>
 
         <div className="flex shrink-0 items-center gap-2 pt-0.5 sm:gap-2.5 sm:pt-0">
           {hasValidationError && (
@@ -479,11 +606,37 @@ export default function DateAccordion({
             </span>
           )}
 
-          {totalAmount > 0 && (
-            <span className="text-sm font-bold tabular-nums text-[color:var(--checkout-brand-primary)] sm:text-lg">
-              {formatMoney(totalAmount)}
-            </span>
-          )}
+          <div className="flex max-w-[9.5rem] flex-col items-end gap-0.5 sm:max-w-none">
+            {appliedDiscount > 0 && discountLabel?.trim() ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                {discountLabel.trim()}
+              </span>
+            ) : discountLockedHint?.trim() && discountLabel?.trim() ? (
+              <span
+                className="max-w-full truncate rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
+                title={discountLockedHint.trim()}
+              >
+                Unlock: {discountLabel.trim()}
+              </span>
+            ) : null}
+            {totalAmount > 0 && (
+              <div className="flex flex-col items-end">
+                {appliedDiscount > 0 && strikeBase > 0 ? (
+                  <span className="text-[11px] tabular-nums text-[color:var(--checkout-muted-foreground)] line-through">
+                    {formatMoney(strikeBase)}
+                  </span>
+                ) : null}
+                <span className="text-lg font-semibold tabular-nums text-[color:var(--checkout-brand-primary)]">
+                  {formatMoney(payableAmount)}
+                </span>
+                {appliedDiscount > 0 ? (
+                  <span className="text-[10px] font-semibold tabular-nums text-emerald-700">
+                    You saved {formatMoney(appliedDiscount)}
+                  </span>
+                ) : null}
+              </div>
+            )}
+          </div>
 
           {onRemoveDate && (
             <button
@@ -715,6 +868,7 @@ export default function DateAccordion({
           <div className="pt-5">
             <div className="rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 py-2.5">
               <button
+                type="button"
                 onClick={() => setShowSpecialRequest(!showSpecialRequest)}
                 className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors py-1.5 w-full"
               >

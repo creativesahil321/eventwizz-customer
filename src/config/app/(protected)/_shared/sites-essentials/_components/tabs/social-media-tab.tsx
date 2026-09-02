@@ -20,12 +20,12 @@ export function SocialMediaTab() {
   const form = useFormContext<SiteEssentialsFormValues>();
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <SectionTitle
         title="Social Media"
         description="Configure your site's social media links"
       />
-      <Separator className="my-4" />
+      <Separator className="my-3 sm:my-4" />
       <div className="space-y-4">
         <FormField
           control={form.control}

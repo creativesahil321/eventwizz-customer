@@ -4,6 +4,7 @@ import { buildMetadata } from "@/config/seo-metadata";
 import { Suspense } from "react";
 import { OnboardingFormSkeleton } from "@/components/ui/onboarding-skeleton";
 import OnboardingClientWrapper from "./client";
+import OnboardingBackGuard from "./_components/onboarding-back-guard";
 
 export async function generateMetadata(
   _: unknown,
@@ -42,7 +43,13 @@ export async function generateMetadata(
 export default function Page() {
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col">
-      <Suspense fallback={<OnboardingFormSkeleton layout="full" />}>
+      <OnboardingBackGuard />
+      {/*
+        First screen after register is the mode chooser ("How would you like to
+        build your site?"), not step 1. Use the neutral centered skeleton so the
+        9-step progress bar doesn't flash before mode selection resolves.
+      */}
+      <Suspense fallback={<OnboardingFormSkeleton layout="ai" />}>
         <OnboardingClientWrapper />
       </Suspense>
     </div>

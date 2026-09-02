@@ -19,6 +19,7 @@ import { useExitImpersonation } from "@/hooks/useImpersonation";
 import { logout } from "@/lib/auth/logout";
 import { addCacheBusting } from "@/lib/image-utils";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import { toTitleCase } from "@/lib/utils";
 
 // Helper function to check if a URL is valid
 const isValidUrl = (url: string | null | undefined): boolean => {
@@ -71,7 +72,7 @@ const UserDropdown = memo(() => {
 
     if (user) {
       if (user.account_type === "admin") {
-        url = "/admin/payment-settings";
+        url = "/admin/settings";
       } else if (user.account_type === "vendor") {
         url = "/vendor/payment-settings";
       } else if (user.account_type === "customer") {
@@ -81,7 +82,7 @@ const UserDropdown = memo(() => {
       const accountType = session.user.account_type;
 
       if (accountType === "admin") {
-        url = "/admin/payment-settings";
+        url = "/admin/settings";
       } else if (accountType === "vendor") {
         url = "/vendor/payment-settings";
       } else if (accountType === "customer") {
@@ -103,10 +104,9 @@ const UserDropdown = memo(() => {
 
   const showSettings = accountType !== "customer";
   const isVendor = accountType === "vendor";
-  const isAdmin = accountType === "admin";
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button className="flex items-center gap-2 bg-transparent text-[var(--color-on-header)] shadow-none hover:bg-transparent hover:text-[var(--color-on-header)]/90 pr-2">
@@ -121,17 +121,18 @@ const UserDropdown = memo(() => {
                 {userName.charAt(0).toUpperCase()}
               </div>
             )}
-            <div className="text-start">
+            <div className="hidden text-start 2xl:block">
               <div className="flex items-center gap-1">
-                <span className="hidden xl:block text-sm font-semibold">
-                  {userName}
-                </span>
+                <span className="text-sm font-semibold">{userName}</span>
                 <ChevronDown size={16} />
               </div>
-              <span className="hidden xl:block text-xs">
-                {user?.active_role || session?.user?.active_role}
+              <span className="text-xs">
+                {toTitleCase(
+                  user?.active_role || session?.user?.active_role || ""
+                )}
               </span>
             </div>
+            <ChevronDown size={16} className="2xl:hidden" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
@@ -149,24 +150,20 @@ const UserDropdown = memo(() => {
           </DropdownMenuItem>
           {showSettings && (
             <PermissionGuard permissionKey="read-account" fallback={null}>
-              {isVendor || isAdmin ? (
+              {isVendor ? (
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger className="cursor-pointer">
                     <Settings size={16} className="mr-2" /> Settings
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-48">
-                    {isVendor && (
-                      <>
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={() => router.push("/vendor/domain-settings")}
-                        >
-                          <Globe size={15} className="mr-2 text-muted-foreground" />
-                          Domain Settings
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => router.push("/vendor/domain-settings")}
+                    >
+                      <Globe size={15} className="mr-2 text-muted-foreground" />
+                      Domain Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="cursor-pointer"
                       onClick={() => router.push(settingsUrl)}

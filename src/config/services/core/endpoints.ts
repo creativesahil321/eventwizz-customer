@@ -10,13 +10,25 @@ export const API_ENDPOINTS = {
     },
     THEME: {
       SETTINGS: "/theme/settings",
+      PRESETS: "/theme/presets",
     },
+    CONTACT_STORE: "/contact/store",
     PERMISSIONS: {
       GET: "/auth/user/permissions",
     },
     LOCATION: {
       GET_EVENTS_AND_LOCATION_DATA: "/domain/{domain}/locations/{slug}",
       GET_EVENT_BY_SLUG: "/domain/{domain}/events/{slug}",
+    },
+    PUBLIC_SEARCH: {
+      SEARCH: "/domain/{domain}/search",
+      AVAILABILITY: "/domain/{domain}/availability",
+      LOCATION_SEARCH: "/domain/{domain}/locations/{location_slug}/search",
+    },
+    /** Public published blogs (no auth). Home cards + article pages. */
+    BLOGS: {
+      LIST: "/blogs",
+      SHOW: "/blogs/{slug}",
     },
   },
   // Auth Endpoints
@@ -61,18 +73,19 @@ export const API_ENDPOINTS = {
       GET_ALL_STEPS: "/vendor/onboarding/steps/{location_id}/{is_rooms}",
       PAYMENT_GATEWAYS: "/vendor/onboarding/payment-gateway-connect",
       PAYMENT_RETURN: "/vendor/onboarding/return",
-      // Multi-room ("event spaces") endpoints. Same vendor onboarding surface, room-scoped.
-      ROOMS: "/vendor/onboarding/rooms",
-      ROOM_BY_ID: "/vendor/onboarding/rooms/{room_id}",
-      ROOMS_TOGGLE: "/vendor/onboarding/rooms/multi-space",
+      // Per-room step store. Room CRUD lives on VENDOR.ROOMS / ROOMS_STORE / ROOM_BY_ID.
       ROOM_STEP_STORE: "/vendor/onboarding/rooms/{room_id}/store",
     },
     PAYMENT_GATEWAYS: {
       GET_ALL: "/vendor/payment-gateway",
       ENABLE_DISABLE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}/is-enabled",
-      CONNECT_PAYMENT_GATEWAY: "/vendor/payment-gateway/connect",
+      DISCONNECT: "/vendor/payment-gateway/disconnect",
       DELETE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}",
       RETURN_URL: "/vendor/payment-gateway/return/{gateway}?account={account_id}",
+    },
+    GOCARDLESS: {
+      CONNECT: "/vendor/gocardless/connect",
+      ALLOW_AUTO_DEBIT: "/vendor/gocardless/allow-auto-debit",
     },
     EVENT: {
       GET_EVENTS: "/vendor/events",
@@ -123,17 +136,37 @@ export const API_ENDPOINTS = {
     },
     NEWSLETTER: {
       GET_ALL: "/vendor/newsletters",
+      COUNTS: "/vendor/newsletters/counts",
       SHOW: "/vendor/newsletters/show/{id}",
       CREATE: "/vendor/newsletters/store",
       UPDATE: "/vendor/newsletters/update/{id}",
       DELETE: "/vendor/newsletters/delete/{id}",
+      /** Suppress by id (preferred). Does not hard-delete. */
+      UNSUBSCRIBE_BY_ID: "/vendor/newsletters/{id}/unsubscribe",
+      /** Suppress by email (staff). */
       UNSUBSCRIBE: "/vendor/newsletters/unsubscribe/{email}",
+      /** CSV file; pass ?status=subscribed|unsubscribed. Optional scope=new. */
+      EXPORT: "/vendor/newsletters/export",
+    },
+    DISCOUNTS: {
+      GET_ALL: "/vendor/discounts",
+      GET_BY_ID: "/vendor/discounts/{id}",
+      /** Current header location: events → dates → rooms */
+      EVENTS_WITH_DATES: "/vendor/discounts/events-with-dates",
+      CREATE: "/vendor/discounts/store",
+      UPDATE: "/vendor/discounts/update/{id}",
+      UPDATE_STATUS: "/vendor/discounts/{id}/status",
+      DELETE: "/vendor/discounts/delete/{id}",
     },
     SITES_ESSENTIALS: {
       GET: "/vendor/site-essentials",
       UPDATE: "/vendor/site-essentials/update",
       RESET_THEME_DEFAULT: "/vendor/site-essentials/reset-theme-default",
+      THEME_PRESETS: "/vendor/site-essentials/theme-presets",
+      APPLY_THEME_PRESET: "/vendor/site-essentials/apply-theme-preset",
     },
+    /** Public per-page CMS content for the vendor tenant site (SSR/SEO). */
+    INFO_PAGES: "/vendor/info-pages",
     LOCATION: {
       SWITCH_LOCATION: "/vendor/locations/switch",
       GET_ALL: "/vendor/locations",
@@ -141,6 +174,12 @@ export const API_ENDPOINTS = {
       CREATE: "/vendor/locations",
       UPDATE: "/vendor/locations/{id}",
       DELETE: "/vendor/locations/{id}",
+      /**
+       * Security-first delete: OTP is emailed to the vendor owner account
+       * (never staff). Frontend contract for backend — implement these routes.
+       */
+      SEND_DELETE_OTP: "/vendor/locations/{id}/send-delete-otp",
+      VERIFY_DELETE_OTP: "/vendor/locations/{id}/verify-delete-otp",
       TOGGLE_LOCATION_STATUS: "/vendor/locations/toggle-status",
     },
     NOTIFICATIONS: {
@@ -148,7 +187,6 @@ export const API_ENDPOINTS = {
       MARK_AS_READ_ALL: "/vendor/notifications/mark-as-read-all",
       MARK_AS_UNREAD: "/vendor/notifications/mark-as-unread/{id}",
       MARK_AS_READ: "/vendor/notifications/mark-as-read/{id}",
-      STATS: "/vendor/notifications/stats",
     },
 
     MENU_CHOICES: {
@@ -232,6 +270,10 @@ export const API_ENDPOINTS = {
       STATISTICS: "/customer/dashboard",
       NEARBY_EVENTS: "/customer/events/nearby",
     },
+    NEWSLETTER: {
+      SUBSCRIBE: "/customer/newsletter/subscribe",
+      UNSUBSCRIBE: "/customer/newsletter/unsubscribe",
+    },
     BOOKINGS: {
       BOOKINGS: "/customer/bookings",
       BOOKING_DETAILS: "/customer/bookings/show/{id}",
@@ -251,6 +293,8 @@ export const API_ENDPOINTS = {
     },
     PAYMENT: {
       STRIPE_SUCCESS: "/customer/payment/stripe/success",
+      /** Authenticated receipt by booking_number. Version follows NEXT_PUBLIC_API_URL. */
+      SUCCESS: "/customer/payment/success",
     },
     MENU_CHOICES: {
       ADD_MENU: "/customer/bookings/menu-items/{id}/{date}/{table_id}",
@@ -265,7 +309,6 @@ export const API_ENDPOINTS = {
       MARK_AS_READ_ALL: "/customer/notifications/mark-as-read-all",
       MARK_AS_UNREAD: "/customer/notifications/mark-as-unread/{id}",
       MARK_AS_READ: "/customer/notifications/mark-as-read/{id}",
-      STATS: "/customer/notifications/stats",
     },
 
     BOOK_EVENT: {
@@ -276,7 +319,7 @@ export const API_ENDPOINTS = {
       DELETE_CART_DATA_ROOM:
         "/customer/event/delete/{room_id}/{date}", // Room events: delete one date for a specific room
       CHECKOUT: "/customer/event/checkout", // Create booking + payment credentials
-      CHECKOUT_RESUME: "/customer/event/checkout/resume", // Resume unpaid Stripe payment
+      CHECKOUT_RESUME: "/customer/event/checkout/resume", // Resume unpaid booking; optional payment_gateway to switch
       CHECKOUT_BOOKING: "/customer/event/checkout/{bookingId}",
     },
 
@@ -305,11 +348,27 @@ export const API_ENDPOINTS = {
       GET: "/admin/site-essentials",
       UPDATE: "/admin/site-essentials/update",
       RESET_THEME_DEFAULT: "/admin/site-essentials/reset-theme-default",
+      THEME_PRESETS: "/admin/site-essentials/theme-presets",
+      APPLY_THEME_PRESET: "/admin/site-essentials/apply-theme-preset",
+    },
+    /** Public per-page CMS content for the main admin marketing site (SSR/SEO). */
+    INFO_PAGES: "/admin/info-pages",
+    BLOGS: {
+      LIST: "/admin/blogs",
+      STORE: "/admin/blogs/store",
+      SHOW: "/admin/blogs/{slug}",
+      UPDATE: "/admin/blogs/update/{slug}",
+      DELETE: "/admin/blogs/delete/{slug}",
+      UPLOAD_IMAGE: "/admin/blogs/upload-image",
     },
     /** Default platform commission; per-venue overrides live on venue detail (PUT /admin/venues/{id}). */
     PAYMENT_SETTINGS: {
       GET_COMMISSION: "/admin/payment-settings/commission",
       UPDATE_COMMISSION: "/admin/payment-settings/commission",
+      GET_GOCARDLESS_COLLECTION_INTERVAL:
+        "/admin/payment-settings/gocardless-collection-interval",
+      UPDATE_GOCARDLESS_COLLECTION_INTERVAL:
+        "/admin/payment-settings/gocardless-collection-interval",
     },
     VENUES: {
       ALL: "/admin/venues?status={status}&search={search}",
@@ -398,13 +457,16 @@ export const API_ENDPOINTS = {
       STATISTICS: "/admin/transactions/internal-transfer-requests/statistics",
     },
     TRANSACTIONS: {
-      ALL: "/admin/transaction-history",
+      ALL: "/admin/transactions",
       INTERNAL_TRANSFER: "/admin/transactions/internal-transfer-requests",
       INTERNAL_TRANSFER_MANAGEMENT: "/admin/internal-transfer",
 
-      HISTORY: "/admin/transaction-history",
+      HISTORY: "/admin/transactions",
       STATISTICS: "/admin/transaction-history/static",
-      EXPORT: "/admin/transaction-history/export",
+      EXPORT: "/admin/transactions/export",
+
+      RECEIPT: "/admin/transactions/{payment_id}/receipt",
+      EXPORT_TRANSACTIONS: "/admin/transactions/export",
     },
     DEPOSITS: {
       AUTO_METHOD: {
@@ -575,6 +637,12 @@ export const API_ENDPOINTS = {
       UPDATE_FAVICON: "/admin/settings/upload-files",
       NIDHI_WALLET: "/admin/wallets/get-all-wallets-with-balance",
       ADD_BALANCE_TO_NIDHI_WALLET: "/admin/wallets/add-balance-to-nidhi-wallet",
+      /** Stored server-side so the platform can switch provider/model/key without a rebuild. */
+      GET_AI_PROVIDERS: "/admin/settings/ai-providers",
+      UPSERT_AI_PROVIDER: "/admin/settings/ai-providers",
+      DELETE_AI_PROVIDER: "/admin/settings/ai-providers/{id}",
+      ACTIVATE_AI_PROVIDER: "/admin/settings/ai-providers/{id}/activate",
+      LIST_AI_MODELS: "/admin/settings/ai-providers/{id}/models",
     },
     PROFIT_WALLET: {
       ALL: "/admin/profit-transfer/schedule-task/list",
@@ -586,9 +654,9 @@ export const API_ENDPOINTS = {
     },
     NOTIFICATIONS: {
       ALL: "/admin/notifications/paginate",
-      STATS: "/admin/notifications/stats",
       MARK_AS_READ: "/admin/notifications/mark-as-read/{id}",
       MARK_AS_UNREAD: "/admin/notifications/mark-as-unread/{id}",
+      MARK_AS_READ_ALL: "/admin/notifications/mark-as-read-all",
       MARK_ALL_AS_READ: "/admin/notifications/mark-as-read-all",
     },
     LANGUAGES: {
@@ -618,6 +686,13 @@ export const API_ENDPOINTS = {
   // Public Endpoints
   PUBLIC: {
     FAQS: "",
+    /** Newsletter opt-in on a vendor site (tenant via X-Domain header). */
     SUBSCRIBE: "/subscribe",
+    /** Confirm a guest opt-in via hashed token. Body: { token }. No OTP. */
+    SUBSCRIBE_VERIFY: "/subscribe/verify",
+    /** Resend confirmation email. Same body as subscribe. Never reveals whether the email exists. */
+    SUBSCRIBE_RESEND: "/newsletters/resend",
+    /** Token-based unsubscribe from an email link. GET preview, POST confirm. */
+    NEWSLETTER_UNSUBSCRIBE: "/newsletter/unsubscribe",
   },
 };

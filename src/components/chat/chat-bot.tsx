@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -131,8 +132,15 @@ import {
   buildChatSafetyReply,
   classifyChatSafetyIntent,
 } from "@/lib/chat-safety";
-import CheckoutStripePaymentModal from "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal";
 import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
+
+const CheckoutStripePaymentModal = dynamic(
+  () =>
+    import(
+      "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal"
+    ),
+  { ssr: false },
+);
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 import { isCustomerFacingChatSurface } from "@/lib/chat-page-context";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
@@ -1013,6 +1021,9 @@ export function ChatBot() {
     checkoutInProgressRef.current = false;
     eventBookingBriefRef.current = null;
     chatPayGatewaysRef.current = [];
+    keepComposerFocusRef.current = false;
+    setIsOpen(false);
+    setIsMinimized(false);
     setIsStripePaymentOpen(false);
     setStripePaymentSession(null);
     const store = useCheckoutPaymentUiStore.getState();
@@ -1039,6 +1050,9 @@ export function ChatBot() {
 
   useEffect(() => {
     if (!isPaymentSuccessPath(pathname)) return;
+    keepComposerFocusRef.current = false;
+    setIsOpen(false);
+    setIsMinimized(false);
     const params =
       typeof window === "undefined"
         ? null
@@ -3465,20 +3479,22 @@ Is there anything else I can help you with?`,
         )}
       </AnimatePresence>
 
-      <CheckoutStripePaymentModal
-        open={isStripePaymentOpen}
-        onOpenChange={(open) => {
-          setIsStripePaymentOpen(open);
-          if (open) return;
-          checkoutInProgressRef.current = false;
-          setStripePaymentSession(null);
-          useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
-        }}
-        session={stripePaymentSession}
-        onPaymentComplete={() => {
-          resetChatAfterPaidBooking(stripePaymentSession?.bookingNumber);
-        }}
-      />
+      {isStripePaymentOpen && stripePaymentSession ? (
+        <CheckoutStripePaymentModal
+          open={isStripePaymentOpen}
+          onOpenChange={(open) => {
+            setIsStripePaymentOpen(open);
+            if (open) return;
+            checkoutInProgressRef.current = false;
+            setStripePaymentSession(null);
+            useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
+          }}
+          session={stripePaymentSession}
+          onPaymentComplete={() => {
+            resetChatAfterPaidBooking(stripePaymentSession?.bookingNumber);
+          }}
+        />
+      ) : null}
 
       <style
         dangerouslySetInnerHTML={{

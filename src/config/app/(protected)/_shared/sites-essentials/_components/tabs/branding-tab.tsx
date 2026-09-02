@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFormContext, useWatch } from "react-hook-form";
 import { SiteEssentialsFormValues } from "../../_lib/hooks";
-import { BANNER_SUB_HEADING_MAX_CHARS } from "../../_lib/schema";
+import {
+  BANNER_SUB_HEADING_MAX_CHARS,
+  COPYRIGHT_MAX_TEXT_CHARS,
+} from "../../_lib/schema";
+import {
+  FOOTER_BRAND_DESCRIPTION_MAX_CHARS,
+  FOOTER_BRAND_DESCRIPTION_MAX_WORDS,
+} from "@/lib/footer-brand-description";
 import {
   FormField,
   FormItem,
@@ -18,23 +26,29 @@ import { SectionTitle } from "../ui/section-title";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
+import { AdminHomePageSection } from "./admin-home-page-section";
+import { InfoPagesTab } from "./info-pages-tab";
+import { SectionCard } from "../ui/section-card";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
 import { addCacheBusting } from "@/lib/image-utils";
 import { LocationIndicator } from "@/components/location-indicator";
 import { MapPin } from "lucide-react";
+import {
+  SITE_HERO_BACKGROUND_CROP,
+  SITE_HERO_UPLOAD_HINT,
+} from "@/lib/event-image-crop-presets";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
+import { useSiteEssentialsQuery } from "../../_lib/queries";
 import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
 import { ensureFilePreview, revokeFilePreview } from "@/lib/file-preview";
-import { Button } from "@/components/ui/button";
-import { optimizeLogoFromSources, isLocalLogoUrl } from "@/lib/logo/optimize-logo-from-sources";
-import { getFriendlyLogoOptimizeErrorMessage } from "@/lib/logo/logo-process-notices";
+import { isLocalLogoUrl } from "@/lib/logo/optimize-logo-from-sources";
 import {
   LOGO_SUPPORTED_ACCEPT,
   LOGO_SUPPORTED_FORMATS_LABEL,
@@ -47,6 +61,8 @@ import {
   useSitePreviewStore,
   type SitePreviewScope,
 } from "@/store/site-preview.store";
+import { isUnsavedPreviewMedia } from "../../_lib/merge-preview-with-api";
+import { syncSitePreviewFormIfNeeded } from "../../_lib/sync-preview-form";
 
 interface BrandingTabProps {
   /** When false, location page is the public home — hide main home tab & fields */
@@ -55,28 +71,107 @@ interface BrandingTabProps {
   serverCoverImage?: string;
   serverCoverVideo?: string;
   serverMainLandingCoverImage?: string;
+  serverLogo?: string;
+  serverFavicon?: string;
 }
 
-type BrandingScopeTab = "site-identity" | "main-home" | "location-page";
+function resolveFooterAiCity(
+  locations: SiteEssentialsFormValues["locations"],
+  slug: string | undefined,
+): string | undefined {
+  const list = locations ?? [];
+  const trimmedSlug = slug?.trim();
+  const match = trimmedSlug
+    ? list.find((loc) => loc.slug === trimmedSlug)
+    : undefined;
+  const city = match?.city?.trim() || list[0]?.city?.trim();
+  return city || undefined;
+}
+
+function coerceMediaUrl(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value instanceof File) return "";
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["url", "src", "path", "original"]) {
+      const candidate = record[key];
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  }
+  return "";
+}
+
+type BrandingScopeTab =
+  | "site-identity"
+  | "main-home"
+  | "location-page"
+  | "info-pages";
 
 const BRANDING_SCOPE_TO_PREVIEW: Record<BrandingScopeTab, SitePreviewScope> = {
   "site-identity": "main",
   "main-home": "main",
   "location-page": "location",
+  "info-pages": "main",
 };
+
+const BRANDING_SCOPE_VALUES: BrandingScopeTab[] = [
+  "site-identity",
+  "main-home",
+  "location-page",
+  "info-pages",
+];
+
+function isBrandingScopeTab(value: string | null): value is BrandingScopeTab {
+  return (
+    value !== null &&
+    (BRANDING_SCOPE_VALUES as readonly string[]).includes(value)
+  );
+}
 
 export function BrandingTab({
   hasMultipleLocations,
   serverCoverImage,
   serverCoverVideo,
   serverMainLandingCoverImage,
+  serverLogo,
+  serverFavicon,
 }: BrandingTabProps) {
   const { readOnly } = useSiteEssentialsUpdateGate();
   const { setPreviewScope } = useSitePreviewStore();
-  const [brandingScope, setBrandingScope] = useState<BrandingScopeTab>(() =>
-    hasMultipleLocations ? "main-home" : "site-identity",
-  );
+  const searchParams = useSearchParams();
+  // Backend often overwrites logo/favicon at the same storage path. Without a
+  // version, addCacheBusting is a no-op and the browser keeps the old image.
+  const { dataUpdatedAt: siteMediaVersion } = useSiteEssentialsQuery();
+  const scopeFromUrl = searchParams.get("scope");
+  const [brandingScope, setBrandingScope] = useState<BrandingScopeTab>(() => {
+    if (isBrandingScopeTab(scopeFromUrl)) {
+      if (!hasMultipleLocations && scopeFromUrl === "main-home") {
+        return "location-page";
+      }
+      return scopeFromUrl;
+    }
+    return hasMultipleLocations ? "main-home" : "site-identity";
+  });
   const form = useFormContext<SiteEssentialsFormValues>();
+  const footerAiTitle = useWatch({ control: form.control, name: "name" });
+  const footerAiLocations = useWatch({
+    control: form.control,
+    name: "locations",
+  });
+  const footerAiSlug = useWatch({ control: form.control, name: "slug" });
+  const footerAiAbout = useWatch({
+    control: form.control,
+    name: "about_description",
+  });
+  const footerAiCity: string | undefined = resolveFooterAiCity(
+    footerAiLocations,
+    footerAiSlug,
+  );
+  // The admin/main marketing site edits a fixed set of home sections (no
+  // per-location vendor fields), so we swap in a dedicated editor.
+  const isAdmin = form.watch("website_role") === "admin";
 
   const previewScopeForTab = (tab: BrandingScopeTab): SitePreviewScope => {
     if (!hasMultipleLocations) {
@@ -91,21 +186,37 @@ export function BrandingTab({
       return;
     }
     setBrandingScope(scope);
-    setPreviewScope(previewScopeForTab(scope));
+    if (!isAdmin) {
+      setPreviewScope(previewScopeForTab(scope));
+    }
   };
+
+  // Deep-link from onboarding Edit (`?tab=branding&scope=main-home|location-page`)
+  useEffect(() => {
+    if (!isBrandingScopeTab(scopeFromUrl)) return;
+    if (!hasMultipleLocations && scopeFromUrl === "main-home") {
+      setBrandingScope("location-page");
+      return;
+    }
+    setBrandingScope(scopeFromUrl);
+  }, [scopeFromUrl, hasMultipleLocations]);
 
   useEffect(() => {
     if (!hasMultipleLocations && brandingScope === "main-home") {
       setBrandingScope("location-page");
-      setPreviewScope("location");
+      if (!isAdmin) {
+        setPreviewScope("location");
+      }
       return;
     }
-    setPreviewScope(previewScopeForTab(brandingScope));
-  }, [brandingScope, hasMultipleLocations, setPreviewScope]);
+    if (!isAdmin) {
+      setPreviewScope(previewScopeForTab(brandingScope));
+    }
+  }, [brandingScope, hasMultipleLocations, setPreviewScope, isAdmin]);
   const headerBackgroundColor =
     useWatch({ control: form.control, name: "colors.header" }) ??
     defaultThemeConstants.colors.header;
-  const { processUpload: processLogoUpload, reprocessExistingUrl, isProcessing: isProcessingLogo } =
+  const { processUpload: processLogoUpload, isProcessing: isProcessingLogo } =
     useLogoUploadProcessor({ headerBackgroundColor });
 
   // File objects for new uploads
@@ -127,60 +238,116 @@ export function BrandingTab({
   const [bannerType, setBannerType] = useState<"image" | "video">("image");
   const [isValidatingVideo, setIsValidatingVideo] = useState(false);
 
-  // Sync banner state from SERVER props first (runs as soon as location data refetches – no form timing issues)
-  useEffect(() => {
-    const hasImage = Boolean(serverCoverImage && serverCoverImage.length > 0);
-    const hasVideo = Boolean(serverCoverVideo && serverCoverVideo.length > 0);
-    setLandingPageImageFiles([]);
-    setLandingPageVideoFiles([]);
-    if (hasImage) {
-      setLandingPageImageUrl(serverCoverImage!);
-    } else {
-      setLandingPageImageUrl("");
-    }
-    if (hasVideo) {
-      setLandingPageVideoUrl(serverCoverVideo!);
-    } else {
-      setLandingPageVideoUrl("");
-    }
-    setBannerType(hasVideo ? "video" : "image");
-  }, [serverCoverImage, serverCoverVideo]);
-
   // Watch form for logo/favicon and for when user uploads new file (form then has File; we don’t overwrite with server in that case)
   const watchedLogo = form.watch("logo");
   const watchedFavicon = form.watch("favicon");
   const watchedCoverImage = form.watch("cover_image");
   const watchedCoverVideo = form.watch("cover_video");
 
-  // Sync logo/favicon from form; for cover_image/cover_video only sync when user has selected a File (so we show their upload), otherwise server props drive banner
+  // Banner priority: unsaved File/blob → explicit null (Remove) → server props.
+  // `null` must stick so Remove is not undone by a later server sync.
+  useEffect(() => {
+    if (
+      isUnsavedPreviewMedia(watchedCoverImage) ||
+      watchedCoverImage instanceof File
+    ) {
+      return;
+    }
+    if (
+      isUnsavedPreviewMedia(watchedCoverVideo) ||
+      watchedCoverVideo instanceof File
+    ) {
+      return;
+    }
+
+    // Explicit clears from Remove — do not resurrect API media
+    if (watchedCoverImage === null && watchedCoverVideo === null) {
+      setLandingPageImageFiles([]);
+      setLandingPageVideoFiles([]);
+      setLandingPageImageUrl("");
+      setLandingPageVideoUrl("");
+      setBannerType("image");
+      return;
+    }
+
+    const allowServerImage = watchedCoverImage !== null;
+    const allowServerVideo = watchedCoverVideo !== null;
+    const hasImage =
+      allowServerImage &&
+      Boolean(serverCoverImage && serverCoverImage.length > 0);
+    const hasVideo =
+      allowServerVideo &&
+      Boolean(serverCoverVideo && serverCoverVideo.length > 0);
+
+    if (allowServerImage) {
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl(hasImage ? serverCoverImage! : "");
+    } else {
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl("");
+    }
+
+    if (allowServerVideo) {
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl(hasVideo ? serverCoverVideo! : "");
+    } else {
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl("");
+    }
+
+    setBannerType(hasVideo ? "video" : "image");
+  }, [
+    serverCoverImage,
+    serverCoverVideo,
+    watchedCoverImage,
+    watchedCoverVideo,
+  ]);
+
+  // Sync logo/favicon from form; for cover_image/cover_video sync File uploads,
+  // unsaved Preview blob/data URLs, and explicit null clears.
   useEffect(() => {
     if (watchedLogo instanceof File) {
       setLogoFiles([ensureFilePreview(watchedLogo)]);
       setLogoUrl("");
-    } else if (typeof watchedLogo === "string" && watchedLogo) {
-      setLogoFiles([]);
-      setLogoUrl(watchedLogo);
-    } else if (watchedLogo !== undefined) {
+    } else if (watchedLogo === null) {
       setLogoFiles([]);
       setLogoUrl("");
+    } else {
+      const nextLogoUrl =
+        coerceMediaUrl(watchedLogo) || coerceMediaUrl(serverLogo);
+      setLogoFiles([]);
+      setLogoUrl(nextLogoUrl);
     }
-    if (typeof watchedFavicon === "string" && watchedFavicon) {
+    if (watchedFavicon instanceof File) {
+      setFaviconFiles([ensureFilePreview(watchedFavicon)]);
+      setFaviconUrl("");
+    } else if (typeof watchedFavicon === "string" && watchedFavicon) {
       setFaviconFiles([]);
       setFaviconUrl(watchedFavicon);
     } else if (
       watchedFavicon !== undefined &&
       !(watchedFavicon instanceof File)
     ) {
+      const nextFaviconUrl =
+        coerceMediaUrl(watchedFavicon) || coerceMediaUrl(serverFavicon);
       setFaviconFiles([]);
-      setFaviconUrl("");
+      setFaviconUrl(nextFaviconUrl);
     }
-    // Only sync banner from form when value is a File (user just picked a file); otherwise server props are source of truth
     if (watchedCoverImage instanceof File) {
       setLandingPageImageFiles([watchedCoverImage]);
       setLandingPageImageUrl("");
       setLandingPageVideoFiles([]);
       setLandingPageVideoUrl("");
       setBannerType("image");
+    } else if (isUnsavedPreviewMedia(watchedCoverImage)) {
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl(String(watchedCoverImage).trim());
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl("");
+      setBannerType("image");
+    } else if (watchedCoverImage === null) {
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl("");
     }
     if (watchedCoverVideo instanceof File) {
       setLandingPageVideoFiles([watchedCoverVideo]);
@@ -188,8 +355,26 @@ export function BrandingTab({
       setLandingPageImageFiles([]);
       setLandingPageImageUrl("");
       setBannerType("video");
+    } else if (isUnsavedPreviewMedia(watchedCoverVideo)) {
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl(String(watchedCoverVideo).trim());
+      setLandingPageImageFiles([]);
+      setLandingPageImageUrl("");
+      setBannerType("video");
+    } else if (watchedCoverVideo === null) {
+      setLandingPageVideoFiles([]);
+      setLandingPageVideoUrl("");
     }
-  }, [watchedLogo, watchedFavicon, watchedCoverImage, watchedCoverVideo]);
+  }, [
+    watchedLogo,
+    watchedFavicon,
+    watchedCoverImage,
+    watchedCoverVideo,
+    serverLogo,
+    serverFavicon,
+    form.formState.dirtyFields.logo,
+    form.formState.dirtyFields.favicon,
+  ]);
 
   const handleLogoFileChange = async (files: File[]) => {
     if (!files.length) return;
@@ -199,39 +384,6 @@ export function BrandingTab({
     setLogoFiles([fileWithPreview]);
     setLogoUrl("");
     form.setValue("logo", fileWithPreview);
-  };
-
-  const handleOptimizeExistingLogo = async () => {
-    if (readOnly || isProcessingLogo) return;
-
-    const formLogo = form.getValues("logo");
-    const logoFile =
-      logoFiles[0] ?? (formLogo instanceof File ? formLogo : null);
-
-    if (!logoFile && !logoUrl) return;
-
-    try {
-      const processed = await optimizeLogoFromSources({
-        logoUrl: logoUrl || undefined,
-        logoFile,
-        processUpload: processLogoUpload,
-        reprocessExistingUrl,
-      });
-
-      if (!processed) return;
-
-      revokeFilePreview(logoFiles[0]);
-      const fileWithPreview = ensureFilePreview(processed);
-      setLogoFiles([fileWithPreview]);
-      setLogoUrl("");
-      form.setValue("logo", fileWithPreview);
-    } catch (error) {
-      console.error("Logo optimize failed:", error);
-      const { toast } = await import("sonner");
-      toast.message("Could not optimize logo", {
-        description: getFriendlyLogoOptimizeErrorMessage(error),
-      });
-    }
   };
 
   const handleFaviconFileChange = (files: File[]) => {
@@ -247,8 +399,35 @@ export function BrandingTab({
     setLandingPageVideoUrl(""); // Clear video URL
     setBannerType("image");
 
-    form.setValue("cover_image", files.length > 0 ? files[0] : null);
-    form.setValue("cover_video", null); // Clear video
+    const coverFile = files.length > 0 ? files[0] : null;
+    form.setValue("cover_image", coverFile, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    form.setValue("cover_video", null, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+
+    const slug = form.getValues("slug")?.trim();
+    const locations = form.getValues("locations");
+    if (slug && Array.isArray(locations) && locations.length > 0) {
+      form.setValue(
+        "locations",
+        locations.map((loc) =>
+          loc.slug?.trim() === slug
+            ? {
+                ...loc,
+                cover_image: coverFile
+                  ? URL.createObjectURL(coverFile)
+                  : loc.cover_image,
+              }
+            : loc,
+        ),
+        { shouldDirty: true },
+      );
+    }
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   const handleLandingPageVideoChange = async (files: File[]) => {
@@ -300,8 +479,15 @@ export function BrandingTab({
       setLandingPageImageUrl(""); // Clear image URL
       setBannerType("video");
 
-      form.setValue("cover_video", file);
-      form.setValue("cover_image", null); // Clear image
+      form.setValue("cover_video", file, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      form.setValue("cover_image", null, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      syncSitePreviewFormIfNeeded(form.getValues());
     } catch (error) {
       console.error("Error validating video:", error);
       const toast = (await import("sonner")).toast;
@@ -318,26 +504,34 @@ export function BrandingTab({
     revokeFilePreview(logoFiles[0]);
     setLogoFiles([]);
     setLogoUrl("");
-    form.setValue("logo", null);
+    form.setValue("logo", null, { shouldDirty: true, shouldTouch: true });
   };
 
   const handleRemoveFavicon = () => {
     setFaviconFiles([]);
     setFaviconUrl("");
-    form.setValue("favicon", null);
+    form.setValue("favicon", null, { shouldDirty: true, shouldTouch: true });
   };
 
   const handleRemoveLandingPageImage = () => {
     setLandingPageImageFiles([]);
     setLandingPageImageUrl("");
-    form.setValue("cover_image", null);
+    form.setValue("cover_image", null, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   const handleRemoveLandingPageVideo = () => {
     setLandingPageVideoFiles([]);
     setLandingPageVideoUrl("");
-    form.setValue("cover_video", null);
+    form.setValue("cover_video", null, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
     setBannerType("image");
+    syncSitePreviewFormIfNeeded(form.getValues());
   };
 
   // Cleanup object URLs to prevent memory leaks
@@ -352,11 +546,18 @@ export function BrandingTab({
   }, [landingPageVideoFiles]);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <Alert className="border-slate-200 bg-slate-50 text-slate-800">
         <Info className="h-4 w-4" />
-        <AlertDescription className="text-sm">
-          {hasMultipleLocations ? (
+        <AlertDescription className="text-sm leading-relaxed">
+          {isAdmin ? (
+            <>
+              Edit your marketing site here. <strong>Site identity</strong>{" "}
+              (logo, favicon, copyright, footer description) applies everywhere;{" "}
+              <strong>Home page</strong> controls each section of your public
+              home.
+            </>
+          ) : hasMultipleLocations ? (
             <>
               Use the tabs below to edit each part of your public site.{" "}
               <strong>Site identity</strong> applies everywhere;{" "}
@@ -368,52 +569,60 @@ export function BrandingTab({
             <>
               You have a single location — your public home page is edited under{" "}
               <strong>Home page</strong>. <strong>Site identity</strong> (logo,
-              favicon, copyright) applies everywhere.
+              favicon, copyright, footer description) applies everywhere.
             </>
           )}
         </AlertDescription>
       </Alert>
 
-      <Tabs value={brandingScope} onValueChange={handleBrandingScopeChange}>
-        <TabsList
-          className={`grid h-auto w-full gap-1 bg-muted/60 p-1 ${
-            hasMultipleLocations ? "grid-cols-3" : "grid-cols-2"
-          }`}
-        >
-          <TabsTrigger
-            value="site-identity"
-            className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
-          >
-            Site identity
-          </TabsTrigger>
-          {hasMultipleLocations ? (
+      <Tabs
+        value={brandingScope}
+        onValueChange={handleBrandingScopeChange}
+        className="min-w-0"
+      >
+        <div className="w-full min-w-0 overflow-x-auto no-scrollbar">
+          <TabsList className="inline-flex h-auto w-max min-w-full gap-1 rounded-lg bg-muted/60 p-1">
             <TabsTrigger
-              value="main-home"
-              className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
+              value="site-identity"
+              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
             >
-              Main home page
+              Site identity
             </TabsTrigger>
-          ) : null}
-          <TabsTrigger
-            value="location-page"
-            className="text-xs sm:text-sm data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white"
-          >
-            {hasMultipleLocations ? "Location page" : "Home page"}
-          </TabsTrigger>
-        </TabsList>
+            {hasMultipleLocations ? (
+              <TabsTrigger
+                value="main-home"
+                className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+              >
+                Main home page
+              </TabsTrigger>
+            ) : null}
+            <TabsTrigger
+              value="location-page"
+              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+            >
+              {hasMultipleLocations ? "Location page" : "Home page"}
+            </TabsTrigger>
+            <TabsTrigger
+              value="info-pages"
+              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+            >
+              Info pages
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="site-identity" className="mt-6 space-y-6">
-      <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 p-6 space-y-6">
+        <TabsContent value="site-identity" className="mt-4 min-w-0 space-y-4 sm:mt-6 sm:space-y-6">
+      <div className="min-w-0 space-y-4 rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:space-y-6 sm:p-6">
         <div className="space-y-2">
           <SectionTitle
             title="Logo & site identity"
-            description="Logo, favicon, and copyright — shared across all locations and pages."
+            description="Logo, favicon, copyright, and the short footer line under your logo — shared across all locations and pages."
           />
         </div>
 
         <Separator className="my-4" />
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 md:gap-6">
           <FormField
             control={form.control}
             name="name"
@@ -442,21 +651,66 @@ export function BrandingTab({
             name="copyright"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Copyright Text</FormLabel>
+                <FormLabel>Copyright &amp; Disclaimer</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="© 2023 EventWizz, All Rights Reserved"
-                    disabled={readOnly}
-                    {...field}
+                  <TiptapEditor
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    placeholder="© 2023 EventWizz. All Rights Reserved. Add any legal disclaimer here…"
+                    maxLength={COPYRIGHT_MAX_TEXT_CHARS}
+                    className="min-h-[120px]"
+                    readOnly={readOnly}
+                    showAIButton={false}
                   />
                 </FormControl>
+                <FormDescription>
+                  Shown at the very bottom of your public site. You can include both a
+                  legal disclaimer and the copyright line here.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <FormField
+          control={form.control}
+          name="footer_brand_description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Footer brand description</FormLabel>
+              <FormControl>
+                <TiptapEditor
+                  value={field.value || ""}
+                  onChange={(html) => {
+                    field.onChange(html);
+                    void form.trigger("footer_brand_description");
+                  }}
+                  placeholder="A short line about your venue, shown under the logo in the footer…"
+                  maxLength={FOOTER_BRAND_DESCRIPTION_MAX_CHARS}
+                  maxWords={FOOTER_BRAND_DESCRIPTION_MAX_WORDS}
+                  className="min-h-[100px]"
+                  readOnly={readOnly}
+                  showAIButton={!readOnly}
+                  aiContext={{
+                    title: footerAiTitle || undefined,
+                    city: footerAiCity,
+                    description: footerAiAbout || undefined,
+                    contentType: "footer",
+                  }}
+                />
+              </FormControl>
+              <FormDescription>
+                Appears under your logo in the site footer on every page. Keep
+                it to one or two sentences. If you leave this empty, the About
+                section description is used instead.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
           <FormField
             control={form.control}
             name="logo"
@@ -482,35 +736,24 @@ export function BrandingTab({
                         style={{ backgroundColor: headerBackgroundColor }}
                       >
                         <img
+                          key={`logo-${siteMediaVersion}`}
                           src={
                             isLocalLogoUrl(logoUrl)
                               ? logoUrl
-                              : addCacheBusting(logoUrl)
+                              : addCacheBusting(logoUrl, siteMediaVersion)
                           }
                           alt="Logo preview"
                           className="max-h-40 w-full object-contain"
                         />
                       </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={readOnly || isProcessingLogo}
-                          onClick={() => void handleOptimizeExistingLogo()}
-                        >
-                          <Sparkles className="mr-1.5 h-4 w-4" />
-                          Optimize for header
-                        </Button>
-                        <button
-                          type="button"
-                          disabled={readOnly}
-                          onClick={handleRemoveLogo}
-                          className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
-                        >
-                          Remove Logo
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        disabled={readOnly}
+                        onClick={handleRemoveLogo}
+                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        Remove Logo
+                      </button>
                     </div>
                   ) : logoFiles.length > 0 ? (
                     <div className="space-y-2">
@@ -527,26 +770,14 @@ export function BrandingTab({
                           className="max-h-40 w-full object-contain"
                         />
                       </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={readOnly || isProcessingLogo}
-                          onClick={() => void handleOptimizeExistingLogo()}
-                        >
-                          <Sparkles className="mr-1.5 h-4 w-4" />
-                          Optimize for header
-                        </Button>
-                        <button
-                          type="button"
-                          disabled={readOnly}
-                          onClick={handleRemoveLogo}
-                          className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
-                        >
-                          Remove Logo
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        disabled={readOnly}
+                        onClick={handleRemoveLogo}
+                        className="text-red-500 text-sm underline disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        Remove Logo
+                      </button>
                     </div>
                   ) : (
                     <FileUploader
@@ -579,7 +810,8 @@ export function BrandingTab({
                   {faviconUrl ? (
                     <div className="space-y-2">
                       <img
-                        src={addCacheBusting(faviconUrl)}
+                        key={`favicon-${siteMediaVersion}`}
+                        src={addCacheBusting(faviconUrl, siteMediaVersion)}
                         alt="Favicon preview"
                         className="max-h-16 object-contain mx-auto"
                       />
@@ -618,34 +850,31 @@ export function BrandingTab({
         </TabsContent>
 
         {hasMultipleLocations ? (
-          <TabsContent value="main-home" className="mt-6">
+          <TabsContent value="main-home" className="mt-4 min-w-0 sm:mt-6">
             <MainLandingPageSection
               serverMainLandingCoverImage={serverMainLandingCoverImage}
             />
           </TabsContent>
         ) : null}
 
-        <TabsContent value="location-page" className="mt-6">
-      <div className="relative rounded-xl border-2 border-blue-400 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-900/50 p-0 overflow-hidden shadow-sm">
-        {/* Thick left accent */}
-        <div
-          className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 dark:bg-blue-400"
-          aria-hidden
-        />
-
-        {/* Unmissable top banner */}
-        <div className="flex flex-wrap items-center gap-3 px-6 py-4 bg-blue-100/90 dark:bg-blue-900/60 border-b border-blue-200 dark:border-blue-700">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 dark:bg-blue-600 text-white shadow-sm">
-              <MapPin className="h-5 w-5" />
+        <TabsContent value="location-page" className="mt-4 min-w-0 sm:mt-6">
+          {isAdmin ? (
+            <AdminHomePageSection />
+          ) : (
+      <div className="min-w-0 space-y-4 sm:space-y-6">
+        {/* Location context banner */}
+        <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/40 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:p-4">
+          <div className="flex min-w-0 items-start gap-3 sm:items-center">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white sm:h-10 sm:w-10">
+              <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
                 {hasMultipleLocations
                   ? "For this location only"
                   : "Your public home page"}
               </p>
-              <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+              <p className="text-sm font-bold leading-snug text-blue-900 dark:text-blue-100">
                 {hasMultipleLocations
                   ? "All fields below apply only to this location"
                   : "Hero, banner, and sections visitors see on your site home"}
@@ -653,32 +882,31 @@ export function BrandingTab({
             </div>
           </div>
           {hasMultipleLocations ? (
-            <div className="ml-auto flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 shadow-sm dark:border-blue-700 dark:bg-slate-800">
-              <span className="text-xs font-medium text-muted-foreground">
+            <div className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-blue-200 bg-white px-2.5 py-2 shadow-sm dark:border-blue-700 dark:bg-slate-800 sm:ml-auto sm:w-auto sm:max-w-full sm:px-3">
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
                 Editing:
               </span>
-              <LocationIndicator variant="light" />
+              <LocationIndicator
+                variant="light"
+                className="min-w-0 max-w-full truncate"
+              />
             </div>
           ) : null}
         </div>
 
-        <div className="p-6 space-y-6">
-          <Separator className="my-0 -mx-6" />
-
-          <SectionTitle
-            title={
-              hasMultipleLocations
-                ? "Location page hero text"
-                : "Home page hero text"
-            }
-            description={
-              hasMultipleLocations
-                ? "Heading and subheading on this location’s public page. Text position is set from Try theme on the Presets tab or preview — not here."
-                : "Heading and subheading on your site home. Text position is set from Try theme on the Presets tab or preview — not here."
-            }
-          />
-
-          <div className="grid gap-6 md:grid-cols-2">
+        <SectionCard
+          title={
+            hasMultipleLocations
+              ? "Location page hero text"
+              : "Home page hero text"
+          }
+          description={
+            hasMultipleLocations
+              ? "Heading and subheading on this location’s public page. Text position is set from Try theme on the Presets tab or preview — not here."
+              : "Heading and subheading on your site home. Text position is set from Try theme on the Presets tab or preview — not here."
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-2 md:gap-6">
             <FormField
               control={form.control}
               name="banner_heading"
@@ -748,14 +976,12 @@ export function BrandingTab({
               }}
             />
           </div>
+        </SectionCard>
 
-          <Separator className="my-4" />
-
-          <SectionTitle
-            title="Location page banner"
-            description="Image or video hero for this location’s page only"
-          />
-
+        <SectionCard
+          title="Location page banner"
+          description="Image or video hero for this location’s page only"
+        >
           <div className="space-y-4">
             <Tabs
               value={bannerType}
@@ -774,16 +1000,18 @@ export function BrandingTab({
                     <FormItem>
                       <FormLabel>Banner Image</FormLabel>
                       <FormDescription>
-                        Upload a static image for this location’s hero banner
-                        (recommended size: 1200 x 600px)
+                        Location page hero banner. {SITE_HERO_UPLOAD_HINT}
                       </FormDescription>
                       <FormControl>
                         {landingPageImageUrl ? (
                           <div className="space-y-2">
                             <img
-                              src={addCacheBusting(landingPageImageUrl)}
+                              src={addCacheBusting(
+                                landingPageImageUrl,
+                                siteMediaVersion,
+                              )}
                               alt="Landing page image preview"
-                              className="max-h-40 object-contain mx-auto"
+                              className="mx-auto aspect-video max-h-40 w-full object-cover"
                             />
                             <button
                               type="button"
@@ -809,13 +1037,8 @@ export function BrandingTab({
                               "image/webp": [],
                             }}
                             enableCropping={true}
-                            aspectRatio={16 / 9}
-                            cropConfig={{
-                              maxSizeKB: 500,
-                              quality: 0.9,
-                              maxWidth: 1920,
-                              maxHeight: 1080,
-                            }}
+                            aspectRatio={SITE_HERO_BACKGROUND_CROP.aspectRatio}
+                            cropConfig={SITE_HERO_BACKGROUND_CROP}
                           />
                         )}
                       </FormControl>
@@ -915,16 +1138,12 @@ export function BrandingTab({
               </TabsContent>
             </Tabs>
           </div>
+        </SectionCard>
 
-          <Separator className="my-4" />
-
-          <SectionTitle
-            title="About section"
-            description="About block on this location’s page"
-          />
-
-          <Separator className="my-4" />
-
+        <SectionCard
+          title="About section"
+          description="About block on this location’s page"
+        >
           <FormField
             control={form.control}
             name="about_title"
@@ -965,7 +1184,8 @@ export function BrandingTab({
             render={({ field }) => (
               <FormItem className="space-y-2">
                 <FormLabel className="text-base font-medium">
-                  About Section Description
+                  About Section Description{" "}
+                  <span className="text-destructive">*</span>
                 </FormLabel>
                 <FormControl>
                   <TiptapEditor
@@ -986,14 +1206,13 @@ export function BrandingTab({
             )}
           />
 
-          <Separator className="my-4" />
+        </SectionCard>
 
-          <SectionTitle
-            title="Event sections"
-            description="Section titles on this location’s page"
-          />
-
-          <div className="grid gap-6 md:grid-cols-2">
+        <SectionCard
+          title="Event sections"
+          description="Section titles on this location’s page"
+        >
+          <div className="grid gap-4 md:grid-cols-2 md:gap-6">
             <FormField
               control={form.control}
               name="event_title_1"
@@ -1063,13 +1282,12 @@ export function BrandingTab({
             />
           </div>
 
-          <Separator className="my-4" />
+        </SectionCard>
 
-          <SectionTitle
-            title="Gallery section"
-            description="Gallery title on this location’s page"
-          />
-
+        <SectionCard
+          title="Gallery section"
+          description="Gallery title on this location’s page"
+        >
           <div className="grid gap-6">
             <FormField
               control={form.control}
@@ -1105,8 +1323,13 @@ export function BrandingTab({
               }}
             />
           </div>
-        </div>
+        </SectionCard>
       </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="info-pages" className="mt-4 min-w-0 sm:mt-6">
+          <InfoPagesTab />
         </TabsContent>
       </Tabs>
     </div>

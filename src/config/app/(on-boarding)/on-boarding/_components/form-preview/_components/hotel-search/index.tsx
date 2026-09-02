@@ -3,6 +3,8 @@
 import React, { useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { cn } from "@/lib/utils";
 
 interface MoreInfo {
   id?: number;
@@ -20,6 +22,7 @@ type MoreInfoList = {
 };
 
 export default function HotelSearch({ moreInfo }: MoreInfoList) {
+  const narrowPreview = usePreviewNarrowLayout();
   const filteredInfo = useMemo(() => {
     return moreInfo.filter((info) => {
       return (
@@ -51,7 +54,12 @@ export default function HotelSearch({ moreInfo }: MoreInfoList) {
 
   return (
     <section className="w-full bg-foreground dark:bg-background py-10">
-      <div className="container grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div
+        className={cn(
+          "container grid grid-cols-1 gap-6",
+          !narrowPreview && "md:grid-cols-2",
+        )}
+      >
         {filteredInfo.map((info, index) => {
           const bgImageUrl = getBackgroundImageUrl(info.background_image);
           return (

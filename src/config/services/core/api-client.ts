@@ -15,6 +15,10 @@ import {
   getCorrectRedirectUrl,
   validateDomainAccess,
 } from "@/lib/utils/api-endpoints";
+import {
+  isOnboardingAlreadyCompletedMessage,
+  recoverFromOnboardingAlreadyCompleted,
+} from "@/lib/onboarding-completion";
 // Browser environment check
 const isBrowser = typeof window !== "undefined";
 
@@ -37,6 +41,11 @@ const safeToast = {
       toast.warning(message);
     } else {
       console.warn(message);
+    }
+  },
+  info: (message: string) => {
+    if (isBrowser) {
+      toast.info(message);
     }
   },
 };
@@ -72,6 +81,23 @@ export const setLogoutInProgress = (status: boolean): void => {
 
 // Function to check if logout is in progress
 export const getLogoutInProgress = (): boolean => isLogoutInProgress;
+
+/**
+ * Nested counter so concurrent AI bulk-apply (or similar) flows can suppress
+ * global success toasts while their own progress UI is the source of truth.
+ */
+let suppressSuccessToastDepth = 0;
+
+export async function withSuppressedSuccessToasts<T>(
+  fn: () => Promise<T>,
+): Promise<T> {
+  suppressSuccessToastDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    suppressSuccessToastDepth = Math.max(0, suppressSuccessToastDepth - 1);
+  }
+}
 
 // Security violation tracking functions
 const recordSecurityViolation = (): number => {
@@ -170,6 +196,8 @@ export interface ApiResponse<T = unknown> {
 
 export interface RequestOptions extends AxiosRequestConfig {
   returnFullResponse?: boolean;
+  /** Return the AxiosResponse (blob downloads need Content-Disposition). */
+  returnAxiosResponse?: boolean;
   /** Skip global error toasts — caller shows inline validation instead. */
   suppressErrorToast?: boolean;
   /** Skip global success toasts — used for silent checkout cart saves on Pay. */
@@ -397,6 +425,12 @@ apiClient.interceptors.response.use(
         return Promise.reject(response.data);
       }
 
+      // Backend says onboarding is done but JWT may still be stale.
+      if (isOnboardingAlreadyCompletedMessage(message)) {
+        void recoverFromOnboardingAlreadyCompleted();
+        return response;
+      }
+
       const suppressErrorToast = (
         response.config as RequestOptions | undefined
       )?.suppressErrorToast;
@@ -410,17 +444,28 @@ apiClient.interceptors.response.use(
       return Promise.reject(response.data);
     }
 
-    // Show success toast for data modification operations only
+    // Show success toast for data modification operations only.
+    // Newsletter subscribe uses data.result: already_subscribed is info, not a new success.
     const method = response.config.method?.toUpperCase();
-    const suppressSuccessToast = (
-      response.config as RequestOptions | undefined
-    )?.suppressSuccessToast;
+    const suppressSuccessToast =
+      suppressSuccessToastDepth > 0 ||
+      (response.config as RequestOptions | undefined)?.suppressSuccessToast;
+    const payload = response.data?.data;
+    const subscribeResult =
+      payload &&
+      typeof payload === "object" &&
+      !Array.isArray(payload) &&
+      "result" in payload
+        ? (payload as { result?: unknown }).result
+        : undefined;
     if (
       !suppressSuccessToast &&
       response.data.status === true &&
       response.data.message &&
       method &&
-      ["POST", "PUT", "PATCH", "DELETE"].includes(method)
+      ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+      subscribeResult !== "already_subscribed" &&
+      subscribeResult !== "confirmation_pending"
     ) {
       safeToast.success(response.data.message);
     }
@@ -437,6 +482,15 @@ apiClient.interceptors.response.use(
         string,
         unknown
       >;
+
+      // Non-2xx responses can still carry the "already completed" signal
+      if (
+        typeof message === "string" &&
+        isOnboardingAlreadyCompletedMessage(message)
+      ) {
+        void recoverFromOnboardingAlreadyCompleted();
+        return Promise.reject(error);
+      }
 
       // Check for security violation indicators in error response
       const isSecurityViolation =
@@ -565,10 +619,26 @@ apiClient.interceptors.response.use(
                 );
               }
             }
+
+            // Business / role permission errors (e.g. staff cannot delete location)
+            const suppressErrorToast = (
+              error.config as RequestOptions | undefined
+            )?.suppressErrorToast;
+            if (!suppressErrorToast && !isLogoutInProgress) {
+              safeToast.error(
+                typeof message === "string" && message.trim()
+                  ? message
+                  : "You do not have permission to perform this action.",
+              );
+            }
           }
           break;
         }
-        case 404:
+        case 404: {
+          const suppressNotFoundToast = (
+            error.config as RequestOptions | undefined
+          )?.suppressErrorToast;
+          if (suppressNotFoundToast) break;
           // Handle not found - show error toast with message from response
           const notFoundData = error.response.data as ApiErrorResponse;
           if (notFoundData?.message && !isLogoutInProgress) {
@@ -577,7 +647,12 @@ apiClient.interceptors.response.use(
             safeToast.error("Resource not found");
           }
           break;
-        case 422:
+        }
+        case 422: {
+          const suppressValidationToast = (
+            error.config as RequestOptions | undefined
+          )?.suppressErrorToast;
+          if (suppressValidationToast) break;
           // Handle validation errors
           const errorData = error.response.data as ApiErrorResponse;
           if (
@@ -597,6 +672,7 @@ apiClient.interceptors.response.use(
             }
           }
           break;
+        }
         case 409: {
           const conflictData = error.response.data as ApiErrorResponse;
           if (
@@ -665,6 +741,15 @@ apiClient.interceptors.response.use(
 export const request = async <T>(config: RequestOptions): Promise<T> => {
   try {
     const response = await apiClient.request<ApiResponse<T> | T>(config);
+
+    if (config.returnAxiosResponse) {
+      return response as unknown as T;
+    }
+
+    // Blob downloads are raw files, not `{ status, data }` envelopes
+    if (config.responseType === "blob") {
+      return response.data as T;
+    }
 
     // Return full response or just data based on options
     if (config.returnFullResponse) {

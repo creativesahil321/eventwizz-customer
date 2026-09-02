@@ -1,4 +1,4 @@
-import { api } from "../../core/api-client";
+import { api, type RequestOptions } from "../../core/api-client";
 import { API_ENDPOINTS } from "../../core/endpoints";
 import {
   CartRequest,
@@ -12,11 +12,18 @@ export const cartService = {
    * Store event booking data in the database
    * This includes event details, selected date, drink packages, tables, and tickets
    */
-  storeEventBooking: async (data: CartRequest): Promise<CartResponse> => {
+  storeEventBooking: async (
+    data: CartRequest,
+    options?: Pick<RequestOptions, "suppressErrorToast" | "suppressSuccessToast">,
+  ): Promise<CartResponse> => {
     return api.post<CartResponse>(
       API_ENDPOINTS.CUSTOMER.BOOK_EVENT.STORE_CART_DATA,
       data,
-      { returnFullResponse: true }
+      {
+        returnFullResponse: true,
+        suppressErrorToast: options?.suppressErrorToast,
+        suppressSuccessToast: options?.suppressSuccessToast,
+      },
     );
   },
 

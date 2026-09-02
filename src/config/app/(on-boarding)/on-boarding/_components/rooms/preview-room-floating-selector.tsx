@@ -8,11 +8,17 @@ import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "../form-preview/preview-layout
 interface PreviewRoomFloatingSelectorProps {
   className?: string;
   visible?: boolean;
+  /** Override room change (e.g. scroll to dates after select). */
+  onRoomChange?: (index: number) => void;
+  /** Stick below header, or below header + event jump nav. */
+  stickyTop?: string;
 }
 
 export function PreviewRoomFloatingSelector({
   className,
   visible = false,
+  onRoomChange,
+  stickyTop = ONBOARDING_PREVIEW_HEADER_OFFSET,
 }: PreviewRoomFloatingSelectorProps) {
   const { enabled, rooms, currentRoomIndex, setCurrentRoomIndex } =
     useRoomManager();
@@ -26,12 +32,14 @@ export function PreviewRoomFloatingSelector({
         label: room.name || `Room ${index + 1}`,
       }))}
       activeIndex={currentRoomIndex}
-      onSelect={setCurrentRoomIndex}
+      onSelect={onRoomChange ?? setCurrentRoomIndex}
       visible={visible}
       minRooms={1}
       layout="sticky"
-      stickyTop={ONBOARDING_PREVIEW_HEADER_OFFSET}
-      className={cn("mx-auto max-w-7xl sm:px-6", className)}
+      stickyTop={stickyTop}
+      label="Choose Room"
+      size="sm"
+      className={cn("mx-auto w-full max-w-full", className)}
     />
   );
 }

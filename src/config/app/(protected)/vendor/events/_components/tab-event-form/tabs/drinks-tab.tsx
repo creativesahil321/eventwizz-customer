@@ -104,7 +104,7 @@ export default function DrinksTab() {
           : [
               {
                 title: "Premium Package",
-                description: "This is a premium service package",
+                description: "Premium package description",
                 price: 20,
                 available_quantity: 100,
               },
@@ -137,7 +137,7 @@ export default function DrinksTab() {
           : [
               {
                 title: "Premium Package",
-                description: "This is a premium service package",
+                description: "Premium package description",
                 price: 20,
                 available_quantity: 100,
               },
@@ -546,7 +546,7 @@ export default function DrinksTab() {
                   className="flex items-center gap-2"
                 >
                   <PlusCircle className="h-4 w-4" />
-                  Add More Package
+                  Add another package
                 </Button>
               )}
             </div>
@@ -628,7 +628,7 @@ export default function DrinksTab() {
                           <FormControl>
                             <Input
                               {...field}
-                              placeholder="e.g. Includes premium access, special amenities..."
+                              placeholder="e.g. Includes premium access and special amenities…"
                               className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                               maxLength={maxLength}
                             />
@@ -654,7 +654,7 @@ export default function DrinksTab() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-medium">
-                          Package Price <span className="text-red-500">*</span>
+                          Package price <span className="text-red-500">*</span>
                         </FormLabel>
                         <FormControl>
                           <Input
@@ -693,7 +693,7 @@ export default function DrinksTab() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-medium">
-                          Available Quantity{" "}
+                          Available quantity{" "}
                           <span className="text-red-500">*</span>
                         </FormLabel>
                         <FormControl>

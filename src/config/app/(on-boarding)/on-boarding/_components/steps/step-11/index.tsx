@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CardContent, CardHeader, OnboardingCard } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { useFormContext } from "../../form-provider";
 import { stepElevenSchema, StepElevenType } from "../../form-provider/schema";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { syncVendorLocationsCache } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { useUpdateSessionWithLocation } from "@/services/common/auth/auth-session";
@@ -30,92 +32,123 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import GoogleLocationSearch from "./google-location-search";
-import { fetchLocationDetails } from "./_lib/actions";
+import { cityFromFormattedAddress } from "../step-7/address-autocomplete";
+import { fetchLocationDetails, geocodeLocation } from "./_lib/actions";
 import { env } from "@/env";
 import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
-import {
-  Loader2,
-  Check,
-  CheckCircle2,
-  Globe,
-  Mail,
-  MapPin,
-} from "lucide-react";
+import { Loader2, Globe, Mail, MapPin } from "lucide-react";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
-import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
-import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
 import { slugify } from "@/lib/utils";
+import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { LOCATION_COORDINATES_REQUIRED_MESSAGE } from "@/lib/to-location-coords-payload";
 
-/** Public-link preview: never show raw venue names (spaces). Match subdomain rules: a-z, 0-9, hyphens, max 63. */
+const EventLocationMap = dynamic(
+  () => import("../step-7/event-location-map"),
+  {
+    ssr: false,
+    loading: () => (
+      <Skeleton className="h-64 w-full rounded-lg border border-white/10" />
+    ),
+  },
+);
+
+/** Public-link / input: subdomain label only (a-z, 0-9, hyphens, max 63). */
+function normalizeSubdomainLabel(
+  selected: string | undefined | null,
+  suffix = "eventwizz.com",
+): string {
+  const stripHostSuffix = (s: string) => {
+    let out = s.trim().toLowerCase();
+    const suffixes = [
+      suffix.trim().toLowerCase(),
+      "eventwizz.com",
+      "eventwizz.vercel.app",
+      "com",
+    ].filter(Boolean);
+    for (const suf of suffixes) {
+      if (out.endsWith(`.${suf}`)) {
+        out = out.slice(0, -(suf.length + 1));
+      }
+    }
+    return out;
+  };
+
+  const cleaned = stripHostSuffix(selected ?? "")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63);
+  return cleaned;
+}
+
 function subdomainPublicPreviewLabel(
   selected: string | undefined | null,
   venueName: string,
+  suffix = "eventwizz.com",
 ): string {
-  const stripHostSuffix = (s: string) =>
-    s
-      .replace(/\.eventwizz\.vercel\.app$/i, "")
-      .replace(/\.eventwizz\.com$/i, "")
-      .replace(/\.com$/i, "");
-
-  const normalizeLabel = (s: string) => {
-    const cleaned = stripHostSuffix(s.trim())
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 63);
-    return cleaned || "yoursubdomain";
-  };
-
-  const trimmedSelected = (selected ?? "").trim();
-  if (trimmedSelected) {
-    return normalizeLabel(trimmedSelected);
-  }
+  const fromSelected = normalizeSubdomainLabel(selected, suffix);
+  if (fromSelected) return fromSelected;
 
   const fromVenue = slugify(venueName.trim()).slice(0, 63);
   return fromVenue || "yoursubdomain";
 }
 
-const PUBLISH_STEPS = [
-  { label: "Saving your settings", icon: "💾" },
-  { label: "Configuring your domain", icon: "🌐" },
-  { label: "Setting up your event page", icon: "📅" },
-  { label: "Publishing your site", icon: "🚀" },
-  { label: "Finalising & going to dashboard", icon: "✅" },
-] as const;
-
 // Days options for reminder emails
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
 const extraOptions = [
-  { value: 60, label: "Before 2 Months" },
-  { value: 90, label: "Before 3 Months" },
-  { value: 120, label: "Before 4 Months" },
-  { value: 180, label: "Before 6 Months" },
+  { value: 60, label: "2 months before" },
+  { value: 90, label: "3 months before" },
+  { value: 120, label: "4 months before" },
+  { value: 180, label: "6 months before" },
 ];
 
 const publishCardClass =
-  "rounded-xl border border-white/[0.08] bg-white/[0.02] p-5 sm:p-6 space-y-4";
+  "rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5 space-y-3";
 const publishStepBadgeClass =
-  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-sm font-semibold tabular-nums text-slate-100";
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-sm font-semibold tabular-nums text-slate-100";
 
 export default function StepEleven() {
-  const { form: globalForm, persistedProgressHydrated } = useFormContext();
+  const {
+    form: globalForm,
+    save,
+    persistedProgressHydrated,
+  } = useFormContext();
 
   const stepElevenPersistedApproved = useWatch({
     control: globalForm.control,
     name: "stepEleven.isApproved",
   });
+  const persistedStepElevenDomain = useWatch({
+    control: globalForm.control,
+    name: "stepEleven.domain",
+  });
+  const persistedDomainSuffix = useWatch({
+    control: globalForm.control,
+    name: "stepEleven.domain_suffix",
+  });
+  const domainSuffix =
+    (typeof persistedDomainSuffix === "string" &&
+      persistedDomainSuffix.trim()) ||
+    "eventwizz.com";
+
   const { update } = useSession();
   const router = useRouter();
   const queryClient = useQueryClient();
   const updateSessionWithLocation = useUpdateSessionWithLocation();
-  const [publishing, setPublishing] = useState(false);
-  const [publishStep, setPublishStep] = useState(-1);
-  const [publishDone, setPublishDone] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  /**
+   * Last domain confirmed via the steps API (`stepEleven.domain` when `isApproved`).
+   * Editing away from this value unchecks confirmation; reverting restores it.
+   */
+  const savedDomainRef = useRef<string>("");
+  /** Whether the API last approved the domain in `savedDomainRef`. */
+  const savedDomainApprovedRef = useRef(false);
+  const subdomainInputSeededRef = useRef(false);
 
   // Domain suggestions
   const {
@@ -144,11 +177,6 @@ export default function StepEleven() {
     return error;
   };
 
-  const persistedStepElevenDomain = useWatch({
-    control: globalForm.control,
-    name: "stepEleven.domain",
-  });
-
   // Reactive so subdomain can seed after persistence GET fills step one.
   const venueName =
     useWatch({
@@ -167,7 +195,8 @@ export default function StepEleven() {
   const form = useForm<StepElevenType>({
     resolver: zodResolver(stepElevenSchema),
     defaultValues: {
-      step: 11 as const,
+      step: 11,
+      isApproved: false,
       event_id: eventId,
       reminder_email_before_days:
         globalForm.getValues().stepEleven?.reminder_email_before_days || 10,
@@ -175,9 +204,12 @@ export default function StepEleven() {
       address: globalForm.getValues().stepEleven?.address || "",
       city: globalForm.getValues().stepEleven?.city || "",
       contact_number: globalForm.getValues().stepEleven?.contact_number || "",
+      latitude: globalForm.getValues().stepEleven?.latitude,
+      longitude: globalForm.getValues().stepEleven?.longitude,
       domain: globalForm.getValues().stepEleven?.domain || "",
-      confirm_domain:
-        globalForm.getValues().stepEleven?.confirm_domain || false,
+      domain_suffix:
+        globalForm.getValues().stepEleven?.domain_suffix || "eventwizz.com",
+      confirm_domain: globalForm.getValues().stepEleven?.confirm_domain || false,
     },
     mode: "onChange",
   });
@@ -189,33 +221,72 @@ export default function StepEleven() {
   }, [stepOneHasMulti, form]);
 
   /**
-   * Visible subdomain input is driven by `selectedDomain`, while “Public link” preview can show
-   * slugified venue — keep them aligned from persistence and default preview.
+   * Sync confirmation checkbox with the currently typed domain vs last saved domain.
+   * - Current === savedDomain and was approved → restore checked
+   * - Current !== savedDomain → uncheck (must confirm again)
    */
-  const subdomainInputSeededRef = useRef(false);
+  const syncConfirmForDomain = (nextDomain: string) => {
+    const saved = savedDomainRef.current;
+    if (
+      saved.length > 0 &&
+      nextDomain === saved &&
+      savedDomainApprovedRef.current
+    ) {
+      form.setValue("confirm_domain", true, { shouldValidate: true });
+      return;
+    }
+    form.setValue("confirm_domain", false, { shouldValidate: true });
+  };
+
+  const applyDomainChange = (raw: string) => {
+    const value = normalizeSubdomainLabel(raw, domainSuffix);
+    setSelectedDomain(value);
+    form.setValue("domain", value, { shouldValidate: true });
+    syncConfirmForDomain(value);
+  };
+
+  /**
+   * Prefill from steps API `stepEleven.domain` / `isApproved`, else seed from venue name.
+   * Domain stays editable while onboarding (`isOnboarded === false`).
+   */
   useEffect(() => {
     if (!persistedProgressHydrated) return;
 
-    const fromGlobal = (persistedStepElevenDomain ?? "").trim();
+    const fromGlobal = normalizeSubdomainLabel(
+      persistedStepElevenDomain,
+      domainSuffix,
+    );
+    const approved = stepElevenPersistedApproved === true;
+
     if (fromGlobal) {
-      const slug = subdomainPublicPreviewLabel(fromGlobal, "");
-      setSelectedDomain(slug);
-      form.setValue("domain", slug);
+      savedDomainRef.current = fromGlobal;
+      savedDomainApprovedRef.current = approved;
+      setSelectedDomain(fromGlobal);
+      form.setValue("domain", fromGlobal);
+      form.setValue("domain_suffix", domainSuffix);
+      form.setValue("confirm_domain", approved, { shouldValidate: true });
+      form.setValue("isApproved", approved);
       subdomainInputSeededRef.current = true;
       return;
     }
 
     if (subdomainInputSeededRef.current) return;
 
-    const fallback = subdomainPublicPreviewLabel("", venueName);
+    savedDomainRef.current = "";
+    savedDomainApprovedRef.current = false;
+    const fallback = subdomainPublicPreviewLabel("", venueName, domainSuffix);
     if (fallback && fallback !== "yoursubdomain") {
       setSelectedDomain(fallback);
       form.setValue("domain", fallback);
+      form.setValue("domain_suffix", domainSuffix);
+      form.setValue("confirm_domain", false, { shouldValidate: true });
       subdomainInputSeededRef.current = true;
     }
   }, [
     persistedProgressHydrated,
     persistedStepElevenDomain,
+    stepElevenPersistedApproved,
+    domainSuffix,
     venueName,
     form,
     setSelectedDomain,
@@ -224,18 +295,68 @@ export default function StepEleven() {
   // Watch reminder email configuration state
   const showReminderDays =
     form.watch("reminder_email_before_days") !== undefined;
+  const duplicateVenueAddress = useWatch({
+    control: form.control,
+    name: "address",
+  });
+  const duplicateVenueLatitude = useWatch({
+    control: form.control,
+    name: "latitude",
+  });
+  const duplicateVenueLongitude = useWatch({
+    control: form.control,
+    name: "longitude",
+  });
 
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-  const stepDelays = [900, 800, 1000, 900, 700];
-
-  // Single clean submit flow — no double API call
   const onSubmit = async (values: StepElevenType) => {
+    setLoading(true);
     try {
-      globalForm.setValue("stepEleven", values);
-      setPublishing(true);
-      setPublishStep(-1);
-      setPublishDone(false);
+      const domain = normalizeSubdomainLabel(values.domain, domainSuffix);
+      if (!domain) {
+        form.setError("domain", {
+          message: "Please select a domain for your website",
+        });
+        setLoading(false);
+        return;
+      }
+
+      let latitude = values.latitude;
+      let longitude = values.longitude;
+      if (values.submit_type === "duplicate") {
+        const hasCoordinates =
+          Number.isFinite(latitude) && Number.isFinite(longitude);
+        if (!hasCoordinates) {
+          const resolved = await geocodeLocation(
+            values.address || "",
+            values.city,
+          );
+          if (!resolved) {
+            form.setError("address", {
+              message: LOCATION_COORDINATES_REQUIRED_MESSAGE,
+            });
+            toast.error(
+              "Confirm the venue on the map or pick the exact address from Google suggestions.",
+            );
+            setLoading(false);
+            return;
+          }
+          latitude = resolved.latitude;
+          longitude = resolved.longitude;
+          form.setValue("latitude", latitude, { shouldValidate: true });
+          form.setValue("longitude", longitude, { shouldValidate: true });
+        }
+      }
+
+      const nextValues: StepElevenType = {
+        ...values,
+        domain,
+        domain_suffix: domainSuffix,
+        confirm_domain: true,
+        isApproved: true,
+        latitude,
+        longitude,
+      };
+      globalForm.setValue("stepEleven", nextValues);
 
       type StepElevenPayload = {
         step: 11;
@@ -244,6 +365,8 @@ export default function StepEleven() {
         address?: string;
         city?: string;
         contact_number?: string;
+        latitude?: number;
+        longitude?: number;
         reminder_email_before_days?: number;
         domain: string;
         confirm_domain: boolean;
@@ -254,9 +377,11 @@ export default function StepEleven() {
         step: 11,
         event_id: values.event_id,
         submit_type: values.submit_type,
-        domain: values.domain,
-        confirm_domain: values.confirm_domain,
+        domain,
+        confirm_domain: true,
         isApproved: true,
+        latitude,
+        longitude,
       };
 
       if (values.submit_type === "duplicate") {
@@ -270,22 +395,24 @@ export default function StepEleven() {
           values.reminder_email_before_days || 10;
       }
 
-      // Step 0 — saving settings (sync to global form only; do not call save() — it triggers cache invalidation and can unmount the overlay)
-      setPublishStep(0);
-      await sleep(stepDelays[0]);
-
-      // Step 1 — configuring domain
-      setPublishStep(1);
-      await sleep(stepDelays[1]);
-
-      // Step 2 — setting up event page (actual API call happens here)
-      setPublishStep(2);
       const response = await onboardingService.storeStepElevenData(
         payload as StepElevenType,
       );
-      if (!response?.status) throw new Error("Failed to publish");
+      if (!response?.status) throw new Error("Failed to save domain settings");
 
-      globalForm.setValue("stepEleven", { ...values, isApproved: true });
+      // Keep checkbox restored for this domain if the vendor navigates back.
+      savedDomainRef.current = domain;
+      savedDomainApprovedRef.current = true;
+      setSelectedDomain(domain);
+      form.setValue("domain", domain);
+      form.setValue("confirm_domain", true);
+      form.setValue("isApproved", true);
+      globalForm.setValue("stepEleven", {
+        ...nextValues,
+        domain,
+        isApproved: true,
+        confirm_domain: true,
+      });
 
       if (values.submit_type === "duplicate") {
         const syncedLocations = await syncVendorLocationsCache(queryClient);
@@ -297,227 +424,40 @@ export default function StepEleven() {
         void queryClient.invalidateQueries({ queryKey: ["locations"] });
       }
 
-      // Step 3 — publishing site
-      setPublishStep(3);
-      await sleep(stepDelays[2]);
-
-      await update({ on_boarding_step: 11 });
-
-      // Step 4 — finalising
-      setPublishStep(4);
-      await sleep(stepDelays[3]);
-
-      // Done — show success screen then redirect
-      setPublishStep(PUBLISH_STEPS.length);
-      await sleep(300);
-      setPublishDone(true);
-
-      setTimeout(() => {
-        router.push("/preview/onboarding");
-      }, 3500);
+      // Final step — mark onboarded, then open preview immediately.
+      // Do this BEFORE save()/invalidate so a persistence refetch cannot race
+      // `recoverFromOnboardingAlreadyCompleted` to /welcome.
+      try {
+        await update({ on_boarding_step: 11, isOnboarded: true });
+      } catch (error) {
+        console.error("Failed to mark onboarded in session:", error);
+      }
+      router.replace("/preview/onboarding");
+      void save().catch((error) => {
+        console.error("Background save error:", error);
+      });
     } catch (error) {
-      console.error("Error during publishing:", error);
-      setPublishing(false);
-      setPublishStep(-1);
+      console.error("Error during Step Eleven submission:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const progressPct =
-    publishStep < 0
-      ? 0
-      : Math.min(
-          Math.round(((publishStep + 1) / PUBLISH_STEPS.length) * 100),
-          100,
-        );
-
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-screen bg-transparent">
-      {/* Full-screen publishing overlay */}
-      <AnimatePresence>
-        {publishing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 backdrop-blur-sm"
-          >
-            <div className="w-full max-w-sm mx-auto px-6">
-              <AnimatePresence mode="wait">
-                {publishDone ? (
-                  /* ── Success screen ── */
-                  <motion.div
-                    key="success"
-                    initial={{ opacity: 0, scale: 0.92 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: "spring", stiffness: 260, damping: 22 }}
-                    className="flex flex-col items-center text-center gap-5"
-                  >
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 18,
-                        delay: 0.1,
-                      }}
-                      className="w-20 h-20 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: "rgba(34,197,94,0.15)" }}
-                    >
-                      <CheckCircle2 className="w-10 h-10 text-green-500" />
-                    </motion.div>
-
-                    <div>
-                      <h2 className="text-2xl font-bold text-foreground">
-                        Your site is live! 🎉
-                      </h2>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Taking you to your dashboard now…
-                      </p>
-                    </div>
-
-                    <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full bg-green-500"
-                        initial={{ width: "0%" }}
-                        animate={{ width: "100%" }}
-                        transition={{ duration: 3.2, ease: "linear" }}
-                      />
-                    </div>
-                  </motion.div>
-                ) : (
-                  /* ── Loading screen ── */
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -16 }}
-                    className="w-full"
-                  >
-                    {/* Animated icon */}
-                    <div className="text-center mb-8">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                        className="w-14 h-14 rounded-2xl border border-blue-500/30 flex items-center justify-center mx-auto mb-4 bg-blue-500/10"
-                      >
-                        <Loader2 className="w-7 h-7 text-blue-400" />
-                      </motion.div>
-                      <h2 className="text-xl font-bold text-white">
-                        Publishing your event…
-                      </h2>
-                      <p className="text-slate-500 text-xs mt-1">
-                        Please don&apos;t close this page
-                      </p>
-                    </div>
-
-                    {/* Progress bar */}
-                    <div className="mb-6">
-                      <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-xs text-slate-500">Progress</span>
-                        <span className="text-xs font-semibold text-blue-400">
-                          {progressPct}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                        <motion.div
-                          className="h-full rounded-full bg-blue-500"
-                          initial={{ width: "0%" }}
-                          animate={{ width: `${progressPct}%` }}
-                          transition={{ duration: 0.5, ease: "easeOut" }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Step list */}
-                    <div className="space-y-2">
-                      {PUBLISH_STEPS.map((step, idx) => {
-                        const isDone = idx < publishStep;
-                        const isActive = idx === publishStep;
-                        const isPending = idx > publishStep;
-                        return (
-                          <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, x: -8 }}
-                            animate={{ opacity: isPending ? 0.35 : 1, x: 0 }}
-                            transition={{ delay: idx * 0.06 }}
-                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
-                              isActive
-                                ? "bg-white/10 border border-white/20"
-                                : "bg-transparent"
-                            }`}
-                          >
-                            <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center">
-                              {isDone ? (
-                                <motion.div
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  transition={{
-                                    type: "spring",
-                                    stiffness: 300,
-                                    damping: 20,
-                                  }}
-                                  className="w-5 h-5 rounded-full flex items-center justify-center bg-green-500/15"
-                                >
-                                  <Check className="w-3 h-3 text-green-500" />
-                                </motion.div>
-                              ) : isActive ? (
-                                <motion.div
-                                  animate={{ rotate: 360 }}
-                                  transition={{
-                                    duration: 1,
-                                    repeat: Infinity,
-                                    ease: "linear",
-                                  }}
-                                >
-                                  <Loader2 className="w-4 h-4 text-blue-400" />
-                                </motion.div>
-                              ) : (
-                                <div className="w-4 h-4 rounded-full border border-slate-500/30" />
-                              )}
-                            </div>
-                            <span className="text-sm mr-1">{step.icon}</span>
-                            <span
-                              className={`text-sm font-medium ${
-                                isDone
-                                  ? "text-slate-400"
-                                  : isActive
-                                    ? "text-white"
-                                    : "text-slate-500"
-                              }`}
-                            >
-                              {step.label}
-                            </span>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="w-full max-w-4xl mx-auto relative">
-        <OnboardingCard className="w-full mx-auto shadow-sm">
-          <CardHeader className="space-y-2 pb-4 pt-4 text-center sm:text-left">
-            <OnboardingTitle>Almost done — publish your event</OnboardingTitle>
+    <div className="flex w-full flex-col items-center justify-start bg-transparent px-4 py-8">
+      <div className="relative mx-auto mb-16 w-full max-w-3xl">
+        <OnboardingCard className="mx-auto w-full shadow-sm">
+          <CardHeader className="space-y-1.5 pb-2 pt-4 text-center sm:text-left">
+            <OnboardingTitle>Set your booking website</OnboardingTitle>
             <p className="mx-auto max-w-xl text-sm leading-relaxed text-slate-400 sm:mx-0">
-              Choose the web address for bookings, optionally turn on balance
-              reminders, then submit. Everything stays editable in your
-              dashboard later.
+              Choose your booking web address and optionally turn on balance
+              reminders. Everything stays editable later from your dashboard.
             </p>
           </CardHeader>
 
-          <CardContent className="px-6 py-2 pb-8">
+          <CardContent className="px-6 pb-6 pt-0">
             <Form {...form}>
-              <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+              <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
                 {/* Hidden fields */}
                 <input type="hidden" {...form.register("step")} />
                 <input
@@ -529,23 +469,23 @@ export default function StepEleven() {
 
                 <WholeStepGuidedShell
                   form={form}
-                  sectionId="step-eleven-publish"
-                  chipLabel="Publish"
-                  chipDescription="Domain, reminders, and submit."
+                  sectionId="step-eleven-domain"
+                  chipLabel="Domain"
+                  chipDescription="Subdomain, reminders, then finish set-up."
                   persistenceHydrated={persistedProgressHydrated}
                   persistedStepApproved={stepElevenPersistedApproved === true}
                   renderFooter={({ guided }) => (
                     <div className="w-full space-y-4">
                       <GuidedWholeStepBottomActions
                         guided={guided}
-                        loading={publishing}
+                        loading={loading}
                         labelWhenReady={
                           form.watch("submit_type") === "duplicate"
-                            ? "Duplicate & submit"
-                            : "Submit"
+                            ? "Duplicate & finish"
+                            : "Finish set-up"
                         }
                         continueDisabled={
-                          publishing ||
+                          loading ||
                           !selectedDomain ||
                           !form.watch("confirm_domain")
                         }
@@ -554,7 +494,7 @@ export default function StepEleven() {
                       />
                       {!selectedDomain && (
                         <p className="text-center text-sm text-muted-foreground">
-                          Please select a subdomain to continue
+                          Please select a subdomain to finish
                         </p>
                       )}
                       {selectedDomain && !form.watch("confirm_domain") && (
@@ -566,16 +506,12 @@ export default function StepEleven() {
                   )}
                 >
                   {() => (
-                    <section
-                      className={guidedInsetSectionSurfaceClass(
-                        "w-full space-y-6 sm:space-y-8",
-                      )}
-                    >
+                    <div className="w-full space-y-4">
                       {/* 1 — Website address (required) */}
                       <div className={publishCardClass}>
-                        <div className="flex gap-4">
+                        <div className="flex gap-3">
                           <span className={publishStepBadgeClass}>1</span>
-                          <div className="min-w-0 flex-1 space-y-4">
+                          <div className="min-w-0 flex-1 space-y-3">
                             <div className="flex flex-wrap items-center gap-2">
                               <Globe
                                 className="h-5 w-5 shrink-0 text-sky-400/90"
@@ -591,17 +527,36 @@ export default function StepEleven() {
                                 {subdomainPublicPreviewLabel(
                                   selectedDomain,
                                   venueName,
+                                  domainSuffix,
                                 )}
-                                .{env.NEXT_PUBLIC_WHITE_LABEL_URL}
+                                .{domainSuffix}
                               </strong>
                             </p>
+
+                            {showDuplicateEventOptions && (
+                              <p className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs leading-relaxed text-sky-200">
+                                This is your <strong>one brand domain</strong>.
+                                Each location gets its own page underneath it
+                                (e.g.{" "}
+                                <span className="font-medium break-all">
+                                  {subdomainPublicPreviewLabel(
+                                    selectedDomain,
+                                    venueName,
+                                    domainSuffix,
+                                  )}
+                                  .{domainSuffix}/your-location
+                                </span>
+                                ) — use your brand name here, not a single
+                                location&apos;s name.
+                              </p>
+                            )}
 
                             <div className="space-y-3">
                               <div className="space-y-2">
                                 <label className="text-sm font-medium text-slate-300">
                                   Subdomain
                                 </label>
-                                <div className="relative">
+                                <div className="flex overflow-hidden rounded-md border border-white/20 bg-white/5 focus-within:ring-1 focus-within:ring-[var(--color-primary,#38bdf8)]">
                                   <Input
                                     placeholder="Enter subdomain name"
                                     value={selectedDomain || ""}
@@ -609,8 +564,7 @@ export default function StepEleven() {
                                       const value = e.target.value
                                         .toLowerCase()
                                         .replace(/[^a-z0-9-]/g, "");
-                                      setSelectedDomain(value);
-                                      form.setValue("domain", value);
+                                      applyDomainChange(value);
 
                                       // Generate suggestions based on typing
                                       if (value && value.length >= 3) {
@@ -621,30 +575,29 @@ export default function StepEleven() {
                                         );
                                       }
                                     }}
-                                    className="h-9 border-white/20 bg-white/5 pr-20 text-sm"
+                                    className="h-9 flex-1 border-0 bg-transparent pr-8 text-sm shadow-none focus-visible:ring-0"
                                     maxLength={63}
                                   />
-                                  <div className="absolute right-3 top-1/2 flex -translate-y-1/2 transform items-center text-sm text-muted-foreground">
-                                    .eventwizz.com
-                                  </div>
-                                  {selectedDomain && (
+                                  {selectedDomain ? (
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setSelectedDomain("");
-                                        form.setValue("domain", "");
+                                        applyDomainChange("");
                                       }}
-                                      className="absolute right-16 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                                      className="shrink-0 px-2 text-slate-500 hover:text-slate-300"
                                       title="Clear domain"
                                     >
                                       ✕
                                     </button>
-                                  )}
-                                  {isGeneratingSuggestions && (
-                                    <div className="absolute right-20 top-1/2 transform -translate-y-1/2">
+                                  ) : null}
+                                  {isGeneratingSuggestions ? (
+                                    <div className="flex shrink-0 items-center pr-2">
                                       <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
                                     </div>
-                                  )}
+                                  ) : null}
+                                  <div className="flex shrink-0 items-center border-l border-white/15 bg-white/[0.03] px-3 text-sm text-muted-foreground">
+                                    .{domainSuffix}
+                                  </div>
                                 </div>
                               </div>
 
@@ -680,8 +633,7 @@ export default function StepEleven() {
                                               key={index}
                                               type="button"
                                               onClick={() => {
-                                                setSelectedDomain(alt);
-                                                form.setValue("domain", alt);
+                                                applyDomainChange(alt);
                                               }}
                                               className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-sm text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.1]"
                                             >
@@ -703,21 +655,26 @@ export default function StepEleven() {
                                         key={index}
                                         type="button"
                                         onClick={() => {
-                                          setSelectedDomain(suggestion.domain);
-                                          form.setValue(
-                                            "domain",
-                                            suggestion.domain,
+                                          applyDomainChange(
+                                            normalizeSubdomainLabel(
+                                              suggestion.domain,
+                                              domainSuffix,
+                                            ),
                                           );
                                         }}
                                         className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 hover:shadow-sm ${
-                                          selectedDomain === suggestion.domain
+                                          selectedDomain ===
+                                          normalizeSubdomainLabel(
+                                            suggestion.domain,
+                                            domainSuffix,
+                                          )
                                             ? "border-[var(--color-primary,#3b82f6)] bg-[var(--color-primary,#3b82f6)]/15 text-foreground shadow-sm"
                                             : "border-white/15 bg-white/[0.06] text-foreground hover:border-white/25 hover:bg-white/[0.1]"
                                         }`}
                                       >
-                                        {suggestion.domain.replace(
-                                          /\.com$|\.eventwizz\.com$/g,
-                                          "",
+                                        {normalizeSubdomainLabel(
+                                          suggestion.domain,
+                                          domainSuffix,
                                         )}
                                       </button>
                                     ))}
@@ -781,9 +738,9 @@ export default function StepEleven() {
 
                       {/* 2 — Reminder emails (optional) */}
                       <div className={publishCardClass}>
-                        <div className="flex gap-4">
+                        <div className="flex gap-3">
                           <span className={publishStepBadgeClass}>2</span>
-                          <div className="min-w-0 flex-1 space-y-4">
+                          <div className="min-w-0 flex-1 space-y-3">
                             <div className="flex flex-wrap items-center gap-2">
                               <Mail
                                 className="h-5 w-5 shrink-0 text-amber-400/90"
@@ -916,9 +873,9 @@ export default function StepEleven() {
                       {/* 3 — Copy event to another venue (multi-location only) */}
                       {showDuplicateEventOptions && (
                         <div className={publishCardClass}>
-                          <div className="flex gap-4">
+                          <div className="flex gap-3">
                             <span className={publishStepBadgeClass}>3</span>
-                            <div className="min-w-0 flex-1 space-y-4">
+                            <div className="min-w-0 flex-1 space-y-3">
                               <div className="flex flex-wrap items-center gap-2">
                                 <MapPin
                                   className="h-5 w-5 shrink-0 text-violet-400/90"
@@ -1007,9 +964,15 @@ export default function StepEleven() {
                                               env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
                                             }
                                             value={field.value || ""}
-                                            onChange={(value) =>
-                                              field.onChange(value)
-                                            }
+                                            onChange={(value) => {
+                                              field.onChange(value);
+                                              form.setValue("latitude", undefined, {
+                                                shouldDirty: true,
+                                              });
+                                              form.setValue("longitude", undefined, {
+                                                shouldDirty: true,
+                                              });
+                                            }}
                                             onSelect={(placeId) =>
                                               fetchLocationDetails(
                                                 form,
@@ -1080,13 +1043,67 @@ export default function StepEleven() {
                                       </FormItem>
                                     )}
                                   />
+
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="text-sm font-medium text-slate-200">
+                                        Confirm on map{" "}
+                                        <span className="text-red-400">*</span>
+                                      </p>
+                                      <p className="mt-1 text-xs text-muted-foreground">
+                                        Drag the pin to the venue entrance if
+                                        search did not land exactly — latitude
+                                        and longitude are required to save this
+                                        location.
+                                      </p>
+                                    </div>
+                                    <EventLocationMap
+                                      key={`duplicate-venue-${duplicateVenueLatitude ?? "na"}-${duplicateVenueLongitude ?? "na"}-${duplicateVenueAddress ?? ""}`}
+                                      initialAddress={duplicateVenueAddress || ""}
+                                      initialLatitude={duplicateVenueLatitude}
+                                      initialLongitude={duplicateVenueLongitude}
+                                      onLocationChange={({
+                                        address,
+                                        latitude,
+                                        longitude,
+                                      }) => {
+                                        form.setValue("address", address, {
+                                          shouldDirty: true,
+                                          shouldValidate: true,
+                                        });
+                                        form.setValue("latitude", latitude, {
+                                          shouldDirty: true,
+                                          shouldValidate: true,
+                                        });
+                                        form.setValue("longitude", longitude, {
+                                          shouldDirty: true,
+                                          shouldValidate: true,
+                                        });
+                                        const parsedCity =
+                                          cityFromFormattedAddress(address);
+                                        if (parsedCity) {
+                                          form.setValue("city", parsedCity, {
+                                            shouldValidate: true,
+                                            shouldDirty: true,
+                                          });
+                                        }
+                                        globalForm.setValue("stepEleven", {
+                                          ...globalForm.getValues("stepEleven"),
+                                          address,
+                                          latitude,
+                                          longitude,
+                                          ...(parsedCity ? { city: parsedCity } : {}),
+                                        });
+                                      }}
+                                    />
+                                  </div>
                                 </div>
                               )}
                             </div>
                           </div>
                         </div>
                       )}
-                    </section>
+                    </div>
                   )}
                 </WholeStepGuidedShell>
               </form>

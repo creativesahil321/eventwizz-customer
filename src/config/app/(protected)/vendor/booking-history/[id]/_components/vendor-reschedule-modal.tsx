@@ -28,7 +28,12 @@ import type {
   VendorMissingTableDetail,
   VendorRescheduleBookingPayload,
 } from "@/services/vendor/bookings/type";
+import {
+  getAdditionalPaymentRequired,
+  selectedRequiresPayment,
+} from "@/services/customer/bookings/reschedule-utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { cn } from "@/lib/utils";
 
 function getTotalMissingTableQuantity(
   missingTables: VendorMissingTableDetail[],
@@ -134,21 +139,28 @@ export function VendorRescheduleDateModal({
   } = useVendorRescheduleData(bookingId, bookingDateId, shouldFetchData);
 
   const rescheduleData = rescheduleDataResponse?.data;
-  const availableDates = rescheduleData?.availableDates.available || [];
-  const needsTablesDates = rescheduleData?.availableDates.needs_tables || [];
+  const availableDatesGroup =
+    rescheduleData?.availableDates ?? rescheduleData?.available_dates;
+  const availableDates = availableDatesGroup?.available || [];
+  const needsTablesDates = availableDatesGroup?.needs_tables || [];
   const currentDateData = rescheduleData?.current;
+
+  const currentPriceValue = currentDateData
+    ? Number.parseFloat(String(currentDateData.price)) || currentDate.price
+    : currentDate.price;
+
+  const paidAmountValue = useMemo(() => {
+    if (currentDateData?.paid_amount == null) return null;
+    const parsed = Number.parseFloat(String(currentDateData.paid_amount));
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [currentDateData]);
 
   const currentBookingDisplay = useMemo(() => {
     if (currentDateData) {
-      const price =
-        typeof currentDateData.price === "number"
-          ? currentDateData.price
-          : Number.parseFloat(String(currentDateData.price)) ||
-            currentDate.price;
-
       return {
-        date: currentDateData.date,
-        price,
+        date: currentDateData.date_label?.trim() || currentDateData.date,
+        price: currentPriceValue,
+        paid_amount: paidAmountValue,
         people: currentDateData.people,
         tables: currentDateData.tables,
         tickets: currentDateData.tickets ?? 0,
@@ -156,8 +168,25 @@ export function VendorRescheduleDateModal({
       };
     }
 
-    return currentDate;
-  }, [currentDate, currentDateData]);
+    return { ...currentDate, paid_amount: null as number | null };
+  }, [currentDate, currentDateData, currentPriceValue, paidAmountValue]);
+
+  const selectedRequiresUpgrade =
+    selectedDate != null &&
+    selectedRequiresPayment(
+      selectedDate,
+      currentPriceValue,
+      paidAmountValue ?? undefined,
+    );
+
+  const selectedAdditionalPayment =
+    selectedDate != null
+      ? getAdditionalPaymentRequired(
+          selectedDate,
+          currentPriceValue,
+          paidAmountValue ?? undefined,
+        )
+      : 0;
 
   // Reset step when modal opens
   useEffect(() => {
@@ -193,8 +222,8 @@ export function VendorRescheduleDateModal({
   };
 
   const handleReviewConfirm = () => {
-    // If price doesn't increase, submit directly from review
-    if (priceDifference <= 0) {
+    // If no additional payment, submit directly from review
+    if (!selectedRequiresUpgrade || selectedAdditionalPayment <= 0) {
       handleFinalConfirm();
       return;
     }
@@ -211,20 +240,24 @@ export function VendorRescheduleDateModal({
       return;
     }
 
-    // Calculate unpaid amount (price difference if new date is more expensive)
-    const currentPriceCalc = Number.parseFloat(currentDateData.price);
-    const newPriceCalc = selectedDate.price;
-    const unpaidAmountCalc =
-      newPriceCalc > currentPriceCalc ? newPriceCalc - currentPriceCalc : 0;
+    // Prefer server `additional_payment_required` (new price − paid_amount)
+    const unpaidAmountCalc = getAdditionalPaymentRequired(
+      selectedDate,
+      currentPriceValue,
+      paidAmountValue ?? undefined,
+    );
+    const requiresPayment =
+      selectedRequiresPayment(
+        selectedDate,
+        currentPriceValue,
+        paidAmountValue ?? undefined,
+      ) && unpaidAmountCalc > 0;
 
-    // Check if terms and payment method are required
-    const requiresPayment = unpaidAmountCalc > 0;
     if (requiresPayment && (!termsAccepted || !paymentMethod)) {
       return;
     }
 
-    // Prepare table details payload
-    const tableDetails = selectedDate.table_details.map((table) => ({
+    const tableDetails = (selectedDate.table_details ?? []).map((table) => ({
       event_date_table_id: table.event_date_table_id,
       allocated_seat: table.allocated_seat,
       table_size: table.table_size,
@@ -234,16 +267,14 @@ export function VendorRescheduleDateModal({
 
     isSubmittingRef.current = true;
 
-    // Determine payment method to send
     const finalPaymentMethod: "online" | "offline" =
       requiresPayment && paymentMethod ? paymentMethod : "offline";
 
-    // Call parent with full payload
     onConfirm({
       booking_id: bookingId,
       booking_date_id: bookingDateId,
-      new_booking_date_id: selectedDate.id,
-      new_date: selectedDate.dateKey,
+      new_booking_date_id: selectedDate.event_date_id ?? selectedDate.id,
+      new_date: selectedDate.date_key ?? selectedDate.dateKey ?? "",
       total_amount: selectedDate.price,
       unpaid_amount: unpaidAmountCalc,
       payment_gateway: finalPaymentMethod === "online" ? "stripe" : "offline",
@@ -270,12 +301,10 @@ export function VendorRescheduleDateModal({
     }
   };
 
-  // Calculate price difference using selected date and current date data
-  const priceDifference =
-    selectedDate && currentDateData
-      ? selectedDate.price - Number.parseFloat(currentDateData.price)
-      : 0;
-  const isPriceIncrease = priceDifference > 0;
+  // Prefer server `additional_payment_required` (accounts for paid_amount)
+  const priceDifference = selectedAdditionalPayment;
+  const isPriceIncrease =
+    selectedRequiresUpgrade && selectedAdditionalPayment > 0;
 
   const getStepProgress = () => {
     const steps: Step[] = hasAddons
@@ -500,6 +529,14 @@ export function VendorRescheduleDateModal({
                             {formatMoney(currentBookingDisplay.price)}
                           </p>
                         </div>
+                        {currentBookingDisplay.paid_amount != null && (
+                          <div>
+                            <span className="text-blue-700">Paid:</span>
+                            <p className="font-medium text-blue-900">
+                              {formatMoney(currentBookingDisplay.paid_amount)}
+                            </p>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-blue-600" />
                           <span className="text-blue-900">
@@ -550,13 +587,22 @@ export function VendorRescheduleDateModal({
                       <div className="space-y-2 sm:space-y-3">
                         {availableDates.map(
                           (date: VendorAvailableRescheduleDate) => {
-                            const datePriceDiff =
-                              date.price - currentDate.price;
-                            const isSame = datePriceDiff === 0;
+                            const dateRequiresPayment = selectedRequiresPayment(
+                              date,
+                              currentPriceValue,
+                              paidAmountValue ?? undefined,
+                            );
+                            const extraPayment = getAdditionalPaymentRequired(
+                              date,
+                              currentPriceValue,
+                              paidAmountValue ?? undefined,
+                            );
+                            const dateLabel =
+                              date.date_label?.trim() || date.date;
 
                             return (
                               <div
-                                key={date.id}
+                                key={date.event_date_id ?? date.id}
                                 className="border rounded-lg p-3 sm:p-4 transition-all hover:border-blue-400 hover:bg-blue-50/30 cursor-pointer active:scale-[0.98]"
                                 onClick={() => handleDateSelect(date)}
                               >
@@ -565,18 +611,24 @@ export function VendorRescheduleDateModal({
                                     <div className="flex items-center gap-2 mb-2">
                                       <Calendar className="h-4 w-4 text-gray-600" />
                                       <h4 className="font-semibold text-gray-900">
-                                        {date.date}
+                                        {dateLabel}
                                       </h4>
                                     </div>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      {isSame && (
+                                      {!dateRequiresPayment && (
                                         <Badge
                                           variant="secondary"
                                           className="bg-gray-100 text-gray-700"
                                         >
-                                          Same Price
+                                          Same or lower price
                                         </Badge>
                                       )}
+                                      {dateRequiresPayment &&
+                                        extraPayment > 0 && (
+                                          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+                                            +{formatMoney(extraPayment)} due
+                                          </Badge>
+                                        )}
                                       <Badge
                                         variant="secondary"
                                         className="bg-green-100 text-green-700"
@@ -705,14 +757,23 @@ export function VendorRescheduleDateModal({
                     </div>
                     <div className="space-y-2 text-sm">
                       <p className="font-medium text-red-900">
-                        {currentDateData.date}
+                        {currentDateData.date_label?.trim() ||
+                          currentDateData.date}
                       </p>
                       <div className="flex items-center justify-between text-red-700">
                         <span>Price:</span>
                         <span className="font-bold">
-                          {formatMoney(Number(currentDateData.price))}
+                          {formatMoney(currentPriceValue)}
                         </span>
                       </div>
+                      {paidAmountValue != null && (
+                        <div className="flex items-center justify-between text-red-700">
+                          <span>Paid:</span>
+                          <span className="font-bold">
+                            {formatMoney(paidAmountValue)}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between text-red-700">
                         <span>People:</span>
                         <span>{currentDateData.people}</span>
@@ -741,7 +802,7 @@ export function VendorRescheduleDateModal({
                     </div>
                     <div className="space-y-2 text-sm">
                       <p className="font-medium text-green-900">
-                        {selectedDate.date}
+                        {selectedDate.date_label?.trim() || selectedDate.date}
                       </p>
                       <div className="flex items-center justify-between text-green-700">
                         <span>Price:</span>
@@ -792,69 +853,59 @@ export function VendorRescheduleDateModal({
                         amount:
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Button
+                        <button
                           type="button"
-                          variant={
+                          aria-pressed={paymentMethod === "online"}
+                          className={cn(
+                            "h-auto rounded-lg border-2 px-4 py-4 text-left transition-colors",
+                            "flex flex-col items-start gap-2 disabled:pointer-events-none disabled:opacity-50",
                             paymentMethod === "online"
-                              ? "event-primary"
-                              : "event-outline"
-                          }
-                          className={`h-auto py-4 px-4 flex flex-col items-start gap-2 ${
-                            paymentMethod === "online"
-                              ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] border-[var(--color-primary)]"
-                              : "border-2 hover:border-blue-300 hover:bg-blue-50"
-                          }`}
+                              ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 ring-2 ring-[var(--color-primary)]/30"
+                              : "border-slate-200 bg-white hover:border-[var(--color-primary)]/50 hover:bg-slate-50",
+                          )}
                           onClick={() => setPaymentMethod("online")}
                           disabled={isProcessing}
                         >
-                          <div className="flex items-center gap-2 w-full">
-                            <CreditCard className="h-5 w-5" />
-                            <span className="font-semibold">
+                          <div className="flex w-full items-center gap-2 text-slate-900">
+                            <CreditCard
+                              className="h-5 w-5 shrink-0 text-[var(--color-primary)]"
+                              aria-hidden
+                            />
+                            <span className="text-sm font-semibold text-slate-900">
                               Online Payment
                             </span>
                           </div>
-                          <span
-                            className={`text-xs ${
-                              paymentMethod === "online"
-                                ? "text-blue-100"
-                                : "text-gray-600"
-                            }`}
-                          >
+                          <span className="text-xs leading-relaxed text-slate-600 whitespace-normal">
                             Customer will pay online via payment gateway
                           </span>
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           type="button"
-                          variant={
+                          aria-pressed={paymentMethod === "offline"}
+                          className={cn(
+                            "h-auto rounded-lg border-2 px-4 py-4 text-left transition-colors",
+                            "flex flex-col items-start gap-2 disabled:pointer-events-none disabled:opacity-50",
                             paymentMethod === "offline"
-                              ? "event-primary"
-                              : "event-outline"
-                          }
-                          className={`h-auto py-4 px-4 flex flex-col items-start gap-2 ${
-                            paymentMethod === "offline"
-                              ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] border-[var(--color-primary)]"
-                              : "border-2 hover:border-blue-300 hover:bg-blue-50"
-                          }`}
+                              ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 ring-2 ring-[var(--color-primary)]/30"
+                              : "border-slate-200 bg-white hover:border-[var(--color-primary)]/50 hover:bg-slate-50",
+                          )}
                           onClick={() => setPaymentMethod("offline")}
                           disabled={isProcessing}
                         >
-                          <div className="flex items-center gap-2 w-full">
-                            <Receipt className="h-5 w-5" />
-                            <span className="font-semibold">
+                          <div className="flex w-full items-center gap-2 text-slate-900">
+                            <Receipt
+                              className="h-5 w-5 shrink-0 text-[var(--color-primary)]"
+                              aria-hidden
+                            />
+                            <span className="text-sm font-semibold text-slate-900">
                               Offline Payment
                             </span>
                           </div>
-                          <span
-                            className={`text-xs ${
-                              paymentMethod === "offline"
-                                ? "text-blue-100"
-                                : "text-gray-600"
-                            }`}
-                          >
+                          <span className="text-xs leading-relaxed text-slate-600 whitespace-normal">
                             Customer will pay manually (cash, bank transfer,
                             etc.)
                           </span>
-                        </Button>
+                        </button>
                       </div>
                       {!paymentMethod && (
                         <p className="text-xs text-red-600 mt-2">
@@ -871,7 +922,7 @@ export function VendorRescheduleDateModal({
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <span className="text-sm font-medium text-green-900">
-                        {priceDifference === 0
+                        {selectedDate.price === currentPriceValue
                           ? "No additional payment required - same price"
                           : "No additional payment required - new date is less expensive"}
                       </span>
@@ -911,15 +962,27 @@ export function VendorRescheduleDateModal({
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">From:</span>
                       <span className="font-medium text-gray-900">
-                        {currentDateData?.date || currentDate.date}
+                        {currentDateData?.date_label?.trim() ||
+                          currentDateData?.date ||
+                          currentDate.date}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">To:</span>
                       <span className="font-medium text-gray-900">
-                        {selectedDate?.date}
+                        {selectedDate?.date_label?.trim() || selectedDate?.date}
                       </span>
                     </div>
+                    {isPriceIncrease && (
+                      <div className="flex items-center justify-between border-t border-blue-100 pt-2 text-sm">
+                        <span className="text-gray-600">
+                          Additional payment:
+                        </span>
+                        <span className="font-bold text-orange-700">
+                          {formatMoney(priceDifference)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

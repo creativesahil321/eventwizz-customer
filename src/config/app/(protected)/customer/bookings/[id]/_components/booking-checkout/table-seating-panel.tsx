@@ -149,6 +149,8 @@ export function TableSeatingPanel({
 
   const [draftAllocation, setDraftAllocation] = useState<number[]>([]);
   const [seatingConfirmed, setSeatingConfirmed] = useState(false);
+  /** Show Auto Distribute / Reset only after the user edits a table. */
+  const [hasTouchedTables, setHasTouchedTables] = useState(false);
   const lastAppliedPlanRef = useRef<string>("");
 
   const belowMinimum = effectiveGroupSize > 0 && effectiveGroupSize < minPersons;
@@ -205,11 +207,13 @@ export function TableSeatingPanel({
     if (effectiveGroupSize <= 0 || tableQuantity <= 0) {
       setDraftAllocation([]);
       setSeatingConfirmed(false);
+      setHasTouchedTables(false);
       return;
     }
 
     setDraftAllocation(buildAutoAllocation(effectiveGroupSize, tableQuantity));
     setSeatingConfirmed(false);
+    setHasTouchedTables(false);
   }, [
     buildAutoAllocation,
     effectiveGroupSize,
@@ -311,6 +315,7 @@ export function TableSeatingPanel({
   };
 
   const stepAllocation = (index: number, delta: number) => {
+    setHasTouchedTables(true);
     setDraftAllocation((current) => {
       const value = current[index] ?? minPersons;
       const next = Math.max(minPersons, Math.min(maxPersons, value + delta));
@@ -336,6 +341,7 @@ export function TableSeatingPanel({
       lastAppliedPlanRef.current = "";
       setDraftAllocation([]);
       setSeatingConfirmed(false);
+      setHasTouchedTables(false);
       return;
     }
 
@@ -362,7 +368,7 @@ export function TableSeatingPanel({
     }
 
     setSeatingConfirmed(true);
-    toast.success("Seating ready — tap Add to booking to save");
+    toast.success("Seating ready. Select Add to booking to save.");
   };
 
   const showConfirmButton =
@@ -486,59 +492,30 @@ export function TableSeatingPanel({
                 />
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <button
-                  type="button"
-                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border-0 text-xs font-semibold leading-none transition-opacity hover:opacity-90 sm:w-auto sm:px-3"
-                  style={{
-                    backgroundColor: "var(--color-primary)",
-                    color: "var(--color-primary-foreground, #fff)",
-                  }}
-                  onClick={handleAutoDistribute}
-                >
-                  <Wand2 className="h-3 w-3" strokeWidth={2} />
-                  Auto Distribute
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-xs font-semibold leading-none text-muted-foreground transition-colors hover:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))] sm:w-auto sm:px-3"
-                  onClick={handleReset}
-                >
-                  <RotateCcw className="h-3 w-3" strokeWidth={2} />
-                  Reset
-                </button>
-              </div>
-
-              {showConfirmButton && (
-                <>
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    Tap{" "}
-                    <span className="font-semibold text-foreground">
-                      Confirm seating
-                    </span>{" "}
-                    to add tables to your order.
-                  </p>
+              {hasTouchedTables ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <button
                     type="button"
-                    className="h-8 w-full rounded-md text-xs font-bold leading-none hover:opacity-[0.92]"
+                    className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border-0 text-xs font-semibold leading-none transition-opacity hover:opacity-90 sm:w-auto sm:px-3"
                     style={{
-                      backgroundColor: "var(--color-success)",
+                      backgroundColor: "var(--color-primary)",
                       color: "var(--color-primary-foreground, #fff)",
                     }}
-                    onClick={handleConfirmSeating}
+                    onClick={handleAutoDistribute}
                   >
-                    Confirm seating
+                    <Wand2 className="h-3 w-3" strokeWidth={2} />
+                    Auto Distribute
                   </button>
-                </>
-              )}
-
-              {seatingConfirmed && (
-                <p className="text-[11px] font-semibold text-emerald-700">
-                  Seating confirmed · {draftGuestTotal} guest
-                  {draftGuestTotal === 1 ? "" : "s"} across {tableQuantity}{" "}
-                  table{tableQuantity === 1 ? "" : "s"}
-                </p>
-              )}
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-xs font-semibold leading-none text-muted-foreground transition-colors hover:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))] sm:w-auto sm:px-3"
+                    onClick={handleReset}
+                  >
+                    <RotateCcw className="h-3 w-3" strokeWidth={2} />
+                    Reset
+                  </button>
+                </div>
+              ) : null}
 
               <div
                 className={cn(
@@ -591,7 +568,7 @@ export function TableSeatingPanel({
                             {currentValue}
                           </p>
                           <p className="mt-0.5 text-[8px] text-muted-foreground">
-                            Max {maxPersons}
+                            {minPersons}–{maxPersons} guests
                           </p>
                           <p className="mt-1 text-[8px] font-semibold tabular-nums text-foreground">
                             {formatCurrency(pricePerPerson * currentValue)}
@@ -624,6 +601,37 @@ export function TableSeatingPanel({
                   );
                 })}
               </div>
+
+              {showConfirmButton && (
+                <>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Tap{" "}
+                    <span className="font-semibold text-foreground">
+                      Confirm seating
+                    </span>{" "}
+                    to add tables to your order.
+                  </p>
+                  <button
+                    type="button"
+                    className="h-8 w-full rounded-md text-xs font-bold leading-none hover:opacity-[0.92]"
+                    style={{
+                      backgroundColor: "var(--color-success)",
+                      color: "var(--color-primary-foreground, #fff)",
+                    }}
+                    onClick={handleConfirmSeating}
+                  >
+                    Confirm seating
+                  </button>
+                </>
+              )}
+
+              {seatingConfirmed && (
+                <p className="text-[11px] font-semibold text-emerald-700">
+                  Seating confirmed · {draftGuestTotal} guest
+                  {draftGuestTotal === 1 ? "" : "s"} across {tableQuantity}{" "}
+                  table{tableQuantity === 1 ? "" : "s"}
+                </p>
+              )}
 
               {!validation.isValid && validation.errors.length > 0 && (
                 <div className="rounded-lg border border-red-100 bg-red-50 px-2.5 py-2">

@@ -22,6 +22,13 @@ export const eventKeys = {
   detail: (id: number) => [...eventKeys.details(), id] as const,
 };
 
+type EventsTabCounts = {
+  active: number;
+  old: number;
+  draft: number;
+  cancelled: number;
+};
+
 type EventsResult = {
   items: EventItem[];
   meta: {
@@ -31,7 +38,24 @@ type EventsResult = {
     [key: string]: unknown;
   };
   filter_meta?: EventsListFilterMeta;
+  tab_counts: EventsTabCounts;
 };
+
+const emptyTabCounts: EventsTabCounts = {
+  active: 0,
+  old: 0,
+  draft: 0,
+  cancelled: 0,
+};
+
+function mapEventsTabCounts(data: EventsResponse): EventsTabCounts {
+  return {
+    active: data.active_events_count ?? 0,
+    old: data.past_events_count ?? 0,
+    draft: data.draft_events_count ?? 0,
+    cancelled: data.cancelled_events_count ?? 0,
+  };
+}
 
 /**
  * Hook to fetch events list with TanStack Query
@@ -72,6 +96,7 @@ export const useEvents = (
           items: [],
           meta: { current_page: 1, last_page: 1, total: 0 },
           filter_meta: undefined,
+          tab_counts: emptyTabCounts,
         };
       }
 
@@ -82,6 +107,7 @@ export const useEvents = (
           items: [],
           meta: { current_page: 1, last_page: 1, total: 0 },
           filter_meta: undefined,
+          tab_counts: emptyTabCounts,
         };
       }
 
@@ -90,6 +116,7 @@ export const useEvents = (
         items: Array.isArray(data.data) ? data.data : [],
         meta: data.meta || { current_page: 1, last_page: 1, total: 0 },
         filter_meta: data.filter_meta,
+        tab_counts: mapEventsTabCounts(data),
       };
     },
     placeholderData: keepPreviousData,
@@ -111,6 +138,10 @@ export const useEvents = (
               total: initialData.length,
             },
             errors: [],
+            active_events_count: 0,
+            past_events_count: 0,
+            draft_events_count: 0,
+            cancelled_events_count: 0,
           }
         : undefined,
     ...options,

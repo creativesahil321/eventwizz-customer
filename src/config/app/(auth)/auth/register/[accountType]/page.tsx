@@ -29,15 +29,15 @@ export default function RegisterPage() {
   return (
     <>
       <div className="flex flex-col space-y-2 text-center mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-black">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--color-text)]">
           {accountType === "vendor"
-            ? "Create Vendor Account"
-            : "Create Customer Account"}
+            ? "Create your vendor account"
+            : "Create your account"}
         </h1>
-        <p className="text-sm text-black">
+        <p className="text-sm text-[var(--color-text-dimmed)]">
           {accountType === "vendor"
             ? `Start offering your services on ${siteName}`
-            : `Join ${siteName} to find and book amazing events`}
+            : `Sign up to discover and book events on ${siteName}`}
         </p>
       </div>
 

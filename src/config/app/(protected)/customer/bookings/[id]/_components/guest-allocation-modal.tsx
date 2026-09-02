@@ -274,7 +274,7 @@ export default function GuestAllocationModal({
       const autoArranged = autoArrangeGuests(tableData, targetTotal);
       setAllocations(autoArranged);
       syncInputValues(autoArranged);
-      toast.success("Guests distributed evenly!");
+      toast.success("Guests distributed evenly.");
     } catch (error) {
       console.error("Auto-arrange error:", error);
       toast.error("Failed to auto-arrange guests");
@@ -413,7 +413,7 @@ export default function GuestAllocationModal({
   const handleConfirm = () => {
     if (validation.isValid) {
       onConfirm(allocations);
-      toast.success("Seating confirmed!");
+      toast.success("Seating confirmed.");
       onClose();
     } else {
       toast.error("Please assign all guests before confirming");
@@ -521,7 +521,7 @@ export default function GuestAllocationModal({
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                     <span className="text-xs font-medium text-emerald-600">
-                      All guests assigned perfectly
+                      All guests assigned
                     </span>
                   </motion.div>
                 ) : guestsRemaining > 0 ? (

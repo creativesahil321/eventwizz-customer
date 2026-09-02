@@ -101,6 +101,13 @@ export function mapOnboardingEventToDetailData(
   const event = apiData.event;
   if (!event) return null;
 
+  const eventId =
+    typeof event.event_id === "number" &&
+    Number.isFinite(event.event_id) &&
+    event.event_id > 0
+      ? event.event_id
+      : 0;
+
   const { slice: primary, hasRoomSystem } = resolvePrimaryEventContent(event);
   const roomEntries = event.rooms ? Object.entries(event.rooms) : [];
 
@@ -159,7 +166,7 @@ export function mapOnboardingEventToDetailData(
   }
 
   const stepOne = {
-    event_id: 0,
+    event_id: eventId,
     step: 1,
     event_name: event.event_name,
     event_banner_image: event.event_banner_image,
@@ -176,7 +183,7 @@ export function mapOnboardingEventToDetailData(
   };
 
   const stepTwo = {
-    event_id: 0,
+    event_id: eventId,
     step: 2,
     is_rooms: hasRoomSystem,
     package_title: primary?.package_title,
@@ -194,19 +201,19 @@ export function mapOnboardingEventToDetailData(
   const stepThreeDates = mapDatesToStepThree(primary?.dates);
   const stepThree = stepThreeDates?.length
     ? {
-        event_id: 0,
+        event_id: eventId,
         step: 3,
         dates: stepThreeDates,
         ...(hasRoomSystem ? { rooms: stepThreeRooms } : {}),
       }
     : hasRoomSystem
-      ? { event_id: 0, step: 3, rooms: stepThreeRooms }
+      ? { event_id: eventId, step: 3, rooms: stepThreeRooms }
       : undefined;
 
   const stepFour =
     primary?.menus?.length || Object.keys(stepFourRooms).length > 0
       ? {
-          event_id: 0,
+          event_id: eventId,
           step: 4,
           catering_option: primary?.menus?.length ? 1 : 0,
           menu_title: primary?.menu_title,
@@ -220,7 +227,7 @@ export function mapOnboardingEventToDetailData(
   const stepFive =
     primary?.packages?.length || Object.keys(stepSixDrinksRooms).length > 0
       ? {
-          event_id: 0,
+          event_id: eventId,
           step: 5,
           drink_title: primary?.drink_title,
           drink_description: primary?.drink_description,
@@ -237,7 +244,7 @@ export function mapOnboardingEventToDetailData(
       : undefined;
 
   const stepSix = {
-    event_id: 0,
+    event_id: eventId,
     step: 6,
     brochure_pdf: primary?.brochure_pdf,
     brochure_pdf_2: primary?.brochure_pdf_2,
@@ -246,11 +253,11 @@ export function mapOnboardingEventToDetailData(
   };
 
   const stepSeven = event.faqs?.length
-    ? { event_id: 0, step: 7, faqs: event.faqs }
+    ? { event_id: eventId, step: 7, faqs: event.faqs }
     : undefined;
 
   const stepEight = {
-    event_id: 0,
+    event_id: eventId,
     step: 8,
     address: event.address ?? event.event_address,
     contact_number: event.phone,
@@ -261,6 +268,10 @@ export function mapOnboardingEventToDetailData(
   return {
     slug: event.slug,
     is_rooms: event.is_rooms,
+    banner_heading_align:
+      event.banner_heading_align ?? apiData.banner_heading_align ?? null,
+    banner_heading_valign:
+      event.banner_heading_valign ?? apiData.banner_heading_valign ?? null,
     logo: event.logo,
     email: event.email ?? undefined,
     contact_number: event.phone,

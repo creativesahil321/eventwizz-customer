@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   flexRender,
   type SortingState,
   type PaginationState,
+  type Updater,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -21,98 +20,146 @@ import {
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import type { SearchParams, Transaction } from "../_lib/types";
 import { getTransactionColumns } from "./columns";
-import { DUMMY_TRANSACTIONS, getDummyEarnings } from "../_lib/dummy-data";
+import {
+  formatAdminTransactionEarnings,
+  isAdminTransactionSortField,
+} from "../_lib/filters";
 import { cn } from "@/lib/utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import {
+  useAdminTransactions,
+  useDownloadAdminReceipt,
+} from "@/services/admin/transactions";
+import { AdminTransactionsTableSkeleton } from "./skeleton-loader";
 
 type AdminTransactionsDataTableProps = {
   search: SearchParams;
   onEarningsUpdate?: (earnings: string) => void;
 };
 
-function parseBookingDate(dateStr: string): Date {
-  const [datePart] = dateStr.split(" ");
-  const [day, month, year] = datePart.split("-");
-  return new Date(Number(year), Number(month) - 1, Number(day));
-}
-
 export function AdminTransactionsDataTable({
   search,
   onEarningsUpdate,
 }: AdminTransactionsDataTableProps) {
   const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
-  const [rowAction, setRowAction] = useState<{
-    row: { original: Transaction };
-    type: "download";
-  } | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 30,
   });
 
-  const columns = useMemo(
-    () => getTransactionColumns({ setRowAction, formatMoneyLocale }),
-    [formatMoneyLocale],
+  const downloadReceiptMutation = useDownloadAdminReceipt();
+
+  const handleDownloadReceipt = useCallback(
+    (paymentId: number | string) => {
+      downloadReceiptMutation.mutate(paymentId);
+    },
+    [downloadReceiptMutation],
   );
 
-  const filteredData = useMemo(() => {
-    let data = [...DUMMY_TRANSACTIONS];
+  const downloadingPaymentId = downloadReceiptMutation.isPending
+    ? downloadReceiptMutation.variables
+    : null;
 
-    const q = (search.search ?? "").toString().toLowerCase().trim();
-    if (q) {
-      data = data.filter(
-        (t) =>
-          t.booking_number.toLowerCase().includes(q) ||
-          t.transaction_id.toLowerCase().includes(q)
-      );
-    }
+  const columns = useMemo(
+    () =>
+      getTransactionColumns({
+        onDownloadReceipt: handleDownloadReceipt,
+        downloadingPaymentId,
+        formatMoneyLocale,
+      }),
+    [downloadingPaymentId, formatMoneyLocale, handleDownloadReceipt],
+  );
 
-    const status = (search.status ?? "").toString();
-    if (status && status !== "all") {
-      data = data.filter((t) => t.status.toLowerCase() === status.toLowerCase());
-    }
+  const sortColumn = sorting[0]?.id;
+  const sortBy = isAdminTransactionSortField(sortColumn)
+    ? sortColumn
+    : undefined;
+  const sortDir = sortBy ? (sorting[0]?.desc ? "desc" : "asc") : undefined;
 
-    const fromDate = search.from_date?.toString();
-    const toDate = search.to_date?.toString();
-    if (fromDate || toDate) {
-      data = data.filter((t) => {
-        const d = parseBookingDate(t.booking_date).getTime();
-        if (fromDate && d < new Date(fromDate).setHours(0, 0, 0, 0))
-          return false;
-        if (toDate && d > new Date(toDate).setHours(23, 59, 59, 999))
-          return false;
-        return true;
-      });
-    }
+  const filterKey = [
+    search.search ?? "",
+    search.status ?? "",
+    search.booking_date ?? "",
+    search.from_date ?? "",
+    search.to_date ?? "",
+    sortBy ?? "",
+    sortDir ?? "",
+  ].join("|");
+  const prevFilterKeyRef = React.useRef(filterKey);
+  const filterChanged = prevFilterKeyRef.current !== filterKey;
+  if (filterChanged) {
+    prevFilterKeyRef.current = filterKey;
+  }
+  const pageIndex = filterChanged ? 0 : pagination.pageIndex;
 
-    return data;
-  }, [search.search, search.status, search.from_date, search.to_date]);
+  if (filterChanged && pagination.pageIndex !== 0) {
+    setPagination((current) => ({ ...current, pageIndex: 0 }));
+  }
 
-  useEffect(() => {
-    const earnings = getDummyEarnings(filteredData);
-    onEarningsUpdate?.(earnings);
-  }, [filteredData, onEarningsUpdate]);
-
-  const table = useReactTable({
-    data: filteredData,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    onSortingChange: setSorting,
-    onPaginationChange: setPagination,
-    state: { sorting, pagination },
+  const { data, isLoading, isError, isFetching } = useAdminTransactions({
+    search: search.search,
+    status: search.status,
+    booking_date: search.booking_date,
+    from_date: search.from_date,
+    to_date: search.to_date,
+    page: pageIndex + 1,
+    per_page: pagination.pageSize,
+    sort_by: sortBy,
+    sort_dir: sortDir,
   });
 
   useEffect(() => {
-    if (rowAction?.type === "download") {
-      setRowAction(null);
-      // Dummy: could trigger file download or toast "Receipt downloaded"
-    }
-  }, [rowAction]);
+    if (!data || !onEarningsUpdate) return;
+    onEarningsUpdate(
+      formatAdminTransactionEarnings(data.earnings_formatted, data.earnings),
+    );
+  }, [data, onEarningsUpdate]);
 
-  if (filteredData.length === 0) {
+  const transactions: Transaction[] = data?.data ?? [];
+  const pageCount = Math.max(1, data?.meta?.last_page ?? 1);
+
+  const handlePaginationChange = useCallback(
+    (updater: Updater<PaginationState>) => {
+      setPagination((current) => {
+        const next = typeof updater === "function" ? updater(current) : updater;
+        if (next.pageSize !== current.pageSize) {
+          return { ...next, pageIndex: 0 };
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const table = useReactTable({
+    data: transactions,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    manualSorting: true,
+    pageCount,
+    onSortingChange: setSorting,
+    onPaginationChange: handlePaginationChange,
+    state: { sorting, pagination: { ...pagination, pageIndex } },
+  });
+
+  if (isLoading) {
+    return <AdminTransactionsTableSkeleton rowCount={9} />;
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-sm p-8">
+        <div className="text-center text-destructive min-h-[280px] flex flex-col items-center justify-center">
+          <p className="text-lg font-medium">Failed to load transactions</p>
+          <p className="text-sm mt-2">Please try again later</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (transactions.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-sm p-8">
         <div className="text-center text-muted-foreground min-h-[280px] flex flex-col items-center justify-center">
@@ -126,7 +173,12 @@ export function AdminTransactionsDataTable({
   }
 
   return (
-    <div className="flex w-full max-w-full min-w-0 flex-col gap-2.5">
+    <div
+      className={cn(
+        "flex w-full max-w-full min-w-0 flex-col gap-2.5",
+        isFetching && "opacity-70 transition-opacity",
+      )}
+    >
       <section className="overflow-x-auto overflow-y-visible bg-white rounded-lg border border-[var(--color-border)] shadow-sm">
         <Table className="min-w-[900px]">
           <TableHeader>
@@ -141,7 +193,7 @@ export function AdminTransactionsDataTable({
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                   </TableHead>
                 ))}
@@ -161,7 +213,7 @@ export function AdminTransactionsDataTable({
                   >
                     {flexRender(
                       cell.column.columnDef.cell,
-                      cell.getContext()
+                      cell.getContext(),
                     )}
                   </TableCell>
                 ))}

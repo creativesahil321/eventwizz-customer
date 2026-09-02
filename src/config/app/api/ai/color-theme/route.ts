@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
-import { env } from "@/env";
+import {
+  aiRuntimeFailureMeta,
+  aiUnconfiguredPayload,
+  resolveAiRuntimeConfig,
+} from "../lib/provider-config";
 
 type ColorTheme = {
   primary: string;
@@ -59,15 +63,29 @@ async function analyzeWebsiteTheme(url: string): Promise<{
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
   const title = titleMatch?.[1]?.trim();
 
-  const colors = Array.from(
-    new Set(
-      (html.match(/#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3}/g) ?? [])
-        .map((c) => normalizeHexColor(c))
-        .slice(0, 24),
-    ),
-  );
+  // Keep duplicates so dark brand surfaces (high frequency) aren't drowned out
+  // by one-off WordPress editor swatches when we decide light vs dark mode.
+  const colors = (html.match(/#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3}/g) ?? [])
+    .map((c) => normalizeHexColor(c))
+    .slice(0, 400);
 
   return { title, colors };
+}
+
+function isDarkWebsitePalette(colors: string[]): boolean {
+  if (colors.length === 0) return false;
+  const counts = new Map<string, number>();
+  for (const c of colors) {
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  let darkWeight = 0;
+  let lightWeight = 0;
+  for (const [hex, count] of counts) {
+    const brightness = getColorBrightness(hex);
+    if (brightness < 90) darkWeight += count;
+    else if (brightness > 200) lightWeight += count;
+  }
+  return darkWeight > lightWeight * 1.15;
 }
 
 function isNightlifeOrHighEnergyTheme(themeLower: string): boolean {
@@ -556,11 +574,9 @@ export async function POST(req: Request) {
     } =
       await req.json();
 
-    if (!env.GROQ_API_KEY) {
-      return NextResponse.json(
-        { error: "AI service is not properly configured" },
-        { status: 500 }
-      );
+    const aiConfig = await resolveAiRuntimeConfig();
+    if (!aiConfig.isConfigured) {
+      return NextResponse.json(aiUnconfiguredPayload(), { status: 500 });
     }
 
     // Build contextual prompt based on user inputs
@@ -592,15 +608,27 @@ export async function POST(req: Request) {
 
     // Handle custom theme input (free text)
     if (websiteAnalysis) {
-      contextPrompt = `Generate a professional color theme inspired by website: "${websiteUrl}". `;
+      const uniqueColors = Array.from(new Set(websiteAnalysis.colors)).slice(
+        0,
+        24,
+      );
+      const darkSite = isDarkWebsitePalette(websiteAnalysis.colors);
+      prefersLightProfessional = !darkSite;
+
+      contextPrompt = `Generate a color theme that closely matches website: "${websiteUrl}". `;
       if (websiteAnalysis.title) {
         contextPrompt += `Website title: "${websiteAnalysis.title}". `;
       }
-      if (websiteAnalysis.colors.length > 0) {
-        contextPrompt += `Extracted website colors: ${websiteAnalysis.colors.join(", ")}. `;
+      if (uniqueColors.length > 0) {
+        contextPrompt += `Extracted website colors: ${uniqueColors.join(", ")}. `;
       }
-      contextPrompt +=
-        "Use this as inspiration, but optimize for readability, cleaner modern aesthetics, and professional event platform UI.";
+      if (darkSite) {
+        contextPrompt +=
+          "This is a DARK brand website. Keep dark header, footer, surface, and background. Use the scraped purple/gold/accent colors for primary. Do NOT convert to a light white theme. Light text on dark surfaces. ";
+      } else {
+        contextPrompt +=
+          "Use this as inspiration, optimize for readability and a clean event platform UI while preserving the brand's primary accent. ";
+      }
     } else if (customTheme && customTheme.trim()) {
       contextPrompt = `Generate a professional color theme for: "${customTheme.trim()}". `;
 
@@ -1030,7 +1058,7 @@ Remember: Return solid hex colors for most fields, but background can be either 
 
     // Use the fallback system to try models in sequence
     const result: FallbackResult = await tryModelsWithFallback(
-      env.GROQ_API_KEY,
+      aiConfig,
       {
         messages: [
           {
@@ -1055,6 +1083,7 @@ Remember: Return solid hex colors for most fields, but background can be either 
           modelsTried: result.modelsTried,
           retryAfter: result.retryAfterHuman,
           retryAfterMs: result.retryAfterMs,
+          ...aiRuntimeFailureMeta(aiConfig),
         },
         { status: result.status || 500 }
       );

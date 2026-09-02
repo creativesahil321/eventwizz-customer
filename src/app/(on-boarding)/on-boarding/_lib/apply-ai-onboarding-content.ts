@@ -40,6 +40,11 @@ import {
   EVENT_GALLERY_MAX_IMAGES,
   resolveEventSchedulerItems,
 } from "@/lib/event-form-limits";
+import { geocodeLocation } from "../_components/steps/step-11/_lib/actions";
+import {
+  hasValidLocationCoordinates,
+  parseOptionalCoordinate,
+} from "@/lib/to-location-coords-payload";
 
 function firstPositiveEventId(...values: unknown[]): number | undefined {
   for (const value of values) {
@@ -359,6 +364,22 @@ async function applyAIGeneratedOnboardingContentInner({
 
   // --- Step 1: Basic Venue Info ---
   setStep(0);
+  let latitude = parseOptionalCoordinate(venueInput.latitude);
+  let longitude = parseOptionalCoordinate(venueInput.longitude);
+  if (
+    venueInput.address?.trim() &&
+    !hasValidLocationCoordinates(latitude, longitude)
+  ) {
+    const resolved = await geocodeLocation(
+      venueInput.address,
+      venueInput.city,
+    );
+    if (resolved) {
+      latitude = resolved.latitude;
+      longitude = resolved.longitude;
+    }
+  }
+
   const stepOneData = {
     step: 1 as const,
     has_multiple_locations: venueInput.has_multiple_locations ?? false,
@@ -369,6 +390,8 @@ async function applyAIGeneratedOnboardingContentInner({
     city: venueInput.city,
     domain: "",
     description: venueInput.description || "",
+    latitude,
+    longitude,
     isApproved: true,
   };
 

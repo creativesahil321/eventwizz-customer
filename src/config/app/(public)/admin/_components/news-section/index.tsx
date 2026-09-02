@@ -1,86 +1,67 @@
-import Image from "next/image";
+"use client";
+
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { SiteHeading } from "@/components/public/site-heading";
+import { Button } from "@/components/ui/button";
+import type { AdminHomeContent } from "@/lib/admin-cms-content";
+import { BLOG_HOME_PER_PAGE, blogPublicPaths } from "@/lib/blogs";
+import { usePublicBlogs } from "@/services/common/blogs";
+import {
+  BlogPostGrid,
+  BlogPostGridSkeleton,
+} from "@/app/(public)/blog/_components/blog-post-grid";
 
-const NEWS_ARTICLES = [
-  {
-    title: "How to Plan a Perfect Corporate Christmas Party",
-    excerpt:
-      "Planning a corporate Christmas party can be stressful — but with the right tools and checklist, it doesn't have to be.",
-    date: "23 Nov, 2024",
-    image: "/assets/images/admin/news-christmas.jpg",
-    category: "Event Planning",
-  },
-  {
-    title: "Top Tips for Running Unforgettable Venue Events",
-    excerpt:
-      "From guest management to menu planning, discover how leading venues keep their guests coming back year after year.",
-    date: "15 Oct, 2024",
-    image: "/assets/images/admin/news-venue.jpg",
-    category: "Venue Management",
-  },
-  {
-    title: "Why Automated Ticketing Transforms Event Revenue",
-    excerpt:
-      "Manual ticketing is costing venues time and money. See how automation changes the game for event profitability.",
-    date: "02 Sep, 2024",
-    image: "/assets/images/admin/news-ticketing.jpg",
-    category: "Ticketing",
-  },
-];
+export default function NewsSection({
+  content,
+}: {
+  content: AdminHomeContent["news"];
+}) {
+  const { data, isLoading } = usePublicBlogs(BLOG_HOME_PER_PAGE + 1);
+  const articles = (data?.posts ?? []).slice(0, BLOG_HOME_PER_PAGE);
+  const hasMore =
+    (data?.total ?? 0) > BLOG_HOME_PER_PAGE ||
+    (data?.posts?.length ?? 0) > BLOG_HOME_PER_PAGE;
 
-export default function NewsSection() {
+  if (!isLoading && articles.length === 0) {
+    return null;
+  }
+
   return (
-    <section className="py-20 bg-[color:var(--color-background)]">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-[color:var(--color-text)] mb-3">
-            Latest News & Articles
-          </h2>
-          <p className="text-[color:var(--color-text-dimmed)]">
-            Insights, tips, and best practices from the EventWizz team
+    <section
+      id="latest-news"
+      className="bg-[color:var(--color-background)] py-10 sm:py-12 md:py-14"
+    >
+      <div className="container mx-auto max-w-6xl px-4">
+        <div className="mb-8 max-w-2xl sm:mb-10">
+          <SiteHeading
+            level={2}
+            title={content.title}
+            variant="onSurface"
+            align="left"
+            className="mb-2 !text-2xl !font-bold sm:!text-3xl md:!text-4xl"
+          />
+          <p className="text-sm text-[color:var(--color-text-dimmed)] sm:text-base">
+            {content.subtitle}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {NEWS_ARTICLES.map((article) => (
-            <article
-              key={article.title}
-              className="bg-[color:var(--color-surface)] rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group cursor-pointer"
-            >
-              {/* Image */}
-              <div className="relative h-52 overflow-hidden">
-                <Image
-                  src={article.image}
-                  alt={article.title}
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                />
-                {/* Category pill */}
-                <div className="absolute top-3 left-3 bg-[color:var(--color-primary)] text-[color:var(--color-primary-foreground)] text-xs font-semibold px-3 py-1 rounded-full shadow">
-                  {article.category}
-                </div>
-              </div>
+        {isLoading ? (
+          <BlogPostGridSkeleton count={BLOG_HOME_PER_PAGE} />
+        ) : (
+          <BlogPostGrid posts={articles} />
+        )}
 
-              {/* Content */}
-              <div className="p-6">
-                <p className="text-xs text-[color:var(--color-text)] mb-2 font-medium">
-                  {article.date}
-                </p>
-                <h3 className="font-bold text-[color:var(--color-text)] mb-2 leading-snug group-hover:text-[color:var(--color-primary)] transition-colors line-clamp-2">
-                  {article.title}
-                </h3>
-                <p className="text-sm text-[color:var(--color-text)] mb-4 leading-relaxed line-clamp-3">
-                  {article.excerpt}
-                </p>
-                <div className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--color-primary)] group-hover:gap-2.5 transition-all">
-                  <span>Read Article</span>
-                  <ArrowRight className="h-4 w-4" />
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
+        {!isLoading && hasMore ? (
+          <div className="mt-10 flex justify-center sm:mt-12">
+            <Button asChild variant="event-outline" size="lg" className="rounded-md px-8">
+              <Link href={blogPublicPaths.list}>
+                View more
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        ) : null}
       </div>
     </section>
   );

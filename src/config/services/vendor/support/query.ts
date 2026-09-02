@@ -52,14 +52,37 @@ export const vendorSupportKeys = {
 function markTicketReadInLists(
   queryClient: ReturnType<typeof useQueryClient>,
   ticketKey: string,
-  isUnread: boolean
+  isUnread: boolean,
+  unreadCount?: number
 ) {
   queryClient.setQueriesData<VendorSupportTicketsResponse>(
     { queryKey: vendorSupportKeys.lists() },
     (current) => {
       if (!current?.data) return current;
+
+      const ticket = current.data.find((item) => item.ticket_key === ticketKey);
+      const wasUnread = ticket?.is_unread === true;
+
+      let nextUnreadCount = current.unread_count;
+      if (typeof unreadCount === "number") {
+        nextUnreadCount = Math.max(0, unreadCount);
+      } else if (
+        typeof current.unread_count === "number" &&
+        !isUnread &&
+        wasUnread
+      ) {
+        nextUnreadCount = Math.max(0, current.unread_count - 1);
+      } else if (
+        typeof current.unread_count === "number" &&
+        isUnread &&
+        !wasUnread
+      ) {
+        nextUnreadCount = current.unread_count + 1;
+      }
+
       return {
         ...current,
+        unread_count: nextUnreadCount,
         data: current.data.map((ticket) =>
           ticket.ticket_key === ticketKey
             ? { ...ticket, is_unread: isUnread }
@@ -371,7 +394,8 @@ export function useMarkVendorSupportMessagesRead() {
       markTicketReadInLists(
         queryClient,
         ticketKey,
-        Boolean(response.data?.is_unread)
+        Boolean(response.data?.is_unread),
+        response.data?.unread_count
       );
     },
     onError: () => {

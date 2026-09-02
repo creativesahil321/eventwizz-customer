@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { invalidateCustomerBookingsList } from "@/services/customer/bookings/query";
 import {
@@ -12,299 +13,264 @@ import {
   Clock,
   CreditCard,
   ArrowRight,
-  Loader2,
 } from "lucide-react";
-import { toast } from "sonner";
-import { api } from "@/services/core/api-client";
-import { API_ENDPOINTS } from "@/services/core/endpoints";
+import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 import {
-  confirmStripePaymentSuccess,
-  mapStripePaymentSuccessData,
-} from "@/services/customer/checkout/checkout-payment";
+  confirmStripePaymentBackup,
+  fetchPaymentSuccessReceipt,
+  type PaymentSuccessReceipt,
+} from "@/services/customer/payment/payment-success";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import { usePaymentSuccessAuth } from "./_lib/use-payment-success-auth";
+import {
+  stripVendorPaymentSuccessQuery,
+  vendorPaymentSuccessHref,
+} from "./_lib/url";
 
-interface PaymentSuccessData {
-  booking_id: number;
-  booking_number?: string;
-  amount: string;
-  gateway: string;
-  transaction_id?: string;
-  event_name?: string;
-  event_date?: string;
-  event_location?: string;
-  guest_count?: number;
+const POLL_INTERVAL_MS = 2500;
+const POLL_MAX_ATTEMPTS = 8;
+
+type PageView =
+  | { type: "loading"; message: string }
+  | { type: "success"; data: PaymentSuccessReceipt }
+  | { type: "pending" }
+  | { type: "not_found" }
+  | { type: "error" };
+
+function InvalidateCustomerBookingsOnMount() {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    void invalidateCustomerBookingsList(queryClient);
+  }, [queryClient]);
+  return null;
+}
+
+function parsePositiveInt(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function isFailedRedirect(status: string | null): boolean {
+  return status === "failed" || status === "canceled" || status === "cancelled";
+}
+
+function formatTransactionId(id: string): string {
+  if (id.length <= 24) return id;
+  return `${id.substring(0, 24)}...`;
+}
+
+function PaymentSuccessSkeleton({
+  message = "Processing your payment...",
+}: {
+  message?: string;
+}) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+      <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
+        <div className="text-center mb-8">
+          <Skeleton className="mx-auto mb-4 h-20 w-20 rounded-full" />
+          <Skeleton className="mx-auto mb-3 h-9 w-64" />
+          <p className="text-gray-600 font-medium">{message}</p>
+          <p className="text-sm text-gray-500 mt-2">Please wait</p>
+        </div>
+        <Card className="mb-6 shadow-lg border-green-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-6 w-24 rounded-full" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+        <Skeleton className="h-12 w-48 rounded-md" />
+      </div>
+    </div>
+  );
 }
 
 function PaymentSuccessContent() {
   const { format: formatMoney } = useCurrencyFormat();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
-  const [paymentData, setPaymentData] = useState<PaymentSuccessData | null>(
-    null
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [verificationError, setVerificationError] = useState<string | null>(
-    null,
+  const bookingNumber = searchParams.get("booking_number")?.trim() || null;
+  const sessionId = searchParams.get("session_id")?.trim() || null;
+  const { isClient, status, isCustomer } = usePaymentSuccessAuth(
+    bookingNumber,
+    Boolean(bookingNumber || sessionId),
   );
 
-  /** Verify via Payment Intents API (legacy) */
-  const verifyPaymentIntentFlow = useCallback(
-    async (params: {
-      bookingId: number;
-      paymentIntentId: string;
-      redirectStatus?: string | null;
-    }) => {
-      if (params.redirectStatus === "failed") {
-        throw new Error("Payment was not completed. Please try again.");
-      }
-
-      const response = await confirmStripePaymentSuccess({
-        booking_id: params.bookingId,
-        payment_intent_id: params.paymentIntentId,
-      });
-
-      if (!response.data?.is_paid) {
-        throw new Error("Payment has not been confirmed yet.");
-      }
-
-      setPaymentData(mapStripePaymentSuccessData(response.data, params.paymentIntentId));
-    },
-    [],
-  );
-
-  /** Verify via Checkout Sessions API (new) */
-  const verifyCheckoutSessionFlow = useCallback(
-    async (params: {
-      bookingId: number;
-      checkoutSessionId: string;
-      redirectStatus?: string | null;
-    }) => {
-      if (params.redirectStatus === "failed") {
-        throw new Error("Payment was not completed. Please try again.");
-      }
-
-      const response = await confirmStripePaymentSuccess({
-        booking_id: params.bookingId,
-        checkout_session_id: params.checkoutSessionId,
-      });
-
-      if (!response.data?.is_paid) {
-        throw new Error("Payment has not been confirmed yet.");
-      }
-
-      setPaymentData(mapStripePaymentSuccessData(response.data, params.checkoutSessionId));
-    },
-    [],
-  );
-
-  const handleStripeSession = useCallback(
-    async (sessionId: string) => {
-      try {
-        const data = await api.post<
-          {
-            status: boolean;
-            message: string;
-            data: PaymentSuccessData;
-          }
-        >(
-          API_ENDPOINTS.CUSTOMER.PAYMENT.STRIPE_SUCCESS,
-          { session_id: sessionId },
-          { returnFullResponse: true }
-        );
-
-        if (data.status && data.data) {
-          setPaymentData({
-            booking_id: data.data.booking_id,
-            booking_number: data.data.booking_number,
-            amount: data.data.amount,
-            gateway: "Stripe",
-            transaction_id: data.data.transaction_id,
-            event_name: data.data.event_name,
-            event_date: data.data.event_date,
-            event_location: data.data.event_location,
-            guest_count: data.data.guest_count,
-          });
-        } else {
-          throw new Error(data.message || "Payment processing failed");
-        }
-      } catch (error) {
-        console.error("Error processing Stripe session:", error);
-        toast.error("Failed to process payment. Please contact support.");
-        setTimeout(() => {
-          router.push("/customer/bookings");
-        }, 2000);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [router]
-  );
+  const [view, setView] = useState<PageView>({
+    type: "loading",
+    message: "Processing your payment...",
+  });
 
   useEffect(() => {
-    const sessionId = searchParams.get("session_id");
-    const bookingId = searchParams.get("booking_id");
-    const amount = searchParams.get("amount");
-    const gateway = searchParams.get("gateway");
-    const bookingNumber = searchParams.get("booking_number");
+    if (!isClient || status === "loading") return;
+
+    if (!bookingNumber && !sessionId) {
+      setView({ type: "error" });
+      return;
+    }
+
+    if (status === "unauthenticated" || !isCustomer) {
+      setView({
+        type: "loading",
+        message: "Processing your payment...",
+      });
+      return;
+    }
+
+    const redirectFailed = isFailedRedirect(
+      searchParams.get("redirect_status"),
+    );
+    const bookingId = parsePositiveInt(searchParams.get("booking_id"));
     const paymentIntentId =
       searchParams.get("payment_intent_id") ??
       searchParams.get("payment_intent");
     const checkoutSessionId = searchParams.get("checkout_session_id");
-    const redirectStatus = searchParams.get("redirect_status");
-    const verified = searchParams.get("verified") === "1";
-    const parsedBookingId = bookingId ? parseInt(bookingId, 10) : NaN;
+
+    let cancelled = false;
+    let attempts = 0;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
+    let lookupNumber = bookingNumber;
+
+    const applyResult = async (): Promise<void> => {
+      if (cancelled || !lookupNumber) return;
+
+      const result = await fetchPaymentSuccessReceipt(lookupNumber);
+      if (cancelled) return;
+
+      if (result.kind === "paid") {
+        stripVendorPaymentSuccessQuery(result.data.booking_number);
+        setView({ type: "success", data: result.data });
+        return;
+      }
+
+      if (result.kind === "not_found") {
+        setView({ type: "not_found" });
+        return;
+      }
+
+      if (result.kind === "unauthorized") {
+        const returnTo = vendorPaymentSuccessHref(lookupNumber);
+        saveAuthCallbackUrl(returnTo);
+        return;
+      }
+
+      if (result.kind === "pending") {
+        if (redirectFailed) {
+          setView({ type: "error" });
+          return;
+        }
+
+        attempts += 1;
+        if (attempts >= POLL_MAX_ATTEMPTS) {
+          setView({ type: "pending" });
+          return;
+        }
+
+        setView({
+          type: "loading",
+          message: "Confirming your payment...",
+        });
+        pollTimer = setTimeout(() => {
+          void applyResult();
+        }, POLL_INTERVAL_MS);
+        return;
+      }
+
+      setView({ type: "error" });
+    };
 
     const run = async () => {
-      setIsLoading(true);
-      setVerificationError(null);
+      setView({
+        type: "loading",
+        message: "Processing your payment...",
+      });
 
-      try {
-        // Legacy: Stripe Checkout hosted session (not our flow)
-        if (sessionId) {
-          await handleStripeSession(sessionId);
-          return;
+      if (!redirectFailed) {
+        const confirmedNumber = await confirmStripePaymentBackup({
+          bookingId,
+          paymentIntentId,
+          checkoutSessionId,
+          sessionId,
+        });
+        if (!lookupNumber && confirmedNumber) {
+          lookupNumber = confirmedNumber;
         }
-
-        // Checkout Sessions API — verify with checkout_session_id
-        if (
-          bookingNumber &&
-          amount &&
-          gateway &&
-          checkoutSessionId &&
-          Number.isFinite(parsedBookingId)
-        ) {
-          if (verified) {
-            setPaymentData({
-              booking_id: parsedBookingId,
-              booking_number: bookingNumber,
-              amount,
-              gateway,
-              transaction_id: checkoutSessionId,
-            });
-            return;
-          }
-
-          await verifyCheckoutSessionFlow({
-            bookingId: parsedBookingId,
-            checkoutSessionId,
-            redirectStatus,
-          });
-          return;
-        }
-
-        // Payment Intents API (legacy) — verify with payment_intent_id
-        if (
-          bookingNumber &&
-          amount &&
-          gateway &&
-          paymentIntentId &&
-          Number.isFinite(parsedBookingId)
-        ) {
-          if (verified) {
-            setPaymentData({
-              booking_id: parsedBookingId,
-              booking_number: bookingNumber,
-              amount,
-              gateway,
-              transaction_id: paymentIntentId,
-            });
-            return;
-          }
-
-          await verifyPaymentIntentFlow({
-            bookingId: parsedBookingId,
-            paymentIntentId,
-            redirectStatus,
-          });
-          return;
-        }
-
-        if (bookingId && amount && gateway) {
-          setPaymentData({
-            booking_id: parseInt(bookingId, 10),
-            booking_number: bookingNumber || undefined,
-            amount,
-            gateway,
-            transaction_id: searchParams.get("transaction_id") || undefined,
-            event_name: searchParams.get("event_name") || undefined,
-            event_date: searchParams.get("event_date") || undefined,
-            event_location: searchParams.get("event_location") || undefined,
-            guest_count: searchParams.get("guest_count")
-              ? parseInt(searchParams.get("guest_count")!, 10)
-              : undefined,
-          });
-          return;
-        }
-
-        throw new Error("Invalid payment confirmation.");
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Payment could not be verified.";
-        setVerificationError(message);
-        toast.error("Payment not confirmed", { description: message });
-      } finally {
-        setIsLoading(false);
       }
+
+      if (cancelled) return;
+
+      if (!lookupNumber) {
+        setView({ type: "error" });
+        return;
+      }
+
+      await applyResult();
     };
 
     void run();
-  }, [searchParams, handleStripeSession, verifyPaymentIntentFlow, verifyCheckoutSessionFlow]);
 
-  useEffect(() => {
-    if (!paymentData) return;
-    void invalidateCustomerBookingsList(queryClient);
-  }, [paymentData, queryClient]);
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, [isClient, status, isCustomer, bookingNumber, sessionId, searchParams]);
 
-  const handleViewBookings = () => {
-    router.push("/customer/bookings");
-  };
+  if (view.type === "not_found") {
+    notFound();
+  }
 
-  if (isLoading) {
+  if (
+    !isClient ||
+    status === "loading" ||
+    ((bookingNumber || sessionId) &&
+      (status === "unauthenticated" || !isCustomer)) ||
+    view.type === "loading"
+  ) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">
-            Processing your payment...
-          </p>
-          <p className="text-sm text-gray-500 mt-2">Please wait</p>
-        </motion.div>
-      </div>
+      <PaymentSuccessSkeleton
+        message={
+          view.type === "loading"
+            ? view.message
+            : "Processing your payment..."
+        }
+      />
     );
   }
 
-  if (verificationError) {
+  if (view.type === "pending") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-4">
           <h1 className="text-2xl font-bold text-gray-900">
-            Payment not confirmed
+            Confirming your payment
           </h1>
           <p className="text-sm text-gray-600 leading-relaxed">
-            {verificationError}
-          </p>
-          <p className="text-xs text-gray-500">
-            If money was taken from your account, contact support with your
-            booking reference. Do not pay again until this is resolved.
+            We&apos;re still confirming this payment with your bank. This can
+            take a moment. You can refresh this page or check your bookings —
+            you will not be charged again.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button onClick={() => router.push("/vendor/checkout")}>
-              Return to checkout
-            </Button>
-            <Button variant="outline" onClick={() => router.push("/customer/bookings")}>
+            <Button onClick={() => window.location.reload()}>Refresh</Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push("/customer/bookings")}
+            >
               View bookings
             </Button>
           </div>
@@ -313,14 +279,41 @@ function PaymentSuccessContent() {
     );
   }
 
-  if (!paymentData) {
+  if (view.type === "error") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Payment not confirmed
+          </h1>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            We couldn&apos;t confirm this payment. If money was taken from your
+            account, contact support with your booking reference. Do not pay
+            again until this is resolved.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/customer/bookings")}
+            >
+              View bookings
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view.type !== "success") {
     return null;
   }
 
+  const paymentData = view.data;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+      <InvalidateCustomerBookingsOnMount />
       <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
-        {/* Success Animation Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -342,7 +335,7 @@ function PaymentSuccessContent() {
             transition={{ delay: 0.4 }}
             className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3"
           >
-            Payment Successful! 🎉
+            Payment Successful
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -354,7 +347,6 @@ function PaymentSuccessContent() {
           </motion.p>
         </motion.div>
 
-        {/* Payment Confirmation Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -381,8 +373,7 @@ function PaymentSuccessContent() {
                     <span>Booking Number</span>
                   </div>
                   <p className="font-bold text-xl text-gray-900">
-                    {paymentData.booking_number ??
-                      `#${paymentData.booking_id}`}
+                    {paymentData.booking_number}
                   </p>
                 </div>
 
@@ -392,7 +383,7 @@ function PaymentSuccessContent() {
                     <span>Amount Paid</span>
                   </div>
                   <p className="font-bold text-xl text-green-600">
-                    {formatMoney(parseFloat(paymentData.amount))}
+                    {formatMoney(paymentData.amount)}
                   </p>
                 </div>
 
@@ -413,7 +404,7 @@ function PaymentSuccessContent() {
                       <span>Transaction ID</span>
                     </div>
                     <p className="font-mono text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded break-all">
-                      {paymentData.transaction_id.substring(0, 24)}...
+                      {formatTransactionId(paymentData.transaction_id)}
                     </p>
                   </div>
                 )}
@@ -422,7 +413,6 @@ function PaymentSuccessContent() {
           </Card>
         </motion.div>
 
-        {/* Event Details */}
         {(paymentData.event_name ||
           paymentData.event_date ||
           paymentData.event_location ||
@@ -451,8 +441,8 @@ function PaymentSuccessContent() {
                         {paymentData.event_date && (
                           <p className="text-sm text-gray-600 mt-1">
                             {new Date(
-                              paymentData.event_date
-                            ).toLocaleDateString("en-US", {
+                              paymentData.event_date,
+                            ).toLocaleDateString("en-GB", {
                               weekday: "long",
                               year: "numeric",
                               month: "long",
@@ -478,7 +468,7 @@ function PaymentSuccessContent() {
                     </div>
                   )}
 
-                  {paymentData.guest_count && (
+                  {paymentData.guest_count ? (
                     <div className="flex items-start gap-3">
                       <div className="p-2 bg-orange-50 rounded-lg">
                         <Users className="h-5 w-5 text-orange-600" />
@@ -491,14 +481,13 @@ function PaymentSuccessContent() {
                         </p>
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
           </motion.div>
         )}
 
-        {/* Next Steps */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -528,7 +517,6 @@ function PaymentSuccessContent() {
           </Card>
         </motion.div>
 
-        {/* Action Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -537,7 +525,7 @@ function PaymentSuccessContent() {
         >
           <Button
             variant="event-primary"
-            onClick={handleViewBookings}
+            onClick={() => router.push("/customer/bookings")}
             className="w-full sm:w-auto"
           >
             View My Bookings
@@ -547,7 +535,6 @@ function PaymentSuccessContent() {
 
         <Separator className="my-6" />
 
-        {/* Support Information */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -574,13 +561,7 @@ function PaymentSuccessContent() {
 
 export default function PaymentSuccessPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center">
-          <Loader2 className="w-12 h-12 text-green-600 animate-spin" />
-        </div>
-      }
-    >
+    <Suspense fallback={<PaymentSuccessSkeleton />}>
       <PaymentSuccessContent />
     </Suspense>
   );

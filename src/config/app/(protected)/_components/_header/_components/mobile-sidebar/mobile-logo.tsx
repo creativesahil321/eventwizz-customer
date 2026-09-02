@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ServerContext } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 import { addCacheBusting } from "@/lib/image-utils";
+import { BrandLogoImage } from "../../../_sidebar/brand-logo-image";
 
 const MobileLogo: React.FC = memo(() => {
   const { theme } = useContext(ServerContext);
@@ -18,14 +19,16 @@ const MobileLogo: React.FC = memo(() => {
       ? theme.logo
       : appConfig.logo;
 
+  const brandName = theme?.name || "EventWizz";
+
   return (
     <Link href="/" className="flex items-center gap-2">
-      <img
+      <BrandLogoImage
         src={addCacheBusting(logoPath)}
-        alt={theme?.name || "EventWizz"}
+        alt={brandName}
         width={110}
         height={30}
-        className="h-8 w-auto object-contain"
+        className="h-8 w-auto"
       />
     </Link>
   );

@@ -44,9 +44,16 @@ export function contrastRatio(hexFg: string, hexBg: string): number | null {
   return (L1 + 0.05) / (L2 + 0.05);
 }
 
+function firstHexInColorValue(value: string | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  const match = raw.match(/#[0-9A-Fa-f]{3,8}/);
+  return match?.[0] ?? raw;
+}
+
 /** True when page background is visually “light” (for Try theme filters). */
 export function isLightUiBackground(hex: string | undefined): boolean {
-  const rgb = hexToRgb(hex ?? "");
+  const rgb = hexToRgb(firstHexInColorValue(hex));
   if (!rgb) return true;
   return relativeLuminance(rgb) > 0.45;
 }
@@ -64,10 +71,10 @@ export function paletteAccessibilityFlags(colors: {
   primary?: string;
   surface?: string;
 }): PaletteAccessibilityFlags {
-  const text = colors.text?.trim() || "#000000";
-  const bg = colors.background?.trim() || "#ffffff";
-  const primary = colors.primary?.trim() || "#000000";
-  const surface = colors.surface?.trim() || "#ffffff";
+  const text = firstHexInColorValue(colors.text) || "#000000";
+  const bg = firstHexInColorValue(colors.background) || "#ffffff";
+  const primary = firstHexInColorValue(colors.primary) || "#000000";
+  const surface = firstHexInColorValue(colors.surface) || "#ffffff";
   const tBg = contrastRatio(text, bg);
   const pS = contrastRatio(primary, surface);
   return {

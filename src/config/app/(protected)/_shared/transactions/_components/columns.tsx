@@ -144,7 +144,7 @@ export function getTransactionColumns({
           <span className="text-sm font-medium">
             {transaction.payment_method ||
               transaction.payment_method_key ||
-              "N/A"}
+              "—"}
           </span>
         );
       },

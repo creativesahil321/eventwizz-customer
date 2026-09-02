@@ -31,6 +31,7 @@ import {
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
+import { useOnboardingPreviewFieldFocus } from "../../../_lib/onboarding-preview-field-focus";
 import type { GuidedSectionConfig } from "../../../_lib/hooks/use-guided-onboarding-sections";
 import { GuidedMultiSectionBottomActions } from "../../guided-section-chips";
 import {
@@ -38,6 +39,10 @@ import {
   GuidedSectionCoreActions,
 } from "../../guided-sticky-approval-bar";
 import { guidedSectionSurfaceClass } from "../../guided-section-surface";
+import {
+  SITE_HERO_BACKGROUND_CROP,
+  SITE_HERO_UPLOAD_HINT,
+} from "@/lib/event-image-crop-presets";
 import { GuidedSectionTitleBar } from "../../guided-section-title-bar";
 import { useLogoUploadProcessor } from "@/hooks/use-logo-upload-processor";
 import { Loader2 } from "lucide-react";
@@ -48,10 +53,16 @@ import {
   LOGO_SUPPORTED_FORMATS_LABEL,
   LOGO_UPLOAD_HINT,
 } from "@/lib/logo/supported-formats";
+import {
+  FOOTER_BRAND_DESCRIPTION_MAX_CHARS,
+  FOOTER_BRAND_DESCRIPTION_MAX_WORDS,
+  clipFooterBrandDescription,
+} from "@/lib/footer-brand-description";
 
 const resolveStepTwoErrorIndex = (keys: string[]) => {
   if (keys.some((k) => k === "__extra_validation__")) return 0;
-  if (keys.some((k) => k === "logo" || k === "cover_image")) return 0;
+  if (keys.some((k) => k === "logo" || k === "cover_image" || k === "footer_brand_description"))
+    return 0;
   if (keys.some((k) => k === "banner_heading" || k === "banner_sub_heading"))
     return 1;
   return 2;
@@ -89,6 +100,9 @@ export default function StepTwo() {
       about_title: globalForm.getValues("stepTwo.about_title") || "",
       about_description:
         globalForm.getValues("stepTwo.about_description") || "",
+      footer_brand_description: clipFooterBrandDescription(
+        globalForm.getValues("stepTwo.footer_brand_description") || "",
+      ),
       logo: globalForm.getValues("stepTwo.logo") || undefined,
       cover_image: globalForm.getValues("stepTwo.cover_image") || undefined,
     },
@@ -102,6 +116,15 @@ export default function StepTwo() {
     };
   }, [setActiveField]);
 
+  const globalLogo = useWatch({
+    control: globalForm.control,
+    name: "stepTwo.logo",
+  });
+  const globalCover = useWatch({
+    control: globalForm.control,
+    name: "stepTwo.cover_image",
+  });
+
   // Initialize file state from global form values
   const [logoFiles, setLogoFiles] = React.useState<File[]>([]);
   const [coverFiles, setCoverFiles] = React.useState<File[]>([]);
@@ -110,28 +133,45 @@ export default function StepTwo() {
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
   const [coverUrl, setCoverUrl] = React.useState<string | null>(null);
 
-  // Initialize URL values from global form on mount
+  // AI apply stores a File; GET hydrate stores a URL. The dropzone only
+  // rendered URLs, so the logo was blank until refresh.
   useEffect(() => {
-    const logo = globalForm.getValues("stepTwo.logo");
-    const cover = globalForm.getValues("stepTwo.cover_image");
-
-    // Check if values are string URLs
-    if (typeof logo === "string" && logo) {
-      setLogoUrl(logo);
+    if (typeof globalLogo === "string" && globalLogo.trim()) {
+      setLogoUrl(globalLogo);
+      setLogoFiles([]);
+      form.setValue("logo", globalLogo);
+      return;
     }
-
-    if (typeof cover === "string" && cover) {
-      setCoverUrl(cover);
+    if (globalLogo instanceof File) {
+      const withPreview = ensureFilePreview(globalLogo);
+      setLogoFiles([withPreview]);
+      setLogoUrl(null);
+      form.setValue("logo", withPreview);
     }
-  }, [globalForm]);
+  }, [form, globalLogo]);
+
+  useEffect(() => {
+    if (typeof globalCover === "string" && globalCover.trim()) {
+      setCoverUrl(globalCover);
+      setCoverFiles([]);
+      form.setValue("cover_image", globalCover);
+      return;
+    }
+    if (globalCover instanceof File) {
+      const withPreview = ensureFilePreview(globalCover);
+      setCoverFiles([withPreview]);
+      setCoverUrl(null);
+      form.setValue("cover_image", withPreview);
+    }
+  }, [form, globalCover]);
 
   const sectionConfigs = useMemo((): GuidedSectionConfig<StepTwoType>[] => {
     return [
       {
         id: "branding",
         label: "Branding",
-        description: "Logo and landing page cover image.",
-        fields: [],
+        description: "Logo, footer line, and landing page cover image.",
+        fields: ["logo", "cover_image", "footer_brand_description"],
         validate: async () => {
           const lg = form.getValues("logo");
           const cv = form.getValues("cover_image");
@@ -199,6 +239,8 @@ export default function StepTwo() {
     persistenceHydrated: persistedProgressHydrated,
     persistedStepApproved: stepTwoPersistedApproved === true,
   });
+
+  useOnboardingPreviewFieldFocus(2, guided.focusGuidedSection);
 
   const handleLogoFileChange = async (
     files: File[],
@@ -390,7 +432,7 @@ export default function StepTwo() {
     <section>
       <OnboardingCard>
         <CardHeader>
-          <OnboardingTitle>OK Let&apos;s Create Your Site</OnboardingTitle>
+          <OnboardingTitle>Let&apos;s create your site</OnboardingTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -399,8 +441,7 @@ export default function StepTwo() {
                 data-guided-section="branding"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 0,
+                  guided.currentSectionIndex === 0,
                   "space-y-6",
                 )}
               >
@@ -411,14 +452,10 @@ export default function StepTwo() {
                   title="Branding"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 0
-                  }
+                  disabled={guided.currentSectionIndex !== 0}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 0 &&
+                    guided.currentSectionIndex !== 0 &&
                       "pointer-events-none",
                   )}
                 >
@@ -428,7 +465,7 @@ export default function StepTwo() {
                     render={({ field }) => (
                       <FormItem>
                         <OnboardingFieldGroupTitle>
-                          Upload Your Logo
+                          Upload your logo
                         </OnboardingFieldGroupTitle>
                         <p className="text-xs text-white/60 mb-2">
                           {LOGO_SUPPORTED_FORMATS_LABEL}, max 1MB.{" "}
@@ -442,7 +479,7 @@ export default function StepTwo() {
                             {isProcessingLogo ? (
                               <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-white/70">
                                 <Loader2 className="h-6 w-6 animate-spin" />
-                                Optimizing logo for header…
+                                Optimising logo for header…
                               </div>
                             ) : logoUrl ? (
                               <div className="relative w-full space-y-2">
@@ -525,12 +562,68 @@ export default function StepTwo() {
                   />
                   <FormField
                     control={form.control}
+                    name="footer_brand_description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <OnboardingFieldGroupTitle>
+                          Footer brand description
+                        </OnboardingFieldGroupTitle>
+                        <p className="mb-2 text-xs text-muted-foreground">
+                          Short line under your logo in the footer. Optional —
+                          About copy is used if this is empty.
+                        </p>
+                        <FormControl>
+                          <div
+                            onClick={() =>
+                              handleFieldFocus("footer_brand_description")
+                            }
+                          >
+                            <TiptapEditor
+                              value={field.value || ""}
+                              onChange={(value) => {
+                                field.onChange(value);
+                                globalForm.setValue(
+                                  "stepTwo.footer_brand_description",
+                                  value,
+                                  { shouldDirty: true, shouldValidate: false },
+                                );
+                              }}
+                              placeholder="A short line about your venue, shown under the logo in the footer…"
+                              maxLength={FOOTER_BRAND_DESCRIPTION_MAX_CHARS}
+                              maxWords={FOOTER_BRAND_DESCRIPTION_MAX_WORDS}
+                              className="min-h-[100px] w-full overflow-hidden max-w-[300px]"
+                              showAIButton={true}
+                              wrapText={true}
+                              aiContext={{
+                                title:
+                                  globalForm.getValues("stepOne.name") ||
+                                  undefined,
+                                city:
+                                  globalForm.getValues("stepOne.city") ||
+                                  undefined,
+                                description:
+                                  form.getValues("about_description") ||
+                                  undefined,
+                                contentType: "footer",
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="cover_image"
                     render={({ field }) => (
                       <FormItem>
                         <OnboardingFieldGroupTitle>
-                          Landing Page Image
+                          Landing page image
                         </OnboardingFieldGroupTitle>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {SITE_HERO_UPLOAD_HINT}
+                        </p>
                         <FormControl>
                           <div
                             className="flex flex-col justify-center items-center h-full space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
@@ -570,13 +663,8 @@ export default function StepTwo() {
                                 }
                                 className="border-dashed"
                                 enableCropping={true}
-                                aspectRatio={16 / 9}
-                                cropConfig={{
-                                  maxSizeKB: 500,
-                                  quality: 0.9,
-                                  maxWidth: 1920,
-                                  maxHeight: 1080,
-                                }}
+                                aspectRatio={SITE_HERO_BACKGROUND_CROP.aspectRatio}
+                                cropConfig={SITE_HERO_BACKGROUND_CROP}
                               />
                             )}
                           </div>
@@ -598,8 +686,7 @@ export default function StepTwo() {
                 data-guided-section="banner"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 1,
+                  guided.currentSectionIndex === 1,
                   "space-y-6",
                 )}
               >
@@ -610,14 +697,10 @@ export default function StepTwo() {
                   title="Banner text"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 1
-                  }
+                  disabled={guided.currentSectionIndex !== 1}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 1 &&
+                    guided.currentSectionIndex !== 1 &&
                       "pointer-events-none",
                   )}
                 >
@@ -631,7 +714,7 @@ export default function StepTwo() {
                       return (
                         <FormItem>
                           <OnboardingFieldGroupTitle>
-                            Add a Banner Heading
+                            Add a banner heading
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
@@ -670,11 +753,11 @@ export default function StepTwo() {
                       return (
                         <FormItem>
                           <OnboardingFieldGroupTitle>
-                            Add a Banner Sub-Heading
+                            Add a banner subheading
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
-                              placeholder="e.g. Experience more Stock Brook Events"
+                              placeholder="e.g. Unforgettable nights at your venue"
                               {...field}
                               maxLength={maxLength}
                               onFocus={() =>
@@ -719,8 +802,7 @@ export default function StepTwo() {
                 data-guided-section="about"
                 tabIndex={-1}
                 className={guidedSectionSurfaceClass(
-                  guided.allSectionsApproved ||
-                    guided.currentSectionIndex === 2,
+                  guided.currentSectionIndex === 2,
                   "space-y-6",
                 )}
               >
@@ -731,14 +813,10 @@ export default function StepTwo() {
                   title="About section"
                 />
                 <fieldset
-                  disabled={
-                    !guided.allSectionsApproved &&
-                    guided.currentSectionIndex !== 2
-                  }
+                  disabled={guided.currentSectionIndex !== 2}
                   className={cn(
                     "min-w-0 border-0 p-0 m-0 space-y-6",
-                    !guided.allSectionsApproved &&
-                      guided.currentSectionIndex !== 2 &&
+                    guided.currentSectionIndex !== 2 &&
                       "pointer-events-none",
                   )}
                 >
@@ -751,11 +829,11 @@ export default function StepTwo() {
                       return (
                         <FormItem>
                           <OnboardingFieldGroupTitle>
-                            Add a Title for Your Page
+                            Add a title for your page
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
-                              placeholder="e.g. Experience more Stock Brook Events or Stock Brook Events"
+                              placeholder="e.g. About your venue"
                               {...field}
                               maxLength={maxLength}
                               onFocus={() => handleFieldFocus("about_title")}
@@ -791,7 +869,7 @@ export default function StepTwo() {
                       <FormItem>
                         <div className="flex items-center justify-between">
                           <OnboardingFieldGroupTitle>
-                            Write a Short Description
+                            Write a short description
                           </OnboardingFieldGroupTitle>
                         </div>
                         <FormControl>
@@ -834,7 +912,9 @@ export default function StepTwo() {
               <GuidedMultiSectionBottomActions
                 onApproveAll={guided.handleApproveAllSections}
                 allSectionsApproved={guided.allSectionsApproved}
+                hasInput={guided.currentSectionHasInput}
                 loading={loading}
+                onEditAll={() => guided.handleUnlockSection(0)}
                 onContinue={() => void handleContinue()}
               />
             </form>

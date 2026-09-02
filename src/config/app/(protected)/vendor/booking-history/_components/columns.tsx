@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
+import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 
@@ -131,41 +132,43 @@ export function getHistoryColumns({
       ),
       cell: ({ row }) => {
         const booking = row.original as History;
-        const eventDates = booking.event_dates || [];
-        const dateValue = row.getValue("date") as string;
+        const eventDates = booking.event_dates ?? [];
+        const primaryEntry = eventDates[0];
+        const primaryLabel =
+          primaryEntry?.date ??
+          (typeof row.getValue("date") === "string"
+            ? (row.getValue("date") as string)
+            : "");
 
-        // Use first date from event_dates if available, otherwise use primary date
-        const primaryDateValue =
-          eventDates.length > 0 ? eventDates[0] : dateValue;
-        const primaryDate = new Date(primaryDateValue);
-
-        // Format date helper
-        const formatDate = (dateStr: string) => {
-          const date = new Date(dateStr);
-          if (isNaN(date.getTime())) return "Invalid Date";
-          const day = String(date.getDate()).padStart(2, "0");
-          const month = String(date.getMonth() + 1).padStart(2, "0");
-          const year = date.getFullYear();
-          return `${day}-${month}-${year}`;
-        };
-
-        if (isNaN(primaryDate.getTime())) {
-          return <span className="text-foreground text-sm">Invalid Date</span>;
+        if (!primaryLabel) {
+          return <span className="text-foreground text-sm">—</span>;
         }
 
-        const formattedPrimaryDate = formatDate(primaryDateValue);
+        const renderDateLabel = (
+          dateLabel: string,
+          roomName?: string,
+          compact = false,
+        ) => (
+          <div className={compact ? "min-w-0" : "flex flex-col gap-0.5 min-w-0"}>
+            <span className="text-foreground text-sm font-medium truncate">
+              {dateLabel}
+            </span>
+            {roomName ? (
+              <span className="text-xs text-muted-foreground truncate">
+                {roomName}
+              </span>
+            ) : null}
+          </div>
+        );
 
-        // If multiple dates, show tooltip
         if (eventDates.length > 1) {
           return (
             <TooltipProvider>
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 cursor-pointer group">
-                    <span className="text-foreground text-sm font-medium">
-                      {formattedPrimaryDate}
-                    </span>
-                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 group-hover:bg-blue-200 transition-colors">
+                  <div className="flex items-center gap-2 cursor-pointer group max-w-[220px]">
+                    {renderDateLabel(primaryLabel, primaryEntry?.room_name)}
+                    <span className="inline-flex shrink-0 items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 group-hover:bg-blue-200 transition-colors">
                       <CalendarDays className="h-3 w-3 mr-1" />+
                       {eventDates.length - 1}
                     </span>
@@ -180,15 +183,22 @@ export function getHistoryColumns({
                       All Event Dates ({eventDates.length}):
                     </p>
                     <div className="space-y-1.5">
-                      {eventDates.map((dateStr, index) => (
+                      {eventDates.map((entry, index) => (
                         <div
-                          key={index}
-                          className="flex items-center gap-2 text-xs text-muted-foreground"
+                          key={`${entry.date}-${entry.room_name ?? "flat"}-${index}`}
+                          className="flex items-start gap-2 text-xs text-muted-foreground"
                         >
-                          <span className="font-medium text-black">
+                          <span className="font-medium text-black shrink-0">
                             {index + 1}.
                           </span>
-                          <span>{formatDate(dateStr)}</span>
+                          <div className="min-w-0">
+                            <span className="text-black">{entry.date}</span>
+                            {entry.room_name ? (
+                              <span className="block text-muted-foreground">
+                                {entry.room_name}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -199,11 +209,10 @@ export function getHistoryColumns({
           );
         }
 
-        // Single date - no tooltip needed
         return (
-          <span className="text-black text-sm font-medium">
-            {formattedPrimaryDate}
-          </span>
+          <div className="max-w-[220px]">
+            {renderDateLabel(primaryLabel, primaryEntry?.room_name)}
+          </div>
         );
       },
       enableSorting: true,
@@ -227,10 +236,27 @@ export function getHistoryColumns({
         const raw = row.getValue("amount");
         const n =
           typeof raw === "string" ? parseFloat(raw) || 0 : Number(raw) || 0;
+        const savedAmount = row.original.saved_amount;
+        const couponCode = row.original.coupon_code;
         return (
-          <span className="font-bold text-sm text-primary">
-            {formatMoney(n)}
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-bold text-sm text-primary">
+              {formatMoney(n)}
+            </span>
+            {savedAmount != null ? (
+              <span className="text-[11px] font-semibold text-emerald-700">
+                You saved {formatMoney(savedAmount)}
+              </span>
+            ) : null}
+            {couponCode ? (
+              <Badge
+                variant="outline"
+                className="h-5 w-fit px-1.5 text-[10px] font-semibold"
+              >
+                {couponCode}
+              </Badge>
+            ) : null}
+          </div>
         );
       },
       enableSorting: true,

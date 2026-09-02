@@ -1,9 +1,7 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import { useDomainStore } from "@/store/domain.store";
 import LayoutToggle from "./_components/layout-toggle";
-import { cn } from "@/lib/utils";
 import UserDropdown from "./_components/user-dropdown";
 import MobileSidebar from "./_components/mobile-sidebar";
 import { MenuItemProps } from "@/config/menus/types";
@@ -17,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import UniversalSearch from "./_components/search";
-import ReferralUrl from "./_components/referral";
+import VendorSiteUrl from "./_components/vendor-site-url";
 import { PermissionGuard } from "@/components/permission";
 import NotificationBell from "./_components/notification-bell";
 import { LocationSelector } from "@/components/location-selector";
@@ -35,9 +33,9 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = memo(({ menus }) => {
-  const { sidebarCollapsed: collapsed } = useDomainStore();
   const { data: session } = useSession();
   const isVendor = session?.user?.account_type === "vendor";
+  const accountType = session?.user?.account_type ?? "vendor";
 
   // Fetch locations to check count (only for vendors)
   // IMPORTANT: Only fetch if user is vendor to avoid 403 errors on customer pages
@@ -48,60 +46,44 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
     return locationsData.data || [];
   }, [locationsData]);
   const hasMultipleLocations = locationsList.length > 1;
-  const { data: profileData } = useProfileData({}, "vendor");
+  const { data: profileData } = useProfileData({}, accountType);
   const venueName = useMemo(() => {
     if (!isVendor) return "";
     return (
-      profileData?.data?.venue_name?.trim() ||
-      session?.user?.name?.trim() ||
-      ""
+      profileData?.data?.venue_name?.trim() || session?.user?.name?.trim() || ""
     );
   }, [isVendor, profileData?.data?.venue_name, session?.user?.name]);
 
-  const headerClass = useMemo(
-    () =>
-      cn(
-        "flex-none min-w-0 border-b border-[var(--color-border)] bg-[var(--color-header)] text-[var(--color-on-header)] px-4 py-3 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm transition-all duration-300 overflow-hidden",
-        collapsed ? "xl:ml-[60px]" : "xl:ml-[264px]",
-      ),
-    [collapsed],
-  );
+  const headerClass =
+    "flex-none min-w-0 w-full border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-3 py-3 md:px-4 md:py-3 2xl:px-6 2xl:py-4 flex items-center gap-2 justify-between shadow-[0_1px_2px_0_rgba(0,0,0,0.05)]";
 
   return (
     <header className={headerClass}>
-      <div className="flex items-center gap-2 flex-1">
+      <div className="flex shrink-0 items-center gap-1.5">
         <div className="md:hidden">
           <MobileSidebar menus={menus} />
         </div>
         <div className="hidden md:block">
           <LayoutToggle />
         </div>
-
-        {/* Search Input */}
-        <div className="relative max-w-md w-full">
-          <UniversalSearch />
-        </div>
+        <UniversalSearch />
       </div>
 
-      <div className="flex items-center gap-2 ml-1">
-        {/* Referral URL - Using the separate component */}
-        <div className="hidden lg:block">
-          <ReferralUrl />
-        </div>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5 2xl:gap-2">
+        <VendorSiteUrl />
 
-        {/* Location Selector - Only show for vendors with multiple locations */}
         {isVendor && venueName && (
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
               <div
-                className="hidden lg:flex items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-background px-2.5 py-1.5 mr-1 max-w-[220px] min-w-0 cursor-default"
+                className="hidden min-w-[9rem] max-w-[12rem] shrink-0 cursor-default items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-background px-2 py-1.5 lg:flex xl:max-w-[14rem] 2xl:max-w-[20rem] 2xl:px-2.5"
                 aria-label={`Venue: ${venueName}`}
               >
-                <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground shrink-0">
+                <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="hidden shrink-0 text-xs text-muted-foreground 2xl:inline">
                   Venue:
                 </span>
-                <span className="text-sm font-semibold text-foreground truncate min-w-0">
+                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
                   {venueName}
                 </span>
               </div>
@@ -117,23 +99,22 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
           </Tooltip>
         )}
 
-        {/* Location Selector - Only show for vendors with multiple locations */}
         {isVendor && hasMultipleLocations && (
-          <div className="hidden md:block mr-1">
+          <div className="hidden shrink-0 md:block">
             <LocationSelector />
           </div>
         )}
 
-        {/* Help Dropdown */}
-        <div className="hidden md:block">
+        <div className="hidden shrink-0 md:block">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="event-ghost"
                 size="sm"
-                className="hidden sm:flex"
+                className="px-2 2xl:px-3"
+                aria-label="Help"
               >
-                <span className="mr-1">Help</span>
+                <span className="mr-1 hidden 2xl:inline">Help</span>
                 <HelpCircle className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -141,18 +122,18 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
               <DropdownMenuItem>
                 <Link
                   href="/documentation"
-                  className="flex items-center w-full"
+                  className="flex w-full items-center"
                 >
                   Documentation
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <Link href="/support" className="flex items-center w-full">
+                <Link href="/support" className="flex w-full items-center">
                   Support
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <Link href="/faq" className="flex items-center w-full">
+                <Link href="/faq" className="flex w-full items-center">
                   FAQs
                 </Link>
               </DropdownMenuItem>
@@ -160,42 +141,27 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
           </DropdownMenu>
         </div>
 
-        {/* Create Event Button - Show on mobile too with icon only */}
         {isVendor && (
           <PermissionGuard permissionKey="create-event">
-            <Link href="/vendor/events/create" className="md:hidden">
+            <Link href="/vendor/events/create" className="shrink-0">
               <Button
                 variant="event-primary"
-                size="icon"
-                aria-label="Create Event"
+                className="flex h-9 items-center gap-1.5 px-2.5 text-xs font-semibold sm:h-10 sm:px-3 sm:text-sm 2xl:px-4"
               >
-                <PlusCircle size={18} />
+                <PlusCircle size={16} className="shrink-0" />
+                <span className="whitespace-nowrap">
+                  <span className="2xl:hidden">Create</span>
+                  <span className="hidden 2xl:inline">Create Event</span>
+                </span>
               </Button>
             </Link>
           </PermissionGuard>
         )}
 
-        {/* Create Event Button - Full button for tablets and up */}
-        {isVendor && (
-          <PermissionGuard permissionKey="create-event">
-            <Link href="/vendor/events/create" className="hidden md:block">
-              <Button
-                variant="event-primary"
-                className="flex items-center gap-2"
-              >
-                <PlusCircle size={16} />
-                Create Event
-              </Button>
-            </Link>
-          </PermissionGuard>
-        )}
-
-        {/* Notification Bell - only when user can read notifications */}
         <PermissionGuard permissionKey="read-notification" fallback={null}>
           <NotificationBell />
         </PermissionGuard>
 
-        {/* User Dropdown */}
         <UserDropdown />
       </div>
     </header>

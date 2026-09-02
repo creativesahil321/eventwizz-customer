@@ -70,6 +70,38 @@ const PAYMENT_GATEWAYS = {
   },
 } as const;
 
+const GATEWAY_PROMPT_NAMES: Record<string, string> = {
+  stripe: "Stripe",
+  paypal: "PayPal",
+  truelayer: "bank transfer",
+  worldpay: "WorldPay",
+  klarna: "Klarna",
+};
+
+/** e.g. "Choose PayPal or Stripe to continue" from available cart gateways. */
+export function formatCheckoutGatewayContinuePrompt(
+  gateways: Array<{ slug?: string | null }> | null | undefined,
+): string {
+  const names = Array.from(
+    new Set(
+      (gateways ?? [])
+        .map((g) => {
+          const slug = g.slug?.trim().toLowerCase() ?? "";
+          return GATEWAY_PROMPT_NAMES[slug] ?? null;
+        })
+        .filter((n): n is string => Boolean(n)),
+    ),
+  );
+
+  if (names.length === 0) return "Choose a payment method to continue";
+  if (names.length === 1) return `Choose ${names[0]} to continue`;
+  if (names.length === 2) {
+    return `Choose ${names[0]} or ${names[1]} to continue`;
+  }
+  const last = names[names.length - 1];
+  return `Choose ${names.slice(0, -1).join(", ")}, or ${last} to continue`;
+}
+
 interface PaymentGatewaySelectorProps {
   availableGateways: Array<{
     id: number;
@@ -126,7 +158,7 @@ export default function PaymentGatewaySelector({
     const gateway = filteredGateways[0];
     const IconComponent = gateway.icon;
     return (
-      <div className="space-y-2">
+      <div id="checkout-payment-method" className="space-y-2 scroll-mt-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--checkout-muted-foreground)]">
           Payment Method
         </p>
@@ -155,7 +187,7 @@ export default function PaymentGatewaySelector({
     : null;
 
   return (
-    <div className="space-y-2">
+    <div id="checkout-payment-method" className="space-y-2 scroll-mt-4">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
           Payment Method
@@ -168,8 +200,8 @@ export default function PaymentGatewaySelector({
       </div>
       
       {showError && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-xs text-red-700 font-medium">
-          Please select a payment method to continue
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-medium text-amber-900">
+          {formatCheckoutGatewayContinuePrompt(availableGateways)}
         </div>
       )}
 
@@ -229,13 +261,16 @@ export default function PaymentGatewaySelector({
 
       {/* Compact selected display when collapsed */}
       {selectedGatewayConfig && !isExpanded && filteredGateways.length > 1 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
+        <motion.div initial={false} animate={{ opacity: 1 }}>
           <button
-            onClick={() => setIsExpanded(true)}
-            className={`w-full text-left ${selectedGatewayConfig.bgSelected} rounded-xl p-3 hover:opacity-90 transition-all`}
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              if (!disabled) setIsExpanded(true);
+            }}
+            className={`w-full text-left ${selectedGatewayConfig.bgSelected} rounded-xl p-3 hover:opacity-90 transition-all ${
+              disabled ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

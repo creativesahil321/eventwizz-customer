@@ -1044,7 +1044,7 @@ export default function PackageTab() {
         localForm: form,
       });
 
-      notifyVendorEventRoomSystemChanged(invalidateCache);
+      notifyVendorEventRoomSystemChanged(invalidateCache, eventId);
 
       if (eventId <= 0) {
         resetLocalFormFromGlobalStepTwo();
@@ -1106,10 +1106,12 @@ export default function PackageTab() {
           noValidate
           autoComplete="off"
         >
-          {/* Event Package Section */}
+          {/* Packages and Gallery Section */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold title-header">Event Package</h2>
+              <h2 className="text-xl font-bold title-header">
+                Packages &amp; Gallery
+              </h2>
             </div>
 
             <FormField
@@ -1118,7 +1120,7 @@ export default function PackageTab() {
               render={() => (
                 <FormItem className="rounded-lg border border-[#E5E7EB] p-4 bg-[#FAFCFC]">
                   <FormLabel className="text-sm font-semibold">
-                    Do you have a room system?
+                    Does your event use multiple rooms or areas?
                   </FormLabel>
                   <FormControl>
                     <RadioGroup
@@ -1145,9 +1147,10 @@ export default function PackageTab() {
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enable this if your event has room-wise package, dates,
-                    menu, and brochure flows.
+                  <p className="text-xs leading-relaxed text-muted-foreground mt-1">
+                    Choose Yes when rooms have different packages, dates,
+                    menus, drinks, or brochures. Choose No for one shared setup
+                    across the venue.
                   </p>
                 </FormItem>
               )}
@@ -1164,13 +1167,13 @@ export default function PackageTab() {
                   return (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
-                        Event Package Heading{" "}
+                        Main event heading{" "}
                         <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="e.g., The Package"
+                          placeholder="e.g., What's included"
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                           maxLength={maxLength}
                           onFocus={() => handleFieldFocus("package_title")}
@@ -1204,12 +1207,12 @@ export default function PackageTab() {
                   return (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
-                        Sub Heading <span className="text-red-500">*</span>
+                        Subheading <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder={`e.g., Prices From ${currencySymbol}65 Plus VAT Include:`}
+                          placeholder={`e.g. Prices from ${currencySymbol}65 plus VAT. Includes:`}
                           className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                           maxLength={maxLength}
                         />
@@ -1233,7 +1236,7 @@ export default function PackageTab() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-base font-medium">
-                    Package Image
+                    Highlights image
                   </FormLabel>
                   <FormControl>
                     <div className="relative min-h-[15rem]">
@@ -1254,7 +1257,7 @@ export default function PackageTab() {
                               Processing package image…
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Crop & optimize dialog may open — please wait
+                              Crop & optimise dialog may open — please wait
                             </p>
                           </div>
                         </div>
@@ -1326,7 +1329,7 @@ export default function PackageTab() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold title-header">
-                Package Details
+                What guests can expect
               </h3>
               {fields.length < 10 && (
                 <Button
@@ -1350,7 +1353,7 @@ export default function PackageTab() {
                   className="bg-white border-gray-200 text-gray-700"
                 >
                   <PlusCircle className="h-4 w-4 mr-2" />
-                  Add Detail
+                  Add detail
                 </Button>
               )}
             </div>
@@ -1459,7 +1462,7 @@ export default function PackageTab() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium">
-                    Event Scheduler Title{" "}
+                    Event schedule title{" "}
                     <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
@@ -1518,7 +1521,7 @@ export default function PackageTab() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-base font-medium">
-                    Event Scheduler Background Image
+                    Event schedule background image
                   </FormLabel>
                   <FormControl>
                     {typeof field.value === "string" && field.value ? (
@@ -1703,7 +1706,7 @@ export default function PackageTab() {
           {/* Gallery Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold title-header">
-              Gallery Images
+              Gallery images
             </h3>
             <FormField
               control={form.control}
@@ -1783,7 +1786,7 @@ export default function PackageTab() {
                                 </Button>
                                 {index === 0 && (
                                   <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs py-1 px-2 text-center">
-                                    Main Image
+                                    Main image
                                   </div>
                                 )}
                               </div>

@@ -8,7 +8,11 @@ import { ProtectedPageHeader } from "@/app/(protected)/_components/page-header-c
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatBookingStatus, getBookingDateRowKey } from "../_lib/utils";
+import {
+  formatBookingStatus,
+  getBookingDateRowKey,
+  getCustomerBookingDetailPath,
+} from "../_lib/utils";
 import {
   Search,
   Filter,
@@ -108,12 +112,13 @@ export default function BookingsList({
   };
 
   const handleViewDetails = (booking: Booking) => {
-    // Navigate to dedicated adjust booking page
-    router.push(`/customer/bookings/${booking.booking_id}`);
+    if (!booking.booking_number) return;
+    router.push(getCustomerBookingDetailPath(booking.booking_number));
   };
 
   const handleAddMenu = (booking: Booking) => {
-    router.push(`/customer/bookings/${booking.booking_id}`);
+    if (!booking.booking_number) return;
+    router.push(getCustomerBookingDetailPath(booking.booking_number));
   };
 
   // API handles all filtering (search, payment_status), so we use bookings directly
@@ -211,7 +216,7 @@ export default function BookingsList({
                 <p className="text-sm sm:text-base text-muted-foreground max-w-md">
                   {localSearchValue || statusFilter !== "all"
                     ? "Try adjusting your search or filters"
-                    : "You don't have any bookings yet. Start exploring events!"}
+                    : "You don’t have any bookings yet. Browse events to make your first booking."}
                 </p>
                 {(localSearchValue ||
                   searchQuery ||
@@ -284,26 +289,39 @@ export default function BookingsList({
                         );
                       })()}
                     </div>
+                    {bookingDate.room_name?.trim() ? (
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
+                        {bookingDate.room_name.trim()}
+                      </p>
+                    ) : null}
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
-                      {bookingDate.tables > 0 && (
+                      {(bookingDate.tables ?? 0) > 0 && (
                         <div className="flex items-center gap-1 sm:gap-1.5">
                           <UtensilsCrossed className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           <span>
                             {bookingDate.tables} Table
-                            {bookingDate.tables > 1 ? "s" : ""}
+                            {(bookingDate.tables ?? 0) > 1 ? "s" : ""}
                           </span>
                         </div>
                       )}
-                      {bookingDate.tickets > 0 && (
+                      {bookingDate.table?.table_size ? (
+                        <div className="flex items-center gap-1 sm:gap-1.5">
+                          <UtensilsCrossed className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          <span>
+                            Table for {bookingDate.table.table_size}
+                          </span>
+                        </div>
+                      ) : null}
+                      {(bookingDate.tickets ?? 0) > 0 && (
                         <div className="flex items-center gap-1 sm:gap-1.5">
                           <Ticket className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           <span>
                             {bookingDate.tickets} Ticket
-                            {bookingDate.tickets > 1 ? "s" : ""}
+                            {(bookingDate.tickets ?? 0) > 1 ? "s" : ""}
                           </span>
                         </div>
                       )}
-                      {bookingDate.drinks > 0 && (
+                      {(bookingDate.drinks ?? 0) > 0 && (
                         <div className="flex items-center gap-1 sm:gap-1.5">
                           <Wine className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           <span>Drinks Included</span>

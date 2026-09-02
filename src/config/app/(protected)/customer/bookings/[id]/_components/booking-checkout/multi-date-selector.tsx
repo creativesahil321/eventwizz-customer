@@ -114,6 +114,11 @@ function DateCardGridItem({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Total
             </p>
+            {card.savedAmount != null ? (
+              <p className="mt-0.5 text-[10px] font-semibold text-emerald-700">
+                You saved {formatCurrency(card.savedAmount)}
+              </p>
+            ) : null}
             <p className="mt-0.5 text-lg font-bold leading-none text-foreground">
               {card.amountFormatted}
             </p>
@@ -242,7 +247,18 @@ function DateStripPill({
       )}
       <div className="mt-2 flex items-baseline justify-between gap-2">
         <span className="text-[10px] font-semibold text-muted-foreground">
-          {card.amountFormatted}
+          {card.savedAmount != null ? (
+            <>
+              <span className="font-bold text-foreground">
+                {card.amountFormatted}
+              </span>
+              <span className="ml-1 font-semibold text-emerald-700">
+                · Saved {formatCurrency(card.savedAmount)}
+              </span>
+            </>
+          ) : (
+            card.amountFormatted
+          )}
         </span>
         <span
           className={cn(
@@ -298,7 +314,16 @@ function SelectedDateActionBar({
           </span>
         )}
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Total {card.amountFormatted}
+          Total{" "}
+          <span className="font-semibold text-foreground">
+            {card.amountFormatted}
+          </span>
+          {card.savedAmount != null ? (
+            <span className="font-semibold text-emerald-700">
+              {" "}
+              · You saved {formatCurrency(card.savedAmount)}
+            </span>
+          ) : null}
           {!isFullyPaid && pendingDue > 0 && (
             <span className="font-semibold text-[#ea580c]">
               {" "}

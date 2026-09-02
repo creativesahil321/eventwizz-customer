@@ -10,24 +10,24 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 cursor-pointer",
+          "bg-[var(--color-primary,var(--primary))] text-[var(--color-primary-foreground,#fff)] shadow-xs hover:bg-[var(--color-primary-hover,var(--color-primary,var(--primary)))] hover:text-[var(--color-primary-foreground,#fff)] cursor-pointer",
         destructive:
-          "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 cursor-pointer",
+          "bg-destructive text-white shadow-xs hover:bg-destructive/90 hover:text-white focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 cursor-pointer",
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 cursor-pointer",
+          "border bg-background text-foreground shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 cursor-pointer",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 cursor-pointer",
+          "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 hover:text-secondary-foreground cursor-pointer",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 cursor-pointer",
         link: "text-primary underline-offset-4 hover:underline cursor-pointer",
         "event-primary":
-          "bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-foreground)] border-[var(--color-primary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer",
+          "bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover,var(--color-primary))] text-[var(--color-primary-foreground,#fff)] hover:text-[var(--color-primary-foreground,#fff)] border-[var(--color-primary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer",
         "event-secondary":
-          "bg-[var(--color-secondary)] hover:bg-[var(--color-secondary-hover)] text-[var(--color-secondary-foreground)] border-[var(--color-secondary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer",
+          "bg-[var(--color-secondary)] hover:bg-[var(--color-secondary-hover,var(--color-secondary))] text-[var(--color-secondary-foreground,#fff)] hover:text-[var(--color-secondary-foreground,#fff)] border-[var(--color-secondary)] hover:scale-[1.03] transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer",
         "event-outline":
-          "bg-[#f8fafa] border border-[var(--color-primary)] text-[var(--color-primary)] shadow-xs hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground)] hover:scale-[1.02] hover:border-[var(--color-primary-hover)] transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ",
+          "bg-[#f8fafa] border border-[var(--color-primary)] text-[var(--color-primary)] shadow-xs hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-foreground,#fff)] hover:scale-[1.02] hover:border-[var(--color-primary-hover,var(--color-primary))] transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ",
         "event-ghost":
-          "text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline hover:bg-[#f8fafa] transition-all duration-200 cursor-pointer",
+          "text-[var(--color-primary)] hover:text-[var(--color-primary-hover,var(--color-primary))] hover:underline hover:bg-[#f8fafa] transition-all duration-200 cursor-pointer",
         "event-social":
           "flex items-center justify-center rounded border border-gray-200 bg-white hover:bg-gray-50 hover:scale-[1.02] transition-all duration-200 cursor-pointer",
       },
@@ -62,7 +62,7 @@ function Button({
     <Comp
       data-slot="button"
       data-variant={variant ?? "default"}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />
   );

@@ -25,7 +25,8 @@ import {
 } from "@/lib/site-custom-font-stylesheets";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { fontInter } from "@/lib/fonts";
-import { addCacheBustingSSR } from "@/lib/image-utils";
+import { addCacheBustingSSR, shouldUseNextImageOptimization } from "@/lib/image-utils";
+import { resolveVendorMainLandingHeroSrc } from "@/lib/resolve-hero-cover-image";
 import { cn } from "@/lib/utils";
 
 /**
@@ -117,6 +118,15 @@ export default async function RootLayout({
    */
   const isAdminSite = initialTheme?.website_role === "admin";
 
+  const vendorHeroPreloadSrc =
+    initialTheme && !isAdminSite
+      ? resolveVendorMainLandingHeroSrc(initialTheme)
+      : null;
+  /** Preload raw URL only when next/image is bypassed — otherwise it competes with /_next/image on Slow 4G. */
+  const shouldPreloadVendorHero =
+    vendorHeroPreloadSrc != null &&
+    !shouldUseNextImageOptimization(vendorHeroPreloadSrc);
+
   return (
     <html
       lang="en"
@@ -139,6 +149,14 @@ export default async function RootLayout({
             fetchPriority="high"
           />
         )}
+        {shouldPreloadVendorHero && vendorHeroPreloadSrc ? (
+          <link
+            rel="preload"
+            href={vendorHeroPreloadSrc}
+            as="image"
+            fetchPriority="high"
+          />
+        ) : null}
         {/* Inject critical theme CSS to prevent flickering */}
         <style
           id="critical-theme-css"
@@ -146,11 +164,19 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: criticalThemeCSS }}
         />
         {themeGoogleFontsHref ? (
-          <link
-            id={THEME_GOOGLE_FONTS_LINK_ID}
-            rel="stylesheet"
-            href={themeGoogleFontsHref}
-          />
+          <>
+            <link rel="preconnect" href="https://fonts.googleapis.com" />
+            <link
+              rel="preconnect"
+              href="https://fonts.gstatic.com"
+              crossOrigin="anonymous"
+            />
+            <link
+              id={THEME_GOOGLE_FONTS_LINK_ID}
+              rel="stylesheet"
+              href={themeGoogleFontsHref}
+            />
+          </>
         ) : null}
         {themeCustomFontStylesheetUrls.map((href, i) => (
           <link

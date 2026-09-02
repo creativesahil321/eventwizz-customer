@@ -13,6 +13,7 @@ import {
   RotateCcw,
   User,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -119,6 +120,9 @@ function VendorDatePaymentStatusRow({
     dateLabel: string,
   ) => void;
 }) {
+  // Remount Select after each pick so the same option can open the confirm
+  // modal again (Radix skips onValueChange when the value is unchanged).
+  const [selectResetKey, setSelectResetKey] = useState(0);
   const statusChangeOptions = getAllowedStatusOptions(
     date.paymentStatusCode,
     date.vendorStatusOptions,
@@ -140,6 +144,7 @@ function VendorDatePaymentStatusRow({
         <StatusBadge status={date.paymentStatusRaw} />
       </div>
       <Select
+        key={selectResetKey}
         onValueChange={(value) => {
           const newStatusCode = Number.parseInt(value, 10);
           if (Number.isNaN(newStatusCode)) return;
@@ -149,6 +154,7 @@ function VendorDatePaymentStatusRow({
             newStatusCode,
             date.date,
           );
+          setSelectResetKey((key) => key + 1);
         }}
         disabled={isUpdatingThis || statusChangeOptions.length === 0}
       >
@@ -253,6 +259,7 @@ export function VendorBookingCheckoutPage({
           : buildDateSubtitle(date),
         amount: date.totalAmount ?? 0,
         amountFormatted: date.total,
+        savedAmount: date.savedAmount ?? null,
         paidAmount: date.paidAmount ?? 0,
         paidAmountFormatted: formatCurrency(date.paidAmount ?? 0),
         paymentStatus: date.paymentStatus ?? "pending",
@@ -558,6 +565,24 @@ export function VendorBookingCheckoutPage({
           "lg:overflow-hidden lg:border lg:rounded-b-xl",
         )}
       >
+        {checkout.summary.savedAmount != null ||
+        checkout.summary.couponCode ? (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-3 sm:px-6 lg:px-8">
+            {checkout.summary.savedAmount != null ? (
+              <p className="text-sm font-semibold text-emerald-700">
+                You saved {formatCurrency(checkout.summary.savedAmount)}
+              </p>
+            ) : null}
+            {checkout.summary.couponCode ? (
+              <Badge
+                variant="outline"
+                className="h-6 px-2 text-xs font-semibold"
+              >
+                {checkout.summary.couponCode}
+              </Badge>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-3 border-b border-border bg-card p-4 py-3 pr-14 sm:p-6 sm:pr-6 lg:p-8 lg:pr-8 sm:py-3.5">
           <p className="text-[10px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">
             Payment Summary
@@ -590,9 +615,11 @@ export function VendorBookingCheckoutPage({
               <PaymentBreakdownTotals
                 subTotal={checkout.summary.subTotal}
                 addOns={checkout.summary.addOns}
+                total={checkout.summary.total}
                 paid={checkout.summary.paid}
                 outstanding={checkout.summary.outstanding}
                 formatCurrency={formatCurrency}
+                savedAmount={checkout.summary.savedAmount}
               />
             </div>
           </div>

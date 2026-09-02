@@ -16,7 +16,15 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
-import { useContext, useState, useEffect, useMemo, type RefObject } from "react";
+import {
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { ServerContext } from "@/lib/server-context";
 import { LucideIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -28,6 +36,7 @@ import {
 } from "./vendor-public-location-book-now";
 import { useCartVisibility } from "@/app/(public)/vendor/checkout/_lib/hooks/useCartVisibility";
 import { addCacheBusting } from "@/lib/image-utils";
+import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { cn } from "@/lib/utils";
 import { getAnchorColor, relativeLuminance } from "@/lib/color-contrast";
 import { useMediaPreviewUrl } from "@/hooks/use-media-preview-url";
@@ -35,8 +44,23 @@ import {
   useIsPreviewModeFromProvider,
   useIsPreviewMode,
 } from "@/contexts/preview-context";
+import {
+  usePreviewDeviceFramesEnabled,
+  usePreviewNarrowLayout,
+} from "@/hooks/use-preview-narrow-layout";
+import { getNearestScrollContainer } from "@/components/public/event-section-nav";
 import type { HeaderDownloadLink } from "@/lib/event-header-downloads";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 import { resolvePublicPageContact } from "@/lib/resolve-venue-contact";
+import {
+  previewBrowseIconVisibility,
+  previewDesktopActionLabel,
+  previewDesktopActionsRowClass,
+  previewDesktopHeaderFlex,
+  previewDesktopHeaderHidden,
+  previewDesktopIconAction,
+  previewLogoSizeClass,
+} from "@/lib/preview-container-layout";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,8 +87,7 @@ function useCustomerCartVisibility() {
   const { data: session } = useSession();
   const isPreviewMode = useIsPreviewMode();
   return useCartVisibility({
-    enabled:
-      session?.user?.account_type === "customer" && !isPreviewMode,
+    enabled: session?.user?.account_type === "customer" && !isPreviewMode,
   });
 }
 
@@ -86,7 +109,10 @@ function CartOrLocationSlot({
       return (
         <CartButton
           size="icon"
-          className={iconTriggerClassName ?? `p-2 transition-colors ${textColorClass} ${hoverColorClass}`}
+          className={
+            iconTriggerClassName ??
+            `p-2 transition-colors ${textColorClass} ${hoverColorClass}`
+          }
         />
       );
     }
@@ -104,7 +130,10 @@ function CartOrLocationSlot({
       <VendorPublicLocationBookNow
         variant="icon"
         pillGlassOnHero={pillGlassOnHero}
-        iconTriggerClassName={iconTriggerClassName ?? `p-2 transition-colors rounded-md ${textColorClass} ${hoverColorClass}`}
+        iconTriggerClassName={
+          iconTriggerClassName ??
+          `p-2 transition-colors rounded-md ${textColorClass} ${hoverColorClass}`
+        }
         align={align ?? "end"}
       />
     );
@@ -137,7 +166,7 @@ function MobileCartOrLocationSlot({
       <div onClick={onNavigate}>
         <CartButton
           size="sm"
-          showBadge={false}
+          showBadge
           fullWidth
           className={cn(
             mobileNavRowClass,
@@ -203,6 +232,17 @@ interface CommonHeaderProps {
   scrollContainerRef?: RefObject<HTMLElement | null>;
   /** Prefer this location's phone from theme.locations when set */
   locationSlug?: string | null;
+  /**
+   * Optional strip above the nav (e.g. event coupon banner).
+   * Renders inside the same fixed/sticky chrome so it never covers the header.
+   */
+  topBanner?: ReactNode;
+  /**
+   * Use the theme header fill + on-header contrast instead of the transparent
+   * overlay used over a dark hero. Required when the hero is not behind the nav
+   * (e.g. location search results). Matches LocationSelectionHeader on main search.
+   */
+  solidBar?: boolean;
 }
 
 export default function CommonHeader({
@@ -218,18 +258,39 @@ export default function CommonHeader({
   compactGuestAuth = false,
   scrollContainerRef,
   locationSlug,
+  topBanner,
+  solidBar = false,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
+  // Theme refetch after logo save updates this → busts browser cache for same URL path
+  const { mediaVersion: themeMediaVersion } = useTheme();
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
+  const isPreviewPath = useIsPreviewMode();
+  const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
+  /**
+   * Guest-facing chrome only inside framed onboarding previews.
+   * Full-page `/preview/site` and `/preview/event` mirror live auth (Dashboard
+   * when the vendor is signed in) so review matches the live site.
+   */
+  const isPreviewChrome =
+    variant === "onboarding" ||
+    (deviceFramesEnabled &&
+      (variant === "preview" || isPreviewFromProvider || isPreviewPath));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated";
-  // const isPreviewMode = useIsPreviewMode(); // Currently unused but available for future use
+  /** Guest auth CTAs in preview even when the editor session is signed in. */
+  const showGuestAuthLinks = isPreviewChrome || !isAuthenticated;
+  const headerRootRef = useRef<HTMLElement>(null);
 
   // Handle scroll effect (window or embedded preview scroll container)
   useEffect(() => {
-    const scrollRoot = scrollContainerRef?.current;
+    const preferred = scrollContainerRef?.current;
+    const scrollRoot =
+      preferred && preferred.scrollHeight > preferred.clientHeight + 1
+        ? preferred
+        : getNearestScrollContainer(headerRootRef.current ?? preferred);
 
     const handleScroll = () => {
       const scrollTop = scrollRoot ? scrollRoot.scrollTop : window.scrollY;
@@ -292,30 +353,37 @@ export default function CommonHeader({
             },
           ]
         : []),
-      // Only show login button if not authenticated
-      ...(isAuthenticated
-        ? []
-        : [
+      // Guest auth: live guests when signed out; always in preview (guest look)
+      ...(showGuestAuthLinks
+        ? [
             {
               link: "/auth/login",
               linkText: "Log In",
             },
-          ]),
-      // Only show register button if not authenticated
-      ...(isAuthenticated
-        ? []
-        : [{ link: "/auth/register", linkText: "Register" }]),
-      // Show dashboard button if authenticated
-      ...(isAuthenticated && session?.user?.account_type
+            { link: "/auth/register", linkText: "Register" },
+          ]
+        : []),
+      // Dashboard / Continue Onboarding is portal chrome — never show in site preview
+      ...(isAuthenticated && session?.user?.account_type && !isPreviewChrome
         ? [
-            {
-              link: `/${session.user.account_type}/dashboard`,
-              linkText: "Dashboard",
-            },
+            session.user.account_type === "vendor" && !session.user.isOnboarded
+              ? {
+                  link: "/on-boarding",
+                  linkText: "Continue Onboarding",
+                }
+              : {
+                  link: `/${session.user.account_type}/dashboard`,
+                  linkText: "Dashboard",
+                },
           ]
         : []),
     ] as NavLink[],
   };
+
+  const accountHomeHref =
+    session?.user?.account_type === "vendor" && !session.user.isOnboarded
+      ? "/on-boarding"
+      : `/${session?.user?.account_type}/dashboard`;
 
   const desktopNavLinkEntries = headerData.navLinks.filter((l) => {
     if (l.icon === "phone" && hideHeaderPhone) return false;
@@ -374,6 +442,11 @@ export default function CommonHeader({
         if (headerIsLight) {
           return solidHeaderBarStyles(isScrolled);
         }
+        // Solid bar when there is no dark hero behind the nav (search results,
+        // coupon strip) so light logos stay readable — same as main-landing search.
+        if (topBanner || solidBar) {
+          return solidHeaderBarStyles(true);
+        }
         // Dark header: transparent bar over hero until scroll (white nav pills).
         const overDarkHero = !isScrolled;
         return {
@@ -395,7 +468,11 @@ export default function CommonHeader({
   const styles = getVariantStyles();
   /** Glass pills over imagery: dark-header live pages over hero + onboarding homepage with cover. */
   const pillGlassOnHero =
-    (variant === "default" && !isScrolled && !headerIsLight) ||
+    (variant === "default" &&
+      !topBanner &&
+      !solidBar &&
+      !isScrolled &&
+      !headerIsLight) ||
     (variant === "onboarding" && hasBackgroundImage);
   const topBarPillClass = cn(
     "rounded-full border px-3 py-1 text-sm transition-colors whitespace-nowrap backdrop-blur-md",
@@ -422,9 +499,19 @@ export default function CommonHeader({
     (variant === "default" && isPreviewFromProvider) ||
     (variant === "preview" && isPreviewFromProvider);
 
+  /**
+   * Brand mark must never navigate to `/` during site/event preview — that dumps
+   * the vendor out of `/preview/*` onto the live home. Cover path-based preview
+   * even if PreviewProvider is missing higher in the tree.
+   */
+  const disableLogoHomeLink =
+    useNonInteractiveChrome ||
+    isPreviewPath ||
+    isPreviewFromProvider ||
+    variant !== "default";
+
   const sessionPending = status === "loading";
-  const commerceSlotLoading =
-    !useNonInteractiveChrome && sessionPending;
+  const commerceSlotLoading = !useNonInteractiveChrome && sessionPending;
   const showHeaderCart =
     !useNonInteractiveChrome && !sessionPending && isAuthenticated;
   const showGuestLocationSwitcher =
@@ -511,40 +598,119 @@ export default function CommonHeader({
       ? "dark:bg-background"
       : "dark:bg-[color:var(--color-header)]";
 
-  /** Nested onboarding/site preview scrolls inside a panel — sticky, not viewport-fixed. */
+  /** Nested / framed previews scroll inside a panel — sticky, not viewport-fixed. */
   const usesEmbeddedScrollPanel = Boolean(scrollContainerRef);
+  const usesStickyHeader = variant === "preview" || usesEmbeddedScrollPanel;
+  /**
+   * Only use `@container/preview` when a device frame (or embedded scroll panel)
+   * actually provides that container. Full-page `/preview/site` has no frame —
+   * container queries never match and the header stuck on hamburger / tiny logo.
+   *
+   * Tablet/Mobile device mode: force hamburger chrome via the preview store.
+   * Live + full-width preview: normal viewport breakpoints.
+   */
+  const isPreviewNarrow = usePreviewNarrowLayout();
+  const usePreviewContainerQueries =
+    deviceFramesEnabled ||
+    (usesEmbeddedScrollPanel &&
+      (variant === "preview" || variant === "onboarding"));
+
+  /**
+   * Full header from viewport `xl` (1280px) / container `@7xl` (1280px).
+   * Below that: hamburger — tablet, mobile, and small desktop / onboarding
+   * side panels. (`@lg/preview` is only 512px and caused logo overlap.)
+   */
+  const desktopHeaderVisibility = isPreviewNarrow
+    ? "hidden"
+    : usePreviewContainerQueries
+      ? previewDesktopHeaderFlex
+      : "hidden xl:flex";
+  const mobileHeaderVisibility = isPreviewNarrow
+    ? "grid"
+    : usePreviewContainerQueries
+      ? previewDesktopHeaderHidden
+      : "xl:hidden";
+
+  /** Icon-first until there is room for labels beside a wordmark logo. */
+  const desktopActionLabelClass = usePreviewContainerQueries
+    ? previewDesktopActionLabel
+    : "hidden 2xl:inline";
+  /**
+   * Phone numbers are the longest header label. In framed preview always icon
+   * only. Live: icon until 2xl.
+   */
+  const desktopPhoneLabelClass = usePreviewContainerQueries
+    ? "sr-only"
+    : "hidden 2xl:inline";
+  const desktopIconActionClass = usePreviewContainerQueries
+    ? previewDesktopIconAction
+    : "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 2xl:h-auto 2xl:w-auto 2xl:gap-1.5 2xl:!px-3";
+  const desktopPhoneIconActionClass = usePreviewContainerQueries
+    ? "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 box-border"
+    : "inline-flex h-9 w-9 shrink-0 items-center justify-center gap-0 !px-0 box-border 2xl:h-auto 2xl:w-auto 2xl:gap-1.5 2xl:!px-3";
+  const browseIconVisibilityClass = usePreviewContainerQueries
+    ? previewBrowseIconVisibility
+    : "h-4 w-4 shrink-0 2xl:hidden";
+  const logoSizeClass = usePreviewContainerQueries
+    ? previewLogoSizeClass
+    : "max-h-11 max-w-[min(100%,9.5rem)] w-auto object-contain xl:max-h-12 xl:max-w-[min(100%,11rem)]";
+  const desktopActionsRowClass = usePreviewContainerQueries
+    ? previewDesktopActionsRowClass
+    : "relative z-0 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 overflow-visible text-xs xl:gap-1.5 xl:text-sm";
 
   return (
     <section
+      ref={headerRootRef}
       className={cn(
-        usesEmbeddedScrollPanel
+        usesStickyHeader
           ? "sticky top-0 z-50 w-full transition-all duration-300"
           : "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        styles.container,
+        // Banner owns its own fill; keep section transparent so strip colour isn't washed.
+        topBanner ? "bg-transparent shadow-none" : styles.container,
         variant !== "default" && styles.textColor,
         headerDarkModeBg,
         className,
       )}
     >
-      <div className="container mx-auto">
-        {/* Desktop Header */}
+      {topBanner ? <div className="w-full">{topBanner}</div> : null}
+      <div
+        className={cn(
+          "w-full",
+          topBanner ? styles.container : null,
+        )}
+      >
+      <div className="container mx-auto min-w-0 px-2 sm:px-4">
+        {/* Desktop Header — mirrors live site; container-aware when embedded */}
         <div
           className={cn(
-            "hidden md:flex justify-between items-center py-3",
+            desktopHeaderVisibility,
+            "justify-between items-center py-3",
             variant === "default" && styles.textColor,
           )}
         >
           <div
-            className={`flex items-center gap-3 w-1/3 ${
-              variant === "preview" && previewBackButtonOffset
-                ? "pl-[11.5rem]"
-                : ""
-            }`}
+            className={cn(
+              "flex min-w-0 w-1/3 items-center gap-3",
+              variant === "preview" &&
+                previewBackButtonOffset &&
+                "pl-[11.5rem]",
+            )}
           >
             {!hideBrowseEvents &&
               (useNonInteractiveChrome ? (
-                <div className={cn(topBarPillDisabledClass, styles.textColor)}>
-                  {headerData.browseEvent.linkText}
+                <div
+                  className={cn(
+                    topBarPillDisabledClass,
+                    styles.textColor,
+                    "inline-flex items-center gap-1.5",
+                    desktopIconActionClass,
+                  )}
+                  aria-label={headerData.browseEvent.linkText}
+                >
+                  <Calendar className={browseIconVisibilityClass} />
+                  <span className={desktopActionLabelClass}>
+                    {headerData.browseEvent.linkText}
+                  </span>
                 </div>
               ) : (
                 <Link
@@ -553,21 +719,30 @@ export default function CommonHeader({
                     topBarPillClass,
                     styles.textColor,
                     styles.hoverColor,
+                    "inline-flex items-center gap-1.5",
+                    desktopIconActionClass,
                   )}
+                  aria-label={headerData.browseEvent.linkText}
                 >
-                  {headerData.browseEvent.linkText}
+                  <Calendar className={browseIconVisibilityClass} />
+                  <span className={desktopActionLabelClass}>
+                    {headerData.browseEvent.linkText}
+                  </span>
                 </Link>
               ))}
           </div>
-          <div className="w-1/3 text-center">
-            {useNonInteractiveChrome ? (
-              <div className="h-14 flex items-center justify-center cursor-default">
+          <div className="relative z-0 w-1/3 min-w-0 overflow-hidden px-1 text-center sm:px-2">
+            {disableLogoHomeLink ? (
+              <div className="flex h-14 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
-                  <img
-                    src={addCacheBusting(logoPath as string)}
+                  <BrandLogoImage
+                    src={addCacheBusting(
+                      logoPath as string,
+                      themeMediaVersion,
+                    )}
                     width={200}
                     height={116}
-                    className="max-h-12 w-auto object-contain"
+                    className={logoSizeClass}
                     alt={vendorTheme?.name || "EventWizz"}
                   />
                 ) : (
@@ -580,14 +755,21 @@ export default function CommonHeader({
                 )}
               </div>
             ) : (
-              <Link href="/" aria-label="Home">
-                <div className="h-14 flex items-center justify-center">
+              <Link
+                href="/"
+                aria-label="Home"
+                className="inline-flex max-w-full"
+              >
+                <div className="flex h-14 max-w-full items-center justify-center">
                   {logoPath ? (
-                    <img
-                      src={addCacheBusting(logoPath as string)}
+                    <BrandLogoImage
+                      src={addCacheBusting(
+                        logoPath as string,
+                        themeMediaVersion,
+                      )}
                       width={200}
                       height={116}
-                      className="max-h-12 w-auto object-contain"
+                      className={logoSizeClass}
                       alt={vendorTheme?.name || "EventWizz"}
                     />
                   ) : (
@@ -602,29 +784,13 @@ export default function CommonHeader({
               </Link>
             )}
           </div>
-          <div
-            className={`flex items-center gap-2 sm:gap-3 w-1/3 justify-end text-xs sm:text-sm`}
-          >
+          <div className={desktopActionsRowClass}>
             {/* Cart (signed-in) or public location switcher (guest) */}
             {useNonInteractiveChrome ? (
-              <>
-                <VendorPublicLocationBookNow
-                  disabled
-                  pillGlassOnHero={pillGlassOnHero}
-                />
-                {isAuthenticated ? (
-                  <div
-                    className={cn(
-                      "flex items-center gap-1",
-                      topBarPillDisabledClass,
-                      styles.textColor,
-                    )}
-                  >
-                    <ShoppingCart size={16} />
-                    <span>Cart</span>
-                  </div>
-                ) : null}
-              </>
+              <VendorPublicLocationBookNow
+                disabled
+                pillGlassOnHero={pillGlassOnHero}
+              />
             ) : commerceSlotLoading ? (
               <div
                 className={cn(
@@ -656,11 +822,13 @@ export default function CommonHeader({
                       "flex max-w-[min(100%,15rem)] shrink-0 items-center gap-1",
                       topBarPillDisabledClass,
                       styles.textColor,
+                      desktopIconActionClass,
                     )}
+                    aria-label={singleHeaderDownload.title}
                     aria-hidden
                   >
                     <FileText size={16} className="shrink-0" />
-                    <span className="truncate">
+                    <span className={cn("truncate", desktopActionLabelClass)}>
                       {singleHeaderDownload.title}
                     </span>
                   </div>
@@ -670,11 +838,13 @@ export default function CommonHeader({
                       "flex shrink-0 items-center gap-1",
                       topBarPillDisabledClass,
                       styles.textColor,
+                      desktopIconActionClass,
                     )}
+                    aria-label="Downloads"
                     aria-hidden
                   >
                     <Download size={16} className="shrink-0" />
-                    <span>Downloads</span>
+                    <span className={desktopActionLabelClass}>Downloads</span>
                   </div>
                 )
               ) : singleHeaderDownload ? (
@@ -687,14 +857,19 @@ export default function CommonHeader({
                     topBarPillClass,
                     styles.textColor,
                     styles.hoverColor,
+                    desktopIconActionClass,
                   )}
                   onClick={handleLinkClick}
+                  aria-label={singleHeaderDownload.title}
+                  title={singleHeaderDownload.title}
                 >
                   <FileText
                     size={16}
                     className={cn("shrink-0", downloadsFileIconClass)}
                   />
-                  <span className="truncate">{singleHeaderDownload.title}</span>
+                  <span className={cn("truncate", desktopActionLabelClass)}>
+                    {singleHeaderDownload.title}
+                  </span>
                 </a>
               ) : multipleHeaderDownloads ? (
                 <DropdownMenu>
@@ -706,11 +881,12 @@ export default function CommonHeader({
                         topBarPillClass,
                         styles.textColor,
                         styles.hoverColor,
+                        desktopIconActionClass,
                       )}
                       aria-label="Downloads"
                     >
                       <Download size={16} className="shrink-0" />
-                      <span>Downloads</span>
+                      <span className={desktopActionLabelClass}>Downloads</span>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -746,11 +922,34 @@ export default function CommonHeader({
               ) : null)}
 
             {desktopNavLinkEntries.map(({ icon, link, linkText }, index) => {
-              const IconComponent = icon ? iconComponents[icon] : null;
               const isPhoneNumber = icon === "phone";
+              const isDashboard =
+                linkText === "Dashboard" || linkText === "Continue Onboarding";
+              const isAuthLink =
+                linkText === "Log In" || linkText === "Register";
+              const IconComponent = icon
+                ? iconComponents[icon]
+                : isDashboard
+                  ? LayoutDashboard
+                  : linkText === "Log In"
+                    ? LogIn
+                    : linkText === "Register"
+                      ? UserPlus
+                      : null;
+              const iconOnlyUntilXl =
+                isPhoneNumber || isDashboard || isAuthLink;
+              const iconActionClass = isPhoneNumber
+                ? desktopPhoneIconActionClass
+                : iconOnlyUntilXl
+                  ? desktopIconActionClass
+                  : undefined;
+              const labelClass = isPhoneNumber
+                ? desktopPhoneLabelClass
+                : iconOnlyUntilXl
+                  ? desktopActionLabelClass
+                  : undefined;
 
-              const useDisabledNavLink =
-                useNonInteractiveChrome && !link.startsWith("tel:");
+              const useDisabledNavLink = useNonInteractiveChrome;
 
               if (useDisabledNavLink) {
                 return (
@@ -759,28 +958,20 @@ export default function CommonHeader({
                     className={cn(
                       "flex items-center gap-1",
                       topBarPillDisabledClass,
-                      "px-2 sm:px-3",
+                      iconActionClass,
+                      !iconOnlyUntilXl && "px-2 sm:px-3",
                       styles.textColor,
                     )}
-                    title={isPhoneNumber ? linkText : undefined}
+                    title={linkText}
+                    aria-label={linkText}
                   >
                     {IconComponent && (
                       <IconComponent
-                        size={14}
-                        className="sm:w-4 sm:h-4 flex-shrink-0"
+                        size={16}
+                        className="h-4 w-4 flex-shrink-0"
                       />
                     )}
-                    <span
-                      className={`${
-                        isPhoneNumber ? "text-[10px] sm:text-xs md:text-sm" : ""
-                      } ${
-                        isPhoneNumber
-                          ? "truncate max-w-[80px] sm:max-w-[120px] md:max-w-[160px] lg:max-w-none"
-                          : ""
-                      }`}
-                    >
-                      {linkText}
-                    </span>
+                    <span className={labelClass}>{linkText}</span>
                   </div>
                 );
               }
@@ -793,29 +984,21 @@ export default function CommonHeader({
                   className={cn(
                     "flex items-center gap-1",
                     topBarPillClass,
-                    "px-2 sm:px-3",
+                    iconActionClass,
+                    !iconOnlyUntilXl && "px-2 sm:px-3",
                     styles.textColor,
                     styles.hoverColor,
                   )}
-                  title={isPhoneNumber ? linkText : undefined}
+                  title={linkText}
+                  aria-label={linkText}
                 >
                   {IconComponent && (
                     <IconComponent
-                      size={14}
-                      className="sm:w-4 sm:h-4 flex-shrink-0"
+                      size={16}
+                      className="h-4 w-4 flex-shrink-0"
                     />
                   )}
-                  <span
-                    className={`${
-                      isPhoneNumber ? "text-[10px] sm:text-xs md:text-sm" : ""
-                    } ${
-                      isPhoneNumber
-                        ? "truncate max-w-[80px] sm:max-w-[120px] md:max-w-[160px] lg:max-w-none"
-                        : ""
-                    }`}
-                  >
-                    {linkText}
-                  </span>
+                  <span className={labelClass}>{linkText}</span>
                 </Link>
               );
             })}
@@ -827,11 +1010,13 @@ export default function CommonHeader({
                     "flex items-center gap-1.5",
                     topBarPillDisabledClass,
                     styles.textColor,
+                    desktopIconActionClass,
                   )}
+                  aria-label="Account"
                   aria-hidden
                 >
                   <UserCircle size={16} className="shrink-0" />
-                  <span>Account</span>
+                  <span className={desktopActionLabelClass}>Account</span>
                 </div>
               ) : (
                 <DropdownMenu>
@@ -843,12 +1028,13 @@ export default function CommonHeader({
                         topBarPillClass,
                         styles.textColor,
                         styles.hoverColor,
+                        desktopIconActionClass,
                       )}
                       aria-label="Account menu"
                       aria-haspopup="menu"
                     >
                       <UserCircle size={16} className="shrink-0" />
-                      <span>Account</span>
+                      <span className={desktopActionLabelClass}>Account</span>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -886,8 +1072,13 @@ export default function CommonHeader({
           </div>
         </div>
 
-        {/* Mobile Header */}
-        <div className="md:hidden grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 py-2.5 min-h-[3.25rem]">
+        {/* Mobile Header — tablet/phone preview + live below lg */}
+        <div
+          className={cn(
+            mobileHeaderVisibility,
+            "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 py-2.5 min-h-[3.25rem]",
+          )}
+        >
           <button
             type="button"
             onClick={toggleMobileMenu}
@@ -901,11 +1092,14 @@ export default function CommonHeader({
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex min-w-0 justify-center px-1">
-            {useNonInteractiveChrome ? (
+            {disableLogoHomeLink ? (
               <div className="flex h-9 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
-                  <img
-                    src={addCacheBusting(logoPath as string)}
+                  <BrandLogoImage
+                    src={addCacheBusting(
+                      logoPath as string,
+                      themeMediaVersion,
+                    )}
                     width={200}
                     height={116}
                     className="max-h-7 max-w-[min(100%,9.5rem)] w-auto object-contain"
@@ -921,11 +1115,18 @@ export default function CommonHeader({
                 )}
               </div>
             ) : (
-              <Link href="/" aria-label="Home" className="flex max-w-full min-w-0">
+              <Link
+                href="/"
+                aria-label="Home"
+                className="flex max-w-full min-w-0"
+              >
                 <div className="flex h-9 max-w-full items-center justify-center">
                   {logoPath ? (
-                    <img
-                      src={addCacheBusting(logoPath as string)}
+                    <BrandLogoImage
+                      src={addCacheBusting(
+                        logoPath as string,
+                        themeMediaVersion,
+                      )}
                       width={200}
                       height={116}
                       className="max-h-7 max-w-[min(100%,9.5rem)] w-auto object-contain"
@@ -956,7 +1157,7 @@ export default function CommonHeader({
                     styles.textColor,
                   )}
                 />
-                {isAuthenticated ? (
+                {isAuthenticated && !isPreviewChrome ? (
                   <div
                     className={`flex h-9 w-9 items-center justify-center ${styles.textColor} opacity-60 transition-colors cursor-not-allowed`}
                   >
@@ -1009,13 +1210,18 @@ export default function CommonHeader({
               </div>
             ) : isAuthenticated ? (
               <Link
-                href={`/${session?.user?.account_type}/dashboard`}
+                href={accountHomeHref}
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
                   styles.textColor,
                   styles.hoverColor,
                 )}
-                aria-label="Dashboard"
+                aria-label={
+                  session?.user?.account_type === "vendor" &&
+                  !session.user.isOnboarded
+                    ? "Continue Onboarding"
+                    : "Dashboard"
+                }
               >
                 <UserCircle className="h-5 w-5" />
               </Link>
@@ -1038,7 +1244,10 @@ export default function CommonHeader({
         {/* Mobile Menu Overlay */}
         {mobileMenuOpen && (
           <div
-            className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+            className={cn(
+              "fixed inset-0 bg-black bg-opacity-50 z-40",
+              mobileHeaderVisibility,
+            )}
             onClick={toggleMobileMenu}
           />
         )}
@@ -1046,7 +1255,8 @@ export default function CommonHeader({
         {/* Mobile Menu Panel */}
         <div
           className={cn(
-            "md:hidden fixed top-0 left-0 z-50 flex h-screen w-[70%] max-w-xs transform flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] transition-transform duration-300 ease-in-out",
+            "fixed top-0 left-0 z-50 flex h-screen w-[70%] max-w-xs transform flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] transition-transform duration-300 ease-in-out",
+            mobileHeaderVisibility,
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -1108,7 +1318,7 @@ export default function CommonHeader({
                     mobileNavIconWrap={mobileNavIconWrap}
                     hoverColorClass={styles.hoverColor}
                   />
-                  {isAuthenticated ? (
+                  {isAuthenticated && !isPreviewChrome ? (
                     <div
                       className={cn(
                         mobileNavRowClass,
@@ -1195,11 +1405,10 @@ export default function CommonHeader({
               )}
 
               {mobileAccountLinks.map(({ link, linkText }, index) => {
-                const useDisabledAccountLink =
-                  useNonInteractiveChrome && !link.startsWith("tel:");
+                const useDisabledAccountLink = useNonInteractiveChrome;
 
                 const AccountIcon =
-                  linkText === "Dashboard"
+                  linkText === "Dashboard" || linkText === "Continue Onboarding"
                     ? LayoutDashboard
                     : linkText === "Log In"
                       ? LogIn
@@ -1260,27 +1469,45 @@ export default function CommonHeader({
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/55">
                   Contact
                 </p>
-                <a
-                  href={mobileContactLink.link}
-                  className={cn(
-                    mobileNavRowClass,
-                    "min-h-0 py-1",
-                    styles.hoverColor,
-                    "transition-colors",
-                  )}
-                  onClick={toggleMobileMenu}
-                >
-                  <span className={mobileNavIconWrap} aria-hidden>
-                    <Phone />
-                  </span>
-                  <span className="min-w-0 break-words">
-                    {mobileContactLink.linkText}
-                  </span>
-                </a>
+                {useNonInteractiveChrome ? (
+                  <div
+                    className={cn(
+                      mobileNavRowClass,
+                      "min-h-0 cursor-not-allowed py-1 opacity-60",
+                    )}
+                    aria-label={mobileContactLink.linkText}
+                  >
+                    <span className={mobileNavIconWrap} aria-hidden>
+                      <Phone />
+                    </span>
+                    <span className="min-w-0 break-words">
+                      {mobileContactLink.linkText}
+                    </span>
+                  </div>
+                ) : (
+                  <a
+                    href={mobileContactLink.link}
+                    className={cn(
+                      mobileNavRowClass,
+                      "min-h-0 py-1",
+                      styles.hoverColor,
+                      "transition-colors",
+                    )}
+                    onClick={toggleMobileMenu}
+                  >
+                    <span className={mobileNavIconWrap} aria-hidden>
+                      <Phone />
+                    </span>
+                    <span className="min-w-0 break-words">
+                      {mobileContactLink.linkText}
+                    </span>
+                  </a>
+                )}
               </div>
             )}
           </nav>
         </div>
+      </div>
       </div>
     </section>
   );

@@ -10,6 +10,8 @@ import "./event-detail.css";
 import { Hydrate } from "./_components/hydration-provider";
 import EventDetailClient from "./_components/event-detail-client";
 import { getRequestHost, getSubdomainFromDomain } from "@/lib/server-theme";
+import { resolveEventBannerHeroSrc } from "@/lib/resolve-hero-cover-image";
+import { preloadHeroImage } from "@/lib/preload-hero-image";
 
 export async function generateMetadata(props: {
   params: { locationSlug: string; eventSlug: string };
@@ -82,11 +84,18 @@ export default async function EventDetailPage(props: {
     notFound();
   }
 
+  preloadHeroImage(resolveEventBannerHeroSrc(eventData.event_banner_image));
+
   // Prefetch event data for client-side hydration
   await queryClient.prefetchQuery({
     queryKey: eventKeys.eventDetail(eventSlug, host),
     queryFn: () => eventsService.getEventDetail(eventSlug, host),
     staleTime: 60 * 1000, // Cache for 1 minute to prevent unnecessary refetches during navigation
+  });
+  await queryClient.prefetchQuery({
+    queryKey: eventKeys.location(locationSlug, host),
+    queryFn: () => eventsService.getLocationWithEvents(locationSlug, host),
+    staleTime: 1000 * 60 * 5,
   });
 
   const dehydratedState = dehydrate(queryClient);

@@ -67,6 +67,10 @@ export interface CheckoutRequest {
   sub_total: number;
   partial_payment: number | null;
   total: number;
+  /** Applied event coupon code (when customer enters a valid code). */
+  coupon_code?: string | null;
+  /** Monetary discount applied to the booking (client-computed preview). */
+  discount_amount?: number | null;
   dates?: CheckoutDateData[];
   rooms?: CheckoutRoomData[];
 }
@@ -100,6 +104,8 @@ export interface CheckoutStripeDetails {
 
 export interface CheckoutResumeRequest {
   booking_number: string;
+  /** When set, resume/switch payment on this gateway for the unpaid booking. */
+  payment_gateway?: number;
 }
 
 export interface StripePaymentSuccessRequest {
@@ -134,9 +140,23 @@ export type StripePaymentSuccessResponse = {
   data?: StripePaymentSuccessData;
 };
 
+/** Redirect-based gateway details (PayPal, TrueLayer, etc.).
+ *  Unlike Stripe (embedded modal), these hand off to a hosted checkout page. */
+export interface CheckoutRedirectDetails {
+  /** Hosted checkout URL the customer is sent to. */
+  redirect_url: string;
+  /** Gateway order/session reference (e.g. PayPal order token). */
+  order_id?: string;
+  /** Seconds until this hosted session expires. */
+  expires_at?: number;
+}
+
 export interface CheckoutPaymentInfo {
   gateway: string;
   stripe?: CheckoutStripeDetails;
+  /** Present when gateway is "paypal". */
+  paypal?: CheckoutRedirectDetails;
+  /** Generic redirect payload for other hosted gateways (e.g. TrueLayer). */
   redirect_url?: string;
 }
 
@@ -147,6 +167,12 @@ export interface CheckoutStripePaymentSession {
   bookingNumber: string;
   bookingId: number;
   amount: number;
+  /**
+   * Pay-today the checkout UI quoted when this session was created.
+   * Used to detect a real cart/payment-option change — do not compare the
+   * UI quote with `amount` (backend may add platform fee or round differently).
+   */
+  clientQuotedAmount?: number;
   dueLater: number | null;
   gateway: string;
   clientSecret: string;

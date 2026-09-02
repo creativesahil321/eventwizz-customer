@@ -9,7 +9,9 @@ export type Transaction = {
   full_name: string;
   email: string;
   card_brand: string | null;
-  cardLast4: string | null;
+  card_last4?: string | null;
+  cardLast4?: string | null;
+  payment_method?: string | null;
   status: string;
   amount: string;
   platform_fee: string;

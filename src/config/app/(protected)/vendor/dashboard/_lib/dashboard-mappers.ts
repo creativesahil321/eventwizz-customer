@@ -9,6 +9,10 @@ import type {
   VendorDashboardRecentBooking,
   VendorDashboardLastEventItem,
 } from "@/services/vendor/dashboard/type";
+import {
+  parseCouponCode,
+  parseSavedAmount,
+} from "@/lib/booking-saved-amount";
 import type { Booking } from "./types";
 
 /** Summary card item (non-clickable) */
@@ -78,7 +82,7 @@ export function mapRecentBookingToTableRow(
 ): Booking {
   return {
     id: String(row.booking_id),
-    transaction_id: row.transaction_id,
+    transaction_id: row.transaction_id ?? undefined,
     event_name: row.event,
     user: { user_name: row.customer },
     user_name: row.customer,
@@ -90,6 +94,8 @@ export function mapRecentBookingToTableRow(
     balance_amount: row.balance_due,
     discount: 0,
     total_amount: row.total,
+    saved_amount: parseSavedAmount(row.saved_amount),
+    coupon_code: parseCouponCode(row.coupon_code),
     payment_status: row.status,
     transaction_history: [],
     date: row.order_date,

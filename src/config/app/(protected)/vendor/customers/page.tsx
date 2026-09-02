@@ -52,6 +52,7 @@ import type { Table } from "@tanstack/react-table";
 import { Customer } from "./_lib/types";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 import { PermissionRoute } from "@/components/permission";
+import { AllLocationsBadge } from "@/components/location-indicator";
 
 // Dynamic import of the customer create dialog
 const CreateCustomerDialog = dynamic(
@@ -295,15 +296,18 @@ export default function CustomersPage() {
           <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
               <div>
-                <h1 className="text-2xl title-header font-bold flex items-center gap-2">
-                  Customers
-                  {isFetching && (
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  )}
-                </h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl title-header font-bold flex items-center gap-2">
+                    Customers
+                    {isFetching && (
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    )}
+                  </h1>
+                  <AllLocationsBadge />
+                </div>
                 <p className="text-muted-foreground mt-2">
-                  Manage your customers. View, edit, and communicate with your
-                  customer base.
+                  Manage your customers across every venue. View, edit, and
+                  communicate with your customer base.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 items-center">

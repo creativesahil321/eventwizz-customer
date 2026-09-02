@@ -4,6 +4,14 @@ import { profileSchema, passwordUpdateSchema } from "./schema";
 export type ProfileFormValues = z.infer<typeof profileSchema>;
 export type PasswordUpdateFormValues = z.infer<typeof passwordUpdateSchema>;
 
+/** Optional company fields sent with admin profile update in the same request. */
+export type ProfileCompanyFields = {
+  company_number?: string;
+  company_registered_office?: string;
+};
+
+export type UpdateProfilePayload = ProfileFormValues & ProfileCompanyFields;
+
 export type ProfileResponse = {
   status: boolean;
   message: string;
@@ -24,6 +32,27 @@ export type ProfileResponse = {
     post_code: string | null;
     /** When present (tenant branding), matches theme API display symbol */
     currency_symbol?: string;
+    /** Same as login — true when at least one payment gateway is connected. */
+    has_payment_provider?: boolean;
+    /**
+     * GoCardless Direct Debit for platform fees.
+     * When `enabled` is false, hide all GoCardless UI.
+     */
+    gocardless?: {
+      enabled: boolean;
+      status: string;
+      connected: boolean;
+      auto_debit_allowed: boolean;
+      mandate_status: string | null;
+    } | null;
+    /** Public vendor storefront URL for copy/open in the header. */
+    site_url?: string | null;
+    /** Unread/total notification counts (replaces /notifications/stats). */
+    notification_stats?: {
+      total_notifications: number;
+      unread_notifications: number;
+      read_notifications: number;
+    };
   };
   errors?: string[];
 };

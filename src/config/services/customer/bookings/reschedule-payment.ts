@@ -1,5 +1,5 @@
 import {
-  buildCheckoutStripeSession,
+  resolveCheckoutPaymentAction,
   type CheckoutPaymentAction,
 } from "../checkout/checkout-payment";
 import type { CheckoutResponseData } from "../checkout/type";
@@ -8,6 +8,10 @@ import type {
   RescheduleBookingResponseData,
 } from "./type";
 
+/**
+ * Maps reschedule-payment API data into the shared checkout payment shape.
+ * Supports Stripe Elements and nested PayPal `payment.paypal.redirect_url`.
+ */
 function toCheckoutPaymentShape(
   data: RescheduleBookingResponseData,
 ): CheckoutResponseData {
@@ -22,9 +26,13 @@ function toCheckoutPaymentShape(
       payment: {
         gateway: payment.gateway,
         stripe: payment.stripe,
+        paypal: payment.paypal,
         redirect_url: payment.redirect_url,
       },
-      redirect_url: data.redirect_url ?? payment.redirect_url,
+      redirect_url:
+        data.redirect_url ??
+        payment.redirect_url ??
+        payment.paypal?.redirect_url,
     };
   }
 
@@ -43,18 +51,7 @@ function toCheckoutPaymentShape(
 export function resolveReschedulePaymentAction(
   data: RescheduleBookingResponseData,
 ): CheckoutPaymentAction | null {
-  const session = buildCheckoutStripeSession(toCheckoutPaymentShape(data));
-  if (session) {
-    return { type: "stripe", session };
-  }
-
-  const redirectUrl =
-    data.redirect_url ?? data.payment?.redirect_url;
-  if (redirectUrl?.trim()) {
-    return { type: "redirect", url: redirectUrl };
-  }
-
-  return null;
+  return resolveCheckoutPaymentAction(toCheckoutPaymentShape(data));
 }
 
 export type { CheckoutPaymentAction };

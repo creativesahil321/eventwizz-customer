@@ -1,5 +1,41 @@
 import type { Table } from "@tanstack/react-table";
 
+/**
+ * Triggers a browser download for a Blob (e.g. server-generated CSV/PDF).
+ * Centralizes the object-URL lifecycle so callers don't duplicate the
+ * create-link/click/revoke dance.
+ */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/** Laravel `Content-Disposition: attachment; filename="subscribers.csv"`. */
+export function filenameFromContentDisposition(
+  header: string | undefined,
+  fallback: string,
+): string {
+  if (!header) return fallback;
+  const star = header.match(/filename\*=(?:UTF-8'')?([^;]+)/i);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/['"]/g, ""));
+    } catch {
+      return star[1].trim().replace(/['"]/g, "");
+    }
+  }
+  const match = header.match(/filename="?([^";]+)"?/i);
+  const name = match?.[1]?.trim();
+  return name || fallback;
+}
+
 export function exportTableToCSV<TData>(
   /**
    * The table to export.

@@ -16,10 +16,11 @@ import { useQueryState, parseAsInteger } from "nuqs";
 import { VendorsTable } from "./_components/vendors-table";
 import { useAdminVenues } from "./_lib/use-admin-venues";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
+import type { AdminVenueListStatus } from "@/services/admin/venues/type";
 
 export default function AdminVendorsPage() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<AdminVenueListStatus>("all");
   const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
   const [per_page, setPerPage] = useQueryState(
     "per_page",
@@ -36,7 +37,7 @@ export default function AdminVendorsPage() {
     isError,
     error,
   } = useAdminVenues({
-    status: statusFilter === "all" ? "" : statusFilter,
+    status: statusFilter,
     search: debouncedSearch,
     page: page ?? 1,
     per_page: per_page ?? 30,
@@ -64,7 +65,7 @@ export default function AdminVendorsPage() {
               <Select
                 value={statusFilter}
                 onValueChange={(v) => {
-                  setStatusFilter(v);
+                  setStatusFilter(v as AdminVenueListStatus);
                   setPage(1);
                 }}
               >
@@ -74,7 +75,7 @@ export default function AdminVendorsPage() {
                 <SelectContent>
                   <SelectItem value="all">All Venues</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="disabled">Inactive</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
 

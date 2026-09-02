@@ -13,13 +13,13 @@ import { useForm, UseFormReturn, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { OnboardingFormData, onboardingSchema } from "./schema";
 import { patchOnboardingPayloadFromApi } from "./hydrate-onboarding-from-api";
+import { isAIBulkApplyInProgress } from "../../_lib/ai-bulk-apply-session-flag";
 import { defaultValues } from "./defaultValues";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
 import { OnboardingFormSkeleton } from "@/components/ui/onboarding-skeleton";
 import { ApiResponse } from "@/services/vendor/onboarding/type";
-import { useOnboardingData } from "../../_lib/hooks/useOnboardingData";
 import type { ThemeSchema } from "@/types/theme.types";
 import {
   extractOnboardingPreviewTheme,
@@ -36,6 +36,20 @@ interface FormContextType {
   previewTheme: ThemeSchema;
   activeField: string | null;
   setActiveField: (fieldName: string | null) => void;
+  /**
+   * Preview → form bridge: a click on a preview "Edit …" hit asks the left form
+   * panel to open (if collapsed) and scroll/focus the matching field. The token
+   * bumps on every request so repeating the same field still re-triggers.
+   */
+  formFieldFocusRequest: {
+    field: string;
+    guidedSectionId?: string;
+    token: number;
+  } | null;
+  requestFormFieldFocus: (
+    field: string,
+    options?: { guidedSectionId?: string },
+  ) => void;
   setActiveStep: (
     step: number,
     options?: { skipSessionSync?: boolean },
@@ -44,6 +58,7 @@ interface FormContextType {
   next: () => Promise<void>;
   back: () => Promise<void>;
   isLoading: boolean;
+  onBackToMode?: () => void;
 }
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
@@ -96,16 +111,15 @@ export function FormProvider({
   children,
   serverData,
   mode,
+  onBackToMode,
 }: {
   children: ReactNode;
   serverData: ApiResponse | null;
   mode?: "ai" | "manual";
+  onBackToMode?: () => void;
 }) {
   // Get session data and update function
   const { data: session, update: updateSession } = useSession();
-
-  // Get the invalidateCache function from useOnboardingData
-  const { invalidateCache } = useOnboardingData();
 
   // Get initial step after component mount
   const [activeStep, setActiveStep] = useState<number>(1); // Default to 1
@@ -113,7 +127,24 @@ export function FormProvider({
   const [persistedProgressHydrated, setPersistedProgressHydrated] =
     useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
-  /** Step save/next only; initial shell is gated by the parent onboarding query, not another artificial delay. */
+  const [formFieldFocusRequest, setFormFieldFocusRequest] = useState<{
+    field: string;
+    guidedSectionId?: string;
+    token: number;
+  } | null>(null);
+
+  const requestFormFieldFocus = useCallback(
+    (field: string, options?: { guidedSectionId?: string }) => {
+      if (!field) return;
+      setFormFieldFocusRequest((prev) => ({
+        field,
+        guidedSectionId: options?.guidedSectionId,
+        token: (prev?.token ?? 0) + 1,
+      }));
+    },
+    [],
+  );
+  /** Step save/next only; initial shell is gated by the parent onboarding query. */
   const [isLoading, setIsLoading] = useState(false);
 
   const maxSteps = 11;
@@ -155,6 +186,8 @@ export function FormProvider({
 
   // Reset form when server data changes - this is important for preserving state
   useEffect(() => {
+    if (isAIBulkApplyInProgress()) return;
+
     if (serverData) {
       const formData = serverData.data || serverData;
 
@@ -315,17 +348,16 @@ export function FormProvider({
         return;
       }
 
-      // Global `save()` is a no-op persistence placeholder; step components call APIs directly.
+      // Persistence refresh is owned by store methods via
+      // `onboardingService.notifyDataChanged()` — do not invalidate here
+      // (that stacked with the event listener and caused multiple GETs).
       await Promise.resolve();
-
-      // Refresh data after saving
-      invalidateCache();
     } catch (error) {
       console.error("Error saving:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [activeStep, form, isLoading, invalidateCache]);
+  }, [activeStep, form, isLoading]);
 
   const next = useCallback(async () => {
     if (isLoading) return;
@@ -379,11 +411,14 @@ export function FormProvider({
       previewTheme,
       activeField,
       setActiveField,
+      formFieldFocusRequest,
+      requestFormFieldFocus,
       setActiveStep: updateActiveStep,
       save,
       next,
       back,
       isLoading,
+      onBackToMode,
     }),
     [
       form,
@@ -393,11 +428,14 @@ export function FormProvider({
       previewTheme,
       activeField,
       setActiveField,
+      formFieldFocusRequest,
+      requestFormFieldFocus,
       isLoading,
       updateActiveStep,
       save,
       next,
       back,
+      onBackToMode,
     ],
   );
 

@@ -210,10 +210,10 @@ export default function StepNine() {
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
-              Do You Want To Add Any Frequently Asked Questions?
+              Do you want to add any frequently asked questions?
             </OnboardingTitle>
             <p className="text-lg mt-2">
-              Help your customers find answers to common questions about your
+              Help your guests find answers to common questions about your
               event
             </p>
           </CardHeader>
@@ -252,7 +252,7 @@ export default function StepNine() {
                 >
                   {() => (
                     <section className={guidedInsetSectionSurfaceClass("w-full mb-4")}>
-                      <OnboardingFieldGroupTitle>Text Entries</OnboardingFieldGroupTitle>
+                      <OnboardingFieldGroupTitle>Questions and answers</OnboardingFieldGroupTitle>
 
                       <div className="space-y-8 mt-4">
                         {fields.map((field, index) => (

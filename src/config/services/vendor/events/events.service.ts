@@ -24,6 +24,8 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
 import {
   appendVendorStepFourRoomToFormData,
+  appendVendorStepFourSingleRoomToFormData,
+  normalizeCateringOptionFlag,
   type VendorStepFourRoomEntry,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
 import {
@@ -34,6 +36,7 @@ import {
   mapVendorDrinkPackagesForApi,
   type VendorStepSixRoomEntry,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import { toLocationCoordsPayload } from "@/lib/to-location-coords-payload";
 import {
   EventsQueryParams,
   EventItem,
@@ -59,6 +62,7 @@ export type StepThreeSavePayload = StepThreeType & {
 
 export type StepFourSavePayload = StepFourType & {
   is_rooms?: 0 | 1;
+  room_id?: number;
   rooms?: VendorStepFourRoomEntry[];
 };
 
@@ -344,6 +348,17 @@ export const eventsService = {
     formData.append("about_event_heading", data.about_event_heading);
     formData.append("about_event_sub_heading", data.about_event_sub_heading);
     formData.append("about_event_description", data.about_event_description);
+    formData.append("event_address", data.event_address || "");
+    const locationCoords = toLocationCoordsPayload(
+      data.latitude,
+      data.longitude,
+    );
+    if (locationCoords) {
+      formData.append("latitude", String(locationCoords.latitude));
+      formData.append("longitude", String(locationCoords.longitude));
+      formData.append("lat", String(locationCoords.lat));
+      formData.append("long", String(locationCoords.long));
+    }
 
     // Add header banner if it exists - handle both File and Blob (cropped images)
     if (data.event_banner_image) {
@@ -418,6 +433,17 @@ export const eventsService = {
     formData.append("about_event_heading", data.about_event_heading);
     formData.append("about_event_sub_heading", data.about_event_sub_heading);
     formData.append("about_event_description", data.about_event_description);
+    formData.append("event_address", data.event_address || "");
+    const locationCoords = toLocationCoordsPayload(
+      data.latitude,
+      data.longitude,
+    );
+    if (locationCoords) {
+      formData.append("latitude", String(locationCoords.latitude));
+      formData.append("longitude", String(locationCoords.longitude));
+      formData.append("lat", String(locationCoords.lat));
+      formData.append("long", String(locationCoords.long));
+    }
 
     // Add header banner if it exists - handle both File and Blob (cropped images)
     if (data.event_banner_image) {
@@ -468,7 +494,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(eventId);
     }
 
     return response;
@@ -711,7 +737,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -789,7 +815,7 @@ export const eventsService = {
       (response.data as { event_deleted?: boolean }).event_deleted === true;
 
     if (response.status && !eventDeleted) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -805,14 +831,28 @@ export const eventsService = {
     formData.append("step", data.step.toString());
     formData.append("event_id", data.event_id.toString());
 
-    const roomPayload =
-      data.is_rooms === 1 && Array.isArray(data.rooms) && data.rooms.length > 0;
-
-    if (roomPayload) {
+    if (data.is_rooms === 1) {
       formData.append("is_rooms", "1");
-      data.rooms!.forEach((room, roomIndex) => {
-        appendVendorStepFourRoomToFormData(formData, roomIndex, room as VendorStepFourRoomEntry);
-      });
+      if (Array.isArray(data.rooms) && data.rooms.length > 0) {
+        data.rooms.forEach((room, roomIndex) => {
+          appendVendorStepFourRoomToFormData(
+            formData,
+            roomIndex,
+            room as VendorStepFourRoomEntry,
+          );
+        });
+      } else if (Number(data.room_id) > 0) {
+        appendVendorStepFourSingleRoomToFormData(formData, {
+          room_id: Number(data.room_id),
+          catering_option: normalizeCateringOptionFlag(data.catering_option),
+          menu_title: data.menu_title,
+          menu_description: data.menu_description,
+          menus: data.menus,
+          menu_background_image: data.menu_background_image,
+        });
+      } else {
+        throw new Error("A room_id is required for a room catering update.");
+      }
     } else {
       formData.append("is_rooms", "0");
       formData.append("catering_option", data.catering_option.toString());
@@ -823,20 +863,13 @@ export const eventsService = {
       if (data.menu_description) {
         formData.append("menu_description", data.menu_description);
       }
-      if (Number(data.event_menu_category_id) > 0) {
-        formData.append(
-          "event_menu_category_id",
-          String(data.event_menu_category_id),
-        );
-      }
-
       if (data.menus) {
         data.menus.forEach((menu, menuIndex) => {
-          formData.append(`menus[${menuIndex}][name]`, menu.name);
-          menu.items.forEach((item, itemIndex) => {
+          formData.append(`menus[${menuIndex}][name]`, menu.name ?? "");
+          (menu.items ?? []).forEach((item, itemIndex) => {
             formData.append(
               `menus[${menuIndex}][items][${itemIndex}][title]`,
-              item.title,
+              item.title ?? "",
             );
             formData.append(
               `menus[${menuIndex}][items][${itemIndex}][description]`,
@@ -869,14 +902,14 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
   },
 
   /**
-   * Store step 5 data (Brochure Info / Location & Pricing)
+   * Store step 5 brochure data
    * @param data Step 5 data to be stored or FormData instance
    * @returns API response with status and message
    */
@@ -898,15 +931,6 @@ export const eventsService = {
 
       if (roomPayload) {
         formData.append("is_rooms", "1");
-        if (data.event_address) {
-          formData.append("event_address", data.event_address);
-        }
-        if (data.latitude !== undefined && data.latitude !== null) {
-          formData.append("lat", data.latitude.toString());
-        }
-        if (data.longitude !== undefined && data.longitude !== null) {
-          formData.append("long", data.longitude.toString());
-        }
         data.rooms!.forEach((room, roomIndex) => {
           appendVendorStepFiveRoomToFormData(formData, roomIndex, room);
         });
@@ -924,15 +948,6 @@ export const eventsService = {
         }
         if (data.remove_brochure_pdf_2) {
           formData.append("remove_brochure_pdf_2", "true");
-        }
-        if (data.event_address) {
-          formData.append("event_address", data.event_address);
-        }
-        if (data.latitude !== undefined && data.latitude !== null) {
-          formData.append("lat", data.latitude.toString());
-        }
-        if (data.longitude !== undefined && data.longitude !== null) {
-          formData.append("long", data.longitude.toString());
         }
       }
     } else {
@@ -957,7 +972,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(eventIdStr);
     }
 
     return response;
@@ -1006,7 +1021,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -1063,7 +1078,7 @@ export const eventsService = {
 
     // Notify that data has changed if successful
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
@@ -1110,6 +1125,17 @@ export const eventsService = {
       formData.append("contact_number", data.contact_number);
     }
 
+    const coords = toLocationCoordsPayload(
+      (data as { latitude?: number }).latitude,
+      (data as { longitude?: number }).longitude,
+    );
+    if (coords) {
+      formData.append("latitude", String(coords.latitude));
+      formData.append("longitude", String(coords.longitude));
+      formData.append("lat", String(coords.lat));
+      formData.append("long", String(coords.long));
+    }
+
     if (
       data.is_duplicate &&
       data.vendor_location_id != null &&
@@ -1139,18 +1165,29 @@ export const eventsService = {
     });
 
     if (response.status) {
-      await eventsService.notifyDataChanged();
+      await eventsService.notifyDataChanged(data.event_id);
     }
 
     return response;
   },
 
-  notifyDataChanged: async (): Promise<void> => {
-    console.log("Notifying event data changed");
+  /**
+   * Broadcast that persisted event data changed.
+   * Pass `eventId` so listeners invalidate only that event — not every open/cached event
+   * (needed so editing the original after a location-duplicate does not wipe the copy).
+   */
+  notifyDataChanged: async (eventId?: string | number): Promise<void> => {
+    if (typeof window === "undefined") return;
 
-    if (typeof window !== "undefined") {
-      const event = new CustomEvent("event-data-changed");
-      window.dispatchEvent(event);
-    }
+    const normalizedId =
+      eventId != null && String(eventId).trim().length > 0
+        ? String(eventId).trim()
+        : undefined;
+
+    window.dispatchEvent(
+      new CustomEvent("event-data-changed", {
+        detail: normalizedId ? { eventId: normalizedId } : undefined,
+      }),
+    );
   },
 };

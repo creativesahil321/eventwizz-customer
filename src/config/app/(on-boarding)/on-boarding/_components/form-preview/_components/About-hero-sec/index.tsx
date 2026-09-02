@@ -1,6 +1,9 @@
-import { Button } from "@/components/ui/button";
+"use client";
+
 import { ArrowRight, Link } from "lucide-react";
 import React, { useState } from "react";
+import { cn } from "@/lib/utils";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 type AboutHeroSectionProps = {
   title?: string;
@@ -16,6 +19,7 @@ function AboutHeroSection({
   link_title,
 }: AboutHeroSectionProps) {
   const [isLoaded, setIsLoaded] = useState(false);
+  const narrowPreview = usePreviewNarrowLayout();
 
   // Trigger layout calculations after component mounts
   React.useEffect(() => {
@@ -28,18 +32,29 @@ function AboutHeroSection({
 
   return (
     <section className={containerClass}>
-      <div className="flex flex-col md:flex-row items-center justify-center px-2 md:px-5 gap-y-6 md:gap-y-0 md:gap-x-6">
-        <div className="w-full md:w-1/2 px-4 md:px-10 mb-4 md:mb-0">
+      <div
+        className={cn(
+          "flex flex-col items-center justify-center px-2 gap-y-6",
+          !narrowPreview &&
+            "md:flex-row md:px-5 md:gap-y-0 md:gap-x-6",
+        )}
+      >
+        <div
+          className={cn(
+            "mb-4 w-full min-w-0 px-4",
+            !narrowPreview && "md:mb-0 md:w-1/2 md:px-10",
+          )}
+        >
           <h2
             className="text-2xl md:text-3xl font-bold text-center break-words"
             style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
           >
-            {title || "e.g. Experience more Stock Brook Events"}
+            {title || "e.g. About your venue"}
           </h2>
         </div>
-        <div className="w-full flex flex-col gap-6">
+        <div className="w-full min-w-0 flex flex-col gap-6">
           <p
-            className="text-base md:text-lg text-[var(--color-text-dimmed)]"
+            className="text-base md:text-lg text-[var(--color-text-dimmed)] break-words"
             dangerouslySetInnerHTML={{
               __html:
                 description ||

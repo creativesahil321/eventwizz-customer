@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import {
   Dialog,
@@ -21,17 +21,30 @@ import {
   Info,
   Check,
   X,
+  Maximize2,
 } from "lucide-react";
 import { ImageCropperProps, CropState, DEFAULT_CROPPER_CONFIG } from "./types";
 import {
   createDownscaledPreviewUrl,
   getCroppedAndCompressedImage,
+  getOptimizedFullImage,
   formatFileSize,
   formatCompressionRatio,
   resolveCropPreviewMaxDimension,
 } from "./crop-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+function getAspectRatioLabel(aspectRatio: number | undefined): string {
+  if (!aspectRatio) return "Free crop";
+  if (aspectRatio === 1) return "Square (1:1)";
+  if (aspectRatio === 16 / 9) return "Landscape (16:9)";
+  if (aspectRatio === 21 / 9) return "Cinematic (21:9)";
+  if (aspectRatio === 3 / 4) return "Portrait (3:4)";
+  if (aspectRatio === 4 / 3) return "Landscape (4:3)";
+  if (aspectRatio === 3 / 2) return "Landscape (3:2)";
+  return `Custom (${aspectRatio.toFixed(2)})`;
+}
 
 /**
  * CropDialog Component
@@ -47,9 +60,15 @@ export function CropDialog({
   const [isOpen, setIsOpen] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const finishedRef = useRef(false);
 
   // Merge with default config
   const mergedConfig = { ...DEFAULT_CROPPER_CONFIG, ...config };
+
+  const recommendedAspect = config.aspectRatio;
+  const [activeAspect, setActiveAspect] = useState<number | undefined>(
+    recommendedAspect
+  );
 
   // Crop state
   const [cropState, setCropState] = useState<CropState>({
@@ -121,6 +140,43 @@ export function CropDialog({
     }));
   }, []);
 
+  const handleAspectChange = useCallback(
+    (next: number | undefined) => {
+      // Re-clicking the already-active mode used to clear croppedAreaPixels and
+      // leave Save disabled — react-easy-crop only re-fires onCropComplete after
+      // a remount or user drag.
+      if (next === activeAspect) return;
+
+      setActiveAspect(next);
+      setCropState((prev) => ({
+        ...prev,
+        crop: { x: 0, y: 0 },
+        zoom: mergedConfig.initialZoom,
+        croppedAreaPixels: null,
+      }));
+    },
+    [activeAspect, mergedConfig.initialZoom]
+  );
+
+  const finishWithResult = useCallback(
+    (croppedImage: Awaited<ReturnType<typeof getOptimizedFullImage>>) => {
+      if (finishedRef.current) return;
+      finishedRef.current = true;
+      if (croppedImage.compressionRatio > 0.1) {
+        toast.success(
+          `Image optimized! ${formatFileSize(
+            croppedImage.originalSize
+          )} → ${formatFileSize(
+            croppedImage.croppedSize
+          )} (${formatCompressionRatio(croppedImage.compressionRatio)} saved)`
+        );
+      }
+      onComplete(croppedImage);
+      setIsOpen(false);
+    },
+    [onComplete]
+  );
+
   // Handle save - crop, compress, and return
   const handleSave = async () => {
     if (!cropState.croppedAreaPixels || !originalFile) {
@@ -138,20 +194,7 @@ export function CropDialog({
         originalFile,
         mergedConfig
       );
-
-      // Show success message with compression details
-      if (croppedImage.compressionRatio > 0.1) {
-        toast.success(
-          `Image optimized! ${formatFileSize(
-            croppedImage.originalSize
-          )} → ${formatFileSize(
-            croppedImage.croppedSize
-          )} (${formatCompressionRatio(croppedImage.compressionRatio)} saved)`
-        );
-      }
-
-      onComplete(croppedImage);
-      setIsOpen(false);
+      finishWithResult(croppedImage);
     } catch (error) {
       console.error("Error cropping image:", error);
       toast.error("Failed to crop image. Please try again.");
@@ -160,24 +203,49 @@ export function CropDialog({
     }
   };
 
-  // Handle cancel
-  const handleCancel = () => {
+  /** Keep the entire uploaded image — optimize only, no crop. */
+  const handleUseFullImage = async () => {
+    if (!originalFile) {
+      toast.error("Image is still loading. Please wait.");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const optimized = await getOptimizedFullImage(originalFile, mergedConfig);
+      finishWithResult(optimized);
+    } catch (error) {
+      console.error("Error optimizing full image:", error);
+      toast.error("Failed to optimize image. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCancel = useCallback(() => {
+    if (finishedRef.current) {
+      setIsOpen(false);
+      return;
+    }
+    finishedRef.current = true;
     setIsOpen(false);
     onCancel();
+  }, [onCancel]);
+
+  const handleOpenChange = (open: boolean) => {
+    if (isProcessing) return;
+    if (!open) {
+      handleCancel();
+      return;
+    }
+    setIsOpen(true);
   };
 
-  // Aspect ratio label
-  const getAspectRatioLabel = () => {
-    if (!mergedConfig.aspectRatio) return "Free crop";
-    if (mergedConfig.aspectRatio === 1) return "Square (1:1)";
-    if (mergedConfig.aspectRatio === 16 / 9) return "Landscape (16:9)";
-    if (mergedConfig.aspectRatio === 21 / 9) return "Cinematic (21:9)";
-    if (mergedConfig.aspectRatio === 3 / 4) return "Portrait (3:4)";
-    return `Custom (${mergedConfig.aspectRatio.toFixed(2)})`;
-  };
+  const showAspectToggle = recommendedAspect !== undefined;
+  const isFreeActive = activeAspect === undefined;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
         className={cn("max-w-4xl h-[90vh] flex flex-col", className)}
         onInteractOutside={(e) => e.preventDefault()}
@@ -187,8 +255,9 @@ export function CropDialog({
             Crop & Optimize Image
           </DialogTitle>
           <DialogDescription className="text-black">
-            Adjust the crop area, zoom, and rotation. The image will be
-            automatically optimized for web use.
+            {recommendedAspect
+              ? `Frame your image to ${getAspectRatioLabel(recommendedAspect)} so it matches the live banner. Zoom and reposition as needed — the image is optimized automatically.`
+              : "Adjust the crop area, zoom, and rotation — or use the full image. The image will be automatically optimized for web use."}
           </DialogDescription>
         </DialogHeader>
 
@@ -202,11 +271,14 @@ export function CropDialog({
           ) : null}
           {imageSrc && !previewLoading ? (
             <Cropper
+              // Remount when aspect/rotation changes so onCropComplete fires
+              // with the new frame (otherwise Save can stay disabled).
+              key={`crop-${activeAspect ?? "free"}-${cropState.rotation}`}
               image={imageSrc}
               crop={cropState.crop}
               zoom={cropState.zoom}
               rotation={cropState.rotation}
-              aspect={mergedConfig.aspectRatio}
+              aspect={activeAspect}
               onCropChange={onCropChange}
               onZoomChange={onZoomChange}
               onCropComplete={onCropComplete}
@@ -223,10 +295,55 @@ export function CropDialog({
 
         {/* Controls */}
         <div className="space-y-4 py-4">
-          {/* Aspect Ratio Info */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground text-black">
-            <Info className="h-4 w-4" />
-            <span>Aspect Ratio: {getAspectRatioLabel()}</span>
+          {/* Aspect Ratio */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground text-black">
+                <Info className="h-4 w-4 shrink-0" />
+                <span>Aspect Ratio: {getAspectRatioLabel(activeAspect)}</span>
+              </div>
+              <Button
+                type="button"
+                variant="event-outline"
+                size="sm"
+                onClick={handleUseFullImage}
+                disabled={isProcessing || previewLoading || !originalFile}
+                className="gap-2"
+              >
+                <Maximize2 className="h-4 w-4" />
+                Use full image
+              </Button>
+            </div>
+            {showAspectToggle ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={
+                    !isFreeActive ? "event-primary" : "event-outline"
+                  }
+                  onClick={() => handleAspectChange(recommendedAspect)}
+                  disabled={isProcessing}
+                >
+                  {getAspectRatioLabel(recommendedAspect)}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isFreeActive ? "event-primary" : "event-outline"}
+                  onClick={() => handleAspectChange(undefined)}
+                  disabled={isProcessing}
+                >
+                  Free crop
+                </Button>
+              </div>
+            ) : null}
+            {isFreeActive ? (
+              <p className="text-xs text-muted-foreground">
+                Drag the crop corners to include as much of the image as you
+                want, or click &quot;Use full image&quot; to keep everything.
+              </p>
+            ) : null}
           </div>
 
           {/* Zoom Control */}

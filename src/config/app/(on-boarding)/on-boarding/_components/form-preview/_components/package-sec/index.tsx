@@ -5,8 +5,10 @@ import { Check, ImageIcon } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 
 type PackageDetail = {
   title: string;
@@ -86,6 +88,7 @@ export default function PackageSection({
   headingAccentHint,
 }: PackageSectionProps) {
   const currencySymbol = useCurrencySymbol();
+  const narrowPreview = usePreviewNarrowLayout();
   const subTrim = (subHeading || "").trim();
   const listIntroRedundant = /include\s*:?\s*$/i.test(subTrim);
 
@@ -103,15 +106,22 @@ export default function PackageSection({
   const useThreeColumns = details.length >= 12;
 
   return (
-    <section className="w-full bg-[var(--color-background)] px-4 py-20 md:py-28">
+    <section className={cn("w-full bg-[var(--color-background)] px-4", PUBLIC_SECTION_PY_CLASS, "@max-5xl/preview:!py-12")}>
       <div className="container mx-auto max-w-7xl">
         <div
           className={cn(
-            "flex flex-col gap-10 md:flex-row md:gap-12 lg:gap-16",
-            useMultiColumnList ? "md:items-start" : "md:items-center",
+            "flex flex-col gap-10",
+            !narrowPreview && "md:flex-row md:gap-12 lg:gap-16",
+            !narrowPreview &&
+              (useMultiColumnList ? "md:items-start" : "md:items-center"),
           )}
         >
-          <div className="w-full shrink-0 md:w-[46%] lg:w-[48%]">
+          <div
+            className={cn(
+              "w-full shrink-0",
+              !narrowPreview && "md:w-[50%] lg:w-[52%]",
+            )}
+          >
             <div className="overflow-hidden rounded-3xl bg-[var(--color-surface)] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.22)] ring-1 ring-[color:color-mix(in_srgb,var(--color-text)_6%,transparent)]">
               {image ? (
                 // eslint-disable-next-line @next/next/no-img-element -- blob / external URLs in preview
@@ -157,8 +167,8 @@ export default function PackageSection({
                   className={cn(
                     "m-0 grid list-none gap-x-8 gap-y-3 p-0",
                     listIntroRedundant && "mt-6",
-                    useMultiColumnList && "sm:grid-cols-2",
-                    useThreeColumns && "lg:grid-cols-3",
+                    !narrowPreview && useMultiColumnList && "sm:grid-cols-2",
+                    !narrowPreview && useThreeColumns && "lg:grid-cols-3",
                   )}
                 >
                   {details.map((item, i) => (

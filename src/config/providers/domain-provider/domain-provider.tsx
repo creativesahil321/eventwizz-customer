@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
 import {
   getDomain,
   getTenantIdFromDomain,
@@ -36,6 +42,22 @@ const DomainContext = createContext<DomainContextType>({
   isDomainRequest: false,
 });
 
+function buildSsrDomainValue(
+  host: string,
+  theme: ThemeSchema,
+): DomainContextType {
+  const tenantData = buildTenantDataFromTheme(host, theme);
+  return {
+    domain: host,
+    tenantId: tenantData.tenantId,
+    website_role: tenantData.website_role,
+    parentDomain: tenantData.parentDomain,
+    settings: tenantData.settings,
+    isLoading: false,
+    isDomainRequest: true,
+  };
+}
+
 export const DomainProvider = ({ children }: { children: ReactNode }) => {
   // Use the Zustand store
   const domainStore = useDomainStore();
@@ -47,6 +69,18 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
     settings: currentSettings,
     isLoading,
   } = domainStore;
+
+  /**
+   * Theme is already fetched in the root layout. Expose it on the first render
+   * (SSR + hydration) so public heroes can emit <Image preload> in the initial
+   * HTML instead of waiting for a client useEffect + skeleton gap.
+   */
+  const ssrDomainValue = useMemo(() => {
+    const ssrTheme = serverContext.theme;
+    const serverHost = serverContext.host?.split(":")[0] ?? null;
+    if (!ssrTheme || !serverHost) return null;
+    return buildSsrDomainValue(serverHost, ssrTheme);
+  }, [serverContext.theme, serverContext.host]);
 
   useEffect(() => {
     const loadDomainData = async () => {
@@ -69,16 +103,10 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
       const serverHost = serverContext.host?.split(":")[0] ?? null;
       const ssrTheme = serverContext.theme;
       const canHydrateFromSsr =
-        ssrTheme != null &&
-        serverHost != null &&
-        serverHost === clientHost;
+        ssrTheme != null && serverHost != null && serverHost === clientHost;
 
       if (canHydrateFromSsr) {
-        if (
-          detectedDomain === currentDomain &&
-          currentSettings &&
-          !isLoading
-        ) {
+        if (detectedDomain === currentDomain && currentSettings && !isLoading) {
           return;
         }
 
@@ -136,19 +164,48 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
     serverContext.host,
   ]);
 
-  // Provide the Zustand store data through the context
-  return (
-    <DomainContext.Provider
-      value={{
+  const contextValue = useMemo((): DomainContextType => {
+    // Once the client effect finishes, the store is authoritative (incl. localhost
+    // `?domain=` where the store host may differ from the SSR request host).
+    if (!domainStore.isLoading) {
+      return {
         domain: domainStore.domain,
         tenantId: domainStore.tenantId,
         website_role: domainStore.website_role,
         parentDomain: domainStore.parentDomain,
         settings: domainStore.settings,
-        isLoading: domainStore.isLoading,
+        isLoading: false,
         isDomainRequest: domainStore.isDomainRequest,
-      }}
-    >
+      };
+    }
+
+    // First paint / SSR: serve layout theme immediately so hero <Image preload> is in HTML.
+    if (ssrDomainValue) {
+      return ssrDomainValue;
+    }
+
+    return {
+      domain: domainStore.domain,
+      tenantId: domainStore.tenantId,
+      website_role: domainStore.website_role,
+      parentDomain: domainStore.parentDomain,
+      settings: domainStore.settings,
+      isLoading: domainStore.isLoading,
+      isDomainRequest: domainStore.isDomainRequest,
+    };
+  }, [
+    domainStore.domain,
+    domainStore.tenantId,
+    domainStore.website_role,
+    domainStore.parentDomain,
+    domainStore.settings,
+    domainStore.isLoading,
+    domainStore.isDomainRequest,
+    ssrDomainValue,
+  ]);
+
+  return (
+    <DomainContext.Provider value={contextValue}>
       {children}
     </DomainContext.Provider>
   );

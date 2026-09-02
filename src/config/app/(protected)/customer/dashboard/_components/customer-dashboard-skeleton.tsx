@@ -62,6 +62,17 @@ export function CustomerDashboardSkeleton() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-4 rounded-lg border bg-background p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Skeleton className="h-7 w-40 rounded-md" />
+            <Skeleton className="h-5 w-24 rounded-full" />
+          </div>
+          <Skeleton className="h-4 w-72 max-w-full rounded-md" />
+        </div>
+        <Skeleton className="h-9 w-32 shrink-0 rounded-md" />
+      </div>
+
       <UpcomingEventsGridSkeleton />
 
       {/* Keep layout stability for the remaining sections */}

@@ -33,9 +33,9 @@ export function NotificationFiltersComponent({
         <div className="flex items-center gap-2">
           <span className="text-sm whitespace-nowrap">Filter By</span>
           <Select
-            value={filters.status || "all"}
+            value={filters.filter || "all"}
             onValueChange={(value) =>
-              onChange({ status: value === "all" ? undefined : value })
+              onChange({ filter: value === "all" ? undefined : value })
             }
           >
             <SelectTrigger className="w-40">

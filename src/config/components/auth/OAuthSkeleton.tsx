@@ -28,7 +28,7 @@ export const OAuthSkeleton: React.FC<OAuthSkeletonProps> = ({
           <span className="w-full border-t" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-white px-4 text-muted-foreground">
+          <span className="bg-[var(--color-surface,#fff)] px-4 text-muted-foreground">
             <Skeleton className="h-4 w-24" />
           </span>
         </div>

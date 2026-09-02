@@ -4,7 +4,7 @@
  */
 
 export const TRANSACTION_STATUSES = [
-  { value: "all", label: "All Status" },
+  { value: "all", label: "All statuses" },
   { value: "success", label: "Completed" }, // API uses "success" for completed
   { value: "refunded", label: "Refunded" },
   { value: "failed", label: "Failed" },

@@ -1,19 +1,139 @@
 import { defaultValues } from "./defaultValues";
+import { normalizeStepTenFromApi } from "./normalize-step-ten-gateways";
 import {
   coerceHasMultipleLocationsFromApi,
   MAX_ROOMS,
   normalizeStepOneFromApi,
   readHasMultipleLocationsField,
 } from "./schema";
+import { toPositiveId } from "@/lib/event-menu-categories";
 
 /**
- * Step 1 gate: only when the GET truly has no flag yet step 1 is already saved (bad payload).
+ * Ask Yes/No whenever persistence has no `has_multiple_locations` yet.
+ * Do not hide this behind `stepOne.isApproved` — GET can mark step 1 saved
+ * without the flag, which is exactly when the vendor still needs to answer.
  */
 export function shouldShowStepOneLocationGate(
   hasMultipleLocations: boolean | undefined,
-  stepOneIsApproved: boolean | undefined,
 ): boolean {
-  return hasMultipleLocations === undefined && stepOneIsApproved !== true;
+  return hasMultipleLocations === undefined;
+}
+
+function hasNonEmptyText(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function readCoordinate(
+  source: Record<string, unknown>,
+  primaryKey: "latitude" | "longitude",
+  legacyKey: "lat" | "long",
+): number | undefined {
+  const value = source[primaryKey] ?? source[legacyKey];
+  const coordinate =
+    typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  return Number.isFinite(coordinate) ? coordinate : undefined;
+}
+
+function hasPersistedUpload(value: unknown): boolean {
+  if (typeof File !== "undefined" && value instanceof File) {
+    return value.size > 0 || value.name.trim().length > 0;
+  }
+  if (typeof Blob !== "undefined" && value instanceof Blob) {
+    return value.size > 0;
+  }
+  return hasNonEmptyText(value);
+}
+
+/** Real catering copy — ignore the empty placeholder row in `defaultValues`. */
+function hasPersistedCateringMenus(menus: unknown): boolean {
+  if (!Array.isArray(menus)) return false;
+  return menus.some((menu) => {
+    if (!menu || typeof menu !== "object") return false;
+    const row = menu as { name?: unknown; items?: unknown };
+    if (hasNonEmptyText(row.name)) return true;
+    if (!Array.isArray(row.items)) return false;
+    return row.items.some((item) => {
+      if (!item || typeof item !== "object") return false;
+      const it = item as {
+        title?: unknown;
+        name?: unknown;
+        description?: unknown;
+      };
+      return (
+        hasNonEmptyText(it.title) ||
+        hasNonEmptyText(it.name) ||
+        hasNonEmptyText(it.description)
+      );
+    });
+  });
+}
+
+/**
+ * After AI apply (or any later-step work), flipping "multiple locations" rebuilds
+ * the venue/brand model and wipes the generated draft. Lock the Yes/No *back*
+ * control once anything past step 1 exists — do not rely on `stepOne.isApproved`
+ * alone (GET often omits it).
+ *
+ * Empty default rows (one blank menu, one blank FAQ) must not lock a fresh
+ * manual start — that skipped the question and made Save fail.
+ */
+export function isOnboardingLocationChoiceLocked(
+  values: {
+    last_completed_step?: number;
+    stepOne?: { isApproved?: boolean };
+    stepTwo?: {
+      logo?: unknown;
+      cover_image?: unknown;
+      banner_heading?: unknown;
+      about_description?: unknown;
+      footer_brand_description?: unknown;
+    };
+    stepThree?: {
+      event_name?: unknown;
+      event_banner_heading?: unknown;
+      about_event_heading?: unknown;
+    };
+    stepSix?: { menus?: unknown[] };
+    stepNine?: { faqs?: Array<{ question?: unknown; answer?: unknown }> };
+  } | null | undefined,
+): boolean {
+  if (!values) return false;
+  if (values.stepOne?.isApproved === true) return true;
+  const last = Number(values.last_completed_step ?? 0);
+  if (Number.isFinite(last) && last >= 2) return true;
+
+  const two = values.stepTwo;
+  if (
+    hasPersistedUpload(two?.logo) ||
+    hasPersistedUpload(two?.cover_image) ||
+    hasNonEmptyText(two?.banner_heading) ||
+    hasNonEmptyText(two?.about_description) ||
+    hasNonEmptyText(two?.footer_brand_description)
+  ) {
+    return true;
+  }
+
+  const three = values.stepThree;
+  if (
+    hasNonEmptyText(three?.event_name) ||
+    hasNonEmptyText(three?.event_banner_heading) ||
+    hasNonEmptyText(three?.about_event_heading)
+  ) {
+    return true;
+  }
+
+  if (hasPersistedCateringMenus(values.stepSix?.menus)) return true;
+
+  const faqs = values.stepNine?.faqs ?? [];
+  if (
+    faqs.some(
+      (faq) => hasNonEmptyText(faq.question) || hasNonEmptyText(faq.answer),
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -78,6 +198,56 @@ export function patchOnboardingPayloadFromApi(
     };
   }
 
+  // Location moved from the legacy brochure step to Step 3. Prefer new Step 3
+  // values, but copy Step 7 values forward so existing events remain editable.
+  const persistedStepThree = (dataAny.stepThree ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const legacyStepSeven = (dataAny.stepSeven ?? {}) as Record<string, unknown>;
+  const eventAddress =
+    hasNonEmptyText(persistedStepThree.event_address)
+      ? String(persistedStepThree.event_address)
+      : hasNonEmptyText(legacyStepSeven.event_address)
+        ? String(legacyStepSeven.event_address)
+        : "";
+  const latitude =
+    readCoordinate(persistedStepThree, "latitude", "lat") ??
+    readCoordinate(legacyStepSeven, "latitude", "lat");
+  const longitude =
+    readCoordinate(persistedStepThree, "longitude", "long") ??
+    readCoordinate(legacyStepSeven, "longitude", "long");
+  if (
+    dataAny.stepThree !== undefined ||
+    eventAddress ||
+    latitude !== undefined ||
+    longitude !== undefined
+  ) {
+    dataAny.stepThree = {
+      ...defaultValues.stepThree,
+      ...persistedStepThree,
+      ...(eventAddress
+        ? {
+            event_address: eventAddress,
+            location: {
+              title: "LOCATION",
+              description: eventAddress,
+              icon: "MapPin",
+            },
+          }
+        : {}),
+      ...(latitude !== undefined ? { latitude } : {}),
+      ...(longitude !== undefined ? { longitude } : {}),
+    };
+  }
+
+  if (dataAny.stepTwo && typeof dataAny.stepTwo === "object") {
+    dataAny.stepTwo = {
+      ...defaultValues.stepTwo,
+      ...(dataAny.stepTwo as object),
+    };
+  }
+
   // Backward compatibility: older payloads persist scheduler fields under step 3.
   // New flow keeps them in step 4 (packages & timeline), so migrate when step 4 is empty.
   const stepThree = (dataAny.stepThree ?? {}) as Record<string, unknown>;
@@ -109,6 +279,24 @@ export function patchOnboardingPayloadFromApi(
         ? stepThree.event_schedular
         : [],
     };
+  }
+
+  // Step 10: API nests gateways under online/offline with key/secret — flatten for UI.
+  if (dataAny.stepTen && typeof dataAny.stepTen === "object") {
+    const normalizedStepTen = normalizeStepTenFromApi(dataAny.stepTen);
+    if (normalizedStepTen) {
+      dataAny.stepTen = {
+        ...defaultValues.stepTen,
+        ...normalizedStepTen,
+      };
+    }
+  }
+
+  // Step 11: subdomain label + confirmation restore from `isApproved`.
+  if (dataAny.stepEleven && typeof dataAny.stepEleven === "object") {
+    dataAny.stepEleven = normalizeStepElevenFromApi(
+      dataAny.stepEleven as Record<string, unknown>,
+    );
   }
 
   // Hydrate the multi-space block from the API response if present. The backend may emit it
@@ -147,14 +335,92 @@ export function patchOnboardingPayloadFromApi(
             ? activeCatering.menu_description
             : "",
         menus: Array.isArray(activeCatering.menus) ? activeCatering.menus : [],
-        ...(typeof activeCatering.event_menu_category_id === "number"
-          ? { event_menu_category_id: activeCatering.event_menu_category_id }
+        ...(toPositiveId(activeCatering.event_menu_category_id) != null
+          ? {
+              event_menu_category_id: toPositiveId(
+                activeCatering.event_menu_category_id,
+              ),
+            }
           : {}),
       };
     }
   }
 
+  if (dataAny.stepSix && typeof dataAny.stepSix === "object") {
+    const stepSix = dataAny.stepSix as Record<string, unknown>;
+    const categoryId = toPositiveId(stepSix.event_menu_category_id);
+    if (categoryId != null) {
+      stepSix.event_menu_category_id = categoryId;
+    } else {
+      delete stepSix.event_menu_category_id;
+    }
+  }
+
   return dataAny;
+}
+
+/** Subdomain label only: strip known host suffixes and normalize slug chars. */
+function normalizeSubdomainLabelFromApi(
+  raw: unknown,
+  suffix?: string,
+): string {
+  if (typeof raw !== "string") return "";
+  let label = raw.trim().toLowerCase();
+  const suffixes = [
+    suffix?.trim().toLowerCase(),
+    "eventwizz.com",
+    "eventwizz.vercel.app",
+    "com",
+  ].filter((s): s is string => Boolean(s));
+
+  for (const suf of suffixes) {
+    if (label.endsWith(`.${suf}`)) {
+      label = label.slice(0, -(suf.length + 1));
+    }
+  }
+
+  return label
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63);
+}
+
+/**
+ * Maps persisted step 11 into the client form shape:
+ * - `domain` → subdomain label only
+ * - `domain_suffix` kept for UI (fallback eventwizz.com)
+ * - `confirm_domain` restored from `isApproved` (vendor confirmation of saved domain)
+ * - API `submit_type: "publish"` → client `"submit"`
+ */
+function normalizeStepElevenFromApi(
+  stepEleven: Record<string, unknown>,
+): Record<string, unknown> {
+  const suffix =
+    typeof stepEleven.domain_suffix === "string" &&
+      stepEleven.domain_suffix.trim().length > 0
+      ? stepEleven.domain_suffix.trim().toLowerCase()
+      : "eventwizz.com";
+
+  const domain = normalizeSubdomainLabelFromApi(stepEleven.domain, suffix);
+  const isApproved = stepEleven.isApproved === true;
+
+  const rawSubmit = stepEleven.submit_type;
+  const submit_type =
+    rawSubmit === "duplicate"
+      ? "duplicate"
+      : "submit"; /* publish / submit / unknown → submit */
+
+  return {
+    ...defaultValues.stepEleven,
+    ...stepEleven,
+    domain,
+    domain_suffix: suffix,
+    isApproved,
+    // Same saved domain on return → checkbox stays checked via isApproved
+    confirm_domain: isApproved && domain.length > 0,
+    submit_type,
+  };
 }
 
 /** Internal: pulls `multi_space` / `rooms` out of the API payload and normalizes the shape. */
@@ -260,7 +526,7 @@ function hydrateMultiSpaceFromApi(
     )
     .slice(0, MAX_ROOMS)
     .map((r, i) => ({
-      id: typeof r.id === "number" ? r.id : undefined,
+      id: toPositiveId(r.id) ?? toPositiveId(r.room_id),
       name:
         typeof r.name === "string" && r.name.trim()
           ? r.name.trim()
@@ -276,7 +542,16 @@ function hydrateMultiSpaceFromApi(
       isApprovedDrinks: Boolean(r.isApprovedDrinks ?? r.is_approved_drinks),
       package: (r.package as Record<string, unknown>) ?? {},
       dates: (r.dates as Record<string, unknown>) ?? { dates: [] },
-      catering: (r.catering as Record<string, unknown>) ?? {},
+      catering: (() => {
+        const catering = (r.catering as Record<string, unknown>) ?? {};
+        const categoryId = toPositiveId(catering.event_menu_category_id);
+        return {
+          ...catering,
+          ...(categoryId != null
+            ? { event_menu_category_id: categoryId }
+            : {}),
+        };
+      })(),
       brochure: (r.brochure as Record<string, unknown>) ?? {},
       drinks: (r.drinks as Record<string, unknown>) ?? {},
     }));
@@ -290,7 +565,7 @@ function hydrateMultiSpaceFromApi(
     const key = name.trim();
     if (!key) return;
     const existing = roomMap.get(key);
-    roomMap.set(key, {
+    const merged = {
       id: existing?.id,
       name: key,
       isApprovedPackage: Boolean(existing?.isApprovedPackage),
@@ -305,19 +580,26 @@ function hydrateMultiSpaceFromApi(
       drinks: (existing?.drinks as Record<string, unknown>) ?? {},
       ...existing,
       ...patch,
-    });
+    };
+    const id = toPositiveId(merged.id) ?? toPositiveId(existing?.id);
+    if (id != null) merged.id = id;
+    else delete merged.id;
+    roomMap.set(
+      key,
+      merged as Record<string, unknown> & { id?: number; name: string },
+    );
   };
 
   if (stepFourRooms) {
     Object.entries(stepFourRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : typeof roomVal.id === "number"
-              ? roomVal.id
-              : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedPackage: Boolean(
           (payload.stepFour as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -384,10 +666,12 @@ function hydrateMultiSpaceFromApi(
       if (!isRecord(roomVal)) return;
       const hydratedDates = Array.isArray(roomVal.dates) ? roomVal.dates : [];
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedDates: Boolean(
           (payload.stepFive as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -405,10 +689,12 @@ function hydrateMultiSpaceFromApi(
     Object.entries(stepSixRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedCatering: Boolean(
           (payload.stepSix as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -446,10 +732,9 @@ function hydrateMultiSpaceFromApi(
             typeof roomVal.menu_description === "string"
               ? roomVal.menu_description
               : "",
-          event_menu_category_id:
-            typeof roomVal.event_menu_category_id === "number"
-              ? roomVal.event_menu_category_id
-              : undefined,
+          event_menu_category_id: toPositiveId(
+            roomVal.event_menu_category_id,
+          ),
           menus: Array.isArray(roomVal.menus) ? roomVal.menus : [],
         },
       });
@@ -460,10 +745,12 @@ function hydrateMultiSpaceFromApi(
     Object.entries(stepSevenRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedBrochure: Boolean(
           (payload.stepSeven as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -500,12 +787,12 @@ function hydrateMultiSpaceFromApi(
     Object.entries(stepEightRooms).forEach(([roomName, roomVal]) => {
       if (!isRecord(roomVal)) return;
       upsertRoomByName(roomName, {
-        id:
-          typeof roomVal.room_id === "number"
-            ? roomVal.room_id
-            : typeof roomVal.id === "number"
-              ? roomVal.id
-              : undefined,
+        ...(toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id)
+          ? {
+              id:
+                toPositiveId(roomVal.room_id) ?? toPositiveId(roomVal.id),
+            }
+          : {}),
         isApprovedDrinks: Boolean(
           (payload.stepEight as Record<string, unknown> | undefined)?.isApproved,
         ),
@@ -543,10 +830,10 @@ function hydrateMultiSpaceFromApi(
       enabled ||
       Boolean(
         stepFourRooms ||
-          stepFiveRooms ||
-          stepSixRooms ||
-          stepSevenRooms ||
-          stepEightRooms,
+        stepFiveRooms ||
+        stepSixRooms ||
+        stepSevenRooms ||
+        stepEightRooms,
       ),
     currentRoomIndex: Math.min(
       Number(direct?.currentRoomIndex ?? direct?.current_room_index ?? 0) || 0,

@@ -44,9 +44,9 @@ export function MultiSpaceHeader({
               Multiple event spaces
             </OnboardingFieldGroupTitle>
             <p className="text-sm text-muted-foreground">
-              Does your venue offer multiple distinct rooms or partitioned
-              halls? Each room can have its own packages, dates, catering and
-              brochure (up to {maxRooms} rooms).
+              Choose Yes when rooms or partitioned halls need different
+              packages, dates, catering, drinks, or brochures. Choose No for
+              one shared setup across the venue (up to {maxRooms} rooms).
             </p>
           </div>
           <MultiSpaceToggle

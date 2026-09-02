@@ -33,8 +33,18 @@ import {
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import { applyAIGeneratedEventToBackend } from "../../_lib/apply-ai-generated-event";
+import { fillAiEventGeneratedDefaults } from "../../_lib/fill-ai-event-content";
+import {
+  inferAiEventRemovedSections,
+  parseAiEventVendorIntent,
+} from "../../_lib/ai-event-vendor-intent";
 import { AIEventApplyOverlay } from "./ai-event-apply-overlay";
 import { toast } from "sonner";
+import type {
+  EventImportAssets,
+  EventImportSectionId,
+} from "@/app/api/ai/import-event/types";
+import EventImportAssetPicker from "../event-url-import/import-asset-picker";
 import {
   BANNER_HEADING_MAX_WORDS,
   countWords,
@@ -54,12 +64,11 @@ import {
 } from "@/lib/event-form-limits";
 
 const SECTIONS = [
-  { id: "stepOne", title: "Event Details & Schedule", icon: "📅" },
-  { id: "stepTwo", title: "Packages", icon: "📦" },
-  { id: "stepThree", title: "Dates & Tickets", icon: "🎟️" },
-  { id: "stepFour", title: "Catering & Menu", icon: "🍽️" },
-  { id: "stepFive", title: "Other Packages", icon: "🥂" },
-  { id: "stepSix", title: "Location & Pricing", icon: "📍" },
+  { id: "stepOne", title: "Event details", icon: "📅" },
+  { id: "stepTwo", title: "Packages and schedule", icon: "📦" },
+  { id: "stepThree", title: "Dates and tickets", icon: "🎟️" },
+  { id: "stepFour", title: "Catering and menu", icon: "🍽️" },
+  { id: "stepFive", title: "Drinks & extras", icon: "🥂" },
   { id: "stepSeven", title: "FAQs", icon: "❓" },
 ] as const;
 
@@ -74,6 +83,11 @@ interface ReviewContentProps {
   onComplete: (eventId: number, isRooms: boolean) => void;
   onRegenerate: () => void;
   onBack: () => void;
+  sourceAssets?: EventImportAssets;
+  onSourceAssetsChange?: (assets: EventImportAssets) => void;
+  initialRemovedSections?: EventImportSectionId[];
+  preserveMissingSections?: boolean;
+  canApply?: boolean;
 }
 
 export default function AIEventReviewContent({
@@ -83,10 +97,27 @@ export default function AIEventReviewContent({
   onComplete,
   onRegenerate,
   onBack,
+  sourceAssets,
+  onSourceAssetsChange,
+  initialRemovedSections,
+  preserveMissingSections = false,
+  canApply = true,
 }: ReviewContentProps) {
-  const [editedContent, setEditedContent] = useState<AIEventGeneratedContent>(content);
+  const [editedContent, setEditedContent] = useState<AIEventGeneratedContent>(
+    () => fillAiEventGeneratedDefaults(content, eventInput),
+  );
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["stepOne"]));
-  const [removedSections, setRemovedSections] = useState<Set<string>>(new Set());
+  const [removedSections, setRemovedSections] = useState<Set<string>>(() =>
+    new Set([
+      ...inferAiEventRemovedSections(
+        parseAiEventVendorIntent(
+          eventInput.eventDescription,
+          eventInput.room_names,
+        ),
+      ),
+      ...(initialRemovedSections ?? []),
+    ]),
+  );
   const [isApplying, setIsApplying] = useState(false);
   const [applyStep, setApplyStep] = useState(-1);
   const [applyDone, setApplyDone] = useState(false);
@@ -121,7 +152,7 @@ export default function AIEventReviewContent({
     (step: keyof AIEventGeneratedContent, field: string, value: unknown) => {
       setEditedContent((prev) => ({
         ...prev,
-        [step]: { ...prev[step], [field]: value },
+        [step]: { ...(prev[step] ?? {}), [field]: value },
       }));
     },
     []
@@ -151,6 +182,8 @@ export default function AIEventReviewContent({
         eventInput,
         categoryId,
         removedSections,
+        sourceAssets,
+        preserveMissingSections,
         onProgress: setApplyStep,
       });
 
@@ -175,13 +208,21 @@ export default function AIEventReviewContent({
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8">
           <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
-            Review Your Event Content
+            Review your event content
           </h2>
           <p className="text-slate-400 text-xs sm:text-sm px-1">
-            Edit any section below — add, remove, or correct what the AI generated.
-            Click <strong className="text-white">Create Event</strong> when ready.
+            Edit any section below — add, remove or correct what was generated.
+            Select <strong className="text-white">Create event</strong> when you
+            are ready.
           </p>
         </div>
+
+        {sourceAssets && onSourceAssetsChange ? (
+          <EventImportAssetPicker
+            assets={sourceAssets}
+            onChange={onSourceAssetsChange}
+          />
+        ) : null}
 
         {/* Sections */}
         <div className="space-y-2 sm:space-y-3 mb-6 sm:mb-8">
@@ -267,6 +308,7 @@ export default function AIEventReviewContent({
                           <StepOneEditor
                             content={editedContent.stepOne}
                             onChange={(f, v) => updateField("stepOne", f, v)}
+                            eventInput={eventInput}
                           />
                         )}
                         {section.id === "stepTwo" && (
@@ -291,12 +333,6 @@ export default function AIEventReviewContent({
                           <StepFiveEditor
                             content={editedContent.stepFive}
                             onChange={updateStepFive}
-                          />
-                        )}
-                        {section.id === "stepSix" && (
-                          <StepSixEditor
-                            content={editedContent.stepSix}
-                            onChange={(f, v) => updateField("stepSix", f, v)}
                           />
                         )}
                         {section.id === "stepSeven" && (
@@ -337,11 +373,12 @@ export default function AIEventReviewContent({
 
           <Button
             onClick={applyToEvent}
+            disabled={!canApply}
             className="min-h-[44px] h-11 px-6 sm:px-8 rounded-xl text-white font-medium touch-manipulation w-full sm:w-auto"
             style={{ background: "var(--color-primary, #3b82f6)" }}
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            Create Event
+            Create event
           </Button>
         </div>
       </div>
@@ -413,7 +450,7 @@ function EditableField({
           className="w-full text-left group flex items-start gap-2"
         >
           <span className="text-sm text-slate-300 flex-1">
-            {value || <span className="text-slate-600 italic">Empty</span>}
+            {value || <span className="text-slate-600 italic">No content</span>}
           </span>
           <Pencil className="w-3 h-3 text-slate-600 group-hover:text-slate-300 transition-colors mt-1 flex-shrink-0" />
         </button>
@@ -467,15 +504,109 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function StepOneEditor({
   content,
   onChange,
+  eventInput,
 }: {
   content: AIEventGeneratedContent["stepOne"];
   onChange: (f: string, v: unknown) => void;
+  eventInput: AIEventInput;
 }) {
-  const schedular = content.event_schedular;
+  return (
+    <>
+      <EditableField
+        label="Event name"
+        value={content.event_name}
+        onChange={(v) => onChange("event_name", v)}
+        maxLength={40}
+      />
+      <EditableField
+        label="Banner heading"
+        value={content.event_banner_heading}
+        onChange={(v) => onChange("event_banner_heading", v)}
+        maxWords={BANNER_HEADING_MAX_WORDS}
+      />
+      <EditableField
+        label="Banner subheading"
+        value={content.event_banner_sub_heading}
+        onChange={(v) => onChange("event_banner_sub_heading", v)}
+        maxLength={80}
+      />
+      <EditableField
+        label="About heading"
+        value={content.about_event_heading}
+        onChange={(v) => onChange("about_event_heading", v)}
+        maxLength={50}
+      />
+      <EditableField
+        label="About subheading"
+        value={content.about_event_sub_heading}
+        onChange={(v) => onChange("about_event_sub_heading", v)}
+        maxLength={80}
+      />
+      <EditableField
+        label="About description"
+        value={content.about_event_description}
+        onChange={(v) => onChange("about_event_description", v)}
+        maxLength={340}
+        multiline
+      />
+      <div className="space-y-1.5">
+        <label className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
+          Event address
+        </label>
+        <AddressAutocomplete
+          value={content.event_address || ""}
+          onChange={(address) => onChange("event_address", address)}
+          onSelect={(_, address) => onChange("event_address", address)}
+          biasCity={eventInput.venueCity || eventInput.venueName || null}
+          biasLatitude={eventInput.venueLatitude ?? null}
+          biasLongitude={eventInput.venueLongitude ?? null}
+          placeholder="Type to search for a UK address or location…"
+          className="w-full"
+        />
+      </div>
+    </>
+  );
+}
 
-  const updateScheduleItem = (idx: number, field: "title" | "time", value: string) => {
+/* ─────────────────────────────────────────────────
+   Step 2 — Packages
+───────────────────────────────────────────────── */
+
+function StepTwoEditor({
+  content,
+  onChange,
+}: {
+  content: AIEventGeneratedContent["stepTwo"];
+  onChange: (f: string, v: unknown) => void;
+}) {
+  const details = content.package_details;
+  const schedular = content.event_schedular ?? [];
+
+  const updateDetail = (idx: number, value: string) => {
+    onChange(
+      "package_details",
+      details.map((d, i) => (i === idx ? { title: value } : d))
+    );
+  };
+
+  const addDetail = () => {
+    onChange("package_details", [...details, { title: "" }]);
+  };
+
+  const removeDetail = (idx: number) => {
+    onChange(
+      "package_details",
+      details.filter((_, i) => i !== idx)
+    );
+  };
+
+  const updateScheduleItem = (
+    idx: number,
+    field: "title" | "time",
+    value: string,
+  ) => {
     const updated = schedular.map((item, i) =>
-      i === idx ? { ...item, [field]: value } : item
+      i === idx ? { ...item, [field]: value } : item,
     );
     onChange("event_schedular", updated);
   };
@@ -487,45 +618,59 @@ function StepOneEditor({
   const removeScheduleItem = (idx: number) => {
     onChange(
       "event_schedular",
-      schedular.filter((_, i) => i !== idx)
+      schedular.filter((_, i) => i !== idx),
     );
   };
 
   return (
     <>
       <EditableField
-        label="Event Name"
-        value={content.event_name}
-        onChange={(v) => onChange("event_name", v)}
+        label="Package title"
+        value={content.package_title}
+        onChange={(v) => onChange("package_title", v)}
         maxLength={40}
       />
       <EditableField
-        label="Banner Heading"
-        value={content.event_banner_heading}
-        onChange={(v) => onChange("event_banner_heading", v)}
-        maxWords={BANNER_HEADING_MAX_WORDS}
-      />
-      <EditableField
-        label="Banner Sub-heading"
-        value={content.event_banner_sub_heading}
-        onChange={(v) => onChange("event_banner_sub_heading", v)}
-        maxLength={80}
-      />
-      <EditableField
-        label="About Heading"
-        value={content.about_event_heading}
-        onChange={(v) => onChange("about_event_heading", v)}
-        maxLength={50}
-      />
-      <EditableField
-        label="About Description"
-        value={content.about_event_description}
-        onChange={(v) => onChange("about_event_description", v)}
-        maxLength={340}
+        label="Package description"
+        value={content.package_description}
+        onChange={(v) => onChange("package_description", v)}
+        maxLength={160}
         multiline
       />
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <SectionLabel>Package features</SectionLabel>
+        </div>
+        <div className="space-y-1.5">
+          {details.map((d, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
+              <Input
+                value={d.title}
+                onChange={(e) => updateDetail(i, e.target.value)}
+                placeholder="Feature"
+                className={`${inputCls} flex-1`}
+              />
+              {details.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeDetail(i)}
+                  className="text-slate-600 hover:text-red-400 transition-colors p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1.5">
+          <AddRowButton label="Add feature" onClick={addDetail} />
+        </div>
+      </div>
+
       <EditableField
-        label="Schedule Title"
+        label="Schedule title"
         value={content.event_schedular_title}
         onChange={(v) => onChange("event_schedular_title", v)}
         maxLength={40}
@@ -533,7 +678,7 @@ function StepOneEditor({
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <SectionLabel>Schedule Items</SectionLabel>
+          <SectionLabel>Schedule items</SectionLabel>
         </div>
         <div className="space-y-1.5">
           {schedular.map((item, i) => (
@@ -564,87 +709,6 @@ function StepOneEditor({
         </div>
         <div className="mt-1.5">
           <AddRowButton label="Add schedule item" onClick={addScheduleItem} />
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ─────────────────────────────────────────────────
-   Step 2 — Packages
-───────────────────────────────────────────────── */
-
-function StepTwoEditor({
-  content,
-  onChange,
-}: {
-  content: AIEventGeneratedContent["stepTwo"];
-  onChange: (f: string, v: unknown) => void;
-}) {
-  const details = content.package_details;
-
-  const updateDetail = (idx: number, value: string) => {
-    onChange(
-      "package_details",
-      details.map((d, i) => (i === idx ? { title: value } : d))
-    );
-  };
-
-  const addDetail = () => {
-    onChange("package_details", [...details, { title: "" }]);
-  };
-
-  const removeDetail = (idx: number) => {
-    onChange(
-      "package_details",
-      details.filter((_, i) => i !== idx)
-    );
-  };
-
-  return (
-    <>
-      <EditableField
-        label="Package Title"
-        value={content.package_title}
-        onChange={(v) => onChange("package_title", v)}
-        maxLength={40}
-      />
-      <EditableField
-        label="Package Description"
-        value={content.package_description}
-        onChange={(v) => onChange("package_description", v)}
-        maxLength={160}
-        multiline
-      />
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <SectionLabel>Package Features</SectionLabel>
-        </div>
-        <div className="space-y-1.5">
-          {details.map((d, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
-              <Input
-                value={d.title}
-                onChange={(e) => updateDetail(i, e.target.value)}
-                placeholder="Feature"
-                className={`${inputCls} flex-1`}
-              />
-              {details.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeDetail(i)}
-                  className="text-slate-600 hover:text-red-400 transition-colors p-0.5"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="mt-1.5">
-          <AddRowButton label="Add feature" onClick={addDetail} />
         </div>
       </div>
     </>
@@ -1035,7 +1099,7 @@ function StepThreeEditor({
           {/* Payment & Deposit (tables / both only) */}
           {(date.booking_type === "tables" || date.booking_type === "both") && (
             <div className="border border-white/10 rounded-lg p-3 space-y-3 bg-white/[0.02]">
-              <SectionLabel>Payment & Deposit</SectionLabel>
+              <SectionLabel>Payment and deposit</SectionLabel>
               <p className="text-[10px] text-slate-500">
                 Configure full payment or deposit for this date.
               </p>
@@ -1111,7 +1175,7 @@ function StepThreeEditor({
                         <div>
                           <label className="text-[10px] text-slate-500 block mb-0.5">
                             {(date.deposit_type ?? "amount") === "amount"
-                              ? `Deposit amount/person (${currencySymbol})`
+                              ? `Deposit amount per person (${currencySymbol})`
                               : "Deposit percentage (%)"}
                           </label>
                           <Input
@@ -1192,13 +1256,13 @@ function StepFourEditor({
   return (
     <>
       <EditableField
-        label="Menu Title"
+        label="Menu title"
         value={content.menu_title}
         onChange={(v) => onChange("menu_title", v)}
         maxLength={40}
       />
       <EditableField
-        label="Menu Description"
+        label="Menu description"
         value={content.menu_description}
         onChange={(v) => onChange("menu_description", v)}
         maxLength={160}
@@ -1207,7 +1271,7 @@ function StepFourEditor({
       {content.menus.map((menu, i) => (
         <div key={i}>
           <span className="text-xs text-slate-500">{menu.name}</span>
-          {menu.items.map((item, j) => (
+          {(menu.items ?? []).map((item, j) => (
             <div key={j} className="text-xs text-slate-400 ml-3 mt-0.5">
               • {item.title}
             </div>
@@ -1219,7 +1283,7 @@ function StepFourEditor({
 }
 
 /* ─────────────────────────────────────────────────
-   Step 5 — Other Packages  (full CRUD)
+   Step 5 — Drinks & extras (full CRUD)
 ───────────────────────────────────────────────── */
 
 function StepFiveEditor({
@@ -1269,13 +1333,13 @@ function StepFiveEditor({
   return (
     <div className="space-y-3">
       <EditableField
-        label="Section Title"
+        label="Section title"
         value={content.drink_title}
         onChange={(v) => onChange({ ...content, drink_title: v })}
         maxLength={DRINK_SECTION_TITLE_MAX_CHARS}
       />
       <EditableField
-        label="Section Description"
+        label="Section description"
         value={content.drink_description}
         onChange={(v) => onChange({ ...content, drink_description: v })}
         maxLength={DRINK_SECTION_DESCRIPTION_MAX_CHARS}
@@ -1392,35 +1456,6 @@ function StepFiveEditor({
 }
 
 /* ─────────────────────────────────────────────────
-   Step 6 — Location & Pricing
-───────────────────────────────────────────────── */
-
-function StepSixEditor({
-  content,
-  onChange,
-}: {
-  content: AIEventGeneratedContent["stepSix"];
-  onChange: (f: string, v: unknown) => void;
-}) {
-  return (
-    <>
-      <div className="space-y-1.5">
-        <label className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
-          Event Address
-        </label>
-        <AddressAutocomplete
-          value={content.event_address || ""}
-          onChange={(address) => onChange("event_address", address)}
-          onSelect={(_, address) => onChange("event_address", address)}
-          placeholder="Type to search for a UK address or location..."
-          className="w-full"
-        />
-      </div>
-    </>
-  );
-}
-
-/* ─────────────────────────────────────────────────
    Step 7 — FAQs  (full CRUD)
 ───────────────────────────────────────────────── */
 
@@ -1431,7 +1466,7 @@ function StepSevenEditor({
   content: AIEventGeneratedContent["stepSeven"];
   onChange: (v: AIEventGeneratedContent["stepSeven"]) => void;
 }) {
-  const { faqs } = content;
+  const faqs = content?.faqs ?? [];
 
   const updateFaq = (idx: number, field: "question" | "answer", value: string) => {
     onChange({

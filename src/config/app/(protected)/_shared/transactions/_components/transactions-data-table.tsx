@@ -165,7 +165,7 @@ export function TransactionsDataTable({
               }
             >
               <SelectTrigger className="w-full max-w-full min-w-0 sm:w-[180px] h-9">
-                <SelectValue placeholder="All Status" />
+                <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
                 {TRANSACTION_STATUSES.map((status) => (
@@ -230,21 +230,15 @@ export function TransactionsDataTable({
           </p>
         </div>
       ) : (
-        <div
-          className={pageCardClassName(
-            "mt-4 max-w-full overflow-hidden !py-0"
-          )}
-        >
-          <div className="overflow-x-auto px-4 sm:px-6 max-w-full">
-            <div className="min-w-full inline-block align-middle">
-              <TransactionListComponent
-                transactions={safeTransactions}
-                meta={meta}
-                onViewDetails={onViewDetails}
-                onPageChange={onPageChange}
-                isLoading={isLoading}
-              />
-            </div>
+        <div className={pageCardClassName("mt-4 max-w-full overflow-hidden")}>
+          <div className="overflow-x-auto max-w-full">
+            <TransactionListComponent
+              transactions={safeTransactions}
+              meta={meta}
+              onViewDetails={onViewDetails}
+              onPageChange={onPageChange}
+              isLoading={isLoading}
+            />
           </div>
         </div>
       )}

@@ -17,6 +17,7 @@ import { persist } from "zustand/middleware";
 const CART_EDIT_STORAGE_KEY = "cart-edit-storage";
 import {
   resolveBestTableSelection,
+  resolveCheckoutGroupSize,
   type ResolvedTableSelection,
 } from "@/app/(public)/vendor/checkout/_lib/table-recommendations";
 import {
@@ -31,6 +32,7 @@ import {
 } from "@/app/(public)/vendor/checkout/_lib/cart-calculations";
 import { formatTableCapacityTitle } from "@/app/(public)/vendor/checkout/_lib/table-labels";
 import type { ApiEventCartData } from "@/lib/types/cart.types";
+import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 
 // Payment calculation utility
 function calculatePaymentAmounts(
@@ -256,23 +258,31 @@ function mapApiDrinksToEditable(
 function derivePeopleCountFromApiDate(
   dateData: Record<string, unknown>,
   tables: EditableItem[],
+  tickets: EditableItem[],
 ): number {
   const fromApi = Number(dateData.people_quantity);
   if (Number.isFinite(fromApi) && fromApi >= 1) {
     return Math.min(500, Math.floor(fromApi));
   }
 
-  let total = 0;
+  let tableGuests = 0;
   for (const table of tables) {
     if (table.quantity <= 0) continue;
     if (table.allocation?.length) {
-      total += table.allocation.reduce((sum, guests) => sum + guests, 0);
+      tableGuests += table.allocation.reduce((sum, guests) => sum + guests, 0);
     } else {
-      total += (table.minPersons || 1) * table.quantity;
+      tableGuests += (table.minPersons || 1) * table.quantity;
     }
   }
+  if (tableGuests > 0) return Math.min(500, tableGuests);
 
-  return total > 0 ? Math.min(500, total) : 20;
+  const ticketQty = tickets.reduce(
+    (sum, ticket) => sum + Math.max(0, ticket.quantity || 0),
+    0,
+  );
+  if (ticketQty >= 1) return Math.min(500, ticketQty);
+
+  return 0;
 }
 
 /** Map one API date bucket (flat or per-room) into Zustand editable state. */
@@ -309,7 +319,7 @@ function mapApiDateBucketToEditableDate(
     tickets,
     drinks,
     hasChanges: false,
-    peopleCount: derivePeopleCountFromApiDate(dateData, tables),
+    peopleCount: derivePeopleCountFromApiDate(dateData, tables, tickets),
     specialRequest: String(dateData.special_request ?? "").trim(),
     confirmedTableIds: tables
       .filter(
@@ -1275,6 +1285,8 @@ export const useCartEditStore = create<CartEditState>()(
 
       clearAllCarts: () => {
         set({ editingData: {} });
+        // Applied coupon is cart-scoped — don't keep it for a fresh booking.
+        useCheckoutPromoStore.getState().clearCoupon();
         // Explicitly remove the persisted key so a page reload (e.g. after
         // payment) never rehydrates stale cart data ahead of the Zustand write.
         if (typeof window !== "undefined") {
@@ -1387,43 +1399,52 @@ export const useCartEditStore = create<CartEditState>()(
             special_request: undefined,
           };
 
+        const tables = getBillableTables(dateData).map((table) => ({
+          id: table.id,
+          table_size: table.tableSize || table.maxPersons || 20,
+          price_per_person:
+            table.pricePerPerson || table.price / (table.maxPersons || 20),
+          no_tables: table.quantity,
+          allocation:
+            table.allocation && table.allocation.length > 0
+              ? table.allocation
+              : undefined,
+        }));
+
+        const tickets = dateData.tickets
+          .filter((ticket) => ticket.quantity > 0)
+          .map((ticket) => ({
+            id: ticket.id,
+            title: ticket.title,
+            description: ticket.description || "",
+            price_per_ticket: ticket.price,
+            quantity: ticket.quantity,
+          }));
+
+        const drink_package = dateData.drinks
+          .filter((drink) => drink.quantity > 0)
+          .map((drink) => ({
+            id: drink.id,
+            title: drink.title,
+            price: drink.price,
+            quantity: drink.quantity,
+          }));
+
+        const hasLineItems =
+          tables.length > 0 || tickets.length > 0 || drink_package.length > 0;
+
         return {
           slug: eventSlug,
           event_date: actualDate,
           ...(resolvedRoomId != null ? { room_id: resolvedRoomId } : {}),
-          tables: getBillableTables(dateData)
-            .map((table) => ({
-              id: table.id,
-              table_size: table.tableSize || table.maxPersons || 20,
-              price_per_person:
-                table.pricePerPerson || table.price / (table.maxPersons || 20),
-              no_tables: table.quantity,
-              allocation:
-                table.allocation && table.allocation.length > 0
-                  ? table.allocation
-                  : undefined,
-            })),
-
-          tickets: dateData.tickets
-            .filter((ticket) => ticket.quantity > 0)
-            .map((ticket) => ({
-              id: ticket.id,
-              title: ticket.title,
-              description: ticket.description || "",
-              price_per_ticket: ticket.price,
-              quantity: ticket.quantity,
-            })),
-
-          drink_package: dateData.drinks
-            .filter((drink) => drink.quantity > 0)
-            .map((drink) => ({
-              id: drink.id,
-              title: drink.title,
-              price: drink.price,
-              quantity: drink.quantity,
-            })),
-
-          people_quantity: dateData.peopleCount,
+          tables,
+          tickets,
+          drink_package,
+          // Backend requires min 1. Ticket-only carts often have peopleCount 0
+          // (table seating skipped) — fall back to ticket qty / group size.
+          people_quantity: hasLineItems
+            ? resolveCheckoutGroupSize(dateData)
+            : undefined,
           special_request: dateData.specialRequest || "",
         };
       },
@@ -1442,6 +1463,11 @@ export const useCartEditStore = create<CartEditState>()(
           }
           return { editingData: newEditingData };
         });
+        // Coupon is applied to the current booking — drop it when the cart is empty.
+        const remaining = get().editingData[eventSlug];
+        if (!remaining || Object.keys(remaining).length === 0) {
+          useCheckoutPromoStore.getState().clearCoupon();
+        }
       },
 
       removeAllDates: (eventSlug: string) => {
@@ -1450,6 +1476,7 @@ export const useCartEditStore = create<CartEditState>()(
           delete newEditingData[eventSlug];
           return { editingData: newEditingData };
         });
+        useCheckoutPromoStore.getState().clearCoupon();
       },
 
       // NEW: Payment management methods
@@ -1523,14 +1550,29 @@ export const useCartEditStore = create<CartEditState>()(
             return state;
           }
 
-          const peopleCount = dateData.peopleCount || 20;
+          const peopleCount = resolveCheckoutGroupSize(dateData);
           const selection = resolveBestTableSelection(
             dateData.tables,
             peopleCount,
           );
 
           if (tablesAlreadyMatchSelection(dateData.tables, selection)) {
-            return state;
+            if (dateData.peopleCount === peopleCount) {
+              return state;
+            }
+
+            return {
+              editingData: {
+                ...state.editingData,
+                [eventSlug]: {
+                  ...state.editingData[eventSlug],
+                  [date]: {
+                    ...dateData,
+                    peopleCount,
+                  },
+                },
+              },
+            };
           }
 
           if (!selection) {
@@ -1547,6 +1589,7 @@ export const useCartEditStore = create<CartEditState>()(
                   ...state.editingData[eventSlug],
                   [date]: {
                     ...dateData,
+                    peopleCount,
                     tables: clearedTables,
                     confirmedTableIds: [],
                     // Keep seating active so UI can show "no tables for group size"
@@ -1581,6 +1624,7 @@ export const useCartEditStore = create<CartEditState>()(
                 ...state.editingData[eventSlug],
                 [date]: {
                   ...dateData,
+                  peopleCount,
                   tables: updatedTables,
                   confirmedTableIds: [],
                   tableSeatingSkipped: false,
@@ -1720,7 +1764,14 @@ export const useCartEditStore = create<CartEditState>()(
       resumeTableSeating: (eventSlug: string, date: string) => {
         set((state) => {
           const dateData = state.editingData[eventSlug]?.[date];
-          if (!dateData) return state;
+          if (!dateData || !dateData.tableSeatingSkipped) return state;
+
+          // Ignore a stale persisted group size (often 20) when seating starts from tickets.
+          const peopleCount = resolveCheckoutGroupSize({
+            tickets: dateData.tickets,
+            tables: dateData.tables,
+            peopleCount: undefined,
+          });
 
           return {
             editingData: {
@@ -1730,6 +1781,7 @@ export const useCartEditStore = create<CartEditState>()(
                 [date]: {
                   ...dateData,
                   tableSeatingSkipped: false,
+                  peopleCount,
                 },
               },
             },

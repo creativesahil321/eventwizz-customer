@@ -5,7 +5,10 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { guidedOnboardingSaveNextButtonClass } from "./guided-sticky-approval-bar";
+import {
+  guidedOnboardingApproveStepButtonClass,
+  guidedOnboardingSaveNextButtonClass,
+} from "./guided-sticky-approval-bar";
 import {
   Tooltip,
   TooltipContent,
@@ -160,6 +163,8 @@ export function GuidedMultiSectionBottomActions({
   onContinue,
   loading = false,
   continueDisabled = false,
+  hasInput = true,
+  onEditAll,
   labelWhenReady,
   extraActions,
   className,
@@ -169,12 +174,17 @@ export function GuidedMultiSectionBottomActions({
   onContinue: () => void | Promise<void>;
   loading?: boolean;
   continueDisabled?: boolean;
+  /** Hide approve/continue until the current section has user-entered content. */
+  hasInput?: boolean;
+  /** Re-open the first section when AI or persistence has approved the whole step. */
+  onEditAll?: () => void;
   labelWhenReady?: string;
   extraActions?: ReactNode;
   className?: string;
 }) {
   const [approving, setApproving] = useState(false);
   const busy = loading || approving;
+  const showPrimary = allSectionsApproved || hasInput;
 
   const handlePrimaryClick = async () => {
     if (busy || continueDisabled) return;
@@ -198,6 +208,8 @@ export function GuidedMultiSectionBottomActions({
       ? (labelWhenReady ?? "Save & continue")
       : "Validate, approve & continue";
 
+  if (!showPrimary && !extraActions) return null;
+
   return (
     <div
       className={cn(
@@ -205,19 +217,34 @@ export function GuidedMultiSectionBottomActions({
         className,
       )}
     >
-      <GuidedApproveAllStatusMessage
-        allSectionsApproved={allSectionsApproved}
-      />
+      {showPrimary ? (
+        <GuidedApproveAllStatusMessage
+          allSectionsApproved={allSectionsApproved}
+        />
+      ) : null}
       <div className="flex w-full min-w-0 flex-row flex-wrap items-center justify-center gap-3">
-        <Button
-          type="button"
-          variant="event-primary"
-          disabled={busy || continueDisabled}
-          className={guidedOnboardingSaveNextButtonClass}
-          onClick={() => void handlePrimaryClick()}
-        >
-          {primaryLabel}
-        </Button>
+        {allSectionsApproved && onEditAll ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || continueDisabled}
+            className={guidedOnboardingApproveStepButtonClass}
+            onClick={onEditAll}
+          >
+            Edit sections
+          </Button>
+        ) : null}
+        {showPrimary ? (
+          <Button
+            type="button"
+            variant="event-primary"
+            disabled={busy || continueDisabled}
+            className={guidedOnboardingSaveNextButtonClass}
+            onClick={() => void handlePrimaryClick()}
+          >
+            {primaryLabel}
+          </Button>
+        ) : null}
         {extraActions}
       </div>
     </div>

@@ -6,6 +6,7 @@ import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 import { addCacheBusting } from "@/lib/image-utils";
+import { BrandLogoImage } from "./brand-logo-image";
 
 interface LogoProps {
   collapsed: boolean;
@@ -14,8 +15,6 @@ interface LogoProps {
 const Logo: React.FC<LogoProps> = ({ collapsed }) => {
   const { theme } = useContext(ServerContext);
 
-  // Determine logo path based on theme, with fallback
-  // Use the same logo in both expanded and collapsed states for brand consistency
   const logoPath =
     theme?.logo?.startsWith("/") ||
     theme?.logo?.startsWith("data:") ||
@@ -24,6 +23,12 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
     theme?.logo?.startsWith("blob")
       ? theme.logo
       : appConfig.logo;
+
+  const brandName = theme?.name || "EventWizz";
+  const faviconPath =
+    typeof theme?.favicon === "string" && theme.favicon.trim()
+      ? theme.favicon
+      : appConfig.mini_logo;
 
   return (
     <nav
@@ -34,20 +39,29 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
     >
       <span className="transition-all duration-300 ease-linear">
         {collapsed ? (
-          /* Mini logo removed per product request - collapsed sidebar shows no logo */
-          <span className="h-8 w-8 block" aria-hidden />
+          <Link
+            href="/"
+            aria-label={`Go to ${brandName} home`}
+            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5 p-0.5 shadow-[0_2px_10px_rgba(0,0,0,0.2)] transition-[transform,box-shadow] duration-200 hover:scale-105 hover:shadow-[0_4px_14px_rgba(0,0,0,0.3)]"
+          >
+            <BrandLogoImage
+              src={addCacheBusting(faviconPath, theme?.media_updated_at)}
+              alt={brandName}
+              width={32}
+              height={32}
+              className="h-8 w-8 scale-[1.15] rounded-md object-contain"
+            />
+          </Link>
         ) : (
           <Link href="/">
-            <img
-              className="h-8 w-auto object-contain drop-shadow-[2px_4px_6px_black]"
+            <BrandLogoImage
               src={addCacheBusting(logoPath)}
-              alt={theme?.name || "EventWizz"}
+              alt={brandName}
+              className="h-8 w-auto"
             />
           </Link>
         )}
-        <span className="sr-only text-sm font-semibold">
-          {theme?.name || "EventWizz"}
-        </span>
+        <span className="sr-only text-sm font-semibold">{brandName}</span>
       </span>
     </nav>
   );

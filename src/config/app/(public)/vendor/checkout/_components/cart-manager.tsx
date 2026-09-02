@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -12,6 +19,7 @@ import {
   MoreHorizontal,
   Package,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -35,11 +43,18 @@ import {
   getAllRoomDateKeys,
   getApiCartDateKeys,
   getEventRoomCatalog,
-  getTotalEventRoomCount,
   hasRoomsAvailableToAdd,
   getRoomDrinkTitle,
   calculateRoomSubtotal,
   getDateGuestCount,
+  getApiDateDiscount,
+  calculateEditableDateDiscountableTotal,
+  calculateEditableDateTablesTotal,
+  calculateEditableDateTotal,
+  computeDateDiscountAmount,
+  isDateDiscountEligible,
+  isFlatPerPersonDateDiscount,
+  getDateDiscountMinPeople,
 } from "../_lib/cart-calculations";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
@@ -47,12 +62,36 @@ import DateAccordion from "./date-accordion";
 import RoomTabSelector from "./room-tab-selector";
 import CartSkeletonLoader from "./cart-skeleton-loader";
 import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
+import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
+import {
+  computeCouponDiscountAmount,
+  isCheckoutCouponApplied,
+  resolveCartEventCoupon,
+} from "./checkout-promo-panel";
 import { useCartSync } from "../_lib/hooks/useCartSync";
 import { useLocationSlug } from "../_lib/hooks/useLocationSlug";
 import { generateEventBookingUrl } from "../_lib/utils/event-url";
+import {
+  checkoutDateDomId,
+  subscribeCheckoutDateFocus,
+} from "../_lib/checkout-date-focus";
+import {
+  firstRoomIdWithRemainingDates,
+  hasRemainingDatesToAdd,
+  hasRemainingDatesToAddAnywhere,
+} from "../_lib/remaining-dates";
+import {
+  countCheckoutDateStatuses,
+  formatCheckoutBookingMetaLine,
+} from "../_lib/checkout-readiness";
+import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
+import { useDomain } from "@/providers/domain-provider/domain-provider";
+import { resolveDateCardBookingOption } from "@/components/public/booking-type-icons";
 import type { ApiRoomCartData } from "@/lib/types/cart.types";
+import { useCheckoutChatHandoff } from "../_lib/hooks/use-checkout-chat-handoff";
+import { readChatEventReturnHref, markCartClearedByUser } from "@/lib/checkout-chat-handoff";
 
 type CartManagerProps = Record<string, never>;
 
@@ -95,12 +134,24 @@ export default function CartManager({}: CartManagerProps) {
   const clearAllCartMutation = useClearAllCart();
   const queryClient = useQueryClient();
   const { format: formatMoney } = useCurrencyFormat();
+  const couponCode = useCheckoutPromoStore((s) => s.couponCode);
 
   const { currentEventSlug, currentEventApiData, firstDate } = useMemo(() => {
     return extractCurrentEventData(apiCartData);
   }, [apiCartData]);
 
+  // Coupon replaces date offers — only one discount applies per booking.
+  const eventCoupon = useMemo(
+    () => resolveCartEventCoupon(currentEventApiData),
+    [currentEventApiData],
+  );
+  const couponReplacesDateOffers = isCheckoutCouponApplied(
+    { couponCode },
+    eventCoupon,
+  );
+
   const locationSlug = useLocationSlug();
+  const { domain } = useDomain();
 
   const roomMode = useMemo(
     () => isRoomBasedCart(currentEventApiData),
@@ -122,20 +173,117 @@ export default function CartManager({}: CartManagerProps) {
     [rooms, eventRoomCatalog],
   );
 
-  const totalEventRooms = useMemo(
-    () => getTotalEventRoomCount(currentEventApiData),
-    [currentEventApiData],
-  );
-
   const drinkTitle = useMemo(
     () => getRoomDrinkTitle(currentEventApiData, activeRoomId),
     [currentEventApiData, activeRoomId],
   );
 
+  // Public event detail (often cached from the event page) — used to know
+  // which bookable dates still remain for Add Dates visibility.
+  const { data: eventDetailResponse } = useEventDetail(
+    currentEventSlug ?? "",
+    domain ?? "",
+  );
+  const eventDetail = eventDetailResponse?.data ?? null;
+
+  // The cart API can retain both legacy option sets after a vendor changes
+  // booking_type. Use the public event detail as the source of truth for what
+  // the customer may select, while keeping old cart data available to sync.
+  const bookingTypeByDate = useMemo(() => {
+    if (!eventDetail) return new Map<string, "tickets" | "tables" | "both">();
+
+    const dates = roomMode
+      ? activeRoomId == null
+        ? undefined
+        : Object.values(eventDetail.rooms ?? {}).find(
+            (room) => Number(room.room_id) === activeRoomId,
+          )?.dates
+      : eventDetail.dates;
+
+    return new Map(
+      (dates ?? [])
+        .map((date) => {
+          const option = resolveDateCardBookingOption({
+            soldOut: date.sold_out,
+            bookingOption: date.booking_option,
+            bookingType: date.booking_type,
+          });
+          return option ? ([date.event_date, option] as const) : null;
+        })
+        .filter((entry): entry is readonly [string, "tickets" | "tables" | "both"] =>
+          Boolean(entry),
+        ),
+    );
+  }, [activeRoomId, eventDetail, roomMode]);
+
+  // Add room stays unscoped. Add Dates prefers the active room, then any
+  // other room that still has bookable dates.
   const eventDetailsUrl = useMemo(
     () => generateEventBookingUrl(locationSlug, currentEventSlug),
     [locationSlug, currentEventSlug],
   );
+
+  const lookupRemainingDate = useCallback(
+    (storeKey: string) =>
+      currentEventSlug ? getDateData(currentEventSlug, storeKey) : null,
+    [currentEventSlug, getDateData, editingData],
+  );
+
+  const addDatesRoomId = useMemo(() => {
+    if (!roomMode) return null;
+    if (
+      activeRoomId != null &&
+      hasRemainingDatesToAdd({
+        eventDetail,
+        cartEventData: currentEventApiData,
+        roomId: activeRoomId,
+        getLocalDateData: lookupRemainingDate,
+      })
+    ) {
+      return activeRoomId;
+    }
+    return firstRoomIdWithRemainingDates({
+      eventDetail,
+      cartEventData: currentEventApiData,
+      getLocalDateData: lookupRemainingDate,
+    });
+  }, [
+    roomMode,
+    activeRoomId,
+    eventDetail,
+    currentEventApiData,
+    lookupRemainingDate,
+  ]);
+
+  const addDatesUrl = useMemo(
+    () =>
+      generateEventBookingUrl(locationSlug, currentEventSlug, addDatesRoomId),
+    [locationSlug, currentEventSlug, addDatesRoomId],
+  );
+
+  const showAddDates = useMemo(() => {
+    if (!addDatesUrl || !currentEventSlug) return false;
+    if (!roomMode) {
+      return hasRemainingDatesToAdd({
+        eventDetail,
+        cartEventData: currentEventApiData,
+        roomId: null,
+        getLocalDateData: lookupRemainingDate,
+      });
+    }
+    return hasRemainingDatesToAddAnywhere({
+      eventDetail,
+      cartEventData: currentEventApiData,
+      getLocalDateData: lookupRemainingDate,
+    });
+  }, [
+    addDatesUrl,
+    currentEventSlug,
+    eventDetail,
+    currentEventApiData,
+    roomMode,
+    lookupRemainingDate,
+  ]);
 
   // Keep active room valid for the current cart event (reset after event replace).
   useEffect(() => {
@@ -162,29 +310,63 @@ export default function CartManager({}: CartManagerProps) {
     }
   }, [currentEventSlug, roomMode, activeRoomId, setCurrentEvent]);
 
-  // Room mode: dates collapsed by default. Flat mode: all expanded.
+  // Flat mode: expand all dates. Room mode: keep multi-date collapsed,
+  // but open the only date when a room has just one.
   // Reset when the cart event changes (e.g. store-only replace).
   useEffect(() => {
     hasInitializedExpanded.current = false;
     setExpandedDates(new Set());
   }, [currentEventSlug]);
 
+  // Offers panel → expand + scroll to the matching date accordion.
   useEffect(() => {
-    if (firstDate && !hasInitializedExpanded.current) {
-      if (roomMode) {
-        setExpandedDates(new Set());
-      } else {
-        const allDates = currentEventApiData
-          ? getAvailableDates(currentEventApiData)
-          : [firstDate];
-        setExpandedDates(new Set(allDates));
+    return subscribeCheckoutDateFocus((dateKey) => {
+      const { roomId } = parseRoomDateKey(dateKey);
+      if (roomId != null && roomId !== activeRoomId) {
+        setActiveRoomId(roomId);
       }
-      hasInitializedExpanded.current = true;
+
+      setExpandedDates((prev) => {
+        if (roomMode) return new Set([dateKey]);
+        const next = new Set(prev);
+        next.add(dateKey);
+        return next;
+      });
+
+      window.setTimeout(() => {
+        const el = document.getElementById(checkoutDateDomId(dateKey));
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, roomId != null && roomId !== activeRoomId ? 80 : 40);
+    });
+  }, [activeRoomId, roomMode]);
+
+  useEffect(() => {
+    if (!firstDate) {
+      if (!(roomMode && rooms.length > 0)) {
+        hasInitializedExpanded.current = false;
+      }
+      return;
     }
-    if (!firstDate && !(roomMode && rooms.length > 0)) {
-      hasInitializedExpanded.current = false;
+    if (hasInitializedExpanded.current) return;
+
+    if (roomMode) {
+      const roomId = activeRoomId ?? rooms[0]?.room_id ?? null;
+      if (roomId == null || !currentEventApiData) return;
+
+      const roomDates = getRoomDates(currentEventApiData, roomId).map((d) =>
+        buildRoomDateKey(roomId, d),
+      );
+      setExpandedDates(
+        roomDates.length === 1 ? new Set(roomDates) : new Set(),
+      );
+    } else {
+      const allDates = currentEventApiData
+        ? getAvailableDates(currentEventApiData)
+        : [firstDate];
+      setExpandedDates(new Set(allDates));
     }
-  }, [firstDate, currentEventApiData, roomMode, rooms]);
+    hasInitializedExpanded.current = true;
+  }, [firstDate, currentEventApiData, roomMode, rooms, activeRoomId]);
 
   // Cart synchronization check — never treat "Zustand not hydrated yet" as a wipe.
   useEffect(() => {
@@ -299,6 +481,42 @@ export default function CartManager({}: CartManagerProps) {
     return getAvailableDates(currentEventApiData);
   }, [currentEventApiData, roomMode, activeRoomId]);
 
+  /** Whole-booking keys for coupon share (all rooms), not just the active room tab. */
+  const allBookingDateKeys = useMemo(() => {
+    if (!currentEventApiData) return [];
+    if (roomMode) return getAllRoomDateKeys(currentEventApiData);
+    return getAvailableDates(currentEventApiData);
+  }, [currentEventApiData, roomMode]);
+
+  useCheckoutChatHandoff(currentEventSlug, allBookingDateKeys);
+
+  const bookingDiscountableForPromo = useMemo(() => {
+    if (!currentEventSlug) return 0;
+    return allBookingDateKeys.reduce((sum, dateKey) => {
+      const dateData = getDateData(currentEventSlug, dateKey);
+      return (
+        sum +
+        (dateData ? calculateEditableDateDiscountableTotal(dateData) : 0)
+      );
+    }, 0);
+  }, [allBookingDateKeys, currentEventSlug, editingData, getDateData]);
+
+  const couponDiscountTotal = useMemo(() => {
+    if (!couponReplacesDateOffers) return 0;
+    return computeCouponDiscountAmount(
+      eventCoupon,
+      bookingDiscountableForPromo,
+    );
+  }, [couponReplacesDateOffers, eventCoupon, bookingDiscountableForPromo]);
+
+  const couponDiscountLabel = useMemo(() => {
+    if (!couponReplacesDateOffers || !eventCoupon) return null;
+    const label = eventCoupon.value_label?.trim();
+    if (label) return label;
+    const code = couponCode?.trim().toUpperCase();
+    return code ? `Coupon ${code}` : "Coupon";
+  }, [couponReplacesDateOffers, eventCoupon, couponCode]);
+
   const { totalCartItems } = useMemo(() => {
     if (!currentEventSlug) {
       return { totalCartItems: 0 };
@@ -332,7 +550,10 @@ export default function CartManager({}: CartManagerProps) {
     const roomDates = getRoomDates(currentEventApiData, roomId).map((d) =>
       buildRoomDateKey(roomId, d),
     );
-    setExpandedDates(roomDates.length > 0 ? new Set([roomDates[0]]) : new Set());
+    // Single date → open; multiple dates stay collapsed by default.
+    setExpandedDates(
+      roomDates.length === 1 ? new Set(roomDates) : new Set(),
+    );
   };
 
   const roomSubtotals = useMemo(() => {
@@ -367,7 +588,25 @@ export default function CartManager({}: CartManagerProps) {
       if (!dateData) return sum;
       return sum + getDateGuestCount(dateData);
     }, 0);
-  }, [currentEventSlug, currentEventApiData, roomMode, getDateData]);
+    // editingData: guest counts live in the cart edit store, not only API cart.
+  }, [
+    currentEventSlug,
+    currentEventApiData,
+    roomMode,
+    getDateData,
+    editingData,
+  ]);
+
+  const checkoutDateCounts = useMemo(() => {
+    if (!currentEventSlug) {
+      return { total: 0, ready: 0, needsItems: 0 };
+    }
+    return countCheckoutDateStatuses(
+      currentEventSlug,
+      allBookingDateKeys,
+      getDateData,
+    );
+  }, [currentEventSlug, allBookingDateKeys, getDateData, editingData]);
 
   const handleRemoveDate = async (dateKey: string) => {
     if (removingDateKey || deleteCartDateMutation.isPending) return;
@@ -383,6 +622,9 @@ export default function CartManager({}: CartManagerProps) {
       newSet.delete(dateKey);
       return newSet;
     });
+    // Drop reserved-payment UI immediately (same as Clear all) so the
+    // timer / "Payment required" card cannot outlive a deleted date.
+    useCheckoutPaymentUiStore.getState().clearPaymentSession();
 
     try {
       const { roomId, date: eventDate } = parseRoomDateKey(dateKey);
@@ -391,6 +633,12 @@ export default function CartManager({}: CartManagerProps) {
         roomId: roomId ?? undefined,
         storeDateKey: dateKey,
       });
+      if (currentEventSlug) {
+        const remaining = useCartEditStore.getState().editingData[currentEventSlug];
+        if (!remaining || Object.keys(remaining).length === 0) {
+          markCartClearedByUser();
+        }
+      }
     } catch (error) {
       console.error("Error removing date:", error);
       toast.error("Couldn't remove this date. Please try again.");
@@ -404,6 +652,10 @@ export default function CartManager({}: CartManagerProps) {
     try {
       setIsProcessing(true);
       clearAllCarts();
+      markCartClearedByUser();
+      // Drop reserved-payment UI + sessionStorage so the timer/"Payment required"
+      // card cannot outlive an explicitly cleared cart.
+      useCheckoutPaymentUiStore.getState().clearPaymentSession();
       setExpandedDates(new Set());
       setShowClearConfirm(false);
       await clearAllCartMutation.mutateAsync();
@@ -461,82 +713,125 @@ export default function CartManager({}: CartManagerProps) {
   // Empty cart — require no API rooms either (room carts can briefly have
   // availableDates=[] while activeRoomId is reconciled after an event switch).
   if (isCartEmpty) {
+    const chatEventHref =
+      typeof window !== "undefined" ? readChatEventReturnHref() : null;
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
         <div className="w-16 h-16 mx-auto bg-gray-50 rounded-2xl flex items-center justify-center mb-5">
           <ShoppingCart className="h-7 w-7 text-gray-300" />
         </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-1.5">
-          Your cart is empty
+          Nothing in your cart yet
         </h3>
-        <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
-          Browse events to find tickets, tables, and packages to add to your cart.
+        <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+          {chatEventHref
+            ? "Tap the dates you want on the event page — that adds them here. Then you can choose tables and pay."
+            : "Browse events to find tickets, tables, and packages to add to your cart."}
         </p>
-        <Button
-          onClick={() => window.history.back()}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
-        >
-          Browse Events
-        </Button>
+        {chatEventHref ? (
+          <Button
+            asChild
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
+          >
+            <Link href={chatEventHref}>Choose dates</Link>
+          </Button>
+        ) : (
+          <Button
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                window.history.back();
+              } else {
+                window.location.href = "/";
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
+          >
+            Browse Events
+          </Button>
+        )}
       </div>
     );
   }
 
-  const totalDatesAcrossRooms = roomMode
-    ? getAllRoomDateKeys(currentEventApiData).length
-    : totalCartItems;
   const activeRoom = rooms.find((r) => r.room_id === activeRoomId);
   const activeRoomIndex = Math.max(
     0,
     rooms.findIndex((r) => r.room_id === activeRoomId),
   );
-  const guestMetaSuffix =
-    totalGuestsAcrossCart > 0
-      ? ` · ${totalGuestsAcrossCart} guest${totalGuestsAcrossCart !== 1 ? "s" : ""}`
+  const isSingleRoomCheckout = roomMode && rooms.length === 1;
+  const isMultiRoomCheckout = roomMode && rooms.length > 1;
+  const bookedRoomCount = rooms.length;
+  const bookingMetaLine = formatCheckoutBookingMetaLine({
+    roomMode: roomMode && bookedRoomCount > 0,
+    roomCount: bookedRoomCount,
+    dateCounts: checkoutDateCounts,
+    guestCount: totalGuestsAcrossCart,
+  });
+
+  const locationName =
+    typeof currentEventApiData?.location_name === "string"
+      ? currentEventApiData.location_name.trim()
       : "";
-  const bookingMetaLine = roomMode && rooms.length > 0
-    ? `${totalEventRooms} ${totalEventRooms === 1 ? "room" : "rooms"} · ${totalDatesAcrossRooms} ${totalDatesAcrossRooms === 1 ? "date" : "dates"}${guestMetaSuffix}`
-    : `${totalCartItems} ${totalCartItems === 1 ? "date" : "dates"}${guestMetaSuffix}`;
 
   const bookingHeader = (
-    <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--checkout-brand-accent)]">
-          Your Booking
-        </p>
-        <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[color:var(--checkout-brand-primary)] sm:text-2xl">
-          {currentEventApiData?.event_name || "Your Booking"}
-        </h1>
-        <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)] sm:text-xs">
-          {bookingMetaLine}
-        </p>
+    <div className="mb-4 space-y-3 sm:mb-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--checkout-brand-accent)]">
+            Your Booking
+          </p>
+          <h1 className="mt-1 text-xl font-extrabold tracking-tight text-[color:var(--checkout-brand-primary)] sm:text-2xl">
+            {currentEventApiData?.event_name || "Your Booking"}
+          </h1>
+          {locationName ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-[color:var(--checkout-muted-foreground)]">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-[color:var(--checkout-brand-accent)]" />
+              <span className="truncate">{locationName}</span>
+            </p>
+          ) : null}
+          <p className="mt-1 text-xs font-medium leading-relaxed text-[color:var(--checkout-muted-foreground)]">
+            {bookingMetaLine}
+          </p>
+        </div>
+
+        {showClearConfirm ? null : (
+          <button
+            type="button"
+            onClick={() => setShowClearConfirm(true)}
+            aria-label="Clear cart"
+            title="Clear cart"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color:var(--checkout-border)] bg-white text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500 sm:hidden"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-        {eventDetailsUrl && currentEventSlug && (
+      <div className="flex items-center gap-2">
+        {showAddDates && addDatesUrl ? (
           <Link
-            href={eventDetailsUrl}
+            href={addDatesUrl}
             className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--checkout-foreground)] transition-colors hover:bg-[color:var(--checkout-muted)] sm:flex-none sm:px-4"
           >
             <CalendarPlus className="h-4 w-4 shrink-0" />
-            <span className="truncate">Add Dates</span>
+            <span>Add Dates</span>
           </Link>
-        )}
+        ) : null}
 
         {showClearConfirm ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-1 items-center gap-1.5 sm:flex-none">
             <button
               type="button"
               onClick={handleClearAllCart}
               disabled={isProcessing || clearAllCartMutation.isPending}
-              className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-600 hover:bg-red-50 sm:flex-none"
             >
-              {clearAllCartMutation.isPending ? "Clearing..." : "Confirm"}
+              {clearAllCartMutation.isPending ? "Clearing..." : "Confirm clear"}
             </button>
             <button
               type="button"
               onClick={() => setShowClearConfirm(false)}
-              className="rounded-lg px-3 py-2 text-xs text-[color:var(--checkout-muted-foreground)]"
+              className="inline-flex min-h-10 items-center rounded-lg px-3 text-xs text-[color:var(--checkout-muted-foreground)]"
             >
               Cancel
             </button>
@@ -545,10 +840,12 @@ export default function CartManager({}: CartManagerProps) {
           <button
             type="button"
             onClick={() => setShowClearConfirm(true)}
-            className="rounded-lg border border-[color:var(--checkout-border)] bg-white p-2 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500"
+            aria-label="Clear cart"
             title="Clear cart"
+            className="hidden min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--checkout-border)] bg-white px-3 text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-500 sm:inline-flex"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4 shrink-0" />
+            <span className="text-sm font-semibold">Clear</span>
           </button>
         )}
       </div>
@@ -575,28 +872,142 @@ export default function CartManager({}: CartManagerProps) {
 
         if (!dateData || !currentEventSlug) return null;
 
+        const bookingType = bookingTypeByDate.get(date);
+        const displayDateData =
+          bookingType == null
+            ? dateData
+            : {
+                ...dateData,
+                tickets:
+                  bookingType === "tables" ? [] : dateData.tickets,
+                tables:
+                  bookingType === "tickets" ? [] : dateData.tables,
+              };
+
         return (
-          <div key={date}>
+          <div
+            key={date}
+            id={checkoutDateDomId(date)}
+            className="scroll-mt-[calc(var(--checkout-header-offset)+0.75rem)]"
+          >
             <DateAccordion
               eventSlug={currentEventSlug}
               date={date}
-              dateData={dateData}
+              dateData={displayDateData}
               isExpanded={isExpanded}
               onToggle={() => toggleDateExpansion(date)}
               onRemoveDate={handleRemoveDate}
               isRemoving={removingDateKey === date}
               roomId={roomMode ? (activeRoomId ?? undefined) : undefined}
-              embedded={roomMode}
+              embedded={isMultiRoomCheckout}
               roomAccentIndex={activeRoomIndex}
+              roomName={
+                isSingleRoomCheckout ? activeRoom?.room_name : undefined
+              }
               drinkTitle={drinkTitle}
               serverEventData={currentEventApiData}
+              {...(() => {
+                if (couponReplacesDateOffers) {
+                  const dateDiscountable =
+                    calculateEditableDateDiscountableTotal(displayDateData);
+                  const dateTotal = calculateEditableDateTotal(displayDateData);
+                  const share =
+                    couponDiscountTotal > 0 &&
+                    bookingDiscountableForPromo > 0 &&
+                    dateDiscountable > 0
+                      ? Math.round(
+                          ((dateDiscountable / bookingDiscountableForPromo) *
+                            couponDiscountTotal +
+                            Number.EPSILON) *
+                            100,
+                        ) / 100
+                      : 0;
+                  return {
+                    discountLabel: share > 0 ? couponDiscountLabel : null,
+                    discountAmount: share > 0 ? share : null,
+                    discountStrikeAmount: share > 0 ? dateTotal : null,
+                    discountLockedHint: null as string | null,
+                  };
+                }
+
+                const discount = getApiDateDiscount(
+                  currentEventApiData,
+                  date,
+                );
+                const label = discount?.value_label?.trim() || null;
+                if (!discount || !label) {
+                  return {
+                    discountLabel: null,
+                    discountAmount: null as number | null,
+                    discountStrikeAmount: null as number | null,
+                    discountLockedHint: null as string | null,
+                  };
+                }
+
+                const guests = getDateGuestCount(displayDateData);
+                const tableTotal =
+                  calculateEditableDateTablesTotal(displayDateData);
+                const discountableTotal =
+                  calculateEditableDateDiscountableTotal(displayDateData);
+                const eligibility = {
+                  guestCount: guests,
+                  discountableTotal,
+                  tableTotal,
+                };
+                const eligible = isDateDiscountEligible(discount, eligibility);
+                const amount = eligible
+                  ? computeDateDiscountAmount(discount, eligibility)
+                  : 0;
+                const minPeople = getDateDiscountMinPeople(discount);
+                const lockedHint = !eligible
+                  ? isFlatPerPersonDateDiscount(discount)
+                    ? minPeople != null
+                      ? `Min ${minPeople} table guests`
+                      : "Confirm table seating"
+                    : "Add tables or tickets"
+                  : null;
+
+                return {
+                  discountLabel: label,
+                  discountAmount: amount > 0 ? amount : null,
+                  discountStrikeAmount: eligible
+                    ? isFlatPerPersonDateDiscount(discount)
+                      ? tableTotal
+                      : discountableTotal
+                    : null,
+                  discountLockedHint: lockedHint,
+                };
+              })()}
             />
           </div>
         );
       })
     );
 
-  if (roomMode && rooms.length > 0 && activeRoomId != null && activeRoom) {
+  const compactAddRoomLink =
+    showAddRoom && eventDetailsUrl ? (
+      <Link
+        href={eventDetailsUrl}
+        className="inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-dashed border-[color:var(--checkout-brand-accent)]/35 px-3 py-2 text-xs font-semibold text-[color:var(--checkout-brand-accent)] transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-blue-50/50"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Add room
+      </Link>
+    ) : null;
+
+  // Single room: merge room name into the date row — no heavy room tab bar.
+  if (isSingleRoomCheckout && activeRoomId != null && activeRoom) {
+    return (
+      <div id="checkout-cart-section" className="space-y-4">
+        {bookingHeader}
+        <div className="space-y-3">{dateSections}</div>
+        {compactAddRoomLink}
+      </div>
+    );
+  }
+
+  // Multi room: keep room tabs so customers can switch between rooms.
+  if (isMultiRoomCheckout && activeRoomId != null && activeRoom) {
     return (
       <div id="checkout-cart-section" className="space-y-4">
         {bookingHeader}
@@ -610,10 +1021,8 @@ export default function CartManager({}: CartManagerProps) {
           addRoomUrl={eventDetailsUrl ?? undefined}
         />
 
-        <div className="overflow-hidden rounded-2xl border border-[color:var(--checkout-border)] bg-white shadow-sm">
-          <div className="divide-y divide-[color:var(--checkout-border)]">
-            {dateSections}
-          </div>
+        <div className="space-y-3 rounded-2xl border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/40 p-2.5 sm:p-3">
+          {dateSections}
         </div>
       </div>
     );

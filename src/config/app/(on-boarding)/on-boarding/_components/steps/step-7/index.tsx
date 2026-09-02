@@ -30,13 +30,10 @@ import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
 import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
 import { GuidedWholeStepBottomActions } from "../../guided-section-chips";
-import EventLocationMap from "./event-location-map";
-import AddressAutocomplete from "./address-autocomplete";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { MultiSpaceHeader } from "../../rooms/multi-space-header";
 import { useRoomScopeSync } from "../../rooms/use-room-scope-sync";
 import { canShowApplyToAllButton, useRoomManager } from "../../rooms/use-room-manager";
-import { isVendorBrochureApplyToAllReady } from "@/app/(protected)/vendor/events/_lib/vendor-step-five-rooms";
 
 export default function StepSeven() {
   const currencySymbol = useCurrencySymbol();
@@ -53,7 +50,7 @@ export default function StepSeven() {
     control: globalForm.control,
     name: "stepSeven.isApproved",
   });
-  // Multi-room hookup for the Brochure / Location / Price section.
+  // Multi-room hookup for the Brochure / Price section.
   const roomScope = useRoomScopeSync("brochure");
   const { rooms, currentRoomIndex, setCurrentRoomIndex } = useRoomManager();
   const stepSevenPersistedApproved = roomScope.isMultiRoom
@@ -61,12 +58,6 @@ export default function StepSeven() {
     : stepSevenPersistedApprovedSingle === true;
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
-  // Get the address from Step 1 to prefill the event address
-  const getStepOneAddress = useCallback(() => {
-    const stepOneData = globalForm.getValues("stepOne");
-    return stepOneData?.address || "";
-  }, [globalForm]);
-
   const eventId = useEventId(globalForm, "stepSeven");
   const activeScopedBrochure = roomScope.isMultiRoom
     ? rooms[currentRoomIndex]?.brochure
@@ -79,19 +70,8 @@ export default function StepSeven() {
       event_id: eventId,
       brochure_pdf: globalForm.getValues("stepSeven.brochure_pdf") || undefined,
       faq_pdf: globalForm.getValues("stepSeven.faq_pdf") || undefined,
-      event_address:
-        globalForm.getValues("stepSeven.event_address") || getStepOneAddress(),
-      latitude: globalForm.getValues("stepSeven.latitude") || undefined,
-      longitude: globalForm.getValues("stepSeven.longitude") || undefined,
       price_start_from:
         globalForm.getValues("stepSeven.price_start_from") || "",
-      location: {
-        title: "LOCATION",
-        description:
-          globalForm.getValues("stepSeven.event_address") ||
-          getStepOneAddress(),
-        icon: "MapPin",
-      },
       downloads: globalForm.getValues("stepSeven.downloads") || [],
       remove_brochure_pdf: false,
       remove_brochure_pdf_2: false,
@@ -103,16 +83,6 @@ export default function StepSeven() {
   // Track if we have string URLs from backend
   const [brochurePdfUrl, setBrochurePdfUrl] = useState<string | null>(null);
   const [brochurePdfUrl2, setBrochurePdfUrl2] = useState<string | null>(null);
-  const watchedEventAddress = useWatch({
-    control: form.control,
-    name: "event_address",
-  });
-  const addressReadyForApply = isVendorBrochureApplyToAllReady(
-    watchedEventAddress ?? "",
-  );
-  const addressSearchFunctionRef = useRef<((address: string) => void) | null>(
-    null,
-  );
 
   const setScopedBrochureField = useCallback(
     (field: keyof StepSevenType, value: unknown) => {
@@ -178,12 +148,6 @@ export default function StepSeven() {
   // Helper: build the full reset state from a scoped brochure object.
   const buildResetState = useCallback(
     (scoped: Record<string, unknown>) => {
-      const stepOneAddress = getStepOneAddress();
-      const scopedAddress =
-        typeof scoped.event_address === "string" && scoped.event_address.trim()
-          ? scoped.event_address
-          : stepOneAddress;
-
       return {
         step: 7 as const,
         event_id: eventId,
@@ -202,26 +166,16 @@ export default function StepSeven() {
           typeof scoped.remove_faq_pdf === "boolean"
             ? scoped.remove_faq_pdf
             : false,
-        event_address: scopedAddress,
-        latitude:
-          typeof scoped.latitude === "number" ? scoped.latitude : undefined,
-        longitude:
-          typeof scoped.longitude === "number" ? scoped.longitude : undefined,
         price_start_from:
           typeof scoped.price_start_from === "string"
             ? scoped.price_start_from
             : "",
-        location: {
-          title: "LOCATION" as const,
-          description: scopedAddress,
-          icon: "MapPin" as const,
-        },
         price: {
           title: "PRICES FROM" as const,
           description:
             typeof scoped.price_start_from === "string" &&
             scoped.price_start_from
-              ? `${currencySymbol}${scoped.price_start_from} PP exc VAT`
+              ? `${currencySymbol}${scoped.price_start_from} per person`
               : "",
           link: "#",
           icon: "Tag" as const,
@@ -231,7 +185,7 @@ export default function StepSeven() {
         more_info: Array.isArray(scoped.more_info) ? scoped.more_info : [],
       };
     },
-    [currencySymbol, eventId, getStepOneAddress, normalizeOptionalPdfValue],
+    [currencySymbol, eventId, normalizeOptionalPdfValue],
   );
 
   // Helper: sync the PDF URL state-setters from a scoped object.
@@ -282,9 +236,6 @@ export default function StepSeven() {
           remove_brochure_pdf: outgoing.remove_brochure_pdf,
           remove_brochure_pdf_2: outgoing.remove_brochure_pdf_2,
           remove_faq_pdf: outgoing.remove_faq_pdf,
-          event_address: outgoing.event_address,
-          latitude: outgoing.latitude,
-          longitude: outgoing.longitude,
           price_start_from: outgoing.price_start_from,
           downloads: outgoing.downloads ?? [],
           more_info: outgoing.more_info ?? [],
@@ -299,24 +250,6 @@ export default function StepSeven() {
       string,
       unknown
     >;
-    // Inherit shared address/lat/lng from stepSeven when the room doesn't have its own.
-    const globalStepSeven = (globalForm.getValues("stepSeven") ?? {}) as Record<
-      string,
-      unknown
-    >;
-    if (!scoped.event_address && globalStepSeven.event_address) {
-      scoped.event_address = globalStepSeven.event_address;
-    }
-    if (scoped.latitude === undefined && globalStepSeven.latitude !== undefined) {
-      scoped.latitude = globalStepSeven.latitude;
-    }
-    if (
-      scoped.longitude === undefined &&
-      globalStepSeven.longitude !== undefined
-    ) {
-      scoped.longitude = globalStepSeven.longitude;
-    }
-
     form.reset(buildResetState(scoped) as StepSevenType);
     syncPdfUrlState(scoped);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -429,21 +362,6 @@ export default function StepSeven() {
     const applyToAllRooms = options?.applyToAllRooms === true;
     setLoading(true);
     try {
-      // Check for required fields manually before submission
-      const missingFields = [];
-
-      if (!data.event_address || data.event_address.trim() === "") {
-        missingFields.push("Event Address");
-      }
-
-      if (missingFields.length > 0) {
-        toast.error(
-          `Please fill in the required fields: ${missingFields.join(", ")}`,
-        );
-        setLoading(false);
-        return;
-      }
-
       const resolvePdfField = (
         value: StepSevenType["brochure_pdf"],
         fallbackUrl: string | null,
@@ -462,15 +380,10 @@ export default function StepSeven() {
       // First ensure the preview data is properly formatted
       const formattedData = {
         ...submissionData,
-        location: {
-          title: "LOCATION",
-          description: data.event_address || "",
-          icon: "MapPin",
-        },
         price: {
           title: "PRICES FROM",
           description: data.price_start_from
-            ? `${currencySymbol}${data.price_start_from} PP exc VAT`
+            ? `${currencySymbol}${data.price_start_from} per person`
             : "",
           link: "#",
           icon: "Tag",
@@ -559,7 +472,7 @@ export default function StepSeven() {
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
             <OnboardingTitle>
-              Check Out The Latest Dates To Be Released
+              Add your brochure and pricing
             </OnboardingTitle>
           </CardHeader>
 
@@ -580,8 +493,9 @@ export default function StepSeven() {
                 <WholeStepGuidedShell
                   form={form}
                   sectionId="step-seven-brochure-location"
-                  chipLabel="Brochure & location"
-                  chipDescription="Brochure files, address, map, and pricing."
+                  previewFocusStep={7}
+                  chipLabel="Brochure info"
+                  chipDescription="Brochure files and pricing."
                   persistenceHydrated={persistedProgressHydrated}
                   persistedStepApproved={stepSevenPersistedApproved}
                   renderFooter={({ guided }) => (
@@ -600,7 +514,7 @@ export default function StepSeven() {
                         )()
                       }
                       extraActions={
-                        canShowApplyToAllButton(rooms, addressReadyForApply) ? (
+                        canShowApplyToAllButton(rooms, true) ? (
                           <Button
                             variant="event-outline"
                             type="button"
@@ -636,7 +550,7 @@ export default function StepSeven() {
                         )}
                       >
                         <OnboardingFieldGroupTitle>
-                          Add More Information
+                          Add more information
                         </OnboardingFieldGroupTitle>
 
                         <div className="mt-4 w-full min-w-0 space-y-6 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-6">
@@ -646,7 +560,7 @@ export default function StepSeven() {
                             render={() => (
                               <FormItem>
                                 <FormLabel className="text-sm font-medium">
-                                  Event Brochure PDF (Optional)
+                                  Event brochure PDF (optional)
                                 </FormLabel>
                                 <FormControl>
                                   {brochurePdfUrl ? (
@@ -754,7 +668,7 @@ export default function StepSeven() {
                             render={() => (
                               <FormItem>
                                 <FormLabel className="text-sm font-medium">
-                                  Event Flyer PDF (Optional)
+                                  Event flyer PDF (optional)
                                 </FormLabel>
                                 <FormControl>
                                   {brochurePdfUrl2 ? (
@@ -864,104 +778,6 @@ export default function StepSeven() {
                         </div>
                       </section>
 
-                      <section
-                        className={guidedInsetSectionSurfaceClass(
-                          "w-full mb-4",
-                        )}
-                      >
-                        <OnboardingFieldGroupTitle>
-                          Event Location
-                        </OnboardingFieldGroupTitle>
-
-                        <div className="space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-6">
-                          <FormField
-                            control={form.control}
-                            name="event_address"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-sm font-medium">
-                                  Event Address (exact location)
-                                </FormLabel>
-                                <FormControl>
-                                  <AddressAutocomplete
-                                    value={field.value}
-                                    onChange={(address) => {
-                                      field.onChange(address);
-                                      mergeScopedBrochureState({
-                                        event_address: address,
-                                        location: {
-                                          title: "LOCATION",
-                                          description: address,
-                                          icon: "MapPin",
-                                        },
-                                      });
-                                    }}
-                                    onSelect={(placeId, address) => {
-                                      field.onChange(address);
-                                      mergeScopedBrochureState({
-                                        event_address: address,
-                                        location: {
-                                          title: "LOCATION",
-                                          description: address,
-                                          icon: "MapPin",
-                                        },
-                                      });
-
-                                      // Trigger map search for the selected address
-                                      if (addressSearchFunctionRef.current) {
-                                        addressSearchFunctionRef.current(
-                                          address,
-                                        );
-                                      }
-                                    }}
-                                    onFocus={() =>
-                                      handleFieldFocus("event_address")
-                                    }
-                                    autoFocus={activeField === "event_address"}
-                                    placeholder="Type to search for a UK address or location..."
-                                    className="w-full"
-                                    variant="dark"
-                                  />
-                                </FormControl>
-                                <p className="mt-1 text-xs font-medium text-[var(--color-primary,#38bdf8)]">
-                                  ⓘ Search for UK addresses or use the map below
-                                  to set exact location
-                                </p>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          {/* Interactive Google Map */}
-
-                          <EventLocationMap
-                            initialAddress={form.watch("event_address")}
-                            onLocationChange={(location) => {
-                              // Update form values with new location data
-                              form.setValue("event_address", location.address);
-                              form.setValue("latitude", location.latitude);
-                              form.setValue("longitude", location.longitude);
-
-                              mergeScopedBrochureState({
-                                event_address: location.address,
-                                latitude: location.latitude,
-                                longitude: location.longitude,
-                                location: {
-                                  title: "LOCATION",
-                                  description: location.address,
-                                  icon: "MapPin",
-                                },
-                              });
-                            }}
-                            onAddressSearch={(searchFunction) => {
-                              addressSearchFunctionRef.current = searchFunction;
-                            }}
-                            className="mt-4"
-                          />
-
-                          {/* Location Status Indicator */}
-                        </div>
-                      </section>
                     </>
                   )}
                 </WholeStepGuidedShell>

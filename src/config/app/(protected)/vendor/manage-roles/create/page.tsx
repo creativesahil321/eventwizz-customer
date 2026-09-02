@@ -17,11 +17,11 @@ export default function CreateRolePage() {
   if (isLoading) {
     return (
       <section className="page bg-[var(--color-background,#f3f4f6)]">
-        <Shell>
+        <Shell className="items-start gap-4 pb-4">
           {/* Page Header with Back Button */}
           <BackButton href="/vendor/manage-roles" label="Back to Roles" />
 
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-6 text-black">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-0 text-black w-full">
             <h1 className="text-2xl title-header font-bold">Create New Role</h1>
             <p className="text-muted-foreground mt-2">
               Define a new role with custom permissions for your staff members.
@@ -29,7 +29,7 @@ export default function CreateRolePage() {
           </div>
 
           {/* Form Card - Loading State */}
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 w-full">
             <div className="space-y-6">
               <Skeleton className="h-10 w-1/2" />
               <Skeleton className="h-10 w-full" />
@@ -80,11 +80,11 @@ export default function CreateRolePage() {
       fallbackPath="/vendor/manage-roles"
     >
       <section className="page bg-[var(--color-background,#f3f4f6)]">
-        <Shell>
+        <Shell className="items-start gap-4 pb-4">
           {/* Page Header with Back Button */}
           <BackButton href="/vendor/manage-roles" label="Back to Roles" />
 
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-6 text-black">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 text-black w-full">
             <h1 className="text-2xl title-header font-bold">Create New Role</h1>
             <p className="text-muted-foreground mt-2">
               Define a new role with custom permissions for your staff members.
@@ -92,7 +92,7 @@ export default function CreateRolePage() {
           </div>
 
           {/* Form Card */}
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6">
+          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 w-full">
             <CreateRoleForm permissions={permissions} />
           </div>
         </Shell>

@@ -23,10 +23,18 @@ export function normalizeSiteEssentialsEvents(
     lowest_price: Number(event.lowest_price) || 0,
     event_category_name: event.event_category_name ?? null,
     event_category: event.event_category ?? null,
+    category: event.category ?? null,
     event_date: event.event_date ?? null,
+    next_available_date: event.next_available_date ?? null,
+    next_event_date: event.next_event_date ?? null,
     formatted_date: event.formatted_date ?? null,
     date: event.date ?? null,
     start_date: event.start_date ?? null,
+    start_time: event.start_time ?? null,
+    end_time: event.end_time ?? null,
+    event_time: event.event_time ?? null,
+    formatted_time: event.formatted_time ?? null,
+    time: event.time ?? null,
   }));
 }
 

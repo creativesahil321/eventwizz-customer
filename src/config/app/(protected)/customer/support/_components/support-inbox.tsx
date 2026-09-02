@@ -41,6 +41,7 @@ import {
 } from "../_lib/utils";
 import type { SupportConversation, SupportStatus } from "../_lib/types";
 import { cn } from "@/lib/utils";
+import { resolveSupportUnreadCount } from "@/app/(protected)/_shared/support/support-unread-count";
 
 const CHAT_MESSAGES_PER_PAGE = 30;
 
@@ -376,8 +377,7 @@ function EmptyDetail() {
         Select a conversation
       </h3>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-        Pick a thread on the left to view the full history, attachments, and
-        reply inline.
+        Select a conversation to view the full history, attachments, and reply.
       </p>
     </div>
   );
@@ -444,6 +444,7 @@ export default function SupportInbox({ selectedId }: SupportInboxProps) {
   );
 
   const inboxCount = data?.inbox_count ?? data?.meta.total ?? conversations.length;
+  const unreadCount = resolveSupportUnreadCount(data?.unread_count, data?.data);
 
   const selected = useMemo(() => {
     if (!selectedId) return undefined;
@@ -469,6 +470,11 @@ export default function SupportInbox({ selectedId }: SupportInboxProps) {
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-100 px-1.5 text-[11px] font-semibold text-muted-foreground">
                   {inboxCount}
                 </span>
+                {unreadCount > 0 ? (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1.5 text-[11px] font-semibold text-white">
+                    {unreadCount} unread
+                  </span>
+                ) : null}
                 {isFetching && !isLoading ? (
                   <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
                 ) : null}
@@ -481,7 +487,7 @@ export default function SupportInbox({ selectedId }: SupportInboxProps) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search conversations..."
+                placeholder="Search conversations…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-9 rounded-lg border-slate-200 bg-slate-50 pl-9 text-sm"
@@ -502,7 +508,7 @@ export default function SupportInbox({ selectedId }: SupportInboxProps) {
             ) : isError ? (
               <div className="space-y-3 p-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Couldn’t load support tickets.
+                  Couldn’t load your support enquiries.
                 </p>
                 <Button
                   type="button"

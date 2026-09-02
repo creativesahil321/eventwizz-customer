@@ -8,6 +8,8 @@ import Link from "next/link";
 import type { CustomerDashboardRecentBooking } from "@/services/customer/dashboard";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { parseFormattedMoney } from "@/lib/currency-format";
+import { parseSavedAmount } from "@/lib/booking-saved-amount";
+import { getCustomerBookingDetailPath } from "@/app/(protected)/customer/bookings/_lib/utils";
 
 interface DashboardRecentBookingsProps {
   readonly bookings: CustomerDashboardRecentBooking[];
@@ -39,79 +41,90 @@ export default function DashboardRecentBookings({
             </div>
           ) : (
             <div className="space-y-3">
-              {bookings.map((booking) => (
-                <Link
-                  key={booking.booking_id}
-                  href={`/customer/bookings/${booking.booking_id}`}
-                  className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                >
-                  <Card className="hover:shadow-md transition-all cursor-pointer">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h3 className="font-semibold text-base line-clamp-1">
-                                  {booking.event_name}
-                                </h3>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs border ${getStatusColorClass(
-                                    booking.status
-                                  )}`}
-                                >
-                                  {booking.status}
-                                </Badge>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs border ${getStatusColorClass(
-                                    booking.payment_status
-                                  )}`}
-                                >
-                                  {booking.payment_status}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  <span>{booking.created_ago}</span>
+              {bookings.map((booking) => {
+                const parsedTotal = parseFormattedMoney(
+                  booking.total_formatted,
+                  symbol,
+                );
+                const displayTotal = Number.isFinite(parsedTotal)
+                  ? parsedTotal
+                  : booking.total;
+                const savedAmount = parseSavedAmount(booking.saved_amount);
+
+                return (
+                  <Link
+                    key={booking.booking_number || booking.booking_id}
+                    href={getCustomerBookingDetailPath(booking.booking_number)}
+                    className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    <Card className="hover:shadow-md transition-all cursor-pointer">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h3 className="font-semibold text-base line-clamp-1">
+                                    {booking.event_name}
+                                  </h3>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <Wallet className="h-3 w-3 text-muted-foreground" />
-                                  <span className="font-medium text-black">
-                                    {formatMoney(
-                                      parseFormattedMoney(
-                                        booking.total_formatted,
-                                        symbol,
-                                      ),
-                                    )}
-                                  </span>
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-xs border ${getStatusColorClass(
+                                      booking.status
+                                    )}`}
+                                  >
+                                    {booking.status}
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-xs border ${getStatusColorClass(
+                                      booking.payment_status
+                                    )}`}
+                                  >
+                                    {booking.payment_status}
+                                  </Badge>
                                 </div>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>{booking.created_ago}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Wallet className="h-3 w-3 text-muted-foreground" />
+                                    <span className="font-medium text-black">
+                                      {formatMoney(displayTotal)}
+                                    </span>
+                                  </div>
+                                  {savedAmount != null ? (
+                                    <span className="font-semibold text-emerald-700">
+                                      You saved {formatMoney(savedAmount)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {booking.booking_ref}
+                                </p>
                               </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {booking.booking_ref}
-                              </p>
                             </div>
                           </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 flex-shrink-0"
+                            tabIndex={-1}
+                            aria-hidden="true"
+                          >
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 flex-shrink-0"
-                          tabIndex={-1}
-                          aria-hidden="true"
-                        >
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
             </div>
           )}
 
