@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface CartConflictModalProps {
   isOpen: boolean;
@@ -74,12 +75,15 @@ export default function CartConflictModal({
     }
   };
 
+  const actionButtonClass =
+    "h-auto min-h-10 w-full min-w-0 max-w-full shrink whitespace-normal px-3 py-2.5 text-left leading-snug [&_svg]:shrink-0";
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-            <AlertTriangle className="w-6 h-6 text-orange-600" />
+      <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg gap-4 overflow-x-hidden p-4 sm:p-6">
+        <DialogHeader className="min-w-0 text-center sm:text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
+            <AlertTriangle className="h-6 w-6 text-orange-600" />
           </div>
 
           <DialogTitle className="text-lg font-semibold text-gray-900">
@@ -94,40 +98,38 @@ export default function CartConflictModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {/* Event Comparison */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              {currentEvent.image && (
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-gray-50 p-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {currentEvent.image ? (
+                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gray-200">
                   <img
                     src={currentEvent.image}
-                    alt={currentEvent.name}
-                    className="w-full h-full object-cover"
+                    alt=""
+                    className="h-full w-full object-cover"
                   />
                 </div>
-              )}
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  {currentEvent.name}
-                </p>
-              </div>
+              ) : null}
+              <p className="truncate text-sm font-medium text-gray-900">
+                {currentEvent.name}
+              </p>
             </div>
 
-            <ArrowRight className="w-4 h-4 text-gray-400" />
+            <ArrowRight className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
 
-            <div className="flex items-center gap-2">
-              {newEvent.image && (
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {newEvent.image ? (
+                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gray-200">
                   <img
                     src={newEvent.image}
-                    alt={newEvent.name}
-                    className="w-full h-full object-cover"
+                    alt=""
+                    className="h-full w-full object-cover"
                   />
                 </div>
-              )}
-              <div>
-                <p className="text-sm font-medium text-gray-900">
+              ) : null}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-gray-900">
                   {newEvent.name}
                 </p>
                 <p className="text-xs text-gray-500">New event</p>
@@ -136,22 +138,24 @@ export default function CartConflictModal({
           </div>
 
           {/* Action Buttons */}
-          <div className="space-y-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <Button
               variant="destructive"
               onClick={handleReplaceCart}
               disabled={isProcessing}
-              className="w-full"
+              className={cn(actionButtonClass, "justify-start")}
             >
               {isProcessing && selectedAction === "replace" ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Switching events...
+                  <div className="mr-2 h-4 w-4 shrink-0 animate-spin rounded-full border-b-2 border-white" />
+                  <span className="min-w-0 break-words">Switching events...</span>
                 </>
               ) : (
                 <>
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Replace with {newEvent.name}
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  <span className="min-w-0 break-words">
+                    Replace with {newEvent.name}
+                  </span>
                 </>
               )}
             </Button>
@@ -160,29 +164,37 @@ export default function CartConflictModal({
               variant="outline"
               onClick={handleContinueWithCurrent}
               disabled={isProcessing}
-              className="w-full border-slate-300 text-slate-900 hover:bg-slate-50"
+              className={cn(
+                actionButtonClass,
+                "justify-start border-slate-300 text-slate-900 hover:bg-slate-50",
+              )}
             >
               {isProcessing && selectedAction === "continue" ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700 mr-2"></div>
-                  Redirecting...
+                  <div className="mr-2 h-4 w-4 shrink-0 animate-spin rounded-full border-b-2 border-gray-700" />
+                  <span className="min-w-0 break-words">Redirecting...</span>
                 </>
               ) : (
                 <>
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Keep {currentEvent.name}
+                  <Calendar className="mr-2 h-4 w-4" />
+                  <span className="min-w-0 break-words">
+                    Keep {currentEvent.name}
+                  </span>
                 </>
               )}
             </Button>
           </div>
         </div>
 
-        <DialogFooter className="pt-2">
+        <DialogFooter className="min-w-0 pt-1 sm:justify-stretch">
           <Button
             variant="outline"
             onClick={handleClose}
             disabled={isProcessing}
-            className="w-full border-slate-300 text-slate-900 hover:bg-slate-50"
+            className={cn(
+              actionButtonClass,
+              "justify-center border-slate-300 text-slate-900 hover:bg-slate-50",
+            )}
           >
             Cancel
           </Button>

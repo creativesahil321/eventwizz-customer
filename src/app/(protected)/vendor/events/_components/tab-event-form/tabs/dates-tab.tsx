@@ -290,7 +290,7 @@ export default function DatesTab() {
     }
   }, [watchedStepOneLocation, form]);
 
-  const { control, watch, setValue, setError, trigger, getValues, reset } =
+  const { control, watch, setValue, setError, clearErrors, trigger, getValues, reset } =
     form;
 
   const watchedDates = useWatch({
@@ -467,10 +467,8 @@ export default function DatesTab() {
           ]);
         }
       } else {
-        setValue(
-          `dates.${dateIndex}.total_ticket_types`,
-          currentTickets.length,
-        );
+        setValue(`dates.${dateIndex}.total_ticket_types`, 0);
+        clearErrors(`dates.${dateIndex}.tickets`);
       }
 
       if (tablesEnabled) {
@@ -493,17 +491,11 @@ export default function DatesTab() {
           setValue(`dates.${dateIndex}.deposit_due_date`, "");
         }
       } else {
-        setValue(
-          `dates.${dateIndex}.total_ticket_types`,
-          currentTickets.length,
-        );
-        setValue(
-          `dates.${dateIndex}.total_table_types`,
-          currentTables.length,
-        );
+        setValue(`dates.${dateIndex}.total_table_types`, 0);
+        clearErrors(`dates.${dateIndex}.tables`);
       }
     },
-    [watch, setValue],
+    [watch, setValue, clearErrors],
   );
 
   // Add date with default booking type of tickets

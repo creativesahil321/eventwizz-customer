@@ -45,6 +45,9 @@ import { PreviewProvider } from "@/contexts/preview-context";
 import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { useEventData } from "../../_lib/hooks/useEventData";
 import { useEventPreviewNavigation } from "../../_lib/use-event-preview-navigation";
+import { mergeVendorLivePreviewData, writeVendorEventPreviewDraft } from "../../_lib/vendor-event-preview-live-data";
+import type { EventDetailData } from "@/services/vendor/events/type";
+import type { EventSchemaType } from "./schema";
 import { useParams } from "next/navigation";
 import {
   capEventRoomList,
@@ -386,6 +389,31 @@ export default function TabEventForm() {
     : params?.eventID;
   const fetchWithRoomPayload = localIsRooms === 1 || stepOneIsRooms === 1;
   const { eventData } = useEventData(eventId, fetchWithRoomPayload);
+
+  /** Live form state so Preview updates before Save. */
+  const liveFormValues = useWatch({
+    control: formContext.control,
+  }) as Partial<EventSchemaType>;
+
+  const livePreviewData = useMemo((): EventDetailData => {
+    const saved =
+      ((eventData as { data?: EventDetailData } | undefined)?.data as
+        | EventDetailData
+        | undefined) ?? {};
+    return mergeVendorLivePreviewData(saved, liveFormValues);
+  }, [eventData, liveFormValues]);
+
+  // Keep the standalone `/preview/event` tab in sync with unsaved edits.
+  // Wait until the editor has restored any IndexedDB draft so the first write
+  // cannot replace a File upload with last-saved API URLs.
+  useEffect(() => {
+    if (!persistedHydrated) return;
+    if (!eventId || !/^\d+$/.test(String(eventId))) return;
+    const timer = window.setTimeout(() => {
+      writeVendorEventPreviewDraft(eventId, liveFormValues ?? formContext.getValues());
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [eventId, liveFormValues, formContext, persistedHydrated]);
 
   const normalizedEventData = useMemo(() => {
     const apiResponse = (eventData || {}) as { data?: EventEnvelope };
@@ -1065,7 +1093,7 @@ export default function TabEventForm() {
                   <div className="h-[min(70vh,720px)] max-h-[min(80vh,calc(100dvh-12rem))] overflow-hidden rounded-lg border border-slate-200/80 shadow-sm bg-white">
                     <PreviewProvider isPreviewMode>
                       <EventPreview
-                        data={(eventData as { data?: object })?.data || {}}
+                        data={livePreviewData}
                         siteEssentials={previewSiteEssentials}
                         embedInShell
                       />

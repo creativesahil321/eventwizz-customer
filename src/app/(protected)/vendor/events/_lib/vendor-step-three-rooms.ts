@@ -329,6 +329,12 @@ export function formatVendorStepThreeDateForApi(
 ): Record<string, unknown> {
   const bookingType = date.booking_type ?? "tickets";
   const cancelled = isVendorDateCancelled(date);
+  const ticketsActive = bookingType === "tickets" || bookingType === "both";
+  const tablesActive = bookingType === "tables" || bookingType === "both";
+  // Form may keep a blank ticket/table row after unchecking that option.
+  // Do not send those rows — Laravel still validates each item in the array.
+  const tickets = ticketsActive ? (date.tickets ?? []) : [];
+  const tables = tablesActive ? (date.tables ?? []) : [];
   const base: Record<string, unknown> = {
     ...(typeof date.id === "number" &&
       Number.isFinite(date.id) &&
@@ -341,12 +347,14 @@ export function formatVendorStepThreeDateForApi(
         cancel_reason: date.cancel_reason.trim(),
         cancellation_reason: date.cancel_reason.trim(),
       }),
-    total_table_types:
-      date.total_table_types ?? (date.tables?.length ?? 0),
-    tables: date.tables ?? [],
-    total_ticket_types:
-      date.total_ticket_types ?? (date.tickets?.length ?? 0),
-    tickets: date.tickets ?? [],
+    total_table_types: tablesActive
+      ? (date.total_table_types ?? tables.length)
+      : 0,
+    tables,
+    total_ticket_types: ticketsActive
+      ? (date.total_ticket_types ?? tickets.length)
+      : 0,
+    tickets,
   };
 
   if (bookingType === "tickets") {

@@ -4,9 +4,9 @@ import { useCallback } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { useEventFormContext } from "../_components/events-form-provider";
-import { useEventData } from "./hooks/useEventData";
 import { getEventPreviewUrl, openEventPreviewTab } from "./open-event-preview-tab";
 import { writeVendorEventIsRoomsFlag } from "./vendor-event-is-rooms";
+import { writeVendorEventPreviewDraft } from "./vendor-event-preview-live-data";
 import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 
 export function useEventPreviewNavigation() {
@@ -17,8 +17,6 @@ export function useEventPreviewNavigation() {
     : params?.eventID;
   const eventIdFromForm = Number(form.getValues().stepOne?.event_id) || 0;
   const eventId = eventIdFromForm > 0 ? eventIdFromForm : Number(eventIdFromUrl) || 0;
-
-  const { invalidateCache } = useEventData(eventIdFromUrl, false);
 
   const openEventPreview = useCallback(() => {
     if (!eventId || eventId <= 0) {
@@ -31,6 +29,7 @@ export function useEventPreviewNavigation() {
       parseEventIsRoomsFlag(form.getValues().stepOne?.is_rooms) === 1;
 
     writeVendorEventIsRoomsFlag(eventId, isRoomsEnabled);
+    writeVendorEventPreviewDraft(eventId, form.getValues());
 
     // Must open synchronously on click — `await` before window.open() makes browsers
     // treat the new tab as a popup and block it.
@@ -39,13 +38,8 @@ export function useEventPreviewNavigation() {
       toast.error("Could not open preview in a new tab.", {
         description: `Allow pop-ups for this site, or paste: ${getEventPreviewUrl(eventId, isRoomsEnabled)}`,
       });
-      return;
     }
-
-    void invalidateCache?.().catch(() => {
-      // Preview tab fetches its own data; cache refresh is best-effort.
-    });
-  }, [eventId, form, invalidateCache]);
+  }, [eventId, form]);
 
   return {
     openEventPreview,

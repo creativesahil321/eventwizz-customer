@@ -39,6 +39,32 @@ export function dedupeMenuCategoriesById(
   return Array.from(byId.values());
 }
 
+/**
+ * One visible option per category name. Prefer `preferredId` when apply-to-all
+ * left the same name on more than one id.
+ */
+export function dedupeMenuCategoriesForSelect(
+  categories: EventMenuCategory[],
+  preferredId?: number,
+): EventMenuCategory[] {
+  const uniqueById = dedupeMenuCategoriesById(categories);
+  const byName = new Map<string, EventMenuCategory>();
+
+  for (const category of uniqueById) {
+    const key = category.name.trim().toLowerCase();
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, category);
+      continue;
+    }
+    if (preferredId != null && Number(category.id) === preferredId) {
+      byName.set(key, category);
+    }
+  }
+
+  return Array.from(byName.values());
+}
+
 export function extractMenuCategoriesList(
   response: unknown,
 ): EventMenuCategory[] {
@@ -77,6 +103,18 @@ export function extractCreatedMenuCategory(
   return null;
 }
 
+export function findMenuCategoryIdByName(
+  categories: EventMenuCategory[],
+  name: string | undefined,
+): number | undefined {
+  const key = String(name ?? "").trim().toLowerCase();
+  if (!key) return undefined;
+  const match = categories.find(
+    (category) => String(category.name ?? "").trim().toLowerCase() === key,
+  );
+  return toPositiveId(match?.id);
+}
+
 /** Prefer the category whose name matches the first menu section (Starters, …). */
 export function findMenuCategoryIdForMenus(
   categories: EventMenuCategory[],
@@ -87,11 +125,7 @@ export function findMenuCategoryIdForMenus(
     .find((name) => name.length > 0);
 
   if (firstName) {
-    const match = categories.find(
-      (category) =>
-        String(category.name ?? "").trim().toLowerCase() === firstName,
-    );
-    const matchedId = toPositiveId(match?.id);
+    const matchedId = findMenuCategoryIdByName(categories, firstName);
     if (matchedId != null) return matchedId;
   }
 

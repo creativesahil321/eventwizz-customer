@@ -690,7 +690,7 @@ export function isBookingConciergeFollowUp(text: string): boolean {
       return true;
     }
   }
-  return /\b(date|dates|available|25th|26th|december|dec\b|room|rooms|hall|space|difference|different|compare|which room|office|snowball|drink|drinks|package|packages|table|tables|ticket|tickets|group|persons?|people|guests?|coupon|discount|promo|code|deposit|pay|payment|checkout|both days|already logg|logged in|book for me|make a booking|that'?s all|that'?s everything|no more|same as last|no drinks)\b/i.test(
+  return /\b(date|dates|available|25th|26th|december|dec\b|room|rooms|hall|space|difference|different|compare|which room|office|snowball|drink|drinks|package|packages|table|tables|ticket|tickets|group|persons?|people|guests?|coupon|discount|promo|code|deposit|pay|payment|checkout|both days|already logg|logged in|book for me|make a booking|that'?s all|that'?s everything|no more|same as last|no drinks|(and|also|what about)\s+(the\s+)?\d{1,2}(st|nd|rd|th)?)\b/i.test(
     text,
   );
 }
@@ -1583,6 +1583,7 @@ EVENT BOOKING DATA:
 - No event detail is loaded for this turn.
 - Do not invent dates, rooms, prices, drinks, or coupon codes.
 - If they want to book, use LIVE EVENTS links to identify the event, then ask the next booking question.
+- If they ask what’s on this weekend / next week / in a city, list only matching LIVE EVENTS. If that city is not listed, say so. Never invent weekend dates — ask them to tap an event so you can check.
 `;
   }
 

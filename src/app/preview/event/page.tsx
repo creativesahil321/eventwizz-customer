@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,12 @@ import { PreviewProvider } from "@/contexts/preview-context";
 import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  loadVendorEventDraft,
+  mergeVendorLivePreviewData,
+  VENDOR_EVENT_PREVIEW_DRAFT_CHANGED,
+} from "@/app/(protected)/vendor/events/_lib/vendor-event-preview-live-data";
+import type { EventSchemaType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 
 function resolveEventPreviewLocationSlug(
   data: EventDetailData | undefined,
@@ -145,8 +151,59 @@ function EventPreviewPageContent() {
 
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [previewDraft, setPreviewDraft] = useState<Partial<EventSchemaType> | null>(
+    null,
+  );
+  const [previewDraftReady, setPreviewDraftReady] = useState(false);
 
   const siteEssentials = useEventPreviewSiteEssentials();
+
+  useEffect(() => {
+    if (!eventId || !/^\d+$/.test(eventId)) {
+      setPreviewDraft(null);
+      setPreviewDraftReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    setPreviewDraftReady(false);
+
+    const refreshDraft = async () => {
+      const draft = await loadVendorEventDraft(eventId);
+      if (cancelled) return;
+      setPreviewDraft(draft);
+      setPreviewDraftReady(true);
+    };
+
+    void refreshDraft();
+
+    const onStorage = (event: StorageEvent) => {
+      if (
+        event.key === `vendor-event-preview-draft:${eventId}` ||
+        event.key == null
+      ) {
+        void refreshDraft();
+      }
+    };
+    const onDraftChanged = (event: Event) => {
+      const changedId = (
+        event as CustomEvent<{ eventId?: string } | undefined>
+      ).detail?.eventId;
+      if (changedId && changedId !== String(eventId)) return;
+      void refreshDraft();
+    };
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(VENDOR_EVENT_PREVIEW_DRAFT_CHANGED, onDraftChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(
+        VENDOR_EVENT_PREVIEW_DRAFT_CHANGED,
+        onDraftChanged,
+      );
+    };
+  }, [eventId]);
 
   const handleGoBack = () => {
     if (eventId && /^\d+$/.test(eventId)) {
@@ -157,6 +214,10 @@ function EventPreviewPageContent() {
   };
 
   const eventPayloadRoot = eventData?.data as EventDetailData | undefined;
+  const livePreviewData = useMemo(
+    () => mergeVendorLivePreviewData(eventPayloadRoot, previewDraft),
+    [eventPayloadRoot, previewDraft],
+  );
   const isEventCancelled =
     eventPayloadRoot &&
     typeof eventPayloadRoot === "object" &&
@@ -240,7 +301,7 @@ function EventPreviewPageContent() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !previewDraftReady) {
     return (
       <div className="bg-gray-50 min-h-screen text-black">
         {/* Header Skeleton */}
@@ -316,7 +377,7 @@ function EventPreviewPageContent() {
     );
   }
 
-  const previewEventData = eventData.data as EventDetailData;
+  const previewEventData = livePreviewData;
   const previewLocationSlug = resolveEventPreviewLocationSlug(
     previewEventData,
     siteEssentials,

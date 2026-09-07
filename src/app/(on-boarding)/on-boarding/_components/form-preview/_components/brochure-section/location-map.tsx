@@ -6,6 +6,7 @@ import { env } from "@/env";
 import { Button } from "@/components/ui";
 import { isLondonDefaultPin } from "@/lib/london-default-coords";
 import { buildEventDirectionsUrl } from "@/lib/event-location";
+import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
 
 interface LocationMapProps {
   address?: string;
@@ -22,11 +23,40 @@ interface MapLocation {
   longitude: number;
 }
 
+const PLACEHOLDER_ADDRESS_RE =
+  /^(event location will be displayed here|enter your event address in the form to display here|add an event address to enable directions)$/i;
+
 function parseCoordinate(value: number | string | null | undefined): number | null {
   if (value == null || value === "") return null;
   const coordinate =
     typeof value === "number" ? value : Number.parseFloat(String(value));
   return Number.isFinite(coordinate) ? coordinate : null;
+}
+
+/** Real venue address only — ignore UI placeholder copy. */
+function resolveDisplayAddress(address?: string): string {
+  const trimmed = address?.trim() ?? "";
+  if (!trimmed || PLACEHOLDER_ADDRESS_RE.test(trimmed)) return "";
+  return trimmed;
+}
+
+function openDirections(address: string, lat?: number | null, lng?: number | null) {
+  const directionsUrl = buildEventDirectionsUrl({
+    address,
+    latitude: lat ?? null,
+    longitude: lng ?? null,
+  });
+  if (directionsUrl) {
+    window.open(directionsUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (address.trim()) {
+    window.open(
+      buildMapsDirectionsUrl(address),
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }
 }
 
 export default function LocationMap({
@@ -51,8 +81,9 @@ export default function LocationMap({
   const maxRetries = 3;
   const parsedLatitude = parseCoordinate(latitude);
   const parsedLongitude = parseCoordinate(longitude);
+  const displayAddress = resolveDisplayAddress(address);
   const hasEventLocationTarget = Boolean(
-    address.trim() ||
+    displayAddress ||
       (parsedLatitude != null &&
         parsedLongitude != null &&
         !isLondonDefaultPin(latitude, longitude)),
@@ -180,7 +211,7 @@ export default function LocationMap({
       return;
     }
 
-    console.log("🗺️ Initializing map with:", { address, latitude, longitude });
+    console.log("🗺️ Initializing map with:", { address: displayAddress, latitude, longitude });
     setIsLoading(true);
     setError(null);
 
@@ -205,7 +236,7 @@ export default function LocationMap({
         return;
       }
 
-      setError("Map loading timed out. Please refresh the page.");
+      setError("Map loading timed out. You can still open directions below.");
       setIsLoading(false);
     }, 10000);
 
@@ -214,7 +245,7 @@ export default function LocationMap({
       const defaultCenter = { lat: 54.7024, lng: -3.2766 };
       let mapCenter = defaultCenter;
       let mapAddress = "";
-      const eventAddress = address.trim();
+      const eventAddress = displayAddress;
       const parsedLatitude = parseCoordinate(latitude);
       const parsedLongitude = parseCoordinate(longitude);
       const hasStoredCoordinates =
@@ -332,7 +363,7 @@ export default function LocationMap({
       );
       setIsLoading(false);
     }
-  }, [address, latitude, longitude, initializeMapWithCenter]);
+  }, [displayAddress, latitude, longitude, initializeMapWithCenter]);
 
   // Initialize map only when mapLoaded is true.
   // Important: when the Maps script is already on window (e.g. after client navigation), we must still
@@ -430,18 +461,21 @@ export default function LocationMap({
       initializeMap();
     }
   }, [
-    address,
+    displayAddress,
     latitude,
     longitude,
     hasEventLocationTarget,
     initializeMap,
   ]);
 
+  const fallbackDirectionsTarget =
+    displayAddress ||
+    (currentLocation?.address ? resolveDisplayAddress(currentLocation.address) : "");
+
   return (
     <div
       className={`relative ${className} overflow-hidden text-[var(--color-text)] `}
     >
-      {/* Event Location Header */}
       {/* Address Overlay - Only show when map is loaded and location exists */}
       {mapLoaded && currentLocation && !isLoading && !error && (
         <div className="flex min-w-0 items-start gap-2 pb-2">
@@ -466,26 +500,38 @@ export default function LocationMap({
             className="w-full h-full rounded-md overflow-hidden bg-[var(--color-primary)] flex items-center justify-center"
             style={{ minHeight: "200px" }}
           >
-            <div className="text-center">
+            <div className="text-center px-4">
               <MapPin className="text-[var(--color-primary-foreground)] mx-auto " size={24} />
               <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase text-[var(--color-primary-foreground)]">
                 EVENT LOCATION
               </h2>
               <p
-                className="max-w-full break-words px-4 pb-2 text-sm leading-relaxed text-[var(--color-primary-foreground)] [overflow-wrap:anywhere]"
-                title={address || undefined}
+                className="max-w-full break-words px-2 pb-2 text-sm leading-relaxed text-[var(--color-primary-foreground)] [overflow-wrap:anywhere]"
+                title={displayAddress || undefined}
               >
-                {address || "Add an event address to enable directions"}
+                {displayAddress || "Add an event address to enable directions"}
               </p>
 
-              <Button
-                variant="event-outline"
-                type="button"
-                onClick={() => setMapLoaded(true)}
-                disabled={!hasEventLocationTarget}
-              >
-                {hasEventLocationTarget ? "View map & directions" : "Directions unavailable"}
-              </Button>
+              <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                {displayAddress ? (
+                  <Button
+                    variant="event-outline"
+                    type="button"
+                    onClick={() => openDirections(displayAddress)}
+                  >
+                    <Navigation className="mr-1.5 h-3.5 w-3.5" />
+                    Get directions
+                  </Button>
+                ) : null}
+                <Button
+                  variant="event-outline"
+                  type="button"
+                  onClick={() => setMapLoaded(true)}
+                  disabled={!hasEventLocationTarget}
+                >
+                  {hasEventLocationTarget ? "View map" : "Map unavailable"}
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
@@ -506,15 +552,70 @@ export default function LocationMap({
           </div>
         )}
 
-        {/* Error Overlay - Only show when map is loaded */}
+        {/* Error / no-map fallback — always surface address + directions when we have one */}
         {mapLoaded && error && (
-          <div className="absolute inset-0 bg-[var(--color-primary)] bg-opacity-75 flex items-center justify-center rounded-md">
-            <div className="flex flex-col items-center gap-2 text-center p-4">
-              <MapPin className="h-8 w-8 text-[var(--color-primary-foreground)]" />
-              <p className="text-[var(--color-primary-foreground)] text-sm">{error}</p>
-              <p className="max-w-full break-words text-[var(--color-primary-foreground)] text-xs [overflow-wrap:anywhere]">
-                {address || "No event location has been provided"}
-              </p>
+          <div className="absolute inset-0 bg-[var(--color-primary)] flex items-center justify-center rounded-md p-4">
+            <div className="flex w-full max-w-md flex-col items-center gap-3 text-center text-[var(--color-primary-foreground)]">
+              <MapPin className="h-8 w-8 shrink-0" aria-hidden />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold">
+                  {fallbackDirectionsTarget
+                    ? "Map unavailable — use the address below"
+                    : "Event location is not available yet"}
+                </p>
+                {error !== "Event location is not available yet." ? (
+                  <p className="text-xs opacity-90">{error}</p>
+                ) : null}
+              </div>
+
+              {fallbackDirectionsTarget ? (
+                <>
+                  <div className="w-full rounded-md bg-black/20 px-3 py-2.5 text-left">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">
+                      Event location
+                    </p>
+                    <p className="mt-1 break-words text-sm font-medium leading-relaxed [overflow-wrap:anywhere]">
+                      {fallbackDirectionsTarget}
+                    </p>
+                  </div>
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+                    <Button
+                      type="button"
+                      variant="event-outline"
+                      className="w-full sm:w-auto"
+                      onClick={() =>
+                        openDirections(
+                          fallbackDirectionsTarget,
+                          parsedLatitude,
+                          parsedLongitude,
+                        )
+                      }
+                    >
+                      <Navigation className="mr-1.5 h-3.5 w-3.5" />
+                      Get directions
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="event-outline"
+                      className="w-full sm:w-auto"
+                      onClick={() =>
+                        window.open(
+                          buildMapsDirectionsUrl(fallbackDirectionsTarget),
+                          "_blank",
+                          "noopener,noreferrer",
+                        )
+                      }
+                    >
+                      <MapPin className="mr-1.5 h-3.5 w-3.5" />
+                      Open in Google Maps
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs opacity-90">
+                  Add an event address so guests can find this venue.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -526,14 +627,11 @@ export default function LocationMap({
             <button
               type="button"
               onClick={() => {
-                const directionsUrl = buildEventDirectionsUrl({
-                  address: currentLocation.address,
-                  latitude: currentLocation.latitude,
-                  longitude: currentLocation.longitude,
-                });
-                if (directionsUrl) {
-                  window.open(directionsUrl, "_blank", "noopener,noreferrer");
-                }
+                openDirections(
+                  currentLocation.address,
+                  currentLocation.latitude,
+                  currentLocation.longitude,
+                );
               }}
               className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md shadow-lg text-xs font-medium transition-colors"
               title="Get directions to this location"
@@ -585,15 +683,25 @@ export default function LocationMap({
         {/* Map Pin Icon Overlay (when no address) */}
         {mapLoaded && !currentLocation && !isLoading && !error && (
           <div className="absolute inset-0 bg-[var(--color-primary)] flex items-center justify-center rounded-md text-[var(--color-primary-foreground)]">
-            <div className="flex flex-col items-center gap-2 ">
+            <div className="flex flex-col items-center gap-2 px-4 text-center">
               <MapPin className="h-8 w-8" />
               <p className="text-sm font-medium text-[var(--color-primary-foreground)]">
                 EVENT LOCATION
               </p>
-              <p className="max-w-full break-words px-4 text-center text-xs text-[var(--color-primary-foreground)] [overflow-wrap:anywhere]">
-                {address ||
+              <p className="max-w-full break-words text-center text-xs text-[var(--color-primary-foreground)] [overflow-wrap:anywhere]">
+                {displayAddress ||
                   "Enter your event address in the form to display here"}
               </p>
+              {displayAddress ? (
+                <Button
+                  type="button"
+                  variant="event-outline"
+                  onClick={() => openDirections(displayAddress)}
+                >
+                  <Navigation className="mr-1.5 h-3.5 w-3.5" />
+                  Get directions
+                </Button>
+              ) : null}
             </div>
           </div>
         )}

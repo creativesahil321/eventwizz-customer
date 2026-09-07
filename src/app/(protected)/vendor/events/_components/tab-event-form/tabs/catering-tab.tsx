@@ -52,8 +52,9 @@ import {
 import { EventMenuCategory } from "@/services/vendor/events/type";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  dedupeMenuCategoriesById,
+  dedupeMenuCategoriesForSelect,
   ensureEventMenuCategoriesForRoom,
+  findMenuCategoryIdByName,
   findMenuCategoryIdForMenus,
   toPositiveId,
 } from "@/lib/event-menu-categories";
@@ -89,8 +90,11 @@ export default function CateringTab() {
 
   const isRoomsEnabled = globalForm.watch("stepTwo.is_rooms") === 1;
   const activeRoomIndex = globalForm.watch("stepTwo.active_room_index") ?? 0;
-  const stepTwoRooms = capEventRoomList(
-    normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
+  const watchedStepTwoRooms = globalForm.watch("stepTwo.rooms");
+  const stepTwoRooms = useMemo(
+    () =>
+      capEventRoomList(normalizeVendorStepTwoRooms(watchedStepTwoRooms)),
+    [watchedStepTwoRooms],
   );
   const resolvedRoomIndex =
     stepTwoRooms.length > 0
@@ -301,15 +305,52 @@ export default function CateringTab() {
   );
 
   useEffect(() => {
-    if (eventMenuCategories.length > 0) {
-      setLocalMenuCategories(dedupeMenuCategoriesById(eventMenuCategories));
-      return;
-    }
-    if (isMenuCategoriesLoading) return;
-    if (isRoomsEnabled) {
-      setLocalMenuCategories([]);
-    }
-  }, [eventMenuCategories, isRoomsEnabled, activeRoomIdForCategories, isMenuCategoriesLoading]);
+    if (isMenuCategoriesLoading && eventMenuCategories.length === 0) return;
+
+    const fromApi = dedupeMenuCategoriesForSelect(
+      eventMenuCategories,
+      toPositiveId(getValues("event_menu_category_id")) ?? undefined,
+    );
+    setLocalMenuCategories((previous) => {
+      if (
+        previous.length === fromApi.length &&
+        previous.every(
+          (category, index) =>
+            Number(category.id) === Number(fromApi[index]?.id) &&
+            category.name === fromApi[index]?.name,
+        )
+      ) {
+        return previous;
+      }
+      return fromApi;
+    });
+
+    if (readOnly) return;
+
+    const selectedId = toPositiveId(getValues("event_menu_category_id"));
+    const firstMenuName = (getValues("menus") ?? [])
+      .map((menu) => String(menu?.name ?? "").trim())
+      .find((name) => name.length > 0);
+    const nameMatchedId = findMenuCategoryIdByName(fromApi, firstMenuName);
+    if (nameMatchedId == null || nameMatchedId === selectedId) return;
+
+    const selectedInApi =
+      selectedId != null &&
+      fromApi.some((category) => Number(category.id) === selectedId);
+    if (selectedInApi) return;
+
+    setValue("event_menu_category_id", nameMatchedId, {
+      shouldValidate: false,
+      shouldDirty: false,
+    });
+  }, [
+    activeRoomIdForCategories,
+    eventMenuCategories,
+    getValues,
+    isMenuCategoriesLoading,
+    readOnly,
+    setValue,
+  ]);
 
   // Keep menu details visibility in sync with catering_option (room switches, API hydrate).
   const cateringOption = watch("catering_option");
@@ -495,39 +536,20 @@ export default function CateringTab() {
   useEffect(() => {
     if (readOnly) return;
     if (normalizeCateringOptionFlag(getValues("catering_option")) !== 1) return;
+    if (toPositiveId(getValues("event_menu_category_id")) != null) return;
 
     const menus = getValues("menus") || [];
-    const hasNamedMenus = menus.some(
-      (menu) => String(menu?.name ?? "").trim().length > 0,
+    const matchedId = findMenuCategoryIdByName(
+      localMenuCategories,
+      menus.find((menu) => String(menu?.name ?? "").trim())?.name,
     );
-    if (!hasNamedMenus) return;
+    if (matchedId == null) return;
 
-    const currentId = toPositiveId(getValues("event_menu_category_id"));
-    if (currentId != null) return;
-
-    const matchedId = findMenuCategoryIdForMenus(localMenuCategories, menus);
-    if (matchedId != null) {
-      setValue("event_menu_category_id", matchedId, {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
-      if (isRoomsEnabled && stepTwoRooms.length > 0) {
-        persistActiveRoomMenuToGlobal(resolvedRoomIndex, {
-          ...getValues(),
-          event_menu_category_id: matchedId,
-        });
-      }
-    }
-  }, [
-    getValues,
-    isRoomsEnabled,
-    localMenuCategories,
-    persistActiveRoomMenuToGlobal,
-    readOnly,
-    resolvedRoomIndex,
-    setValue,
-    stepTwoRooms.length,
-  ]);
+    setValue("event_menu_category_id", matchedId, {
+      shouldValidate: false,
+      shouldDirty: false,
+    });
+  }, [getValues, localMenuCategories, readOnly, setValue]);
 
   const handleMenuCategoryCreated = useCallback(
     (newCategory?: { id: number; name: string }) => {
@@ -669,13 +691,43 @@ export default function CateringTab() {
               : entry,
           );
 
+          if (applyToAllRooms && data.event_id > 0) {
+            mergedRoomsGlobal = await Promise.all(
+              mergedRoomsGlobal.map(async (entry) => {
+                if (normalizeCateringOptionFlag(entry.catering_option) !== 1) {
+                  return entry;
+                }
+                const roomCategoryId = await ensureEventMenuCategoriesForRoom(
+                  data.event_id,
+                  entry.room_id,
+                  entry.menus,
+                );
+                return {
+                  ...entry,
+                  event_menu_category_id:
+                    toPositiveId(roomCategoryId) ??
+                    entry.event_menu_category_id ??
+                    0,
+                };
+              }),
+            );
+            await queryClient.invalidateQueries({
+              queryKey: [...eventKeys.all, "menuCategories", data.event_id],
+            });
+          }
+
+          const activeForPayload = findStepFourMenuForRoom(
+            mergedRoomsGlobal,
+            Number(stepTwoRoomsForSave[resolvedRoomIndex]?.room_id),
+          );
+
           cleanedData = applyToAllRooms
             ? {
                 step: 4,
                 event_id: data.event_id,
                 is_rooms: 1,
                 rooms: mergedRoomsGlobal,
-                ...roomEntryToStepFourFields(activeSnapshot),
+                ...roomEntryToStepFourFields(activeForPayload),
               }
             : {
                 step: 4,
@@ -691,6 +743,18 @@ export default function CateringTab() {
             is_rooms: 0,
             event_menu_category_id: data.event_menu_category_id || 0,
           };
+        }
+
+        if (cleanedData.is_rooms === 1) {
+          setValue(
+            "event_menu_category_id",
+            roomEntryToStepFourFields(
+              findStepFourMenuForRoom(
+                mergedRoomsGlobal,
+                Number(stepTwoRoomsForSave[resolvedRoomIndex]?.room_id),
+              ),
+            ).event_menu_category_id ?? 0,
+          );
         }
 
         globalForm.setValue("stepFour", {
@@ -745,7 +809,14 @@ export default function CateringTab() {
         setIsLoading(false);
       }
     },
-    [globalForm, persistActiveRoomMenuToGlobal, resolvedRoomIndex, advanceStep],
+    [
+      advanceStep,
+      globalForm,
+      persistActiveRoomMenuToGlobal,
+      queryClient,
+      resolvedRoomIndex,
+      setValue,
+    ],
   );
 
   const attemptSubmit = useCallback(
@@ -987,6 +1058,11 @@ export default function CateringTab() {
                           categories={localMenuCategories}
                           value={field.value}
                           initialValue={toPositiveId(field.value)}
+                          fallbackLabel={
+                            (getValues("menus") ?? [])
+                              .map((menu) => String(menu?.name ?? "").trim())
+                              .find((name) => name.length > 0) || undefined
+                          }
                           onSelect={(value) => {
                             const numVal = toPositiveId(value);
                             if (numVal != null) {

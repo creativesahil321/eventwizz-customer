@@ -22,6 +22,10 @@ import {
   hasPersistedStepOneData,
   patchEventPayloadFromApi,
 } from "../../_lib/hydrate-event-from-api";
+import {
+  applyVendorEventDraft,
+  loadVendorEventDraft,
+} from "../../_lib/vendor-event-preview-live-data";
 import { EventSchemaType, eventSchema } from "../tab-event-form/schema";
 import { initialData } from "../tab-event-form/initialData";
 import { useLocationStore } from "@/store/location.store";
@@ -103,6 +107,7 @@ export function FormProvider({
   const isMounted = useRef(true);
   const dataLoadAttempted = useRef(false);
   const didInitActiveStepFromServer = useRef(false);
+  const hydratedEventIdRef = useRef<string | null>(null);
 
   const mergedDefaults = useMemo(() => {
     if (resolvedServerData?.status && resolvedServerData.data) {
@@ -147,29 +152,54 @@ export function FormProvider({
     mode: "onChange",
   });
 
-  // Hydrate global form when persistence GET returns (same pattern as onboarding).
+  // Hydrate once per event. Later API refetches must not wipe unsaved Files.
   useEffect(() => {
     if (!resolvedServerData?.status || !resolvedServerData.data) return;
 
-    form.reset(mergedDefaults);
-
-    if (hasPersistedStepOneData(mergedDefaults)) {
-      setPersistedHydrated(true);
+    const eventKey = eventIdFromUrl ? String(eventIdFromUrl) : "new";
+    if (hydratedEventIdRef.current === eventKey) {
+      return;
     }
 
-    const explicitActive = coercePositiveEventStep(
-      (resolvedServerData.data as { current_step?: number }).current_step,
-    );
+    let cancelled = false;
 
-    if (!didInitActiveStepFromServer.current && explicitActive > 0) {
-      didInitActiveStepFromServer.current = true;
-      setActiveStep((prev) => Math.max(prev, explicitActive));
-      setLastCompletedStep((prev) => Math.max(prev, explicitActive));
-    }
+    const hydrate = async () => {
+      const draft = eventIdFromUrl
+        ? await loadVendorEventDraft(eventIdFromUrl)
+        : null;
+      if (cancelled) return;
 
-    setInitialDataLoaded(true);
-    setIsLoading(false);
-  }, [resolvedServerData, mergedDefaults, form]);
+      const nextValues = applyVendorEventDraft(
+        mergedDefaults as unknown as Record<string, unknown>,
+        draft,
+      ) as EventSchemaType;
+
+      form.reset(nextValues);
+      hydratedEventIdRef.current = eventKey;
+
+      if (hasPersistedStepOneData(nextValues)) {
+        setPersistedHydrated(true);
+      }
+
+      const explicitActive = coercePositiveEventStep(
+        (resolvedServerData.data as { current_step?: number }).current_step,
+      );
+
+      if (!didInitActiveStepFromServer.current && explicitActive > 0) {
+        didInitActiveStepFromServer.current = true;
+        setActiveStep((prev) => Math.max(prev, explicitActive));
+        setLastCompletedStep((prev) => Math.max(prev, explicitActive));
+      }
+
+      setInitialDataLoaded(true);
+      setIsLoading(false);
+    };
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedServerData, mergedDefaults, form, eventIdFromUrl]);
 
   useEffect(() => {
     if (!eventIdFromUrl && !eventQueryLoading) {

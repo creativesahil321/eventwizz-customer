@@ -433,33 +433,26 @@ const baseDateSchema = z.object({
 
 const dateSchema = baseDateSchema
   .extend({
+    // Ticket/table rows may be preserved while that option is unchecked.
+    // Strict field rules run in superRefine only when booking_type includes them.
     tickets: z
       .array(
         z
           .object({
-            id: optionalCoercedFiniteNumber, // From API when editing
-            event_date_id: optionalCoercedFiniteNumber, // From API when editing
+            id: optionalCoercedFiniteNumber,
+            event_date_id: optionalCoercedFiniteNumber,
             title: z
               .string()
-              .min(1, "Title is required")
               .max(25, "Ticket title must not exceed 25 characters"),
             description: z
               .string()
-              .min(1, "Description is required")
               .max(160, "Ticket description must not exceed 160 characters"),
-            total_capacity: z.union([z.string(), z.number()]).refine((val) => {
-              const num = typeof val === "string" ? parseInt(val, 10) : val;
-              return !isNaN(num) && num >= 1 && num <= 100000;
-            }, "Total capacity must be between 1 and 100,000"),
-            price: z.union([z.string(), z.number()]).refine((val) => {
-              const num = typeof val === "string" ? parseInt(val, 10) : val;
-              return !isNaN(num) && num >= 1 && num <= 9999;
-            }, "Price must be between 1 and 9,999 (4 digits max)"),
-            sold_tickets: optionalCoercedFiniteNumber, // Read-only from API
-            status: optionalBooleanFromApi, // API may send 0/1
+            total_capacity: z.union([z.string(), z.number()]),
+            price: z.union([z.string(), z.number()]),
+            sold_tickets: optionalCoercedFiniteNumber,
+            status: optionalBooleanFromApi,
           })
           .superRefine((ticket, ctx) => {
-            // Validate that total_capacity is not less than sold_tickets
             if (
               ticket.sold_tickets !== undefined &&
               ticket.sold_tickets !== null
@@ -467,10 +460,11 @@ const dateSchema = baseDateSchema
               const totalCapacity =
                 typeof ticket.total_capacity === "string"
                   ? parseInt(ticket.total_capacity, 10)
-                  : ticket.total_capacity;
+                  : Number(ticket.total_capacity);
 
               if (
-                !isNaN(totalCapacity) &&
+                Number.isFinite(totalCapacity) &&
+                !Number.isNaN(totalCapacity) &&
                 totalCapacity < ticket.sold_tickets
               ) {
                 ctx.addIssue({
@@ -488,36 +482,27 @@ const dateSchema = baseDateSchema
       .array(
         z
           .object({
-            id: optionalCoercedFiniteNumber, // From API when editing
-            event_date_id: optionalCoercedFiniteNumber, // From API when editing
-            min_persons: z.union([z.string(), z.number()]).refine((val) => {
-              const num = typeof val === "string" ? parseInt(val, 10) : val;
-              return !isNaN(num) && num >= 1;
-            }, "Minimum persons must be at least 1"),
-            max_persons: z.union([z.string(), z.number()]).refine((val) => {
-              const num = typeof val === "string" ? parseInt(val, 10) : val;
-              return !isNaN(num) && num >= 1;
-            }, "Maximum persons must be at least 1"),
-            price: z.union([z.string(), z.number()]).refine((val) => {
-              const num = typeof val === "string" ? parseInt(val, 10) : val;
-              return !isNaN(num) && num >= 0 && num <= 9999;
-            }, "Price must be between 0 and 9,999 (4 digits max)"),
-            total_tables: z.union([z.string(), z.number()]).refine((val) => {
-              const num = typeof val === "string" ? parseInt(val, 10) : val;
-              return !isNaN(num) && num >= 1 && num <= 5000;
-            }, "Total tables must be between 1 and 5,000"),
-            sold_tables: optionalCoercedFiniteNumber, // Read-only from API
-            status: optionalBooleanFromApi, // API may send 0/1
+            id: optionalCoercedFiniteNumber,
+            event_date_id: optionalCoercedFiniteNumber,
+            min_persons: z.union([z.string(), z.number()]),
+            max_persons: z.union([z.string(), z.number()]),
+            price: z.union([z.string(), z.number()]),
+            total_tables: z.union([z.string(), z.number()]),
+            sold_tables: optionalCoercedFiniteNumber,
+            status: optionalBooleanFromApi,
           })
           .superRefine((table, ctx) => {
-            // Validate that total_tables is not less than sold_tables
             if (table.sold_tables !== undefined && table.sold_tables !== null) {
               const totalTables =
                 typeof table.total_tables === "string"
                   ? parseInt(table.total_tables, 10)
-                  : table.total_tables;
+                  : Number(table.total_tables);
 
-              if (!isNaN(totalTables) && totalTables < table.sold_tables) {
+              if (
+                Number.isFinite(totalTables) &&
+                !Number.isNaN(totalTables) &&
+                totalTables < table.sold_tables
+              ) {
                 ctx.addIssue({
                   code: z.ZodIssueCode.custom,
                   message: `Total tables cannot be less than sold tables (${table.sold_tables})`,
@@ -534,8 +519,135 @@ const dateSchema = baseDateSchema
   .superRefine((data, ctx) => {
     if (isVendorDateCancelled(data)) return;
 
+    const ticketsActive = ["tickets", "both"].includes(data.booking_type);
+    const tablesActive = ["tables", "both"].includes(data.booking_type);
+
+    if (ticketsActive) {
+      (data.tickets ?? []).forEach((ticket, index) => {
+        if (!String(ticket.title ?? "").trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Title is required",
+            path: ["tickets", index, "title"],
+          });
+        }
+        if (!String(ticket.description ?? "").trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Description is required",
+            path: ["tickets", index, "description"],
+          });
+        }
+        const capacity =
+          typeof ticket.total_capacity === "string"
+            ? parseInt(ticket.total_capacity, 10)
+            : Number(ticket.total_capacity);
+        if (
+          ticket.total_capacity === "" ||
+          ticket.total_capacity == null ||
+          Number.isNaN(capacity) ||
+          capacity < 1 ||
+          capacity > 100000
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Total capacity must be between 1 and 100,000",
+            path: ["tickets", index, "total_capacity"],
+          });
+        }
+        const price =
+          typeof ticket.price === "string"
+            ? parseInt(ticket.price, 10)
+            : Number(ticket.price);
+        if (
+          ticket.price === "" ||
+          ticket.price == null ||
+          Number.isNaN(price) ||
+          price < 1 ||
+          price > 9999
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Price must be between 1 and 9,999 (4 digits max)",
+            path: ["tickets", index, "price"],
+          });
+        }
+      });
+    }
+
+    if (tablesActive) {
+      (data.tables ?? []).forEach((table, index) => {
+        const minPersons =
+          typeof table.min_persons === "string"
+            ? parseInt(table.min_persons, 10)
+            : Number(table.min_persons);
+        if (
+          table.min_persons === "" ||
+          table.min_persons == null ||
+          Number.isNaN(minPersons) ||
+          minPersons < 1
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Minimum persons must be at least 1",
+            path: ["tables", index, "min_persons"],
+          });
+        }
+        const maxPersons =
+          typeof table.max_persons === "string"
+            ? parseInt(table.max_persons, 10)
+            : Number(table.max_persons);
+        if (
+          table.max_persons === "" ||
+          table.max_persons == null ||
+          Number.isNaN(maxPersons) ||
+          maxPersons < 1
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Maximum persons must be at least 1",
+            path: ["tables", index, "max_persons"],
+          });
+        }
+        const price =
+          typeof table.price === "string"
+            ? parseInt(table.price, 10)
+            : Number(table.price);
+        if (
+          table.price === "" ||
+          table.price == null ||
+          Number.isNaN(price) ||
+          price < 0 ||
+          price > 9999
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Price must be between 0 and 9,999 (4 digits max)",
+            path: ["tables", index, "price"],
+          });
+        }
+        const totalTables =
+          typeof table.total_tables === "string"
+            ? parseInt(table.total_tables, 10)
+            : Number(table.total_tables);
+        if (
+          table.total_tables === "" ||
+          table.total_tables == null ||
+          Number.isNaN(totalTables) ||
+          totalTables < 1 ||
+          totalTables > 5000
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Total tables must be between 1 and 5,000",
+            path: ["tables", index, "total_tables"],
+          });
+        }
+      });
+    }
+
     // Only validate deposit fields for tables/both when deposit is selected
-    if (!["tables", "both"].includes(data.booking_type)) {
+    if (!tablesActive) {
       return;
     }
 

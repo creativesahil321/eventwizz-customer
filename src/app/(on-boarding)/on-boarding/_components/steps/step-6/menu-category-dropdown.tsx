@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 import { EventMenuCategory } from "@/services/vendor/events/type";
 import { eventsService } from "@/services/vendor/events/events.service";
 import {
+  dedupeMenuCategoriesForSelect,
   extractCreatedMenuCategory,
   toPositiveId,
 } from "@/lib/event-menu-categories";
@@ -51,6 +52,8 @@ interface MenuCategoryDropdownProps {
   eventId?: number;
   /** When multi-room is enabled, scope categories to this room */
   roomId?: number;
+  /** Shown when the selected id is not yet in this room's category list. */
+  fallbackLabel?: string;
 }
 
 // Schema for menu category creation
@@ -73,33 +76,51 @@ export default function MenuCategoryDropdown({
   disabled = false,
   eventId,
   roomId,
+  fallbackLabel,
 }: MenuCategoryDropdownProps) {
   const [createdCategories, setCreatedCategories] = useState<
     EventMenuCategory[]
   >([]);
 
+  useEffect(() => {
+    setCreatedCategories([]);
+  }, [eventId, roomId]);
+
   // Deduplicate and merge categories from props with any locally created categories
   const allCategories = React.useMemo(() => {
-    const map = new Map<number, EventMenuCategory>();
-    for (const cat of categories || []) {
-      const id = toPositiveId(cat?.id);
-      if (id != null) {
-        map.set(id, { ...cat, id, name: String(cat.name ?? "").trim() });
-      }
+    const selectedId = toPositiveId(value ?? initialValue);
+    const merged: EventMenuCategory[] = [
+      ...(categories || []),
+      ...createdCategories,
+    ];
+    const label = String(fallbackLabel ?? "").trim();
+    if (selectedId != null && label) {
+      merged.push({ id: selectedId, name: label });
     }
-    for (const cat of createdCategories) {
-      const id = toPositiveId(cat?.id);
-      if (id != null && !map.has(id)) {
-        map.set(id, { ...cat, id, name: String(cat.name ?? "").trim() });
-      }
-    }
-    return Array.from(map.values());
-  }, [categories, createdCategories]);
+    return dedupeMenuCategoriesForSelect(merged, selectedId ?? undefined);
+  }, [categories, createdCategories, fallbackLabel, initialValue, value]);
 
   const effectiveId = toPositiveId(value ?? initialValue);
   const [selectedValue, setSelectedValue] = useState<string | undefined>(
     effectiveId != null ? String(effectiveId) : undefined,
   );
+
+  const resolvedSelectValue = React.useMemo(() => {
+    const selectedId = toPositiveId(value ?? initialValue);
+    if (
+      selectedId != null &&
+      allCategories.some((cat) => Number(cat.id) === selectedId)
+    ) {
+      return String(selectedId);
+    }
+    const label = String(fallbackLabel ?? "").trim().toLowerCase();
+    const nameMatch = allCategories.find(
+      (cat) => cat.name.toLowerCase() === label,
+    );
+    if (nameMatch) return String(nameMatch.id);
+    if (selectedId != null) return String(selectedId);
+    return selectedValue;
+  }, [allCategories, fallbackLabel, initialValue, selectedValue, value]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: session } = useSession();
@@ -194,7 +215,7 @@ export default function MenuCategoryDropdown({
       <div className="flex gap-2">
         <div className="flex-1">
           <Select
-            value={selectedValue}
+            value={resolvedSelectValue}
             onValueChange={handleSelectChange}
             disabled={isLoading || disabled}
           >
@@ -225,17 +246,19 @@ export default function MenuCategoryDropdown({
                       </SelectItem>
                     );
                   })}
-                  {selectedValue &&
-                    toPositiveId(selectedValue) != null &&
+                  {resolvedSelectValue &&
+                    toPositiveId(resolvedSelectValue) != null &&
                     !allCategories.some(
                       (category) =>
                         String(toPositiveId(category.id) ?? "") ===
-                        selectedValue,
+                        resolvedSelectValue,
                     ) && (
-                      <SelectItem value={selectedValue}>
+                      <SelectItem value={resolvedSelectValue}>
                         {createdCategories.find(
-                          (c) => String(c.id) === selectedValue,
-                        )?.name || "Selected category"}
+                          (c) => String(c.id) === resolvedSelectValue,
+                        )?.name ||
+                          String(fallbackLabel ?? "").trim() ||
+                          "Select a category"}
                       </SelectItem>
                     )}
                 </>

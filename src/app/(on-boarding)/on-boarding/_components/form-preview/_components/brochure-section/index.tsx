@@ -42,9 +42,7 @@ export default function BrochureSection({
   const narrowPreview = usePreviewNarrowLayout();
 
   const defaultLocation = {
-    description:
-      location?.description ||
-      "Enter your event address in the form to display here",
+    description: location?.description?.trim() || "",
     latitude: location?.latitude || null,
     longitude: location?.longitude || null,
   };

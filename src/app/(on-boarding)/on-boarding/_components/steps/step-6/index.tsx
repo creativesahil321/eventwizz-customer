@@ -1080,6 +1080,14 @@ export default function StepSix() {
                                 <FormControl>
                                   <MenuCategoryDropdown
                                     categories={localMenuCategories}
+                                    fallbackLabel={
+                                      (form.getValues("menus") ?? [])
+                                        .map((menu) =>
+                                          String(menu?.name ?? "").trim(),
+                                        )
+                                        .find((name) => name.length > 0) ||
+                                      undefined
+                                    }
                                     onSelect={(value) => {
                                       field.onChange(Number(value));
                                       setScopedCateringField(

@@ -1,5 +1,6 @@
 import type { LiveEvent, LocationData } from "@/types/theme.types";
 import { isDisallowedChatSafetyIntent } from "@/lib/chat-safety";
+import { addDays, format, nextSaturday, startOfWeek } from "date-fns";
 
 const STOP_WORDS = new Set([
   "a",
@@ -242,6 +243,160 @@ export function extractLiveEventTheme(text: string): LiveEventTheme | null {
   return dated ? themeFromRequestedDate(dated) : null;
 }
 
+export type RequestedEventWindow = {
+  key: "weekend" | "next-weekend" | "week" | "next-week" | "month";
+  label: string;
+};
+
+const WELL_KNOWN_CITIES = [
+  "london",
+  "manchester",
+  "birmingham",
+  "leeds",
+  "glasgow",
+  "liverpool",
+  "bristol",
+  "edinburgh",
+  "cardiff",
+  "belfast",
+  "newcastle",
+  "sheffield",
+  "nottingham",
+  "leicester",
+  "brighton",
+  "oxford",
+  "cambridge",
+  "york",
+  "reading",
+  "southampton",
+  "plymouth",
+  "exmouth",
+  "oldham",
+  "bradford",
+  "billericay",
+  "porthcawl",
+  "brimington",
+  "retford",
+];
+
+const PLACE_TIME_NOISE =
+  /^(this|the|upcoming|coming|next|last|weekend|week|month|year|friday|saturday|sunday|today|tomorrow|tonight|event|events)$/i;
+
+function formatDayMonth(date: Date): string {
+  return format(date, "d MMM");
+}
+
+/** “this weekend”, “upcoming weekend”, “next week”. */
+export function extractRequestedEventWindow(
+  text: string,
+  now: Date = new Date(),
+): RequestedEventWindow | null {
+  const query = normalizeChatBookingQuery(text).toLowerCase();
+  if (!query) return null;
+
+  const thisWeekend =
+    /\b((this|the|upcoming|coming)\s+weekend|(on|at)\s+the\s+weekend)\b/.test(
+      query,
+    ) && !/\bnext\s+weekend\b/.test(query);
+  const nextWeekend = /\bnext\s+weekend\b/.test(query);
+  if (thisWeekend || nextWeekend) {
+    const today = now.getDay();
+    const thisSat =
+      today === 6 ? now : today === 0 ? addDays(now, -1) : nextSaturday(now);
+    const weekendStart = nextWeekend ? addDays(thisSat, 7) : thisSat;
+    const weekendEnd = addDays(weekendStart, 1);
+    return {
+      key: nextWeekend ? "next-weekend" : "weekend",
+      label: `${nextWeekend ? "next weekend" : "this weekend"} (${formatDayMonth(weekendStart)}–${formatDayMonth(weekendEnd)})`,
+    };
+  }
+
+  if (/\bnext\s+week\b/.test(query)) {
+    const start = addDays(startOfWeek(now, { weekStartsOn: 1 }), 7);
+    const end = addDays(start, 6);
+    return {
+      key: "next-week",
+      label: `next week (${formatDayMonth(start)}–${formatDayMonth(end)})`,
+    };
+  }
+  if (/\b(this|the|upcoming|coming)\s+week\b/.test(query)) {
+    const start = startOfWeek(now, { weekStartsOn: 1 });
+    const end = addDays(start, 6);
+    return {
+      key: "week",
+      label: `this week (${formatDayMonth(start)}–${formatDayMonth(end)})`,
+    };
+  }
+  if (/\b(this|the)\s+month\b/.test(query)) {
+    return { key: "month", label: format(now, "MMMM") };
+  }
+  return null;
+}
+
+export type AskedPlace = {
+  label: string;
+  catalogCity: string | null;
+};
+
+function catalogCities(events: LiveEvent[]): Array<{ key: string; city: string }> {
+  const seen = new Map<string, string>();
+  for (const event of events) {
+    const city = normalize(event.location_city);
+    const slugCity = normalize(event.location_slug.replace(/-\d+$/, "").replace(/-/g, " "));
+    if (city) seen.set(city, event.location_city);
+    if (slugCity && !seen.has(slugCity)) seen.set(slugCity, event.location_city || slugCity);
+  }
+  return [...seen.entries()]
+    .map(([key, city]) => ({ key, city }))
+    .sort((a, b) => b.key.length - a.key.length);
+}
+
+/** City they named — catalog match or a well-known city we don't list. */
+export function extractAskedPlace(
+  text: string,
+  events: LiveEvent[] | null | undefined,
+): AskedPlace | null {
+  const query = normalizeChatBookingQuery(text);
+  const q = normalize(query);
+  if (!q) return null;
+
+  const catalog = catalogCities(events ?? []);
+  for (const item of catalog) {
+    if (item.key.length >= 3 && q.includes(item.key)) {
+      return { label: titleCaseCity(item.city), catalogCity: item.key };
+    }
+  }
+
+  const known = [...WELL_KNOWN_CITIES].sort((a, b) => b.length - a.length);
+  for (const city of known) {
+    if (new RegExp(`\\b${city}\\b`, "i").test(q)) {
+      const catalogHit = catalog.find((item) => item.key === city);
+      return {
+        label: titleCaseCity(catalogHit?.city ?? city),
+        catalogCity: catalogHit?.key ?? null,
+      };
+    }
+  }
+
+  const preposition = q.match(
+    /\b(?:in|on|at|near|around)\s+([a-z][a-z\s-]{2,24}?)(?:\s*[?.!]|$)/i,
+  );
+  if (preposition?.[1]) {
+    const raw = preposition[1].trim();
+    const first = raw.split(/\s+/)[0] ?? "";
+    if (!PLACE_TIME_NOISE.test(first) && first.length >= 3) {
+      const catalogHit = catalog.find(
+        (item) => item.key === first || item.key.includes(first),
+      );
+      return {
+        label: titleCaseCity(catalogHit?.city ?? first),
+        catalogCity: catalogHit?.key ?? null,
+      };
+    }
+  }
+  return null;
+}
+
 function eventSearchText(event: LiveEvent): string {
   return `${event.title} ${event.category_name || ""}`;
 }
@@ -364,7 +519,16 @@ export function isBrochureQuestion(text: string): boolean {
 export function isBroadEventListIntent(text: string): boolean {
   const t = normalizeChatBookingQuery(text);
   if (extractRequestedEventDate(t)) return false;
-  return /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|which\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?|events?\s+(do you |have you )?have)\b/i.test(
+  const theme = extractLiveEventTheme(t);
+  if (extractRequestedEventWindow(t) && !theme) return true;
+  if (
+    !theme &&
+    extractAskedPlace(t, []) &&
+    /\b(event|events|what'?s\s+on|whats\s+on|anything\s+on)\b/i.test(t)
+  ) {
+    return true;
+  }
+  return /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|which\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?|events?\s+(do you |have you )?have|anything\s+on)\b/i.test(
     t,
   );
 }
@@ -384,6 +548,10 @@ export function normalizeChatBookingQuery(text: string): string {
       "book $1",
     )
     .replace(/\b(christmas|xmas)event\b/gi, "$1 event")
+    .replace(/\b(upcomming|upcomng|upcomin|up coming)\b/gi, "upcoming")
+    .replace(/\b(weekned|weeknd|wekeend|wekend)\b/gi, "weekend")
+    .replace(/\bweek\s+end\b/gi, "weekend")
+    .replace(/\b(londn|londan|londom)\b/gi, "london")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -425,6 +593,17 @@ export function isLiveEventBookingIntent(text: string): boolean {
     return true;
   }
 
+  if (extractRequestedEventWindow(t)) {
+    return true;
+  }
+
+  if (
+    /\b(event|events|what'?s\s+on|whats\s+on|anything)\b/i.test(t) &&
+    extractAskedPlace(t, [])
+  ) {
+    return true;
+  }
+
   return false;
 }
 
@@ -433,6 +612,14 @@ export function isLiveEventAvailabilityQuestion(text: string): boolean {
   const t = normalizeChatBookingQuery(text);
   if (!t) return false;
   if (/\b(book|booking|reserve|checkout|pay)\b/i.test(t)) return false;
+  if (extractRequestedEventWindow(t)) return true;
+  if (
+    extractAskedPlace(t, []) &&
+    /\b(which|what|any|what'?s\s+on|whats\s+on|anything)\b/i.test(t) &&
+    /\b(event|events)\b/i.test(t)
+  ) {
+    return true;
+  }
   const asksIfListed =
     /\b(available|availability)\b/i.test(t) ||
     /\b((is|are) there|do you have|have you (got|got any)|got any|any)\b/i.test(
@@ -446,9 +633,146 @@ export function isLiveEventAvailabilityQuestion(text: string): boolean {
 }
 
 export function buildLiveEventHref(event: LiveEvent): string {
-  const locationSlug = event.location_slug.replace(/^\/+|\/+$/g, "");
-  const eventSlug = event.slug.replace(/^\/+|\/+$/g, "");
-  return `/${locationSlug}/events/${eventSlug}`;
+  return `/${normalizeLiveEventSlug(event.location_slug)}/events/${normalizeLiveEventSlug(event.slug)}`;
+}
+
+/** Theme slugs sometimes arrive as "christmas event 2" — URLs need hyphens. */
+export function normalizeLiveEventSlug(slug: string): string {
+  return slug
+    .trim()
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function parseEventPageHref(
+  href: string,
+): { locationSlug: string; eventSlug: string } | null {
+  const raw = href.split("#")[0]?.split("?")[0] ?? "";
+  let pathname = raw;
+  try {
+    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+      pathname = new URL(raw).pathname;
+    }
+  } catch {
+    pathname = raw;
+  }
+  const match = pathname.match(/^\/([^/]+)\/events\/([^/]+)\/?$/);
+  if (!match) return null;
+  return {
+    locationSlug: normalizeLiveEventSlug(decodeURIComponent(match[1])),
+    eventSlug: normalizeLiveEventSlug(decodeURIComponent(match[2])),
+  };
+}
+
+function titleToEventSlug(title: string): string {
+  return normalizeLiveEventSlug(
+    title.toLowerCase().replace(/[^a-z0-9\s-]/g, " "),
+  );
+}
+
+/**
+ * The model often slugifies the title (`christmas-event`) and 404s.
+ * Map that invented path back onto the published live_events slug
+ * (`christmas-event-2`).
+ */
+export function canonicalizeLiveEventHref(
+  href: string,
+  liveEvents: LiveEvent[] | null | undefined,
+  preferred?: LiveEvent | null,
+): string {
+  const parsed = parseEventPageHref(href);
+  if (!parsed) return href;
+  const catalog = (liveEvents ?? []).map((event) => ({
+    event,
+    locationSlug: normalizeLiveEventSlug(event.location_slug),
+    eventSlug: normalizeLiveEventSlug(event.slug),
+  }));
+  if (preferred) {
+    const prefLoc = normalizeLiveEventSlug(preferred.location_slug);
+    if (prefLoc === parsed.locationSlug) {
+      return buildLiveEventHref({
+        ...preferred,
+        slug: normalizeLiveEventSlug(preferred.slug),
+        location_slug: prefLoc,
+      });
+    }
+  }
+
+  const exact = catalog.find(
+    (item) =>
+      item.locationSlug === parsed.locationSlug &&
+      item.eventSlug === parsed.eventSlug,
+  );
+  if (exact) {
+    return buildLiveEventHref({
+      ...exact.event,
+      slug: exact.eventSlug,
+      location_slug: exact.locationSlug,
+    });
+  }
+
+  const atLocation = catalog.filter(
+    (item) => item.locationSlug === parsed.locationSlug,
+  );
+  const prefixed = atLocation.filter(
+    (item) =>
+      item.eventSlug === parsed.eventSlug ||
+      item.eventSlug.startsWith(`${parsed.eventSlug}-`),
+  );
+  if (prefixed.length === 1) {
+    return buildLiveEventHref({
+      ...prefixed[0].event,
+      slug: prefixed[0].eventSlug,
+      location_slug: prefixed[0].locationSlug,
+    });
+  }
+
+  const byTitle = atLocation.filter(
+    (item) => titleToEventSlug(item.event.title) === parsed.eventSlug,
+  );
+  if (byTitle.length === 1) {
+    return buildLiveEventHref({
+      ...byTitle[0].event,
+      slug: byTitle[0].eventSlug,
+      location_slug: byTitle[0].locationSlug,
+    });
+  }
+
+  return `/${parsed.locationSlug}/events/${parsed.eventSlug}`;
+}
+
+export function rewriteAssistantEventHrefs(
+  content: string,
+  liveEvents: LiveEvent[] | null | undefined,
+  preferred?: LiveEvent | null,
+): string {
+  if (!content) return content;
+  return content.replace(
+    /\]\(((?:https?:\/\/[^)\s]+)?\/[^)\s]+\/events\/[^)\s]+)\)/g,
+    (_full, href: string) =>
+      `](${canonicalizeLiveEventHref(href, liveEvents, preferred)})`,
+  );
+}
+
+export function preferredLiveEventFromConversation(
+  userText: string,
+  messages: Array<{ role: string; content: string }>,
+  liveEvents: LiveEvent[] | null | undefined,
+): LiveEvent | null {
+  const matches = matchLiveEventsFromConversation(
+    userText,
+    messages,
+    liveEvents,
+  );
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0].event;
+  const titles = new Set(matches.map((item) => normalize(item.event.title)));
+  const cities = new Set(
+    matches.map((item) => normalize(item.event.location_city)),
+  );
+  if (titles.size === 1 && cities.size === 1) return matches[0].event;
+  return null;
 }
 
 export type GuestBookableLink = {
@@ -777,8 +1101,12 @@ export function matchLiveEvents(
   if (exact.length > 0) return exact;
 
   const query = normalizeChatBookingQuery(userText);
-  const mentionedCity = extractMentionedCity(query, liveEvents);
+  const askedPlace = extractAskedPlace(query, liveEvents);
+  const mentionedCity = askedPlace?.catalogCity ?? extractMentionedCity(query, liveEvents);
   const theme = extractLiveEventTheme(query);
+  if (askedPlace && !mentionedCity) {
+    return [];
+  }
   const pool = mentionedCity
     ? liveEvents.filter(
         (event) => normalize(event.location_city) === mentionedCity,
@@ -839,6 +1167,13 @@ export function matchLiveEventsFromConversation(
   if (exact.length > 0) return exact;
 
   const currentTheme = extractLiveEventTheme(userText);
+  const askedPlace = extractAskedPlace(userText, liveEvents);
+  if (askedPlace && !askedPlace.catalogCity) {
+    return [];
+  }
+  if (extractRequestedEventWindow(userText) && !currentTheme) {
+    return matchLiveEvents(userText, liveEvents);
+  }
   const fromCurrentTheme = matchLiveEvents(userText, liveEvents);
   if (currentTheme) {
     const themed = fromCurrentTheme.filter((item) =>
@@ -847,7 +1182,8 @@ export function matchLiveEventsFromConversation(
     return themed;
   }
 
-  const mentionedCity = extractMentionedCity(userText, liveEvents);
+  const mentionedCity =
+    askedPlace?.catalogCity ?? extractMentionedCity(userText, liveEvents);
   const priorCorpus = messages.map((m) => m.content).join("\n");
   const priorMatches = priorCorpus.trim()
     ? matchLiveEvents(priorCorpus, liveEvents)
@@ -939,6 +1275,7 @@ export function needsLiveEventLocationChoice(
   allLiveEvents: LiveEvent[],
 ): boolean {
   if (!matches.length) return false;
+  if (extractRequestedEventWindow(userText)) return true;
   const theme = extractLiveEventTheme(userText);
   if (
     theme &&
@@ -995,6 +1332,18 @@ function formatCityList(cities: string[]): string {
   if (cities.length <= 1) return cities[0] ?? "";
   if (cities.length === 2) return `${cities[0]} and ${cities[1]}`;
   return `${cities.slice(0, -1).join(", ")} and ${cities[cities.length - 1]}`;
+}
+
+function uniqueCatalogCityLabels(events: LiveEvent[]): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const event of events) {
+    const key = normalize(event.location_city);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    labels.push(titleCaseCity(event.location_city));
+  }
+  return labels;
 }
 
 function chatChoiceMarkdown(label: string, sendText: string): string {
@@ -1063,8 +1412,15 @@ export function buildLiveEventsDirectReply(options: {
 
   const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
   const brand = siteName?.trim() || "our venue";
-  const mentionedCity = extractMentionedCity(userText, allLiveEvents);
-  const askedCity = mentionedCity ? titleCaseCity(mentionedCity) : null;
+  const askedWindow = extractRequestedEventWindow(userText);
+  const askedPlace = extractAskedPlace(userText, allLiveEvents);
+  const mentionedCity =
+    askedPlace?.catalogCity ?? extractMentionedCity(userText, allLiveEvents);
+  const askedCity = mentionedCity
+    ? titleCaseCity(mentionedCity)
+    : askedPlace?.catalogCity
+      ? titleCaseCity(askedPlace.catalogCity)
+      : null;
   const theme = extractLiveEventTheme(userText);
   const themeHits = theme
     ? matches.filter((m) => eventMatchesTheme(m.event, theme))
@@ -1146,6 +1502,7 @@ export function buildLiveEventsDirectReply(options: {
 
   const browsingCatalogue =
     askedBrochure ||
+    Boolean(askedWindow) ||
     matches.every((m) => m.score <= 1) ||
     isBroadEventListIntent(userText) ||
     (!theme && distinctEventTitles(matches) > 1);
@@ -1153,6 +1510,7 @@ export function buildLiveEventsDirectReply(options: {
   if (browsingCatalogue) {
     const pickerEvents =
       themeHits.length > 0 ? themeHits.map((m) => m.event) : matches.map((m) => m.event);
+    const windowBit = askedWindow ? ` for **${askedWindow.label}**` : "";
     let intro: string;
     if (askedBrochure) {
       intro = `Which event would you like the brochure for${nameBit}?`;
@@ -1167,15 +1525,25 @@ export function buildLiveEventsDirectReply(options: {
       ];
       const elsewhereBit =
         elsewhereCities.length > 0
-          ? ` It’s currently listed in **${elsewhereCities.join(" and ")}**.`
+          ? ` It’s currently listed in **${formatCityList(elsewhereCities)}**.`
           : "";
       intro = askedCity
         ? `I couldn’t find a **${theme.label}** in **${askedCity}** on the current list${nameBit}.${elsewhereBit}\n\nHere are events you can book in **${askedCity}**:`
         : `I couldn’t find a **${theme.label}** on the current list${nameBit}.\n\nHere are events you can book at **${brand}**:`;
     } else if (theme && themeHits.length > 0 && askedCity) {
-      intro = `These look closest to a **${theme.label}** in **${askedCity}**${nameBit}:`;
+      intro = askedWindow
+        ? `These **${theme.label}** listings in **${askedCity}** are on the current list${nameBit}.`
+        : `These look closest to a **${theme.label}** in **${askedCity}**${nameBit}:`;
+    } else if (theme && themeHits.length > 0) {
+      intro = askedWindow
+        ? `These **${theme.label}** listings are on the current list${nameBit}.`
+        : `These look closest to a **${theme.label}**${nameBit}:`;
+    } else if (askedCity && askedWindow) {
+      intro = `Here’s what’s listed in **${askedCity}**${windowBit}${nameBit}.`;
     } else if (askedCity) {
-      intro = `Here’s what’s available to book in **${askedCity}**${nameBit}:`;
+      intro = `Here’s what’s listed in **${askedCity}**${nameBit}:`;
+    } else if (askedWindow) {
+      intro = `Here’s what’s currently listed at **${brand}**${windowBit}${nameBit}. Tell me a city if you want to narrow it down.`;
     } else {
       intro = `Here’s what’s currently available to book at **${brand}**${nameBit}:`;
     }
@@ -1186,7 +1554,9 @@ export function buildLiveEventsDirectReply(options: {
         totalCount: pickerEvents.length,
         footer: askedBrochure
           ? "Tap an event and I’ll send the brochure files I have for it."
-          : undefined,
+          : askedWindow
+            ? `I don’t have those dates on this list. Tap one and I’ll check whether **${askedWindow.label}** is bookable here in chat.`
+            : undefined,
       }),
     };
   }
@@ -1245,19 +1615,36 @@ export function buildLiveEventsNoMatchReply(options: {
   }
   const theme = userText ? extractLiveEventTheme(userText) : null;
   const askedDate = userText ? extractRequestedEventDate(userText) : null;
-  const askedCity = userText
-    ? extractMentionedCity(userText, allLiveEvents)
+  const askedWindow = userText ? extractRequestedEventWindow(userText) : null;
+  const askedPlace = userText
+    ? extractAskedPlace(userText, allLiveEvents)
     : null;
-  const cityLabel = askedCity ? titleCaseCity(askedCity) : null;
+  const askedCity =
+    askedPlace?.catalogCity ??
+    (userText ? extractMentionedCity(userText, allLiveEvents) : null);
+  const cityLabel = askedCity
+    ? titleCaseCity(askedCity)
+    : askedPlace
+      ? askedPlace.label
+      : null;
+  const bookableCities = formatCityList(uniqueCatalogCityLabels(allLiveEvents));
   let intro: string;
-  if (cityLabel) {
-    intro = `I don’t have that event listed in **${cityLabel}** right now${nameBit}. Here’s what’s available to book at **${brand}**:`;
+  if (askedPlace && !askedPlace.catalogCity) {
+    intro = askedWindow
+      ? `I don’t have events listed in **${askedPlace.label}** right now${nameBit}, so I can’t show what’s on **${askedWindow.label}** there. I can help you book in **${bookableCities}**:`
+      : `I don’t have events listed in **${askedPlace.label}** right now${nameBit}. I can help you book in **${bookableCities}**:`;
+  } else if (cityLabel) {
+    intro = theme
+      ? `I don’t have a **${theme.label}** listed in **${cityLabel}** right now${nameBit}. Here’s what’s available to book at **${brand}**:`
+      : `I don’t have that event listed in **${cityLabel}** right now${nameBit}. Here’s what’s available to book at **${brand}**:`;
   } else if (theme && askedDate) {
     intro = `I couldn’t find a **${theme.label}** for **${askedDate.label}** among our current listings${nameBit}. Here’s what’s available to book at **${brand}**:`;
   } else if (theme) {
     intro = `I couldn’t find a **${theme.label}** among our current listings${nameBit}. Here’s what’s available to book at **${brand}**:`;
   } else if (askedDate) {
     intro = `I can’t see a published event specifically for **${askedDate.label}** from this list${nameBit}. Tap an event and I’ll check whether that date is bookable:`;
+  } else if (askedWindow) {
+    intro = `I can’t confirm what’s on **${askedWindow.label}** from this list${nameBit}. Here’s what’s available to book at **${brand}**:`;
   } else {
     intro = `I couldn’t find that event among our current locations${nameBit}. Here’s what’s available to book at **${brand}**:`;
   }
@@ -1266,6 +1653,9 @@ export function buildLiveEventsNoMatchReply(options: {
       intro,
       events: allLiveEvents,
       totalCount: allLiveEvents.length,
+      footer: askedWindow
+        ? `I don’t have those dates on this list. Tap one and I’ll check whether **${askedWindow.label}** is bookable here in chat.`
+        : undefined,
     }),
   };
 }
@@ -1312,16 +1702,18 @@ LIVE EVENTS (theme):
 
   return `
 LIVE EVENTS (authoritative — only these cities exist on this site):
-When the guest asks about an event by name or category (e.g. Christmas, Diwali, New Year, weddings):
-1. Answer from this list only — never invent events, cities, or URLs.
+When the guest asks about an event by name, category, city, or time (this weekend, next week, this month):
+1. Answer from this list only — never invent events, cities, dates, or URLs.
 2. Event titles are often people's names. The type is category_name. Match category_name when they ask for Christmas, Halloween, weddings, etc. If category_name is null, only match the title.
-3. If they named a city or category, only offer matching events. If none match, say so in one sentence, then offer at most ${MAX_LIVE_EVENT_CHAT_CHOICES} alternatives in that city (or at this venue). Never start booking a different category.
-4. Event buttons MUST be unique — never repeat “Book now”. Use [Event name · City](chat:Book Event name in City).
-5. Location-only picks stay in chat: [Book in City](chat:Book in City)
-6. NEVER write /chat: or /chat — the prefix is chat: with no slash. Dates: [Thu 27 Aug](chat:Thu 27 Aug 2026)
-7. NEVER send [Book in City](/location-slug/events/event-slug) — that leaves chat.
-8. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room when this event has rooms → guests → tables/tickets → which table types and quantities → which ticket types and quantities → drinks, then another date if they want, or another room only when rooms exist → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
-9. Dates must show the room name only when this event has rooms. Guests can pick more than one drink and more than one date (and more than one room when rooms exist). Quote prices. Coupon last — after they apply a code, repeat it on the summary with the discount. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
+3. If they named a city, only offer events in that city. If that city is not on this list, say so and name the cities you can book. Never pretend a Bristol or Porthcawl event is in London.
+4. This list has no dates. If they ask what’s on this weekend / next week / this month, list matching events and ask them to tap one so you can check those dates. Never claim an event runs that weekend.
+5. If they named a category, only offer matching events. If none match, say so in one sentence, then offer at most ${MAX_LIVE_EVENT_CHAT_CHOICES} alternatives in that city (or at this venue). Never start booking a different category.
+6. Event buttons MUST be unique — never repeat “Book now”. Use [Event name · City](chat:Book Event name in City).
+7. Location-only picks stay in chat: [Book in City](chat:Book in City)
+8. NEVER write /chat: or /chat — the prefix is chat: with no slash. Dates: [Thu 27 Aug](chat:Thu 27 Aug 2026)
+9. NEVER send [Book in City](/location-slug/events/event-slug) — that leaves chat.
+10. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room when this event has rooms → guests → tables/tickets → which table types and quantities → which ticket types and quantities → drinks, then another date if they want, or another room only when rooms exist → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
+11. Dates must show the room name only when this event has rooms. Guests can pick more than one drink and more than one date (and more than one room when rooms exist). Quote prices. Coupon last — after they apply a code, repeat it on the summary with the discount. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
 
 ${lines.join("\n")}
 `;

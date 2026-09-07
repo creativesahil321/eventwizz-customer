@@ -59,10 +59,16 @@ import {
   filterLiveEventsToPublishedLocations,
   listGuestBookableLinks,
   extractLiveEventTheme,
+  extractAskedPlace,
+  extractRequestedEventWindow,
   liveEventMatchesRequestedTheme,
   isBroadEventListIntent,
   isLiveEventAvailabilityQuestion,
   asWeakMatches,
+  canonicalizeLiveEventHref,
+  rewriteAssistantEventHrefs,
+  preferredLiveEventFromConversation,
+  normalizeLiveEventSlug,
   type LiveEventChatMatch,
 } from "@/lib/chat-live-events";
 import type { LiveEvent, LocationData } from "@/types/theme.types";
@@ -2468,6 +2474,8 @@ Is there anything else I can help you with?`,
       const matched = matchLiveEvents(userText, liveEvents);
       const namedType =
         Boolean(extractLiveEventTheme(userText)) ||
+        Boolean(extractAskedPlace(userText, liveEvents)) ||
+        Boolean(extractRequestedEventWindow(userText)) ||
         isLiveEventAvailabilityQuestion(userText);
       const matches =
         matched.length > 0
@@ -2490,7 +2498,16 @@ Is there anything else I can help you with?`,
         siteName,
         userName,
       });
-      if (direct) {
+      const uniqueCatalogEvent =
+        matches.length === 1 ||
+        (matches.length > 0 &&
+          !needsLiveEventLocationChoice(userText, matches, liveEvents) &&
+          new Set(
+            matches.map(
+              (item) => `${item.event.location_slug}/${item.event.slug}`,
+            ),
+          ).size === 1);
+      if (direct && !uniqueCatalogEvent) {
         setMessages((prev) => [
           ...prev,
           {
@@ -2960,7 +2977,8 @@ Is there anything else I can help you with?`,
         !namedOtherEvent &&
         !pinnedWrongTheme &&
         !isBroadEventListIntent(userText) &&
-        !isLiveEventAvailabilityQuestion(userText)
+        !isLiveEventAvailabilityQuestion(userText) &&
+        !extractRequestedEventWindow(userText)
       ) {
         eventBookingBrief = pinnedBrief;
       }
@@ -2977,7 +2995,11 @@ Is there anything else I can help you with?`,
               liveEventMatchesRequestedTheme(item.event, userText),
             )
           : conversationMatches;
-        if (askedTheme && matches.length === 0) {
+        const askedPlace = extractAskedPlace(userText, liveEvents);
+        if (
+          matches.length === 0 &&
+          (askedTheme || (askedPlace && !askedPlace.catalogCity))
+        ) {
           const none = buildLiveEventsNoMatchReply({
             allLiveEvents: liveEvents,
             siteName,
@@ -2998,7 +3020,7 @@ Is there anything else I can help you with?`,
           matches,
           liveEvents,
         );
-        if (matches.length > 1 && needsEventChoice) {
+        if (matches.length > 0 && needsEventChoice) {
           const direct = buildLiveEventsDirectReply({
             userText,
             matches,
@@ -3031,7 +3053,7 @@ Is there anything else I can help you with?`,
         if (pickedLiveEvent) {
           try {
             const detail = await eventsService.getEventDetail(
-              pickedLiveEvent.event.slug,
+              normalizeLiveEventSlug(pickedLiveEvent.event.slug),
               tenantHost,
               { suppressErrorToast: true },
             );
@@ -3040,8 +3062,10 @@ Is there anything else I can help you with?`,
                 summarizeEventDetailForChat(detail.data, {
                   href: pickedLiveEvent.href,
                   locationCity: pickedLiveEvent.event.location_city,
-                  locationSlug: pickedLiveEvent.event.location_slug,
-                  eventSlug: pickedLiveEvent.event.slug,
+                  locationSlug: normalizeLiveEventSlug(
+                    pickedLiveEvent.event.location_slug,
+                  ),
+                  eventSlug: normalizeLiveEventSlug(pickedLiveEvent.event.slug),
                   currencySymbol,
                 }),
                 eventBookingBriefRef.current,
@@ -3148,26 +3172,47 @@ Is there anything else I can help you with?`,
                 ? matches.map((item) => item.event)
                 : liveEvents,
             );
+        const preferredEvent = preferredLiveEventFromConversation(
+          userText,
+          [...messages, userMessage],
+          liveEvents,
+        );
+        const gateContent = rewriteAssistantEventHrefs(
+          compare +
+            buildGuestBookingGateCopy({
+              brief: eventBookingBrief,
+              events: guestEvents,
+              userName,
+              includeEventLead: !compare,
+              registerHref: hrefs.registerHref,
+              loginHref: hrefs.loginHref,
+            }),
+          liveEvents,
+          preferredEvent,
+        );
+        const gateActions = toUiQuickActions(
+          buildGuestBookingGateActions(eventBookingBrief, {
+            ...hrefs,
+            events: guestEvents,
+          }),
+        ).map((action) =>
+          action.href
+            ? {
+                ...action,
+                href: canonicalizeLiveEventHref(
+                  action.href,
+                  liveEvents,
+                  preferredEvent,
+                ),
+              }
+            : action,
+        );
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content:
-              compare +
-              buildGuestBookingGateCopy({
-                brief: eventBookingBrief,
-                events: guestEvents,
-                userName,
-                includeEventLead: !compare,
-                registerHref: hrefs.registerHref,
-                loginHref: hrefs.loginHref,
-              }),
-            quickActions: toUiQuickActions(
-              buildGuestBookingGateActions(eventBookingBrief, {
-                ...hrefs,
-                events: guestEvents,
-              }),
-            ),
+            content: gateContent,
+            quickActions: gateActions,
           },
         ]);
         return;
@@ -3479,7 +3524,16 @@ Is there anything else I can help you with?`,
       }
 
       const data = await response.json();
-      const rawReply = typeof data.message === "string" ? data.message : "";
+      const preferredEvent = preferredLiveEventFromConversation(
+        userText,
+        [...messages, userMessage],
+        liveEvents,
+      );
+      const rawReply = rewriteAssistantEventHrefs(
+        typeof data.message === "string" ? data.message : "",
+        liveEvents,
+        preferredEvent,
+      );
       const choices = parseChatBookingChoices(
         [...conversation, { role: "assistant", content: rawReply }],
         briefForHandoff,
@@ -3550,6 +3604,17 @@ Is there anything else I can help you with?`,
         supportCta?.href,
         briefForHandoff,
       );
+      if (quickActions.length > 0) {
+        for (const action of quickActions) {
+          if (action.href) {
+            action.href = canonicalizeLiveEventHref(
+              action.href,
+              liveEvents,
+              preferredEvent,
+            );
+          }
+        }
+      }
       const replySupportCta = eventPageCta ? undefined : supportCta;
       setMessages((prev) => [
         ...prev,

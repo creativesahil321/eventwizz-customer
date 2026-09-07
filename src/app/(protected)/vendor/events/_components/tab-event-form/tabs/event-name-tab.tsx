@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { AlertCircle } from "lucide-react";
@@ -31,7 +32,7 @@ import { toast } from "sonner";
 import { useEventFormContext } from "../../events-form-provider";
 import { StepOneType, stepOneSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { addCacheBusting } from "@/lib/image-utils";
 import {
   BANNER_HEADING_MAX_WORDS,
@@ -40,6 +41,7 @@ import {
 } from "@/lib/word-count";
 import { mapGlobalStepOneToLocal } from "../../../_lib/map-global-step-to-local";
 import { useSyncStepFormFromGlobal } from "../../../_lib/use-sync-step-form-from-global";
+import { writeVendorEventPreviewDraft } from "../../../_lib/vendor-event-preview-live-data";
 import AddressAutocomplete from "./_components/address-autocomplete";
 import EventLocationMap from "./_components/event-location-map";
 import { useLocationStore } from "@/store/location.store";
@@ -48,9 +50,59 @@ import {
   resolveVenueLocationCoords,
 } from "@/lib/venue-location-address";
 
+function filePreviewSrc(file: File): string {
+  const withPreview = file as File & { preview?: string };
+  if (typeof withPreview.preview === "string" && withPreview.preview.trim()) {
+    return withPreview.preview;
+  }
+  return URL.createObjectURL(file);
+}
+
+function applyBannerMediaToUi(
+  values: Pick<StepOneType, "event_banner_image" | "event_banner_video">,
+  setBannerImageFile: (files: File[]) => void,
+  setBannerImageUrl: (url: string) => void,
+  setBannerVideoFile: (files: File[]) => void,
+  setBannerVideoUrl: (url: string) => void,
+  setBannerType: (type: "image" | "video") => void,
+) {
+  const bannerImage = values.event_banner_image;
+  const bannerVideo = values.event_banner_video;
+
+  if (typeof File !== "undefined" && bannerImage instanceof File) {
+    setBannerImageFile([bannerImage]);
+    setBannerImageUrl(filePreviewSrc(bannerImage));
+    setBannerType("image");
+  } else if (typeof bannerImage === "string" && bannerImage.trim()) {
+    setBannerImageUrl(bannerImage);
+    setBannerImageFile([]);
+    setBannerType("image");
+  } else {
+    setBannerImageUrl("");
+    setBannerImageFile([]);
+  }
+
+  if (typeof File !== "undefined" && bannerVideo instanceof File) {
+    setBannerVideoFile([bannerVideo]);
+    setBannerVideoUrl(filePreviewSrc(bannerVideo));
+    setBannerType("video");
+  } else if (typeof bannerVideo === "string" && bannerVideo.trim()) {
+    setBannerVideoUrl(bannerVideo);
+    setBannerVideoFile([]);
+    setBannerType("video");
+  } else {
+    setBannerVideoUrl("");
+    setBannerVideoFile([]);
+  }
+}
+
 export default function EventNameTab() {
   // No need to use session update as we get data from API
   const router = useRouter();
+  const params = useParams<{ eventID?: string }>();
+  const eventIdFromRoute = Array.isArray(params?.eventID)
+    ? params.eventID[0]
+    : params?.eventID;
   // Access the GLOBAL form context
   const {
     form: globalForm,
@@ -65,17 +117,50 @@ export default function EventNameTab() {
   const { data: eventCategories, isLoading: isEventCategoriesLoading } =
     useEventCategories();
 
+  const initialStepOne = globalForm.getValues().stepOne;
+  const initialBannerImage = initialStepOne?.event_banner_image;
+  const initialBannerVideo = initialStepOne?.event_banner_video;
+
   // State for banner files and uploads
-  const [bannerType, setBannerType] = useState<"image" | "video">("image");
-  const [bannerImageFile, setBannerImageFile] = useState<File[]>([]);
-  const [bannerVideoFile, setBannerVideoFile] = useState<File[]>([]);
+  const [bannerType, setBannerType] = useState<"image" | "video">(() => {
+    if (typeof File !== "undefined" && initialBannerVideo instanceof File) {
+      return "video";
+    }
+    if (
+      typeof initialBannerVideo === "string" &&
+      initialBannerVideo.trim()
+    ) {
+      return "video";
+    }
+    return "image";
+  });
+  const [bannerImageFile, setBannerImageFile] = useState<File[]>(() =>
+    typeof File !== "undefined" && initialBannerImage instanceof File
+      ? [initialBannerImage]
+      : [],
+  );
+  const [bannerVideoFile, setBannerVideoFile] = useState<File[]>(() =>
+    typeof File !== "undefined" && initialBannerVideo instanceof File
+      ? [initialBannerVideo]
+      : [],
+  );
   const [bannerImageUploading, setBannerImageUploading] = useState(false);
   const [bannerVideoUploading, setBannerVideoUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // URL strings from backend for existing videos/images
-  const [bannerImageUrl, setBannerImageUrl] = useState<string>("");
-  const [bannerVideoUrl, setBannerVideoUrl] = useState<string>("");
+  // URL strings from backend or unsaved File previews
+  const [bannerImageUrl, setBannerImageUrl] = useState(() => {
+    if (typeof File !== "undefined" && initialBannerImage instanceof File) {
+      return filePreviewSrc(initialBannerImage);
+    }
+    return typeof initialBannerImage === "string" ? initialBannerImage : "";
+  });
+  const [bannerVideoUrl, setBannerVideoUrl] = useState(() => {
+    if (typeof File !== "undefined" && initialBannerVideo instanceof File) {
+      return filePreviewSrc(initialBannerVideo);
+    }
+    return typeof initialBannerVideo === "string" ? initialBannerVideo : "";
+  });
   const selectedLocation = useLocationStore((state) => state.selectedLocation);
   const venueAddressHint = useMemo(
     () => resolveVenueLocationAddress(selectedLocation),
@@ -145,20 +230,50 @@ export default function EventNameTab() {
     toLocalValues: (stepOne) =>
       mapGlobalStepOneToLocal(stepOne, vendorLocationId),
     onAfterSync: (values) => {
-      const bannerImage = values.event_banner_image;
-      if (typeof bannerImage === "string" && bannerImage) {
-        setBannerImageUrl(bannerImage);
-        setBannerType("image");
-        setBannerImageFile([]);
-      }
-      const bannerVideo = values.event_banner_video;
-      if (typeof bannerVideo === "string" && bannerVideo) {
-        setBannerVideoUrl(bannerVideo);
-        setBannerType("video");
-        setBannerVideoFile([]);
-      }
+      applyBannerMediaToUi(
+        values,
+        setBannerImageFile,
+        setBannerImageUrl,
+        setBannerVideoFile,
+        setBannerVideoUrl,
+        setBannerType,
+      );
     },
   });
+
+  const globalBannerImage = useWatch({
+    control: globalForm.control,
+    name: "stepOne.event_banner_image",
+  });
+  const globalBannerVideo = useWatch({
+    control: globalForm.control,
+    name: "stepOne.event_banner_video",
+  });
+
+  useEffect(() => {
+    if (!persistedHydrated) return;
+    form.setValue(
+      "event_banner_image",
+      globalBannerImage as StepOneType["event_banner_image"],
+      { shouldDirty: false },
+    );
+    form.setValue(
+      "event_banner_video",
+      globalBannerVideo as StepOneType["event_banner_video"],
+      { shouldDirty: false },
+    );
+    applyBannerMediaToUi(
+      {
+        event_banner_image: globalBannerImage as StepOneType["event_banner_image"],
+        event_banner_video: globalBannerVideo as StepOneType["event_banner_video"],
+      },
+      setBannerImageFile,
+      setBannerImageUrl,
+      setBannerVideoFile,
+      setBannerVideoUrl,
+      setBannerType,
+    );
+  }, [form, persistedHydrated, globalBannerImage, globalBannerVideo]);
 
   // Update form when vendor_location_id changes
   useEffect(() => {
@@ -192,47 +307,14 @@ export default function EventNameTab() {
     }
   }, [form, globalForm, venueAddressHint, venueCoords]);
 
-  // Initialize banner image and video from existing data
-  useEffect(() => {
-    const bannerImage = form.watch("event_banner_image");
-    const bannerVideo = form.watch("event_banner_video");
-
-    // Handle banner image
-    if (bannerImage) {
-      if (typeof bannerImage === "string" && bannerImage) {
-        // If it's a URL string, set the banner type to image
-        setBannerImageUrl(bannerImage);
-        setBannerType("image");
-        console.log("Existing image URL detected:", bannerImage);
-      } else if (bannerImage instanceof File) {
-        // If it's already a File object
-        setBannerImageFile([bannerImage]);
-        setBannerImageUrl(""); // Clear URL when using File
-        setBannerType("image");
-        console.log("Existing image File detected:", bannerImage);
-      }
-    } else {
-      setBannerImageUrl("");
-    }
-
-    // Handle banner video
-    if (bannerVideo) {
-      if (typeof bannerVideo === "string" && bannerVideo) {
-        // If it's a URL string
-        setBannerVideoUrl(bannerVideo);
-        setBannerType("video");
-        console.log("Existing video URL detected:", bannerVideo);
-      } else if (bannerVideo instanceof File) {
-        // If it's already a File object
-        setBannerVideoFile([bannerVideo]);
-        setBannerVideoUrl(""); // Clear URL when using File
-        setBannerType("video");
-        console.log("Existing video File detected:", bannerVideo);
-      }
-    } else {
-      setBannerVideoUrl("");
-    }
-  }, [form]);
+  const persistUnsavedDraft = useCallback(() => {
+    const eventId =
+      Number(globalForm.getValues().stepOne?.event_id) ||
+      Number(eventIdFromRoute) ||
+      0;
+    if (eventId <= 0) return;
+    writeVendorEventPreviewDraft(eventId, globalForm.getValues());
+  }, [eventIdFromRoute, globalForm]);
 
   // Cleanup object URLs to prevent memory leaks
   useEffect(() => {
@@ -264,20 +346,24 @@ export default function EventNameTab() {
 
       try {
         // Update local form
-        form.setValue("event_banner_image", files[0]);
+        form.setValue("event_banner_image", files[0], { shouldDirty: true });
 
         // Sync to global form
         const currentStepOne = globalForm.getValues().stepOne || {};
-        globalForm.setValue("stepOne", {
-          ...currentStepOne,
-          event_banner_image: files[0],
-          remove_event_banner_image: false,
-          remove_event_banner_video: false,
-        });
+        globalForm.setValue(
+          "stepOne",
+          {
+            ...currentStepOne,
+            event_banner_image: files[0],
+            remove_event_banner_image: false,
+            remove_event_banner_video: false,
+          },
+          { shouldDirty: true },
+        );
 
         // Clear removal flags when new file is uploaded
-        form.setValue("remove_event_banner_image", false);
-        form.setValue("remove_event_banner_video", false);
+        form.setValue("remove_event_banner_image", false, { shouldDirty: true });
+        form.setValue("remove_event_banner_video", false, { shouldDirty: true });
 
         // Switch to image mode
         setBannerType("image");
@@ -285,14 +371,15 @@ export default function EventNameTab() {
         // Clear video when image is uploaded
         setBannerVideoFile([]);
         setBannerVideoUrl(""); // Clear video URL too
-        form.setValue("event_banner_video", undefined);
+        form.setValue("event_banner_video", undefined, { shouldDirty: true });
+        persistUnsavedDraft();
       } catch (error) {
         console.error("Error handling banner image:", error);
       } finally {
         setBannerImageUploading(false);
       }
     },
-    [form, globalForm],
+    [form, globalForm, persistUnsavedDraft],
   );
 
   // Handle banner video change
@@ -332,21 +419,24 @@ export default function EventNameTab() {
         setBannerVideoUrl(""); // Clear URL when new file is uploaded
 
         // Update local form
-        form.setValue("event_banner_video", file);
-        console.log("Video uploaded, form values:", form.getValues());
+        form.setValue("event_banner_video", file, { shouldDirty: true });
 
         // Clear removal flags when new file is uploaded
-        form.setValue("remove_event_banner_image", false);
-        form.setValue("remove_event_banner_video", false);
+        form.setValue("remove_event_banner_image", false, { shouldDirty: true });
+        form.setValue("remove_event_banner_video", false, { shouldDirty: true });
 
         // Update global form
         const currentStepOne = globalForm.getValues().stepOne || {};
-        globalForm.setValue("stepOne", {
-          ...currentStepOne,
-          event_banner_video: file,
-          remove_event_banner_image: false,
-          remove_event_banner_video: false,
-        });
+        globalForm.setValue(
+          "stepOne",
+          {
+            ...currentStepOne,
+            event_banner_video: file,
+            remove_event_banner_image: false,
+            remove_event_banner_video: false,
+          },
+          { shouldDirty: true },
+        );
 
         // Switch to video mode
         setBannerType("video");
@@ -354,8 +444,11 @@ export default function EventNameTab() {
         // Clear image when video is uploaded
         setBannerImageFile([]);
         setBannerImageUrl(""); // Clear image URL too
-        form.setValue("event_banner_image", undefined);
-        globalForm.setValue("stepOne.event_banner_image", undefined);
+        form.setValue("event_banner_image", undefined, { shouldDirty: true });
+        globalForm.setValue("stepOne.event_banner_image", undefined, {
+          shouldDirty: true,
+        });
+        persistUnsavedDraft();
 
         // Success toast will be shown by axios interceptor when form is saved
       } catch (error) {
@@ -368,41 +461,51 @@ export default function EventNameTab() {
         setBannerVideoUploading(false);
       }
     },
-    [form, globalForm],
+    [form, globalForm, persistUnsavedDraft],
   );
 
   // Handle banner image removal
   const handleRemoveBannerImage = useCallback(() => {
     setBannerImageFile([]);
     setBannerImageUrl(""); // Clear URL too
-    form.setValue("event_banner_image", undefined);
-    form.setValue("remove_event_banner_image", true);
+    form.setValue("event_banner_image", undefined, { shouldDirty: true });
+    form.setValue("remove_event_banner_image", true, { shouldDirty: true });
 
     // Update global form
     const currentStepOne = globalForm.getValues().stepOne || {};
-    globalForm.setValue("stepOne", {
-      ...currentStepOne,
-      event_banner_image: undefined,
-      remove_event_banner_image: true,
-    });
-  }, [form, globalForm]);
+    globalForm.setValue(
+      "stepOne",
+      {
+        ...currentStepOne,
+        event_banner_image: undefined,
+        remove_event_banner_image: true,
+      },
+      { shouldDirty: true },
+    );
+    persistUnsavedDraft();
+  }, [form, globalForm, persistUnsavedDraft]);
 
   // Handle banner video removal
   const handleRemoveBannerVideo = useCallback(() => {
     setBannerVideoFile([]);
     setBannerVideoUrl(""); // Clear URL too
-    form.setValue("event_banner_video", undefined);
-    form.setValue("remove_event_banner_video", true);
+    form.setValue("event_banner_video", undefined, { shouldDirty: true });
+    form.setValue("remove_event_banner_video", true, { shouldDirty: true });
     setBannerType("image");
 
     // Update global form
     const currentStepOne = globalForm.getValues().stepOne || {};
-    globalForm.setValue("stepOne", {
-      ...currentStepOne,
-      event_banner_video: undefined,
-      remove_event_banner_video: true,
-    });
-  }, [form, globalForm]);
+    globalForm.setValue(
+      "stepOne",
+      {
+        ...currentStepOne,
+        event_banner_video: undefined,
+        remove_event_banner_video: true,
+      },
+      { shouldDirty: true },
+    );
+    persistUnsavedDraft();
+  }, [form, globalForm, persistUnsavedDraft]);
 
   // Handle form submission
   const handleSubmit = useCallback(
@@ -592,6 +695,24 @@ export default function EventNameTab() {
     },
     [globalForm, advanceStep, form, setActiveField, router, bannerImageFile],
   );
+
+  if (globalLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-7 w-28" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+        <Skeleton className="h-10 w-full rounded-md" />
+        <Skeleton className="h-48 w-full rounded-lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6 md:space-y-8">

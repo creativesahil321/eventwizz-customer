@@ -37,6 +37,7 @@ import {
   type VendorStepSixRoomEntry,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { toLocationCoordsPayload } from "@/lib/to-location-coords-payload";
+import { clearVendorEventPreviewDraft } from "@/app/(protected)/vendor/events/_lib/vendor-event-preview-live-data";
 import {
   EventsQueryParams,
   EventItem,
@@ -1183,6 +1184,10 @@ export const eventsService = {
       eventId != null && String(eventId).trim().length > 0
         ? String(eventId).trim()
         : undefined;
+
+    if (normalizedId) {
+      void clearVendorEventPreviewDraft(normalizedId);
+    }
 
     window.dispatchEvent(
       new CustomEvent("event-data-changed", {

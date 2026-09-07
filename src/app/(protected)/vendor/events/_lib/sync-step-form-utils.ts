@@ -23,6 +23,19 @@ export function canSyncStepFromGlobal(
   return true;
 }
 
+function mediaSyncToken(value: unknown): string {
+  if (typeof File !== "undefined" && value instanceof File) {
+    return `file:${value.name}:${value.size}:${value.lastModified}`;
+  }
+  if (typeof value === "string" && value.trim()) {
+    return `url:${value.trim()}`;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => mediaSyncToken(item)).join(",");
+  }
+  return "none";
+}
+
 export function buildStepSyncFingerprint(
   stepKey: EventFormStepKey,
   globalStep: EventSchemaType[EventFormStepKey],
@@ -31,12 +44,26 @@ export function buildStepSyncFingerprint(
 
   if (stepKey === "stepOne") {
     const stepOne = globalStep as EventSchemaType["stepOne"];
-    return `${Number(stepOne.event_id) || 0}:${String(stepOne.event_name || "").trim()}:${stepOne.event_category_id}`;
+    return [
+      Number(stepOne.event_id) || 0,
+      String(stepOne.event_name || "").trim(),
+      stepOne.event_category_id,
+      mediaSyncToken(stepOne.event_banner_image),
+      mediaSyncToken(stepOne.event_banner_video),
+      stepOne.remove_event_banner_image ? 1 : 0,
+      stepOne.remove_event_banner_video ? 1 : 0,
+    ].join(":");
   }
 
   if (stepKey === "stepTwo") {
     const stepTwo = globalStep as EventSchemaType["stepTwo"];
-    return `${Number(stepTwo.event_id) || 0}:${stepTwo.is_rooms}:${String(stepTwo.package_title || "")}`;
+    return [
+      Number(stepTwo.event_id) || 0,
+      stepTwo.is_rooms,
+      String(stepTwo.package_title || ""),
+      mediaSyncToken(stepTwo.package_image),
+      mediaSyncToken(stepTwo.gallery),
+    ].join(":");
   }
 
   return JSON.stringify(globalStep);

@@ -593,8 +593,7 @@ export default function EventDetailClient({
             headingEmphasis={headingEmphasisFromSite}
             location={{
               title: "EVENT LOCATION",
-              description:
-                slices.event_address || "Event location will be displayed here",
+              description: slices.event_address || "",
               icon: "MapPin",
               latitude: slices.lat,
               longitude: slices.long,

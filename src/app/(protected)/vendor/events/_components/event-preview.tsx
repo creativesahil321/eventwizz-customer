@@ -793,7 +793,7 @@ export function EventPreview({
           location={{
             title: "EVENT LOCATION",
             description:
-              brochureAddress || "Event location will be displayed here",
+              brochureAddress || "",
             icon: "MapPin",
             latitude: brochureLat,
             longitude: brochureLng,
