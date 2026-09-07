@@ -42,6 +42,7 @@ export function SocialMediaTab() {
                   disabled={readOnly}
                   placeholder="https://facebook.com/eventwizz"
                   {...field}
+                  value={field.value ?? ""}
                 />
               </FormControl>
               <FormMessage />
@@ -64,6 +65,7 @@ export function SocialMediaTab() {
                   disabled={readOnly}
                   placeholder="https://twitter.com/eventwizz"
                   {...field}
+                  value={field.value ?? ""}
                 />
               </FormControl>
               <FormMessage />
@@ -86,6 +88,7 @@ export function SocialMediaTab() {
                   disabled={readOnly}
                   placeholder="https://instagram.com/eventwizz"
                   {...field}
+                  value={field.value ?? ""}
                 />
               </FormControl>
               <FormMessage />
@@ -108,6 +111,7 @@ export function SocialMediaTab() {
                   disabled={readOnly}
                   placeholder="https://linkedin.com/company/eventwizz"
                   {...field}
+                  value={field.value ?? ""}
                 />
               </FormControl>
               <FormMessage />
@@ -130,6 +134,7 @@ export function SocialMediaTab() {
                   disabled={readOnly}
                   placeholder="https://youtube.com/c/eventwizz"
                   {...field}
+                  value={field.value ?? ""}
                 />
               </FormControl>
               <FormMessage />

@@ -39,6 +39,48 @@ export const geocodeLocation = async (
   }
 };
 
+export function extractCityFromPlace(
+  place: google.maps.places.PlaceResult,
+): string {
+  if (place.address_components?.length) {
+    const pick = (...types: string[]) =>
+      place.address_components?.find((c) =>
+        types.some((t) => c.types.includes(t)),
+      )?.long_name;
+
+    const city =
+      pick("postal_town", "locality") ||
+      pick("sublocality_level_1", "sublocality") ||
+      pick("administrative_area_level_2") ||
+      pick("administrative_area_level_1");
+    if (city?.trim()) return city.trim();
+  }
+
+  if (place.formatted_address) {
+    const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/gi;
+    const US_ZIP = /\b\d{5}(?:-\d{4})?\b/g;
+    const parts = place.formatted_address
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length >= 2) {
+      const withoutCountry = parts.slice(0, -1);
+      for (let i = withoutCountry.length - 1; i >= 0; i--) {
+        const candidate = withoutCountry[i]
+          .replace(UK_POSTCODE, "")
+          .replace(US_ZIP, "")
+          .trim()
+          .replace(/^[-,]+|[-,]+$/g, "")
+          .trim();
+        if (candidate.length >= 2 && !/^\d+$/.test(candidate)) {
+          return candidate;
+        }
+      }
+    }
+  }
+  return "";
+}
+
 export const fetchLocationDetails = <T extends FormWithLocationFields>(
   form: UseFormReturn<T>,
   placeId: string
@@ -74,29 +116,20 @@ export const fetchLocationDetails = <T extends FormWithLocationFields>(
       }
 
       // Update form values with place details using type assertion for safety
-      // Use additional type assertion for safety
       form.setValue(
         "address" as Path<T>,
         (place.formatted_address ?? "") as unknown as PathValue<T, Path<T>>,
-        { shouldValidate: true }
+        { shouldValidate: true, shouldDirty: true }
       );
 
-      // Extract city from address components if available
-      if (place.address_components) {
-        const cityComponent = place.address_components.find(
-          (component) =>
-            component.types.includes("locality") ||
-            component.types.includes("postal_town") ||
-            component.types.includes("administrative_area_level_1")
+      // Robustly extract city from address components or formatted address
+      const resolvedCity = extractCityFromPlace(place);
+      if (resolvedCity) {
+        form.setValue(
+          "city" as Path<T>,
+          resolvedCity as unknown as PathValue<T, Path<T>>,
+          { shouldValidate: true, shouldDirty: true }
         );
-
-        if (cityComponent) {
-          form.setValue(
-            "city" as Path<T>,
-            cityComponent.long_name as unknown as PathValue<T, Path<T>>,
-            { shouldValidate: true }
-          );
-        }
       }
 
       // Pin for venue location create/update payloads

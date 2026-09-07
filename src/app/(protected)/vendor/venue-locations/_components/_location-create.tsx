@@ -259,7 +259,8 @@ export default function CreateLocationDialog() {
                         {...field}
                         autoComplete="off"
                         readOnly
-                        className="bg-muted cursor-not-allowed"
+                        disabled
+                        className="bg-muted cursor-not-allowed opacity-80"
                       />
                     </FormControl>
                     <FormMessage />

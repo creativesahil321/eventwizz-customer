@@ -203,8 +203,8 @@ export default function UpdateLocationDialog({
                       {...field}
                       autoComplete="off"
                       readOnly
-                      disabled={isSettingDefault}
-                      className="bg-muted cursor-not-allowed"
+                      disabled
+                      className="bg-muted cursor-not-allowed opacity-80"
                     />
                   </FormControl>
                   <FormMessage />

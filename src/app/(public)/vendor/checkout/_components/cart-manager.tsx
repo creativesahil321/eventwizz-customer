@@ -725,7 +725,7 @@ export default function CartManager({}: CartManagerProps) {
         </h3>
         <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
           {chatEventHref
-            ? "Tap the dates you want on the event page — that adds them here. Then you can choose tables and pay."
+            ? "Tap the dates you want on the event page — that adds them here. Then you can choose tickets, tables, drinks, and pay."
             : "Browse events to find tickets, tables, and packages to add to your cart."}
         </p>
         {chatEventHref ? (

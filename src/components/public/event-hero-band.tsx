@@ -9,9 +9,6 @@ import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import type { EventHeroBreadcrumb, EventHeroMeta } from "@/lib/event-hero-meta";
 import {
-  heroBandContentPadClass,
-  heroBandCopyPlacementClass,
-  heroBandCopyPlacementStyle,
   heroBandMediaOverlayClass,
   heroBannerContactRowClass,
   heroBannerHeadingTypeClass,
@@ -207,8 +204,9 @@ export function EventHeroBand({
     <section
       ref={sectionRef}
       className={cn(
-        "relative mx-auto w-full overflow-hidden",
-        "h-[min(64dvh,700px)] min-h-[360px] max-h-[760px] md:h-[min(68dvh,720px)] md:min-h-[380px]",
+        "relative mx-auto flex w-full flex-col overflow-hidden",
+        "min-h-[480px] md:min-h-[520px]",
+        "h-auto md:h-[min(68dvh,720px)]",
         onEditHero && "group/preview-edit cursor-pointer",
         className,
       )}
@@ -287,12 +285,13 @@ export function EventHeroBand({
 
       <div
         className={cn(
-          heroBandCopyPlacementClass(bannerValign),
-          "max-w-7xl px-3 sm:px-4",
+          "relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-3 sm:px-4",
           heroHeadingMeasureClass,
-          heroBandContentPadClass(bannerValign),
+          bannerValign === "top" && "justify-start",
+          bannerValign === "bottom" && "justify-end",
+          (bannerValign === "center" || !bannerValign) && "justify-center",
+          "pt-24 pb-12 sm:pt-28 sm:pb-14 md:pt-32 md:pb-16",
         )}
-        style={heroBandCopyPlacementStyle(bannerValign)}
       >
         <div
           className={cn(

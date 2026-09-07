@@ -16,6 +16,7 @@ import {
 } from "date-fns";
 import { formatMoneyLocale, parseFormattedMoney } from "@/lib/currency-format";
 import { getTenantCurrencySymbol } from "@/lib/tenant-currency";
+import { normalizeVendorChatText } from "@/lib/chat-typo-normalizer";
 
 export type VendorChatDashboardSnapshot = {
   current_location_id?: number;
@@ -98,7 +99,7 @@ export function resolveChatDateRange(
   text: string,
   now: Date = new Date(),
 ): ChatDateRange {
-  const t = text.toLowerCase();
+  const t = normalizeVendorChatText(text).toLowerCase();
 
   // All-time / overall (Booking History style — no from/to dates)
   if (isAllTimePeriod(t)) {
@@ -233,59 +234,69 @@ export function resolveChatDateRange(
 }
 
 export function isVendorStatsIntent(text: string): boolean {
+  const norm = normalizeVendorChatText(text);
   return (
-    isVendorEarningsIntent(text) ||
-    isVendorBookingSummaryIntent(text) ||
-    /\b(total\s+events?|active\s+events?|past\s+events?|draft\s+events?|cancelled\s+events?|how\s+many\s+events?|event\s+count|my\s+events?|total\s+bookings?|booking\s+count|bookings?\s+(today|this|last|total|cost)|how\s+many\s+bookings?|dashboard\s+stats?|my\s+stats?|business\s+stats?|venue\s+stats?|performance|summary|overview\s+stats?|recent\s+bookings?|platform\s+fee)\b/i.test(
-      text,
+    isVendorEarningsIntent(norm) ||
+    isVendorBookingSummaryIntent(norm) ||
+    isVendorPendingIntent(norm) ||
+    isVendorRefundIntent(norm) ||
+    isVendorCommissionIntent(norm) ||
+    /\b(total\s+events?|active\s+events?|past\s+events?|draft\s+events?|cancelled\s+(events?|bookings?)|how\s+many\s+events?|event\s+count|my\s+events?|total\s+bookings?|booking\s+count|bookings?\s+(today|this|last|total|cost)|how\s+many\s+(bookings?|payments?)|dashboard\s+stats?|my\s+stats?|business\s+stats?|venue\s+stats?|performance|summary|overview\s+stats?|recent\s+bookings?|platform\s+fee|pending\s+balance|pending\s+money|partial-?payment\s+bookings?)\b/i.test(
+      norm,
     )
   );
 }
 
 export function isVendorEarningsIntent(text: string): boolean {
+  const norm = normalizeVendorChatText(text);
   // “how much we refunded” is refunds, not earnings
   if (
-    isVendorRefundIntent(text) ||
-    isVendorPendingIntent(text) ||
-    isVendorDepositIntent(text) ||
-    isVendorCommissionIntent(text)
+    isVendorRefundIntent(norm) ||
+    isVendorPendingIntent(norm) ||
+    isVendorDepositIntent(norm) ||
+    isVendorCommissionIntent(norm)
   ) {
     return false;
   }
   return /\b(earn(ings?|ed)?|revenue|income|sales|ben[ei]fits?|profits?|total\s+payment|received\s+payment|how\s+much\s+(did\s+i|have\s+i|was|we|have\s+we)|money\s+(made|earned)|turnover|made\s+(this|last|in)|takings?|cash\s+taken)\b/i.test(
-    text,
+    norm,
   );
 }
 
 export function isVendorPendingIntent(text: string): boolean {
-  return /\b(pending\s+(payment|amount|balance)|balance\s+due|outstanding|owed|still\s+to\s+(pay|collect)|unpaid)\b/i.test(
-    text,
+  const norm = normalizeVendorChatText(text);
+  return /\b(pending\s+(payment|amount|balance|money)|(money|amount|balance|payment)\s+(?:is\s+)?(?:currently\s+)?pending|balance\s+due|outstanding|owed|still\s+to\s+(pay|collect)|unpaid)\b/i.test(
+    norm,
   );
 }
 
 export function isVendorCommissionIntent(text: string): boolean {
+  const norm = normalizeVendorChatText(text);
   return /\b(commission|platform\s+fee|fees?\s+due|fee\s+settled)\b/i.test(
-    text,
+    norm,
   );
 }
 
 export function isVendorRefundIntent(text: string): boolean {
-  return /\b(refunds?|refunded|refund)\b/i.test(text);
+  const norm = normalizeVendorChatText(text);
+  return /\b(refunds?|refunded|refund)\b/i.test(norm);
 }
 
 export function isVendorDepositIntent(text: string): boolean {
-  return /\b(deposits?|deposit\s+amount|total\s+deposit)\b/i.test(text);
+  const norm = normalizeVendorChatText(text);
+  return /\b(deposits?|deposit\s+amount|total\s+deposit)\b/i.test(norm);
 }
 
 /** Booking History summary cards (total / deposit / pending / refund / fees). */
 export function isVendorBookingSummaryIntent(text: string): boolean {
+  const norm = normalizeVendorChatText(text);
   return (
-    isVendorRefundIntent(text) ||
-    isVendorPendingIntent(text) ||
-    isVendorDepositIntent(text) ||
-    isVendorCommissionIntent(text) ||
+    isVendorRefundIntent(norm) ||
+    isVendorPendingIntent(norm) ||
+    isVendorDepositIntent(norm) ||
+    isVendorCommissionIntent(norm) ||
     /\b(total\s+amount|booking\s+summary|bookings?\s+summary|how\s+much\s+(in\s+)?total|grand\s+total)\b/i.test(
-      text,
+      norm,
     )
   );
 }

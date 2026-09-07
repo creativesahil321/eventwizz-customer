@@ -302,8 +302,8 @@ export function DuplicateLocationFields({
                       placeholder="Select an address above to auto-fill"
                       autoComplete="off"
                       readOnly
-                      disabled={readOnly}
-                      className="h-11 bg-muted border-[#E5E7EB] cursor-not-allowed"
+                      disabled
+                      className="h-11 bg-muted border-[#E5E7EB] cursor-not-allowed opacity-80"
                       onFocus={() => onFieldFocus?.("city")}
                     />
                   </FormControl>

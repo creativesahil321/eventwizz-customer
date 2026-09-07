@@ -1331,8 +1331,9 @@ export default function AICollectInfo({
                   <input
                     {...form.register("city")}
                     readOnly
+                    disabled
                     autoComplete="off"
-                    placeholder="Filled from your Google listing"
+                    placeholder="Auto-detected from address"
                     className={`${INPUT_CLASS} cursor-not-allowed opacity-80`}
                   />
                   <p className="text-xs text-slate-500 mt-1.5">

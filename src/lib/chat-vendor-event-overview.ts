@@ -15,7 +15,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useLocationStore } from "@/store/location.store";
 
 const GENERIC_EVENT_WORDS =
-  /^(this|that|your|an|a|the|total|active|past|draft|our|my|new|all|next|last|event|events)$/i;
+  /^(this|that|your|an|a|the|total|active|past|draft|our|my|new|all|next|last|event|events|today|todays|today\s*s|yesterday|yesterdays|yesterday\s*s|tomorrow|tomorrows|tonight|tonights|morning|evening|week|this\s*week|last\s*week|month|this\s*month|last\s*month|year|this\s*year|last\s*year|recent|latest|pending|confirmed|cancelled|partial|paid|customer|customers|booking|bookings)$/i;
 
 const EVENT_NAME_NOISE =
   /\b(bbooking|booking|bookings|revenue|list|pdf|csv|export|earn(ings?|ed)?|income|sales|profit|ben[ei]fit|turnover|money|made|guests?|tickets?|tables?|sold|left|available|overview|stats?|status|performance|how|much|many|we|you|i|did|have|has|was|were|done|get|give|tell|show|me|can|please|what|is|are|in|for|from|on|of|to|a|an|the|our|my|so|far)\b/gi;
@@ -32,9 +32,17 @@ function cleanEventName(raw: string): string {
 }
 
 function isUsableEventName(name: string): boolean {
-  if (!name || GENERIC_EVENT_WORDS.test(name)) return false;
-  if (name.split(/\s+/).length > 5) return false;
-  if (name.length < 2) return false;
+  const trimmed = name.trim();
+  if (!trimmed || GENERIC_EVENT_WORDS.test(trimmed)) return false;
+  if (
+    /^(today|todays|yesterday|yesterdays|tomorrow|tomorrows|tonight|morning|evening|week|month|year|recent|latest|pending|confirmed|partial|partial-payment|partial\s+payment|paid|unpaid|cancelled)(\s+s)?$/i.test(
+      trimmed
+    )
+  ) {
+    return false;
+  }
+  if (trimmed.split(/\s+/).length > 5) return false;
+  if (trimmed.length < 2) return false;
   return true;
 }
 
@@ -44,6 +52,24 @@ function isUsableEventName(name: string): boolean {
  */
 export function extractEventNameFromChat(text: string): string | null {
   const t = text.trim().replace(/\s+/g, " ");
+
+  // General booking list inquiries (e.g. "give me a list of today's booking", "show all bookings", "list of bookings")
+  // should never treat temporal words as event names.
+  if (
+    /\b(give\s+me\s+(a\s+)?list|list\s+of|show\s+me\s+(the\s+|all\s+)?bookings?|all\s+bookings?|today'?s?\s+bookings?|recent\s+bookings?|pending\s+bookings?)\b/i.test(
+      t
+    )
+  ) {
+    // Only extract if an explicit event preposition exists (e.g. "list of bookings for Diwali Party")
+    const explicitEvent = t.match(
+      /\b(?:for|in|about)\s+(?:the|our|my)?\s*([a-z0-9][\w'’-]*(?:\s+[a-z0-9][\w'’-]*){0,3})(?:\s+events?)?\b/i
+    );
+    if (explicitEvent?.[1]) {
+      const name = cleanEventName(explicitEvent[1]);
+      if (isUsableEventName(name)) return name;
+    }
+    return null;
+  }
 
   // “earn/bookings in/for/from Diwali event”
   const prepEvent = t.match(

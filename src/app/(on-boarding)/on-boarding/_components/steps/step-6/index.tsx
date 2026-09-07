@@ -548,7 +548,10 @@ export default function StepSix() {
       return [...prev, category];
     });
 
-    form.setValue("event_menu_category_id", toPositiveId(newCategory.id));
+    form.setValue("event_menu_category_id", toPositiveId(newCategory.id), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
     setScopedCateringField(
       "event_menu_category_id",
       toPositiveId(newCategory.id),
@@ -1112,6 +1115,7 @@ export default function StepSix() {
                                       }
                                     }}
                                     isLoading={isMenuCategoriesLoading}
+                                    value={toPositiveId(field.value)}
                                     initialValue={toPositiveId(field.value)}
                                     onCategoryCreated={
                                       handleMenuCategoryCreated

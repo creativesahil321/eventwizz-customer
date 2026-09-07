@@ -1002,8 +1002,11 @@ export default function StepEleven() {
                                         <FormControl>
                                           <Input
                                             {...field}
-                                            placeholder="City"
-                                            className="h-10 border-white/10 bg-white/5"
+                                            disabled
+                                            readOnly
+                                            autoComplete="off"
+                                            placeholder="Auto-detected from address"
+                                            className="h-10 border-white/10 bg-white/5 opacity-80 cursor-not-allowed text-slate-200"
                                           />
                                         </FormControl>
                                         <FormMessage />

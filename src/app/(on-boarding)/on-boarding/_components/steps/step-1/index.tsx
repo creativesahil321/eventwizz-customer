@@ -794,9 +794,10 @@ export default function StepOne() {
                               </FormLabel>
                               <FormControl>
                                 <Input
-                                  placeholder="Filled from your Google listing"
+                                  placeholder="Auto-detected from address"
                                   className="cursor-not-allowed bg-white/5 opacity-80"
                                   readOnly
+                                  disabled
                                   autoComplete="off"
                                   {...field}
                                 />

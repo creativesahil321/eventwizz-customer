@@ -440,11 +440,10 @@ export default function MoreInfoTab() {
           ) {
             const nextRoomIndex = resolvedRoomIndex + 1;
             if (nextRoomIndex < stepTwoRoomsForSave.length) {
-              globalForm.setValue(
-                "stepTwo.active_room_index",
-                nextRoomIndex,
-                { shouldDirty: false, shouldTouch: false },
-              );
+              globalForm.setValue("stepTwo.active_room_index", nextRoomIndex, {
+                shouldDirty: false,
+                shouldTouch: false,
+              });
               toast.info("Saved. Continue with the next room.");
               return;
             }
@@ -492,9 +491,7 @@ export default function MoreInfoTab() {
       void form.handleSubmit(
         (data) => handleSubmit(data, { applyToAllRooms: false }),
         () => {
-          toast.error(
-            "Please complete the required address for this room.",
-          );
+          toast.error("Please complete the required address for this room.");
         },
       )();
     },
@@ -523,13 +520,8 @@ export default function MoreInfoTab() {
               Add more information
             </h2>
             <p className="text-sm text-gray-500 mt-1 mb-4">
-              Upload important documents for your event
+              Upload brochures and flyers for your event
             </p>
-            <div className="rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-800">
-              Your event address and map are managed in the Event name tab.
-              Brochure uploads are saved separately here.
-            </div>
-
             <div className="space-y-6 border border-[#E5E7EB] p-6 rounded-md bg-white">
               <FormField
                 control={control}

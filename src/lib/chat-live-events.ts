@@ -125,6 +125,111 @@ const LIVE_EVENT_THEMES: Array<LiveEventTheme & { pattern: RegExp }> = [
   },
 ];
 
+const MONTH_INDEX: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+};
+
+const MONTH_PATTERN =
+  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+
+export type RequestedEventDate = {
+  month: number;
+  day: number;
+  label: string;
+};
+
+/** “25 dec”, “25th December”, “Dec 25”, “christmas day”. */
+export function extractRequestedEventDate(
+  text: string,
+): RequestedEventDate | null {
+  const query = normalizeChatBookingQuery(text).toLowerCase();
+  if (!query) return null;
+  if (/\bchristmas\s+day\b/.test(query)) {
+    return { month: 12, day: 25, label: "25 Dec" };
+  }
+  const dayFirst = query.match(
+    new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_PATTERN})\\b`, "i"),
+  );
+  if (dayFirst) {
+    const day = Number(dayFirst[1]);
+    const month = MONTH_INDEX[dayFirst[2].toLowerCase()] ?? 0;
+    if (day >= 1 && day <= 31 && month > 0) {
+      return { month, day, label: `${day} ${titleCaseMonth(dayFirst[2])}` };
+    }
+  }
+  const monthFirst = query.match(
+    new RegExp(`\\b(${MONTH_PATTERN})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "i"),
+  );
+  if (monthFirst) {
+    const month = MONTH_INDEX[monthFirst[1].toLowerCase()] ?? 0;
+    const day = Number(monthFirst[2]);
+    if (day >= 1 && day <= 31 && month > 0) {
+      return { month, day, label: `${day} ${titleCaseMonth(monthFirst[1])}` };
+    }
+  }
+  return null;
+}
+
+function titleCaseMonth(raw: string): string {
+  const key = raw.toLowerCase();
+  const names: Record<number, string> = {
+    1: "Jan",
+    2: "Feb",
+    3: "Mar",
+    4: "Apr",
+    5: "May",
+    6: "Jun",
+    7: "Jul",
+    8: "Aug",
+    9: "Sep",
+    10: "Oct",
+    11: "Nov",
+    12: "Dec",
+  };
+  return names[MONTH_INDEX[key] ?? 0] ?? raw;
+}
+
+function themeFromRequestedDate(
+  date: RequestedEventDate,
+): LiveEventTheme | null {
+  if (date.month === 12 && date.day >= 24 && date.day <= 26) {
+    return { key: "christmas", label: "Christmas party" };
+  }
+  if (date.month === 10 && date.day === 31) {
+    return { key: "halloween", label: "Halloween event" };
+  }
+  if (date.month === 2 && (date.day === 14 || date.day === 15)) {
+    return { key: "valentine", label: "Valentine's event" };
+  }
+  if (date.month === 1 && date.day === 1) {
+    return { key: "new-year", label: "New Year event" };
+  }
+  return null;
+}
+
 export function extractLiveEventTheme(text: string): LiveEventTheme | null {
   const query = normalizeChatBookingQuery(text);
   if (!query) return null;
@@ -133,7 +238,8 @@ export function extractLiveEventTheme(text: string): LiveEventTheme | null {
       return { key: theme.key, label: theme.label };
     }
   }
-  return null;
+  const dated = extractRequestedEventDate(query);
+  return dated ? themeFromRequestedDate(dated) : null;
 }
 
 function eventSearchText(event: LiveEvent): string {
@@ -148,10 +254,21 @@ function eventTitleMatchesTheme(
   return Boolean(def && def.pattern.test(event.title || ""));
 }
 
+function eventHasConflictingTheme(
+  event: LiveEvent,
+  theme: LiveEventTheme,
+): boolean {
+  return LIVE_EVENT_THEMES.some(
+    (other) =>
+      other.key !== theme.key && other.pattern.test(event.title || ""),
+  );
+}
+
 function eventMatchesTheme(event: LiveEvent, theme: LiveEventTheme): boolean {
   const def = LIVE_EVENT_THEMES.find((item) => item.key === theme.key);
   if (!def) return false;
   if (def.pattern.test(event.title || "")) return true;
+  if (eventHasConflictingTheme(event, theme)) return false;
   if (theme.key === "christmas") {
     return /\b(christmas|xmas)\b/i.test(event.category_name || "");
   }
@@ -246,6 +363,7 @@ export function isBrochureQuestion(text: string): boolean {
 
 export function isBroadEventListIntent(text: string): boolean {
   const t = normalizeChatBookingQuery(text);
+  if (extractRequestedEventDate(t)) return false;
   return /\b(what('?s|\s+is)\s+on|upcoming\s+events?|live\s+events?|what\s+events?|which\s+events?|any\s+events?|events?\s+available|list\s+(of\s+)?events?|events?\s+(do you |have you )?have)\b/i.test(
     t,
   );
@@ -442,9 +560,16 @@ function scoreEvent(query: string, event: LiveEvent): number {
 
   if (!q) return 0;
 
-  // Exact / contains title (not the whole chat sentence vs a short name)
-  if (title.length >= 4 && (q.includes(title) || title.includes(q))) return 100;
-  if (category.length >= 4 && (q.includes(category) || category.includes(q))) {
+  // Exact / contains title — only when the query is the title, not a chat dump
+  if (title.length >= 4 && q.includes(title) && q.length - title.length <= 16) {
+    return 100;
+  }
+  if (title.length >= 4 && title.includes(q) && q.length >= 4) return 100;
+  if (
+    category.length >= 4 &&
+    q.includes(category) &&
+    q.length - category.length <= 16
+  ) {
     return 90;
   }
 
@@ -677,6 +802,8 @@ export function matchLiveEvents(
   if (theme) {
     const themed = themeMatchesFromPool(pool, theme, scored);
     if (themed.length > 0) return themed;
+    // Named a type (Christmas, Diwali) — never fall back to a random wedding / DJ night.
+    return [];
   }
 
   if (scored.length > 0) {
@@ -690,7 +817,7 @@ export function matchLiveEvents(
     return categoryHits.map((event) => toMatch(event, 70));
   }
 
-  if (listingIntent || bookingIntent || brochureIntent || mentionedCity || theme) {
+  if (listingIntent || bookingIntent || brochureIntent || mentionedCity) {
     return asWeakMatches(pool);
   }
 
@@ -710,6 +837,15 @@ export function matchLiveEventsFromConversation(
 
   const exact = matchExactEventBookChoice(userText, liveEvents);
   if (exact.length > 0) return exact;
+
+  const currentTheme = extractLiveEventTheme(userText);
+  const fromCurrentTheme = matchLiveEvents(userText, liveEvents);
+  if (currentTheme) {
+    const themed = fromCurrentTheme.filter((item) =>
+      eventMatchesTheme(item.event, currentTheme),
+    );
+    return themed;
+  }
 
   const mentionedCity = extractMentionedCity(userText, liveEvents);
   const priorCorpus = messages.map((m) => m.content).join("\n");
@@ -993,13 +1129,16 @@ export function buildLiveEventsDirectReply(options: {
     }
     if (distinctEventTitles(themeHits) > 1) {
       const cityBit = askedCity ? ` in **${askedCity}**` : "";
+      const askedDate = extractRequestedEventDate(userText);
+      const dateBit = askedDate ? ` for **${askedDate.label}**` : "";
       return {
         content: buildEventPickerReply({
-          intro: `These look closest to a **${theme.label}**${cityBit}${nameBit}:`,
+          intro: `These look closest to a **${theme.label}**${dateBit}${cityBit}${nameBit}:`,
           events: themeHits.map((item) => item.event),
           totalCount: themeHits.length,
-          footer:
-            "Tap the one you’d like and I’ll help you book it here in chat.",
+          footer: askedDate
+            ? "Tap one and I’ll check whether that date is bookable here in chat."
+            : "Tap the one you’d like and I’ll help you book it here in chat.",
         }),
       };
     }
@@ -1105,6 +1244,7 @@ export function buildLiveEventsNoMatchReply(options: {
     };
   }
   const theme = userText ? extractLiveEventTheme(userText) : null;
+  const askedDate = userText ? extractRequestedEventDate(userText) : null;
   const askedCity = userText
     ? extractMentionedCity(userText, allLiveEvents)
     : null;
@@ -1112,8 +1252,12 @@ export function buildLiveEventsNoMatchReply(options: {
   let intro: string;
   if (cityLabel) {
     intro = `I don’t have that event listed in **${cityLabel}** right now${nameBit}. Here’s what’s available to book at **${brand}**:`;
+  } else if (theme && askedDate) {
+    intro = `I couldn’t find a **${theme.label}** for **${askedDate.label}** among our current listings${nameBit}. Here’s what’s available to book at **${brand}**:`;
   } else if (theme) {
     intro = `I couldn’t find a **${theme.label}** among our current listings${nameBit}. Here’s what’s available to book at **${brand}**:`;
+  } else if (askedDate) {
+    intro = `I can’t see a published event specifically for **${askedDate.label}** from this list${nameBit}. Tap an event and I’ll check whether that date is bookable:`;
   } else {
     intro = `I couldn’t find that event among our current locations${nameBit}. Here’s what’s available to book at **${brand}**:`;
   }

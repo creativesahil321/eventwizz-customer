@@ -78,6 +78,10 @@ export const env = createEnv({
       process.env.NEXT_PUBLIC_ENABLE_SUBDOMAIN_ROUTING ?? "false",
   },
 
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  skipValidation:
+    !!process.env.SKIP_ENV_VALIDATION ||
+    process.env.NODE_ENV === "test" ||
+    Boolean(process.env.npm_lifecycle_event?.startsWith("test")) ||
+    process.argv.some((a) => a.includes("test")),
   emptyStringAsUndefined: true,
 });

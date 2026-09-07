@@ -167,12 +167,29 @@ import {
   isVendorBookingListIntent,
   fetchVendorBookingListChatReply,
 } from "@/lib/chat-vendor-booking-list";
-import {
-  useVendorDashboardBookings,
-  vendorDashboardService,
-} from "@/services/vendor/dashboard";
+import { vendorDashboardService } from "@/services/vendor/dashboard";
 import { vendorBookingsService } from "@/services/vendor/bookings/bookings.service";
-import { useQuery } from "@tanstack/react-query";
+import {
+  isAdminDashboardStatsIntent,
+  isAdminVenueDetailIntent,
+  fetchAdminDashboardChatReply,
+  fetchAdminVenueDetailChatReply,
+} from "@/lib/chat-admin-live-stats";
+import {
+  type VendorQueryType,
+  detectVendorOnDemandQueryType,
+  fetchVendorOnDemandChatReply,
+  isVendorFollowUpQuery,
+  resolveVendorTopicFromHistory,
+} from "@/lib/chat-vendor-on-demand";
+import { usePermissionStore } from "@/store/permission.store";
+import {
+  hasPermissionForDomain,
+  detectRestrictedResourceIntent,
+  buildAccessRestrictedReply,
+  RESOURCE_PERMISSION_RULES,
+  type RestrictedResourceDomain,
+} from "@/lib/chat-permissions-guard";
 
 type QuickAction = {
   id: string;
@@ -266,6 +283,179 @@ function vendorGreetingActions(options?: {
     });
   }
   return actions;
+}
+
+function platformGuestGreetingActions(): QuickAction[] {
+  return [
+    {
+      id: "register-vendor",
+      label: "Register venue",
+      href: "/auth/register",
+    },
+    {
+      id: "book-demo",
+      label: "Book a demo",
+      sendText: "I'd like to book a demo or call",
+    },
+    {
+      id: "platform-features",
+      label: "Platform features",
+      sendText: "What features does EventWizz offer for venues?",
+    },
+    {
+      id: "vendor-onboarding",
+      label: "Vendor onboarding",
+      sendText: "How does venue onboarding work?",
+    },
+  ];
+}
+
+function platformVendorGreetingActions(
+  userPermissions?: string[] | null,
+): QuickAction[] {
+  const actions: QuickAction[] = [
+    {
+      id: "vendor-dashboard",
+      label: "Dashboard",
+      href: "/vendor/dashboard",
+    },
+    {
+      id: "vendor-events",
+      label: "Events",
+      href: "/vendor/events",
+    },
+    {
+      id: "vendor-bookings",
+      label: "Bookings",
+      href: "/vendor/booking-history",
+    },
+    {
+      id: "vendor-sites-essentials",
+      label: "Sites Essentials",
+      href: "/vendor/sites-essentials",
+    },
+  ];
+
+  if (
+    !userPermissions ||
+    !Array.isArray(userPermissions) ||
+    userPermissions.length >= 80
+  ) {
+    return actions;
+  }
+
+  return actions.filter((act) => {
+    if (act.id === "vendor-dashboard") {
+      return hasPermissionForDomain("dashboard", userPermissions);
+    }
+    if (act.id === "vendor-events") {
+      return hasPermissionForDomain("events", userPermissions);
+    }
+    if (act.id === "vendor-bookings") {
+      return userPermissions.includes("read-booking");
+    }
+    if (act.id === "vendor-sites-essentials") {
+      return hasPermissionForDomain("site_essentials", userPermissions);
+    }
+    return true;
+  });
+}
+
+function platformAdminGreetingActions(
+  userPermissions?: string[] | null,
+): QuickAction[] {
+  const actions: QuickAction[] = [
+    {
+      id: "admin-venues",
+      label: "All Venues",
+      href: "/admin/vendors",
+    },
+    {
+      id: "admin-commissions",
+      label: "Commission Overview",
+      href: "/admin/commission-overview",
+    },
+    {
+      id: "admin-disputes",
+      label: "Dispute Resolution",
+      href: "/admin/disputes",
+    },
+    {
+      id: "admin-sites-essentials",
+      label: "Site Essentials",
+      href: "/admin/sites-essentials",
+    },
+  ];
+
+  if (
+    !userPermissions ||
+    !Array.isArray(userPermissions) ||
+    userPermissions.length >= 80
+  ) {
+    return actions;
+  }
+
+  return actions.filter((act) => {
+    if (act.id === "admin-venues") {
+      return hasPermissionForDomain("vendors", userPermissions);
+    }
+    if (act.id === "admin-commissions") {
+      return hasPermissionForDomain("commissions", userPermissions);
+    }
+    if (act.id === "admin-disputes") {
+      return hasPermissionForDomain("disputes", userPermissions);
+    }
+    if (act.id === "admin-sites-essentials") {
+      return hasPermissionForDomain("site_essentials", userPermissions);
+    }
+    return true;
+  });
+}
+
+function getInitialChatGreeting(options: {
+  isVendorStorefront: boolean;
+  accountType?: string | null;
+  userName?: string | null;
+  userPermissions?: string[] | null;
+}): { content: string; quickActions?: QuickAction[] } {
+  const { isVendorStorefront, accountType, userName, userPermissions } = options;
+  const nameBit = userName ? `, ${userName}` : "";
+
+  if (isVendorStorefront) {
+    if (accountType === "vendor") {
+      return {
+        content: `Hello${nameBit} — how can I help you with your venue today?`,
+      };
+    }
+    return {
+      content: `Hello${nameBit} — how can I help you today? Book an event, ask what’s on, or type any other question.`,
+      quickActions: vendorGreetingActions({
+        showBookings: accountType === "customer",
+      }),
+    };
+  }
+
+  // Platform / Admin site (eventwizz.com / eventwizz.vercel.app)
+  if (accountType === "vendor") {
+    const actions = platformVendorGreetingActions(userPermissions);
+    return {
+      content: `Hello${nameBit} — how can I help you with your venue today? Manage your dashboard, events, bookings, locations, or onboarding.`,
+      quickActions: actions.length > 0 ? actions : undefined,
+    };
+  }
+  if (accountType === "admin") {
+    const actions = platformAdminGreetingActions(userPermissions);
+    return {
+      content: `Hello${nameBit} — how can I help you with platform administration today? Manage venues, commissions, disputes, or system settings.`,
+      quickActions: actions.length > 0 ? actions : undefined,
+    };
+  }
+
+  // Guest on platform site (venue owner / organiser / visitor)
+  return {
+    content: `Hello — welcome to EventWizz, the event management platform for venues. How can I help you today? Ask about vendor registration, onboarding, platform features, or booking a demo.`,
+    quickActions: platformGuestGreetingActions(),
+  };
 }
 
 function isPaymentSuccessPath(path: string | null | undefined): boolean {
@@ -529,17 +719,21 @@ function buildSubject(
   return seed.length > 80 ? `${seed.slice(0, 77)}…` : seed;
 }
 
-/** Render markdown links, bold (**text**), and safe relative paths. */
-function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
+/** Render markdown inline formatting (bold, inline code, links, choices) */
+function renderInlineSpans(
+  content: string,
+  isUser: boolean,
+  keyPrefix = "span"
+): ReactNode[] {
   const linkClass = isUser
     ? "underline underline-offset-2 font-medium opacity-95"
-    : "underline underline-offset-2 font-medium text-slate-700";
+    : "underline underline-offset-2 font-medium text-slate-700 hover:text-slate-950";
   const boldClass = isUser
     ? "font-bold opacity-100"
     : "font-bold text-slate-950";
 
   const pattern =
-    /(\*\*([^*]+)\*\*)|\[([^\]]+)\]\((\/?chat(?::[^)]*)?|https?:\/\/[^)\s]+|\/[^)\s]+)\)|(\/(?:vendor|customer|admin|auth|contact|welcome|on-boarding|preview)[^\s]*)/g;
+    /(\*\*([^*]+)\*\*)|(`([^`]+)`)|\[([^\]]+)\]\((\/?chat(?::[^)]*)?|https?:\/\/[^)\s]+|\/[^)\s]+)\)|(\/(?:vendor|customer|admin|auth|contact|welcome|on-boarding|preview)[^\s]*)/g;
 
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
@@ -553,43 +747,93 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
 
     if (match[1] && match[2] != null) {
       nodes.push(
-        <strong key={`bold-${key++}`} className={boldClass}>
+        <strong key={`${keyPrefix}-bold-${key++}`} className={boldClass}>
           {match[2]}
         </strong>,
       );
+    } else if (match[3] && match[4] != null) {
+      nodes.push(
+        <code
+          key={`${keyPrefix}-code-${key++}`}
+          className={
+            isUser
+              ? "rounded bg-black/20 px-1 py-0.5 font-mono text-[11px] font-semibold text-inherit"
+              : "rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-800 border border-slate-200/80"
+          }
+        >
+          {match[4]}
+        </code>
+      );
     } else {
-      const label = match[3];
-      const markdownHref = match[4];
-      const bareHref = match[5];
+      const label = match[5];
+      const markdownHref = match[6];
+      const bareHref = match[7];
       const parsed = markdownHref
         ? parseMarkdownLinkTarget(markdownHref)
         : bareHref
           ? parseMarkdownLinkTarget(bareHref)
           : null;
 
+      const isPill =
+        !isUser &&
+        Boolean(
+          label &&
+            /^(open|manage|view|go to|take me to|check|book)\b/i.test(
+              label.trim()
+            )
+        );
+
       if (parsed?.kind === "chat") {
         nodes.push(
-          <span key={`choice-${key++}`} className={boldClass}>
+          <span key={`${keyPrefix}-choice-${key++}`} className={boldClass}>
             {label || parsed.sendText}
           </span>,
         );
       } else if (parsed?.kind === "href" && parsed.href.startsWith("/")) {
         nodes.push(
-          <Link key={`link-${key++}`} href={parsed.href} className={linkClass}>
-            {label || parsed.href}
-          </Link>,
+          isPill ? (
+            <Link
+              key={`${keyPrefix}-link-${key++}`}
+              href={parsed.href}
+              className="inline-flex items-center gap-1 my-0.5 mr-1.5 rounded-md border border-slate-200/90 bg-slate-50/90 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-white hover:border-slate-300 hover:text-slate-950 transition-all cursor-pointer"
+            >
+              <span>{label || parsed.href}</span>
+              <ExternalLink className="h-2.5 w-2.5 text-slate-400" />
+            </Link>
+          ) : (
+            <Link
+              key={`${keyPrefix}-link-${key++}`}
+              href={parsed.href}
+              className={linkClass}
+            >
+              {label || parsed.href}
+            </Link>
+          ),
         );
       } else if (parsed?.kind === "href") {
         nodes.push(
-          <a
-            key={`link-${key++}`}
-            href={parsed.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={linkClass}
-          >
-            {label || parsed.href}
-          </a>,
+          isPill ? (
+            <a
+              key={`${keyPrefix}-link-${key++}`}
+              href={parsed.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 my-0.5 mr-1.5 rounded-md border border-slate-200/90 bg-slate-50/90 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-white hover:border-slate-300 hover:text-slate-950 transition-all cursor-pointer"
+            >
+              <span>{label || parsed.href}</span>
+              <ExternalLink className="h-2.5 w-2.5 text-slate-400" />
+            </a>
+          ) : (
+            <a
+              key={`${keyPrefix}-link-${key++}`}
+              href={parsed.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={linkClass}
+            >
+              {label || parsed.href}
+            </a>
+          ),
         );
       } else if (markdownHref || bareHref) {
         nodes.push(label || markdownHref || bareHref);
@@ -602,6 +846,110 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
   if (lastIndex < content.length) {
     nodes.push(content.slice(lastIndex));
   }
+
+  return nodes.length > 0 ? nodes : [content];
+}
+
+/** Render markdown links, bold (**text**), safe relative paths, and responsive tables. */
+function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
+  if (!content.includes("|")) {
+    return renderInlineSpans(content, isUser, "msg");
+  }
+
+  const lines = content.split("\n");
+  const nodes: ReactNode[] = [];
+  let currentTextLines: string[] = [];
+  let tableLines: string[] = [];
+  let key = 0;
+
+  function flushText() {
+    if (currentTextLines.length > 0) {
+      const text = currentTextLines.join("\n");
+      nodes.push(...renderInlineSpans(text, isUser, `t-${key++}`));
+      currentTextLines = [];
+    }
+  }
+
+  function flushTable() {
+    if (tableLines.length >= 2) {
+      const headerLine = tableLines[0];
+      const bodyLines = tableLines.slice(2);
+      const parseCells = (line: string) =>
+        line
+          .replace(/^\||\|$/g, "")
+          .split("|")
+          .map((c) => c.trim());
+
+      const headers = parseCells(headerLine);
+      const rows = bodyLines.map(parseCells);
+
+      nodes.push(
+        <div
+          key={`tbl-${key++}`}
+          className="my-2.5 max-w-full overflow-x-auto rounded-xl border border-slate-200/90 bg-white shadow-2xs"
+        >
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-800">
+                {headers.map((h, i) => (
+                  <th
+                    key={i}
+                    className="px-3 py-2 font-semibold whitespace-nowrap"
+                  >
+                    {renderInlineSpans(h, isUser, `th-${key}-${i}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((row, rIdx) => (
+                <tr
+                  key={rIdx}
+                  className="hover:bg-slate-50/60 transition-colors"
+                >
+                  {row.map((cell, cIdx) => (
+                    <td
+                      key={cIdx}
+                      className="px-3 py-2 text-slate-700 whitespace-nowrap"
+                    >
+                      {renderInlineSpans(
+                        cell,
+                        isUser,
+                        `td-${key}-${rIdx}-${cIdx}`
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      tableLines = [];
+    } else if (tableLines.length > 0) {
+      currentTextLines.push(...tableLines);
+      tableLines = [];
+      flushText();
+    }
+  }
+
+  for (const line of lines) {
+    const isTableRow = /^\s*\|.+\|\s*$/.test(line);
+    if (isTableRow) {
+      flushText();
+      tableLines.push(line.trim());
+    } else {
+      if (tableLines.length > 0) {
+        flushTable();
+      }
+      currentTextLines.push(line);
+    }
+  }
+
+  if (tableLines.length > 0) {
+    flushTable();
+  }
+  flushText();
 
   return nodes.length > 0 ? nodes : [content];
 }
@@ -678,91 +1026,46 @@ function clearQuickActions(messages: Message[]): Message[] {
   );
 }
 
-/**
- * Vendor-only stats loader. Rendered exclusively for logged-in vendors after the
- * chat is opened, so the vendor query keys never register in the shared cache on
- * customer/public tenants. Reports the computed stats up via `onStats`.
- */
-function VendorChatStatsLoader({
-  dateRange,
-  onStats,
-}: {
-  dateRange: Parameters<typeof useVendorDashboardBookings>[0];
-  onStats: (stats: VendorChatLiveStats | null) => void;
-}) {
-  const { data: vendorDashboardResponse } = useVendorDashboardBookings(
-    dateRange,
-    { enabled: true },
-  );
-
-  const { data: vendorBookingsSummaryResponse } = useQuery({
-    queryKey: ["vendor", "bookings", "chat-summary", "per_page_1000"],
-    queryFn: () =>
-      vendorBookingsService.getBookings({
-        page: 1,
-        // Backend `summary` is derived from returned rows — per_page=1 yields wrong totals
-        per_page: 1000,
-      }),
-    enabled: true,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  const stats = useMemo((): VendorChatLiveStats | null => {
-    const raw = vendorDashboardResponse?.data;
-    const bookingSummary = vendorBookingsSummaryResponse?.summary;
-    const metaTotal = vendorBookingsSummaryResponse?.meta?.total;
-
-    if (!raw && !bookingSummary && metaTotal == null) return null;
-
-    const dashboard: VendorChatDashboardSnapshot | null = raw
-      ? {
-          current_location_id: raw.current_location_id,
-          booking_period: raw.booking_period ?? raw.period ?? null,
-          booking_period_start:
-            raw.booking_period_start ?? raw.period_start ?? null,
-          booking_period_end: raw.booking_period_end ?? raw.period_end ?? null,
-          summary: raw.summary ?? null,
-          bookings_stats: raw.bookings_stats ?? null,
-          commissions_stats: raw.commissions_stats ?? null,
-          recent_bookings: (raw.recent_bookings ?? []).slice(0, 5),
-        }
-      : null;
-
-    return {
-      fetchedAt: new Date().toISOString(),
-      dashboard,
-      bookingSummary: {
-        booking_count: metaTotal ?? 0,
-        total_amount: bookingSummary?.total_amount ?? "0.00",
-        deposit_amount: bookingSummary?.deposit_amount ?? "0.00",
-        pending_amount: bookingSummary?.pending_amount ?? "0.00",
-        refunded_amount: bookingSummary?.refunded_amount ?? "0.00",
-        total_platform_fee: bookingSummary?.total_platform_fee ?? "0.00",
-        platform_fee_settled: bookingSummary?.platform_fee_settled ?? "0.00",
-        platform_fee_due: bookingSummary?.platform_fee_due ?? "0.00",
-      },
-    };
-  }, [
-    vendorDashboardResponse?.data,
-    vendorBookingsSummaryResponse?.summary,
-    vendorBookingsSummaryResponse?.meta?.total,
-  ]);
-
-  useEffect(() => {
-    onStats(stats);
-  }, [stats, onStats]);
-
-  return null;
-}
-
 export function ChatBot() {
   const router = useRouter();
   const pathname = usePathname();
   const { theme } = useTheme();
   const { data: session, status: sessionStatus } = useSession();
   const authUser = useAuthStore((s) => s.user);
+  const authActiveRole = useAuthStore((s) => s.active_role);
   const vendorLocationId = useAuthStore((s) => s.vendor_location_id);
+  const storePermissions = usePermissionStore((s) => s.permissions);
+  const sessionPermissions = (session?.user as any)?.permissions;
+
+  const effectivePermissions = useMemo((): string[] => {
+    if (Array.isArray(storePermissions) && storePermissions.length > 0) {
+      return storePermissions;
+    }
+    if (Array.isArray(sessionPermissions) && sessionPermissions.length > 0) {
+      return sessionPermissions;
+    }
+    return storePermissions || [];
+  }, [storePermissions, sessionPermissions]);
+
+  const activeRole = useMemo(() => {
+    return (
+      (session?.user as any)?.active_role ||
+      authActiveRole ||
+      (authUser as any)?.active_role ||
+      null
+    );
+  }, [session?.user, authActiveRole, authUser]);
+
+  const isStaffUser = useMemo(() => {
+    if (activeRole && activeRole !== "admin" && activeRole !== "vendor") {
+      return true;
+    }
+    if (effectivePermissions.length > 0 && effectivePermissions.length < 80) {
+      return true;
+    }
+    return false;
+  }, [activeRole, effectivePermissions]);
+
   const {
     website_role: domainWebsiteRole,
     domain,
@@ -776,11 +1079,37 @@ export function ChatBot() {
 
   const websiteRole =
     domainWebsiteRole || (theme?.website_role as string | undefined) || null;
-  const isLoggedInCustomer =
-    sessionStatus === "authenticated" &&
-    session?.user?.account_type === "customer";
-  const isAuthenticated = sessionStatus === "authenticated";
-  const accountType = session?.user?.account_type ?? null;
+  const effectiveRole = useMemo(() => {
+    const fromSession =
+      (session?.user as any)?.account_type ||
+      (session?.user as any)?.active_role ||
+      (session?.user as any)?.user_type ||
+      (authUser as any)?.account_type ||
+      (authUser as any)?.active_role;
+    if (
+      fromSession === "admin" ||
+      fromSession === "vendor" ||
+      fromSession === "customer"
+    ) {
+      return fromSession as "admin" | "vendor" | "customer";
+    }
+    // Path-based fallback for protected portals
+    if (pathname?.startsWith("/admin")) return "admin";
+    if (pathname?.startsWith("/vendor")) return "vendor";
+    if (pathname?.startsWith("/customer")) return "customer";
+    return null;
+  }, [
+    session?.user,
+    authUser,
+    pathname,
+  ]);
+
+  const accountType = effectiveRole;
+  const isAuthenticated =
+    sessionStatus === "authenticated" || Boolean(effectiveRole);
+  const isLoggedInCustomer = accountType === "customer";
+  const isLoggedInVendor = accountType === "vendor";
+  const isLoggedInAdmin = accountType === "admin";
   const userName = useMemo(() => {
     // Same sources as the header user dropdown (first_name is the reliable field)
     const raw =
@@ -808,28 +1137,9 @@ export function ChatBot() {
   const chatChromeHover = brandedChatChrome
     ? CHAT_CHROME_BRANDED_HOVER
     : CHAT_CHROME_STATIC_HOVER;
-  const isLoggedInVendor =
-    sessionStatus === "authenticated" && accountType === "vendor";
   const { refetch: refetchCustomerCart } = useGetCartData(
     isVendorStorefront && isLoggedInCustomer,
   );
-
-  const todayYmd = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
-  const chatDashboardRange = useMemo(
-    () => ({ from_date: todayYmd, to_date: todayYmd }),
-    [todayYmd],
-  );
-
-  // Latch: only fetch vendor chat stats once the user actually opens the chat.
-  // ChatBot is mounted globally on every tenant, so gating on this avoids
-  // eager vendor API calls on customer/public pages (server-load bug).
-  const [hasOpenedChat, setHasOpenedChat] = useState(false);
-  const shouldLoadVendorChatStats = isLoggedInVendor && hasOpenedChat;
-
-  // Held in parent state, but the vendor queries live in a child that only
-  // mounts for vendors — so customer/public tenants never register the keys.
-  const [vendorLiveStats, setVendorLiveStats] =
-    useState<VendorChatLiveStats | null>(null);
 
   const contactPhone =
     theme?.contactDetails?.phone?.trim() ||
@@ -878,12 +1188,21 @@ export function ChatBot() {
     });
   }, [eventPath, pageEventResponse?.data, liveEvents, currencySymbol]);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: `Hello — how can I help you today? Book an event, ask what’s on, or type any other question.`,
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const greeting = getInitialChatGreeting({
+      isVendorStorefront,
+      accountType,
+      userName,
+      userPermissions: usePermissionStore.getState().permissions,
+    });
+    return [
+      {
+        role: "assistant",
+        content: greeting.content,
+        quickActions: greeting.quickActions,
+      },
+    ];
+  });
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [awaitingGuestEmail, setAwaitingGuestEmail] = useState(false);
@@ -937,43 +1256,31 @@ export function ChatBot() {
     );
   }, [pageBookingBrief]);
 
-  // Personalise opening greeting once we know the signed-in user (customer / vendor / admin)
+  // Personalise opening greeting once session, tenant role, or RBAC permissions resolve
   useEffect(() => {
-    if (sessionStatus !== "authenticated" || !accountType) return;
-
     setMessages((prev) => {
       if (prev.length !== 1 || prev[0]?.role !== "assistant") return prev;
-      const current = prev[0].content;
-      const isDefaultGreeting =
-        current === "Hello — how can I help you today?" ||
-        current.startsWith("Hello — how can I help you today?") ||
-        current.startsWith("Hello, ") ||
-        (current.startsWith("Hello") && current.includes("signed in"));
 
-      if (!isDefaultGreeting) return prev;
+      const greeting = getInitialChatGreeting({
+        isVendorStorefront,
+        accountType,
+        userName,
+        userPermissions: effectivePermissions,
+      });
 
-      const nameBit = userName ? `, ${userName}` : "";
-      const greetingActions =
-        isVendorStorefront && !isLoggedInVendor
-          ? vendorGreetingActions({ showBookings: isLoggedInCustomer })
-          : undefined;
-
-      // Keep greetings short and professional — never mention “signed in / venue account”
-      if (isVendorStorefront && accountType === "customer") {
-        return [
-          {
-            role: "assistant",
-            content: `Hello${nameBit} — how can I help you today? Book an event, ask what’s on, or type any other question.`,
-            quickActions: greetingActions,
-          },
-        ];
+      if (
+        prev[0].content === greeting.content &&
+        JSON.stringify(prev[0].quickActions) ===
+          JSON.stringify(greeting.quickActions)
+      ) {
+        return prev;
       }
 
       return [
         {
           role: "assistant",
-          content: `Hello${nameBit} — how can I help you today? Book an event, ask what’s on, or type any other question.`,
-          quickActions: greetingActions,
+          content: greeting.content,
+          quickActions: greeting.quickActions,
         },
       ];
     });
@@ -982,25 +1289,8 @@ export function ChatBot() {
     accountType,
     userName,
     isVendorStorefront,
-    isLoggedInVendor,
-    isLoggedInCustomer,
+    effectivePermissions,
   ]);
-
-  useEffect(() => {
-    if (!isVendorStorefront || isLoggedInVendor) return;
-    setMessages((prev) => {
-      if (prev.length !== 1 || prev[0]?.role !== "assistant") return prev;
-      if (prev[0].quickActions?.length) return prev;
-      return [
-        {
-          ...prev[0],
-          quickActions: vendorGreetingActions({
-            showBookings: isLoggedInCustomer,
-          }),
-        },
-      ];
-    });
-  }, [isVendorStorefront, isLoggedInVendor, isLoggedInCustomer]);
 
   useEffect(() => {
     const wasCheckout = isCustomerCheckoutPath(prevPathnameRef.current);
@@ -1815,6 +2105,200 @@ export function ChatBot() {
       return;
     }
 
+    // ── RBAC Pre-Check for authenticated staff / restricted users ──
+    if (isAuthenticated && isStaffUser && effectivePermissions.length > 0) {
+      const restrictedIntent = detectRestrictedResourceIntent(userText);
+      if (
+        restrictedIntent &&
+        !hasPermissionForDomain(restrictedIntent.domain, effectivePermissions)
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: buildAccessRestrictedReply(restrictedIntent, { userName }),
+          },
+        ]);
+        return;
+      }
+    }
+
+    // ── Admin on-demand live data queries ──
+    if (isLoggedInAdmin && !isVendorStorefront) {
+      const isAdminStats = isAdminDashboardStatsIntent(userText);
+      const isAdminVenueQ = isAdminVenueDetailIntent(userText);
+
+      if (isAdminStats || isAdminVenueQ) {
+        // RBAC enforcement for admin staff
+        if (isStaffUser && effectivePermissions.length > 0) {
+          if (
+            isAdminStats &&
+            !hasPermissionForDomain("dashboard", effectivePermissions)
+          ) {
+            const rule = RESOURCE_PERMISSION_RULES.find(
+              (r) => r.domain === "dashboard",
+            )!;
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: buildAccessRestrictedReply(rule, { userName }),
+              },
+            ]);
+            return;
+          }
+          if (
+            isAdminVenueQ &&
+            !hasPermissionForDomain("vendors", effectivePermissions)
+          ) {
+            const rule = RESOURCE_PERMISSION_RULES.find(
+              (r) => r.domain === "vendors",
+            )!;
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: buildAccessRestrictedReply(rule, { userName }),
+              },
+            ]);
+            return;
+          }
+        }
+
+        setIsLoading(true);
+        try {
+          const result = isAdminVenueQ
+            ? await fetchAdminVenueDetailChatReply({ userText, userName })
+            : await fetchAdminDashboardChatReply({ userText, userName });
+          if (result?.reply) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: result.reply },
+            ]);
+            setIsLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error("Admin on-demand chat failed:", error);
+        }
+        setIsLoading(false);
+      }
+    }
+
+    // ── Vendor on-demand live data queries ──
+    if (isLoggedInVendor && !isVendorStorefront) {
+      let vendorQueryType = detectVendorOnDemandQueryType(userText);
+      let effectiveOnDemandText = userText;
+
+      // Conversational follow-ups (e.g. "show me all", "why you only give 5 ?", "show more")
+      if (!vendorQueryType && isVendorFollowUpQuery(userText)) {
+        const resolvedTopic = resolveVendorTopicFromHistory(messages);
+        if (resolvedTopic && resolvedTopic !== "booking_list") {
+          vendorQueryType = resolvedTopic;
+          effectiveOnDemandText = `${resolvedTopic} ${userText}`;
+        }
+      }
+
+      if (vendorQueryType) {
+        // RBAC enforcement for vendor staff
+        if (isStaffUser && effectivePermissions.length > 0) {
+          const DOMAIN_MAP: Record<VendorQueryType, RestrictedResourceDomain> = {
+            booking_lookup: "events",
+            payment_lookup: "transactions",
+            customers: "customers",
+            menu_choices: "menus",
+            coupons: "coupons",
+            locations: "locations",
+            staff_roles: "staff",
+            transactions: "transactions",
+            rooms: "events",
+          };
+          const targetDomain = DOMAIN_MAP[vendorQueryType];
+          const hasAccess =
+            vendorQueryType === "booking_lookup"
+              ? effectivePermissions.includes("read-booking") ||
+                hasPermissionForDomain("events", effectivePermissions)
+              : targetDomain
+                ? hasPermissionForDomain(targetDomain, effectivePermissions)
+                : true;
+
+          if (!hasAccess) {
+            const rule =
+              RESOURCE_PERMISSION_RULES.find((r) => r.domain === targetDomain) ||
+              RESOURCE_PERMISSION_RULES.find((r) => r.domain === "events")!;
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: buildAccessRestrictedReply(rule, { userName }),
+              },
+            ]);
+            return;
+          }
+        }
+
+        setIsLoading(true);
+        try {
+          const result = await fetchVendorOnDemandChatReply({
+            userText: effectiveOnDemandText,
+            userName,
+            queryType: vendorQueryType,
+          });
+          if (result?.reply) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: result.reply },
+            ]);
+            setIsLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error("Vendor on-demand chat failed:", error);
+        }
+        setIsLoading(false);
+      }
+    }
+
+    const isPlatformEventBookingQuestion =
+      !isVendorStorefront &&
+      (isLiveEventBookingIntent(userText) ||
+        isBroadEventListIntent(userText) ||
+        isLiveEventAvailabilityQuestion(userText));
+
+    if (isPlatformEventBookingQuestion) {
+      const nameBit = userName ? `, ${userName}` : "";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Hello${nameBit} — you are currently on the **EventWizz platform website** (${siteName || "EventWizz"}), which is an event management software platform for venue owners, event organisers, and administrators.
+
+**Public events cannot be booked directly on this platform website.** There are no events or tickets for sale here.
+
+- To **book an event or purchase tickets**, please visit the specific venue’s own website powered by EventWizz.
+- If you are a **venue owner or event organiser** looking to host and sell events online, you can [Register as a Vendor](/auth/register) or [Book a demo](#book-a-call) to get started!`,
+          quickActions: [
+            {
+              id: "register-vendor",
+              label: "Register as a vendor",
+              href: "/auth/register",
+            },
+            {
+              id: "book-demo",
+              label: "Book a demo",
+              sendText: "I'd like to book a demo or call",
+            },
+            {
+              id: "platform-features",
+              label: "Platform features",
+              sendText: "What features does EventWizz offer for venues?",
+            },
+          ],
+        },
+      ]);
+      return;
+    }
+
     const isGuestCustomer =
       isVendorStorefront && !isLoggedInVendor && !isLoggedInCustomer;
 
@@ -1982,7 +2466,15 @@ Is there anything else I can help you with?`,
         (isBrochureQuestion(userText) && !catalogueBrief))
     ) {
       const matched = matchLiveEvents(userText, liveEvents);
-      const matches = matched.length > 0 ? matched : asWeakMatches(liveEvents);
+      const namedType =
+        Boolean(extractLiveEventTheme(userText)) ||
+        isLiveEventAvailabilityQuestion(userText);
+      const matches =
+        matched.length > 0
+          ? matched
+          : namedType
+            ? []
+            : asWeakMatches(liveEvents);
       const pickerText =
         isBrochureQuestion(userText) ||
         messages.some(
@@ -2004,6 +2496,22 @@ Is there anything else I can help you with?`,
           {
             role: "assistant",
             ...inChatChoiceMessage(direct.content),
+          },
+        ]);
+        return;
+      }
+      if (namedType && matched.length === 0) {
+        const none = buildLiveEventsNoMatchReply({
+          allLiveEvents: liveEvents,
+          siteName,
+          userName,
+          userText,
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            ...inChatChoiceMessage(none.content),
           },
         ]);
         return;
@@ -2094,20 +2602,41 @@ Is there anything else I can help you with?`,
       }
     }
 
-    const asksEventOverview =
-      isLoggedInVendor && isVendorEventOverviewIntent(statsQueryText);
+    const isBookingListFollowUp =
+      isLoggedInVendor &&
+      isVendorFollowUpQuery(userText) &&
+      resolveVendorTopicFromHistory(messages) === "booking_list";
+
     const asksBookingList =
       isLoggedInVendor &&
-      !asksEventOverview &&
-      isVendorBookingListIntent(userText);
+      (isVendorBookingListIntent(userText) || isBookingListFollowUp);
+    const asksEventOverview =
+      isLoggedInVendor &&
+      !asksBookingList &&
+      isVendorEventOverviewIntent(statsQueryText);
     const asksVendorStats =
       isLoggedInVendor &&
-      !asksEventOverview &&
       !asksBookingList &&
+      !asksEventOverview &&
       isVendorStatsIntent(statsQueryText);
 
     // List pending bookings + customer phone/email (direct API — no LLM)
     if (asksBookingList) {
+      if (
+        isStaffUser &&
+        effectivePermissions.length > 0 &&
+        !effectivePermissions.includes("read-booking")
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `**Access Restricted**\n\nI am sorry, but your account does not have permission to access **Bookings** (requires \`read-booking\`).\n\nPlease speak with your venue administrator to request access.`,
+          },
+        ]);
+        setIsLoading(false);
+        return;
+      }
       try {
         const priorUserTexts = messages
           .filter((m) => m.role === "user")
@@ -2142,6 +2671,24 @@ Is there anything else I can help you with?`,
 
     // Named event (e.g. Christmas) → overview API, not today's dashboard totals
     if (asksEventOverview) {
+      if (
+        isStaffUser &&
+        effectivePermissions.length > 0 &&
+        !hasPermissionForDomain("events", effectivePermissions)
+      ) {
+        const rule = RESOURCE_PERMISSION_RULES.find(
+          (r) => r.domain === "events",
+        )!;
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: buildAccessRestrictedReply(rule, { userName }),
+          },
+        ]);
+        setIsLoading(false);
+        return;
+      }
       try {
         const result = await fetchVendorEventOverviewChatReply({
           userText: statsQueryText,
@@ -2178,6 +2725,7 @@ Is there anything else I can help you with?`,
           accountType,
           isAuthenticated,
           isVendorStorefront,
+          userPermissions: effectivePermissions,
         });
 
     const supportCta =
@@ -2189,9 +2737,49 @@ Is there anything else I can help you with?`,
           }
         : undefined);
 
-    // Fetch the period they asked about (last month / all time / etc.)
-    let statsForChat = vendorLiveStats;
+    // Fetch the period they asked about (last month / all time / etc.) on demand
+    let statsForChat: VendorChatLiveStats | null = null;
     if (asksVendorStats) {
+      if (isStaffUser && effectivePermissions.length > 0) {
+        const asksEarningsOrComm =
+          isVendorEarningsIntent(statsQueryText) ||
+          isVendorCommissionIntent(statsQueryText);
+        if (
+          asksEarningsOrComm &&
+          !hasPermissionForDomain("commissions", effectivePermissions) &&
+          !hasPermissionForDomain("transactions", effectivePermissions)
+        ) {
+          const rule = RESOURCE_PERMISSION_RULES.find(
+            (r) => r.domain === "commissions",
+          )!;
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: buildAccessRestrictedReply(rule, { userName }),
+            },
+          ]);
+          setIsLoading(false);
+          return;
+        }
+        if (
+          !hasPermissionForDomain("dashboard", effectivePermissions) &&
+          !hasPermissionForDomain("transactions", effectivePermissions)
+        ) {
+          const rule = RESOURCE_PERMISSION_RULES.find(
+            (r) => r.domain === "dashboard",
+          )!;
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: buildAccessRestrictedReply(rule, { userName }),
+            },
+          ]);
+          setIsLoading(false);
+          return;
+        }
+      }
       try {
         const range = resolveChatDateRange(statsQueryText);
         const bookingDateParams = range.allTime
@@ -2379,11 +2967,32 @@ Is there anything else I can help you with?`,
       const locationPick = isLiveEventLocationChoiceText(userText, liveEvents);
       let pickedLiveEvent: LiveEventChatMatch | undefined;
       if (isVendorStorefront && !eventBookingBrief && tenantHost) {
-        const matches = matchLiveEventsFromConversation(
+        const conversationMatches = matchLiveEventsFromConversation(
           userText,
           messages,
           liveEvents,
         );
+        const matches = askedTheme
+          ? conversationMatches.filter((item) =>
+              liveEventMatchesRequestedTheme(item.event, userText),
+            )
+          : conversationMatches;
+        if (askedTheme && matches.length === 0) {
+          const none = buildLiveEventsNoMatchReply({
+            allLiveEvents: liveEvents,
+            siteName,
+            userName,
+            userText,
+          });
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              ...inChatChoiceMessage(none.content),
+            },
+          ]);
+          return;
+        }
         const needsEventChoice = needsLiveEventLocationChoice(
           userText,
           matches,
@@ -2414,21 +3023,25 @@ Is there anything else I can help you with?`,
             : needsEventChoice
               ? undefined
               : matches[0];
-        pickedLiveEvent = pick;
-        if (pick) {
+        pickedLiveEvent =
+          pick &&
+          (!askedTheme || liveEventMatchesRequestedTheme(pick.event, userText))
+            ? pick
+            : undefined;
+        if (pickedLiveEvent) {
           try {
             const detail = await eventsService.getEventDetail(
-              pick.event.slug,
+              pickedLiveEvent.event.slug,
               tenantHost,
               { suppressErrorToast: true },
             );
             if (detail?.data) {
               eventBookingBrief = mergeChatBriefInventory(
                 summarizeEventDetailForChat(detail.data, {
-                  href: pick.href,
-                  locationCity: pick.event.location_city,
-                  locationSlug: pick.event.location_slug,
-                  eventSlug: pick.event.slug,
+                  href: pickedLiveEvent.href,
+                  locationCity: pickedLiveEvent.event.location_city,
+                  locationSlug: pickedLiveEvent.event.location_slug,
+                  eventSlug: pickedLiveEvent.event.slug,
                   currencySymbol,
                 }),
                 eventBookingBriefRef.current,
@@ -2748,6 +3361,9 @@ Is there anything else I can help you with?`,
             contactPhone,
             contactEmail,
             contactAddress,
+            permissions: effectivePermissions,
+            activeRole,
+            isStaff: isStaffUser,
             vendorLiveStats: isLoggedInVendor ? slimStats : null,
             liveEvents: isVendorStorefront
               ? eventBookingBrief
@@ -2782,6 +3398,59 @@ Is there anything else I can help you with?`,
                 userName,
               })
             : null;
+        if (isLoggedInVendor) {
+          const nameGreeting = userName ? `Hello, ${userName}! ` : "";
+          const content =
+            `${nameGreeting}I am connected in direct venue mode. How can I assist you with your venue today?\n\n` +
+            `- [Open Dashboard](/vendor/dashboard) — overview & metrics\n` +
+            `- [Manage Events](/vendor/events) — event listings & dates\n` +
+            `- [Booking History](/vendor/booking-history) — view all bookings\n` +
+            `- [Transactions](/vendor/transactions) — payments & ledger\n` +
+            `- [Customer Directory](/vendor/customers) — customer records`;
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content,
+              quickActions: [
+                { id: "v-dash", label: "Dashboard", href: "/vendor/dashboard" },
+                { id: "v-events", label: "Events", href: "/vendor/events" },
+                { id: "v-bookings", label: "Bookings", href: "/vendor/booking-history" },
+                { id: "v-txns", label: "Transactions", href: "/vendor/transactions" },
+                { id: "v-custs", label: "Customers", href: "/vendor/customers" },
+              ],
+            },
+          ]);
+          setIsLoading(false);
+          return;
+        }
+
+        if (isLoggedInAdmin) {
+          const nameGreeting = userName ? `Hello, ${userName}! ` : "";
+          const content =
+            `${nameGreeting}I am connected in direct platform mode. You can manage platform administration directly:\n\n` +
+            `- [All Venues](/admin/vendors)\n` +
+            `- [Commission Overview](/admin/commission-overview)\n` +
+            `- [Transaction History](/admin/transactions)\n` +
+            `- [Dispute Resolution](/admin/disputes)\n` +
+            `- [Site Essentials](/admin/sites-essentials)`;
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content,
+              quickActions: [
+                { id: "a-venues", label: "All Venues", href: "/admin/vendors" },
+                { id: "a-comm", label: "Commissions", href: "/admin/commission-overview" },
+                { id: "a-txns", label: "Transactions", href: "/admin/transactions" },
+                { id: "a-disputes", label: "Disputes", href: "/admin/disputes" },
+              ],
+            },
+          ]);
+          setIsLoading(false);
+          return;
+        }
+
         const content = wait
           ? `I'm a bit busy right now. Please try again in ${wait}.`
           : recovery ||
@@ -2870,12 +3539,12 @@ Is there anything else I can help you with?`,
               offerBookingUi,
             })
           : extractBookingQuickActions(reply)
-              .filter((action) => Boolean(action.sendText) && !action.href)
               .map((action) => ({
                 id: action.id,
                 label: action.label,
                 hint: action.hint,
                 sendText: action.sendText,
+                href: action.href,
               }));
       const eventPageCta = isBareEventPageHref(
         supportCta?.href,
@@ -2955,12 +3624,6 @@ Is there anything else I can help you with?`,
 
   const chatOverlay = (
     <>
-      {shouldLoadVendorChatStats && (
-        <VendorChatStatsLoader
-          dateRange={chatDashboardRange}
-          onStats={setVendorLiveStats}
-        />
-      )}
       <AnimatePresence>
         {!isOpen && (
           <motion.div
@@ -2988,7 +3651,6 @@ Is there anything else I can help you with?`,
             <motion.button
               type="button"
               onClick={() => {
-                setHasOpenedChat(true);
                 setIsMinimized(false);
                 setIsOpen(true);
               }}

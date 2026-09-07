@@ -44,6 +44,7 @@ interface MenuCategoryDropdownProps {
   categories: EventMenuCategory[];
   onSelect: (value: string) => void;
   isLoading: boolean;
+  value?: number | string;
   initialValue?: number;
   onCategoryCreated?: (newCategory?: { id: number; name: string }) => void;
   disabled?: boolean;
@@ -66,15 +67,38 @@ export default function MenuCategoryDropdown({
   categories,
   onSelect,
   isLoading,
+  value,
   initialValue,
   onCategoryCreated,
   disabled = false,
   eventId,
   roomId,
 }: MenuCategoryDropdownProps) {
-  const selectedId = toPositiveId(initialValue);
+  const [createdCategories, setCreatedCategories] = useState<
+    EventMenuCategory[]
+  >([]);
+
+  // Deduplicate and merge categories from props with any locally created categories
+  const allCategories = React.useMemo(() => {
+    const map = new Map<number, EventMenuCategory>();
+    for (const cat of categories || []) {
+      const id = toPositiveId(cat?.id);
+      if (id != null) {
+        map.set(id, { ...cat, id, name: String(cat.name ?? "").trim() });
+      }
+    }
+    for (const cat of createdCategories) {
+      const id = toPositiveId(cat?.id);
+      if (id != null && !map.has(id)) {
+        map.set(id, { ...cat, id, name: String(cat.name ?? "").trim() });
+      }
+    }
+    return Array.from(map.values());
+  }, [categories, createdCategories]);
+
+  const effectiveId = toPositiveId(value ?? initialValue);
   const [selectedValue, setSelectedValue] = useState<string | undefined>(
-    selectedId != null ? String(selectedId) : undefined,
+    effectiveId != null ? String(effectiveId) : undefined,
   );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,15 +112,17 @@ export default function MenuCategoryDropdown({
     },
   });
 
-  // Update selected value when initialValue changes
+  // Update selected value when prop value or initialValue changes to a valid positive id
   useEffect(() => {
-    const nextId = toPositiveId(initialValue);
-    setSelectedValue(nextId != null ? String(nextId) : undefined);
-  }, [initialValue]);
+    const nextId = toPositiveId(value ?? initialValue);
+    if (nextId != null) {
+      setSelectedValue(String(nextId));
+    }
+  }, [value, initialValue]);
 
-  const handleSelectChange = (value: string) => {
-    setSelectedValue(value);
-    onSelect(value);
+  const handleSelectChange = (val: string) => {
+    setSelectedValue(val);
+    onSelect(val);
   };
 
   const handleCreateCategory = async (values: MenuCategoryFormValues) => {
@@ -131,10 +157,24 @@ export default function MenuCategoryDropdown({
         form.reset();
         setIsDialogOpen(false);
 
+        const newIdStr = String(created.id);
+
+        // 1. Immediately store in local createdCategories so it exists in options
+        setCreatedCategories((prev) => {
+          if (prev.some((c) => Number(c.id) === Number(created.id))) return prev;
+          return [...prev, created];
+        });
+
+        // 2. Set the select value state
+        setSelectedValue(newIdStr);
+
+        // 3. Inform parent component that category was created
         if (onCategoryCreated) {
           onCategoryCreated({ id: created.id, name: created.name });
-          setSelectedValue(String(created.id));
         }
+
+        // 4. Trigger onSelect so form Controller field.onChange is called and dropdown stays selected
+        onSelect(newIdStr);
       } else {
         // Error toast is handled by axios interceptor
         console.error(
@@ -176,7 +216,7 @@ export default function MenuCategoryDropdown({
                   <SelectItem value="placeholder" disabled>
                     Select an option
                   </SelectItem>
-                  {categories.map((category) => {
+                  {allCategories.map((category) => {
                     const id = toPositiveId(category.id);
                     if (id == null) return null;
                     return (
@@ -187,13 +227,15 @@ export default function MenuCategoryDropdown({
                   })}
                   {selectedValue &&
                     toPositiveId(selectedValue) != null &&
-                    !categories.some(
+                    !allCategories.some(
                       (category) =>
                         String(toPositiveId(category.id) ?? "") ===
                         selectedValue,
                     ) && (
                       <SelectItem value={selectedValue}>
-                        Selected category
+                        {createdCategories.find(
+                          (c) => String(c.id) === selectedValue,
+                        )?.name || "Selected category"}
                       </SelectItem>
                     )}
                 </>

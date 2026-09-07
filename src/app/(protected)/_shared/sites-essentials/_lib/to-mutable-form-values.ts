@@ -3,6 +3,7 @@ import type { SiteEssentialsFormValues } from "./schema";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
 import { toPlainText, wrapPlainTextAsHtml } from "@/lib/plain-text-length";
+import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
 
 type MediaField = string | File | null | undefined;
 
@@ -13,9 +14,12 @@ type MediaField = string | File | null | undefined;
 export function normalizeSiteEssentialsTypography(
   raw: unknown,
 ): SiteEssentialsFormValues["typography"] {
+  const defaultHeading = defaultThemeConstants.typography.fontFamily.heading || "Arial, sans-serif";
+  const defaultBody = defaultThemeConstants.typography.fontFamily.body || "Arial, sans-serif";
+
   if (!raw || typeof raw !== "object") {
     return {
-      fontFamily: { heading: "", body: "" },
+      fontFamily: { heading: defaultHeading, body: defaultBody },
       customFontStylesheetUrls: [],
       headingEmphasis: "uniform",
     };
@@ -30,12 +34,12 @@ export function normalizeSiteEssentialsTypography(
   const heading =
     (typeof fontFamilyRaw.heading === "string" && fontFamilyRaw.heading.trim()) ||
     (typeof record.heading === "string" && record.heading.trim()) ||
-    "";
+    defaultHeading;
 
   const body =
     (typeof fontFamilyRaw.body === "string" && fontFamilyRaw.body.trim()) ||
     (typeof record.body === "string" && record.body.trim()) ||
-    "";
+    defaultBody;
 
   const customFontStylesheetUrls = Array.isArray(record.customFontStylesheetUrls)
     ? record.customFontStylesheetUrls.filter(
@@ -93,6 +97,30 @@ function normalizeFaqItems(
     }));
 }
 
+function normalizeSocialLinks(
+  raw: unknown,
+): SiteEssentialsFormValues["socialLinks"] {
+  const record = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    facebook: typeof record.facebook === "string" ? record.facebook : "",
+    twitter: typeof record.twitter === "string" ? record.twitter : "",
+    instagram: typeof record.instagram === "string" ? record.instagram : "",
+    linkedin: typeof record.linkedin === "string" ? record.linkedin : "",
+    youtube: typeof record.youtube === "string" ? record.youtube : "",
+  };
+}
+
+function normalizeSeo(
+  raw: unknown,
+): SiteEssentialsFormValues["seo"] {
+  const record = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    title: typeof record.title === "string" ? record.title : "",
+    description: typeof record.description === "string" ? record.description : "",
+    keywords: typeof record.keywords === "string" ? record.keywords : "",
+  };
+}
+
 /**
  * Deep-clone site essentials for react-hook-form.
  * TanStack Query (and some merges) return frozen objects; RHF `values` / `reset`
@@ -114,6 +142,8 @@ export function toMutableSiteEssentialsFormValues(
       source.main_landing_cover_image,
     ),
     typography: normalizeSiteEssentialsTypography(source.typography),
+    socialLinks: normalizeSocialLinks(source.socialLinks),
+    seo: normalizeSeo(source.seo),
     theme_preset_id:
       "theme_preset_id" in source
         ? ((source as { theme_preset_id?: string | null }).theme_preset_id ??

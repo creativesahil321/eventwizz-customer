@@ -10,6 +10,7 @@ import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import { clampCheckoutQuantity } from "@/app/(public)/vendor/checkout/_lib/checkout-availability";
 
 type DrinkPackage = {
   id?: number;
@@ -32,6 +33,14 @@ type DrinkSectionProps = {
   defaultExpanded?: boolean;
   headingEmphasis?: HeadingEmphasis | string | null;
 };
+
+/** Finite stock from API; `undefined` means no limit was provided. */
+function parseDrinkAvailableQuantity(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.floor(n);
+}
 
 export default function DrinkSection({
   title,
@@ -65,6 +74,31 @@ export default function DrinkSection({
       pkg.title.trim() !== "" || pkg.description.trim() !== "" || pkg.price > 0,
   );
 
+  const stockSignature = filteredPackages
+    .map(
+      (pkg) =>
+        `${pkg.title}\0${pkg.available_quantity ?? ""}`,
+    )
+    .join("\n");
+
+  // Drop / clamp stale localStorage qty when API stock is lower (incl. 0).
+  useEffect(() => {
+    if (!isHydrated || filteredPackages.length === 0) return;
+
+    for (const pkg of filteredPackages) {
+      const maxQty = parseDrinkAvailableQuantity(pkg.available_quantity);
+      if (maxQty == null) continue;
+      const current = getDrinkQuantity(pkg.title);
+      const clamped = clampCheckoutQuantity(current, maxQty);
+      if (clamped !== current) {
+        updateDrinkQuantity(pkg.title, clamped);
+      }
+    }
+    // stockSignature captures package titles + available_quantity without
+    // depending on a fresh array identity every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [isHydrated, stockSignature, getDrinkQuantity, updateDrinkQuantity]);
+
   if (
     title.trim() === "" &&
     description.trim() === "" &&
@@ -74,6 +108,9 @@ export default function DrinkSection({
   }
 
   const handleAdd = (drink: DrinkPackage) => {
+    const maxQty = parseDrinkAvailableQuantity(drink.available_quantity);
+    if (maxQty === 0) return;
+
     const drinkId =
       drink.id ||
       drink.title
@@ -90,8 +127,11 @@ export default function DrinkSection({
   };
 
   const handleIncrease = (drink: DrinkPackage) => {
+    const maxQty = parseDrinkAvailableQuantity(drink.available_quantity);
     const currentQuantity = getDrinkQuantity(drink.title);
-    updateDrinkQuantity(drink.title, currentQuantity + 1);
+    const next = clampCheckoutQuantity(currentQuantity + 1, maxQty);
+    if (next === currentQuantity) return;
+    updateDrinkQuantity(drink.title, next);
   };
 
   const handleDecrease = (drink: DrinkPackage) => {
@@ -150,6 +190,13 @@ export default function DrinkSection({
               const quantity = isHydrated
                 ? getDrinkQuantity(singlePackage.title)
                 : 0;
+              const maxQty = parseDrinkAvailableQuantity(
+                singlePackage.available_quantity,
+              );
+              const isSoldOut = maxQty === 0;
+              const atMax =
+                maxQty != null && quantity >= maxQty && quantity > 0;
+
               return (
                 <section
                   key={idx}
@@ -160,6 +207,7 @@ export default function DrinkSection({
                     narrowPreview
                       ? "flex flex-col items-start justify-between gap-3"
                       : "flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4 sm:p-6",
+                    isSoldOut && "opacity-70",
                   )}
                 >
                   <article className="flex w-full min-w-0 flex-1 flex-col items-start text-left">
@@ -210,7 +258,19 @@ export default function DrinkSection({
                       <span>{formatMoney(singlePackage.price)}</span>
                     </p>
 
-                    {quantity === 0 ? (
+                    {isSoldOut ? (
+                      <Button
+                        variant="event-primary"
+                        size="sm"
+                        disabled
+                        className={cn(
+                          "w-full px-4 py-2 text-sm",
+                          !narrowPreview && "sm:w-auto sm:px-6 sm:text-base",
+                        )}
+                      >
+                        Sold Out
+                      </Button>
+                    ) : quantity === 0 ? (
                       <Button
                         variant="event-primary"
                         size="sm"
@@ -255,9 +315,13 @@ export default function DrinkSection({
                             "min-w-[44px] px-4 py-2 text-lg font-semibold touch-manipulation hover:bg-[var(--color-background)]/80",
                             !narrowPreview &&
                               "sm:min-w-0 sm:px-3 sm:py-1 sm:text-base",
+                            atMax &&
+                              "cursor-not-allowed opacity-40 hover:bg-transparent",
                           )}
                           onClick={() => handleIncrease(singlePackage)}
                           aria-label="Increase quantity"
+                          aria-disabled={atMax}
+                          disabled={atMax}
                           type="button"
                         >
                           +

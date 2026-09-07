@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormProvider } from "react-hook-form";
+import { FormProvider, type FieldErrors } from "react-hook-form";
 import {
   Loader2,
   Save,
@@ -58,6 +58,27 @@ function isSiteEssentialsTab(value: string | null): value is SiteEssentialsTab {
     value !== null &&
     (SITE_ESSENTIALS_TABS as readonly string[]).includes(value)
   );
+}
+
+function resolveTabForErrorField(fieldName: string): SiteEssentialsTab {
+  if (fieldName === "colors") return "colors";
+  if (fieldName === "typography") return "typography";
+  if (fieldName === "socialLinks") return "social-media";
+  if (fieldName === "seo") return "seo";
+  return "branding";
+}
+
+function extractFirstErrorMessage(errors: unknown): string {
+  if (!errors || typeof errors !== "object") return "";
+  const record = errors as Record<string, unknown>;
+  if (typeof record.message === "string" && record.message.trim()) {
+    return record.message.trim();
+  }
+  for (const val of Object.values(record)) {
+    const nested = extractFirstErrorMessage(val);
+    if (nested) return nested;
+  }
+  return "";
 }
 
 export function SiteEssentialsForm() {
@@ -233,35 +254,9 @@ function SiteEssentialsFormInner() {
     const errors = form.formState.errors;
     const errorsByTab: Record<string, boolean> = {};
 
-    // Check for errors in Branding tab fields
-    if (errors.logo || errors.favicon || errors.copyright || errors.footer_brand_description) {
-      errorsByTab.branding = true;
-    }
-
-    // Check for errors in Colors tab fields
-    if (errors.colors) {
-      errorsByTab.colors = true;
-    }
-
-    // Check for errors in Typography tab fields
-    if (errors.typography) {
-      errorsByTab.typography = true;
-    }
-
-    // Check for errors in Social Media tab fields
-    if (
-      errors.socialLinks?.facebook ||
-      errors.socialLinks?.twitter ||
-      errors.socialLinks?.instagram ||
-      errors.socialLinks?.linkedin ||
-      errors.socialLinks?.youtube
-    ) {
-      errorsByTab.socialMedia = true;
-    }
-
-    // Check for errors in SEO tab fields
-    if (errors.seo) {
-      errorsByTab.seo = true;
+    for (const key of Object.keys(errors)) {
+      const tab = resolveTabForErrorField(key);
+      errorsByTab[tab] = true;
     }
 
     setTabsWithErrors(errorsByTab);
@@ -416,16 +411,29 @@ function SiteEssentialsFormInner() {
   };
 
   // Handle form validation failure
-  const handleInvalid = () => {
+  const handleInvalid = (errors: FieldErrors<SiteEssentialsFormValues>) => {
+    console.warn("Site essentials validation errors:", errors);
     setShowErrorSummary(true);
+
+    const firstErrorMessage = extractFirstErrorMessage(errors);
+
+    const errorTabs: SiteEssentialsTab[] = [];
+    for (const key of Object.keys(errors)) {
+      const tab = resolveTabForErrorField(key);
+      if (!errorTabs.includes(tab)) {
+        errorTabs.push(tab);
+      }
+    }
+
     toast({
       title: "Validation Error",
-      description: "Please complete all required fields in highlighted tabs",
+      description:
+        firstErrorMessage ||
+        "Please complete all required fields in highlighted tabs",
       variant: "destructive",
     });
 
     // Switch to the first tab with errors
-    const errorTabs = Object.keys(tabsWithErrors);
     if (errorTabs.length > 0) {
       setActiveTab(errorTabs[0]);
     }

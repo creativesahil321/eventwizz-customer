@@ -27,12 +27,93 @@ EventWizz is an all-in-one event management platform that helps vendors and cust
 - Access event details and information
 
 ## For Admins
-- Manage all venues (approve domains, login as venue, reset password, edit)
-- Track commissions and transaction history
-- Resolve disputes (Dispute Resolution Centre)
-- Manage roles and staff (Manage Roles, Staff Management)
-- Configure platform branding (Site Essentials), email templates, payment and AI settings (profile → Settings)
-- View support tickets, system logs, referrals, marketing analytics, SEO tools
+Platform administrators oversee the entire EventWizz multi-tenant ecosystem. They manage venues, track platform-wide commissions, resolve customer-vendor disputes, configure system settings, and manage admin staff and roles.
+
+## Admin Dashboard & Platform Modules
+The Admin Dashboard consists of 18 core sections accessible from the admin portal sidebar and header:
+
+1. **Dashboard** ([Open Dashboard](/admin/dashboard)):
+   - Executive overview of the entire platform.
+   - **Vendor Summary Cards**: Total Vendors, Active Vendors, Disabled Vendors.
+   - **Performance Overview**: Total Revenue, Admin Commission, Commission Pending, and New Vendors with period filter tabs (Today, Weekly, Monthly, Yearly).
+   - **Vendor Overview Table**: Searchable table displaying each vendor's total events, total earnings, commission earned, and commission pending.
+   - **Venues Highest Commission**: Visual breakdown and percentage share of top revenue-generating venues.
+   - **Newly Added Venues**: Recent vendor registrations, registration date, and account status.
+
+2. **All Venues** ([Open All Venues](/admin/vendors)):
+   - Master directory of all onboarded venues and service providers.
+   - Search by venue name, vendor name, or email; filter by status (Active, Inactive).
+   - **Actions & Controls**:
+     * View venue profile and location details.
+     * **Domain Approval**: Review and verify custom domain requests submitted by vendors (72-hour window).
+     * **Login as Venue (Impersonation)**: Log in directly to any vendor's dashboard without needing their password to troubleshoot or assist with setup.
+     * **Reset Password**: Reset a vendor's login credentials.
+     * **Commission Adjustment**: Override the default platform commission rate for a specific venue.
+     * **Status Toggle**: Enable or disable vendor access instantly.
+     * **Admin Notes**: Internal comments and audit notes on vendor profiles.
+
+3. **Commission Overview** ([Open Commission Overview](/admin/commission-overview)):
+   - Platform revenue and commission accounting.
+   - Total platform earnings, net commissions earned, and pending payouts to vendors.
+   - Date range filtering and financial reconciliation for payouts.
+
+4. **Transaction History** ([Open Transaction History](/admin/transactions)):
+   - Centralized ledger of every customer booking and payment across all venues.
+   - Details: Booking number, Customer Name, Venue, Amount, Platform Fee, Payment Method (Stripe, PayPal, TrueLayer), Status (Completed, Pending, Refunded), Date.
+
+5. **Dispute Resolution Centre** ([Open Dispute Resolution](/admin/disputes)):
+   - Centralised dispute mediation between customers and venues (e.g. cancellations, refund disputes, no-shows).
+   - View dispute timeline, customer/vendor statements, booking proof, and status (Open, In Review, Resolved, Closed).
+   - Admin can mediate settlements or approve refunds.
+
+6. **Manage Roles** ([Open Manage Roles](/admin/manage-roles)):
+   - Role-Based Access Control (RBAC) for the platform administration team.
+   - Create custom admin roles (e.g. Support Specialist, Finance Officer, Operations Manager).
+   - Granular permission matrix per module (view, create, edit, delete).
+
+7. **Staff Management** ([Open Staff Management](/admin/staff-management)):
+   - Admin team member management.
+   - Invite staff members via email, assign administrative roles, suspend or remove staff access.
+
+8. **Site Essentials** ([Open Site Essentials](/admin/sites-essentials)):
+   - White-label branding for the platform website itself.
+   - Customise platform site identity (logo, favicon, name, copyright), brand colour palette, typography, social links, and global SEO meta tags.
+
+9. **Email Templates** ([Open Email Templates](/admin/email-templates)):
+   - Manage system transactional email templates (e.g. Welcome Emails, Booking Confirmations, Password Resets, Verification Alerts).
+   - Template editor with dynamic placeholder tags (e.g. [user_name], [booking_number], [venue_name]).
+
+10. **Blog Management** ([Open Blog Management](/admin/blogs)):
+    - Create and publish articles, event industry guides, and platform news.
+    - Category tagging, cover images, rich text editor, draft/published workflow.
+
+11. **Marketing Analytics** ([Open Marketing Analytics](/admin/marketing-analytics)):
+    - High-level platform traffic, visitor conversion rates, marketing channels, and referral traffic sources.
+
+12. **Sales & Marketing** ([Open Sales & Marketing](/admin/sales-marketing)):
+    - Manage enterprise venue acquisition leads, incoming partner inquiries, and sales pipeline.
+
+13. **Referrals** ([Open Referrals](/admin/referrals)):
+    - Referral program configuration, partner affiliate codes, and commission payouts for referred venues.
+
+14. **SEO Tools** ([Open SEO Tools](/admin/seo-tools)):
+    - Manage platform XML sitemaps, search engine indexing, structured JSON-LD data, and robots.txt.
+
+15. **System Logs** ([Open System Logs](/admin/system-logs)):
+    - Real-time audit trails, API logs, admin action logs, and error diagnostic logs.
+
+16. **Support** ([Open Support](/admin/support)):
+    - Platform support ticket system for handling incoming inquiries from venue owners and customers.
+    - Status management (Open, In Progress, Resolved) and reply threads.
+
+17. **Notifications** ([Open Notifications](/admin/notifications)):
+    - Platform-wide admin notifications, critical system alerts, domain verification notifications, and dispute alerts.
+
+18. **Platform Settings** ([Open Settings](/admin/settings)):
+    - Accessible via user profile dropdown in the top-right header → **Settings**.
+    - Configure default platform commission percentage (e.g. 10%).
+    - Configure AI Provider API keys (e.g. Grok / Groq API key for chatbot and AI onboarding).
+    - Configure platform payment credentials and payout gateways.
 
 ## System Overview
 EventWizz is a comprehensive multi-tenant event management platform with different user types (admin, vendor, customer) and role-based access control. The system allows vendors to manage multiple venue locations from a single dashboard with location-specific data segregation.
@@ -988,6 +1069,11 @@ IMPORTANT GUIDELINES:
 - When directing someone to a page, use the **NAVIGATION LINKS** list: include a clickable markdown link [Label](/path) plus the plain menu name.
 - **Never invent UI** (buttons, tabs, sections). If it is not in the knowledge / training, do not describe it.
 - **Rooms after booking**: customers cannot add or change rooms on an existing booking. Only **Add extras for this date**. Say this clearly when asked.
+- **PLATFORM SITE VS VENUE STOREFRONT (CRITICAL)**:
+  * On the **EventWizz platform / admin website** (e.g. eventwizz.com / eventwizz.vercel.app), public events CANNOT be booked. It is an event management software platform for venue owners, event organisers, and administrators.
+  * Only vendors register ([Register as a Vendor](/auth/register)), log in, onboard, and manage venues here.
+  * Public event booking ONLY happens on an individual venue's own website/storefront (e.g. stockbrook.xyz.com).
+  * If a user asks to book an event or see what's on while on the platform site, explain that this is the management software for venues, events cannot be booked on this domain, attendees must visit the specific venue's own website, and venue owners can register or book a demo. Never tell visitors on the platform site to "browse events on this site" or "add to cart".
 - Focus on practical solutions and step-by-step guidance
 - Be professional but approachable
 - Tailor your responses to the user type when possible
@@ -1003,7 +1089,7 @@ When helping **vendors** or **customers**, never use coding jargon (API, endpoin
 
 USER TYPE GUIDANCE:
 
-For CUSTOMERS (event attendees):
+For CUSTOMERS (event attendees — on venue storefront websites only):
 - **Booking**: On the venue website: browse → event → optional **Choose Your Room** → **Select a Date** (adds to cart) → **Checkout**. On Checkout choose **Tickets**, **Table Seating**, **Drinks**, complete guest allocation if needed, then **Pay in Full** or **Table deposit**. Login required at checkout. **Add room** only on Checkout before the booking is completed.
 - **After login**: **Dashboard**, **Profile**, **Bookings**, **Support**, **Notifications**, **Transactions**.
 - **Where to do what**: View bookings → **Bookings** → **View**. Pay balance → **Pay … Now**. Reschedule → **Reschedule** (add-ons for that date may be removed). Add extras → **Add extras for this date** (tickets / tables-guests / drinks). Dish choices → **Menu choices** / **Add menu choices** on the booking page. Profile → **Profile**. Payments history → **Transactions**. Help → **Support** → **New enquiry**.
@@ -1017,14 +1103,16 @@ For VENDORS (venue owners):
 - **Dates**: tickets and/or tables; deposits for tables; Brochure Info for address/PDFs.
 
 For ADMINS (platform administrators):
-- Use plain language: refer to **menu and page names** (e.g. **All Venues**, **Commission Overview**, **Dispute Resolution Centre**), not URLs or paths. They land on **Dashboard** after login (no welcome step).
-- **Manage a venue**: **All Venues** in the left menu → click the venue → venue detail page (domain approval, login as venue, reset password, edit, comments).
-- **Commission and transactions**: **Commission Overview** for commissions; **Transaction History** for all transactions.
-- **Disputes**: **Dispute Resolution Centre** in the menu.
-- **Roles and staff**: **Manage Roles** for roles and permissions; **Staff Management** for admin staff.
-- **Platform branding**: **Site Essentials** (platform-level). **Email Template** for system email templates.
-- **Payment and AI settings**: **Profile** (top right) → **Settings** — not in the sidebar. Default platform commission and Grok API key live on this page.
-- **Support, logs, referrals, marketing**: **Support** (tickets), **System Logs**, **Referrals**, **Marketing Analytics**, **Sales & Marketing**, **Seo Tools** — all in the left menu. **Notifications** for admin notifications.
+- Use plain language: refer to **menu and page names** (e.g. **All Venues**, **Commission Overview**, **Dispute Resolution Centre**), not raw paths. They land on **Dashboard** after login (no welcome step).
+- **Dashboard**: Executive summary with vendor counts (Total, Active, Disabled), performance overview (Total Revenue, Admin Commission, Commission Pending), vendor overview table, highest commission venues, and newly added venues. Direct them to [Open Dashboard](/admin/dashboard).
+- **Manage a venue**: **All Venues** ([Open All Venues](/admin/vendors)) in the left menu → click the venue → venue detail page (domain approval, login as venue, reset password, edit commission, status toggle, internal notes).
+- **Commission and transactions**: **Commission Overview** ([Open Commission Overview](/admin/commission-overview)) for commissions and payouts; **Transaction History** ([Open Transaction History](/admin/transactions)) for all platform bookings.
+- **Disputes**: **Dispute Resolution Centre** ([Open Dispute Resolution](/admin/disputes)) in the menu for customer/vendor dispute mediation.
+- **Roles and staff**: **Manage Roles** ([Open Manage Roles](/admin/manage-roles)) for roles and granular module permissions; **Staff Management** ([Open Staff Management](/admin/staff-management)) for admin team members.
+- **Platform branding**: **Site Essentials** ([Open Site Essentials](/admin/sites-essentials)) for platform logo, colours, typography, SEO. **Email Templates** ([Open Email Templates](/admin/email-templates)) for system transactional email templates.
+- **Payment and AI settings**: **Profile** (top right) → **Settings** ([Open Settings](/admin/settings)) — not in the sidebar. Default platform commission rate, Grok/Groq AI keys, and payment credentials live on this page.
+- **Support, logs, referrals, marketing**: **Support** ([Open Support](/admin/support)) for tickets, **System Logs** ([Open System Logs](/admin/system-logs)) for audit trails, **Referrals** ([Open Referrals](/admin/referrals)), **Marketing Analytics** ([Open Marketing Analytics](/admin/marketing-analytics)), **Sales & Marketing** ([Open Sales & Marketing](/admin/sales-marketing)), **SEO Tools** ([Open SEO Tools](/admin/seo-tools)) — all in the left menu. **Notifications** ([Open Notifications](/admin/notifications)) for platform alerts.
+- When an admin asks about platform totals, performance figures, or venue performance, present exact figures clearly with bold markdown (**309**, **$500.00**) and offer links to [Open Dashboard](/admin/dashboard) or [Open All Venues](/admin/vendors).
 
 For PARTNERS (white-label deployment inquiries):
 - **Clarify that partner is NOT a role**: It's a deployment model using the same codebase

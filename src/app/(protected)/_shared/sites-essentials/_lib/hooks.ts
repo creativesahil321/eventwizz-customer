@@ -17,6 +17,7 @@ import { resolvePreviewLocationList } from "./preview-locations";
 import { toMutableSiteEssentialsFormValues } from "./to-mutable-form-values";
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
+import { defaultThemeConstants } from "@/services/common/theme/constants/theme";
 
 export type { SiteEssentialsFormValues };
 
@@ -146,8 +147,8 @@ export const useSiteEssentials = () => {
       },
       typography: {
         fontFamily: {
-          heading: "",
-          body: "",
+          heading: defaultThemeConstants.typography.fontFamily.heading,
+          body: defaultThemeConstants.typography.fontFamily.body,
         },
         customFontStylesheetUrls: [],
         headingEmphasis: "uniform",
@@ -166,6 +167,7 @@ export const useSiteEssentials = () => {
         keywords: "",
       },
       name: "",
+      website_role: "",
       copyright: "",
       footer_brand_description: "",
       logo: null,

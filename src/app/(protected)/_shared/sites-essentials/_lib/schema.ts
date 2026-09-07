@@ -189,19 +189,35 @@ function featureIconField() {
 }
 
 // Form schema for validation
+const optionalUrlSchema = z
+  .union([
+    z.string().url("Please enter a valid URL"),
+    z.literal(""),
+    z.null(),
+  ])
+  .optional();
+
+const optionalStringSchema = z
+  .union([
+    z.string(),
+    z.literal(""),
+    z.null(),
+  ])
+  .optional();
+
 export const siteEssentialsFormSchema = z.object({
   colors: z.object({
-    primary: z.string().optional().or(z.literal("")),
-    secondary: z.string().optional().or(z.literal("")),
-    header: z.string().optional().or(z.literal("")),
-    footer: z.string().optional().or(z.literal("")),
-    background: z.string().optional().or(z.literal("")),
-    surface: z.string().optional().or(z.literal("")),
-    text: z.string().optional().or(z.literal("")),
-    textDimmed: z.string().optional().or(z.literal("")),
-    socialLogin: z.object({
-      google: z.string().optional().or(z.literal("")),
-      microsoft: z.string().optional().or(z.literal("")),
+    primary: optionalStringSchema,
+    secondary: optionalStringSchema,
+    header: optionalStringSchema,
+    footer: optionalStringSchema,
+    background: optionalStringSchema,
+    surface: optionalStringSchema,
+    text: optionalStringSchema,
+    textDimmed: optionalStringSchema,
+    socialLogin: z.object({ 
+      google: optionalStringSchema,
+      microsoft: optionalStringSchema,
     }),
   }),
   typography: z.object({
@@ -221,36 +237,16 @@ export const siteEssentialsFormSchema = z.object({
   theme_preset_id: z.string().nullable().optional(),
 
   socialLinks: z.object({
-    facebook: z
-      .string()
-      .url("Please enter a valid URL")
-      .optional()
-      .or(z.literal("")),
-    twitter: z
-      .string()
-      .url("Please enter a valid URL")
-      .optional()
-      .or(z.literal("")),
-    instagram: z
-      .string()
-      .url("Please enter a valid URL")
-      .optional()
-      .or(z.literal("")),
-    linkedin: z
-      .string()
-      .url("Please enter a valid URL")
-      .optional()
-      .or(z.literal("")),
-    youtube: z
-      .string()
-      .url("Please enter a valid URL")
-      .optional()
-      .or(z.literal("")),
+    facebook: optionalUrlSchema,
+    twitter: optionalUrlSchema,
+    instagram: optionalUrlSchema,
+    linkedin: optionalUrlSchema,
+    youtube: optionalUrlSchema,
   }),
   seo: z.object({
-    title: z.string().min(1, "SEO title is required"),
-    description: z.string().min(1, "SEO description is required"),
-    keywords: z.string().min(1, "SEO keywords are required"),
+    title: optionalStringSchema,
+    description: optionalStringSchema,
+    keywords: optionalStringSchema,
   }),
   name: z.string().max(50, "Site name must not exceed 50 characters").optional(),
   copyright: z
@@ -306,14 +302,7 @@ export const siteEssentialsFormSchema = z.object({
     .max(40, "About title must not exceed 40 characters")
     .nullable()
     .optional(),
-  about_description: z
-    .string()
-    .nullable()
-    .optional()
-    .refine(
-      (s) => stripSiteEssentialsHtml(s ?? "").length > 0,
-      "About section description is required.",
-    ),
+  about_description: z.string().nullable().optional(),
   about_link_title: z
     .string()
     .max(18, "Button text must not exceed 18 characters")
@@ -601,6 +590,26 @@ export const siteEssentialsFormSchema = z.object({
       intensity: z.enum(["low", "medium", "high"]).optional(),
     })
     .optional(),
+}).superRefine((data, ctx) => {
+  // Check if this is the admin marketing site
+  const isAdmin =
+    data.website_role === "admin" ||
+    (typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/admin"));
+
+  // About section description is only applicable and required for vendor sites
+  if (!isAdmin) {
+    const plainLength = stripSiteEssentialsHtml(
+      data.about_description ?? "",
+    ).length;
+    if (plainLength === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "About section description is required.",
+        path: ["about_description"],
+      });
+    }
+  }
 });
 
 export type SiteEssentialsFormValues = z.infer<typeof siteEssentialsFormSchema>;

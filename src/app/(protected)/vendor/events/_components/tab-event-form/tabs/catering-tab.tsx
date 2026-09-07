@@ -51,7 +51,12 @@ import {
 } from "@/services/vendor/events/query";
 import { EventMenuCategory } from "@/services/vendor/events/type";
 import { useQueryClient } from "@tanstack/react-query";
-import { dedupeMenuCategoriesById } from "@/lib/event-menu-categories";
+import {
+  dedupeMenuCategoriesById,
+  ensureEventMenuCategoriesForRoom,
+  findMenuCategoryIdForMenus,
+  toPositiveId,
+} from "@/lib/event-menu-categories";
 import MenuCategoryDropdown from "@/app/(on-boarding)/on-boarding/_components/steps/step-6/menu-category-dropdown";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -213,10 +218,14 @@ export default function CateringTab() {
           ? [fields.menu_background_image]
           : null;
       setMenuBackgroundImage(bg);
+      const currentCatId = toPositiveId(getValues("event_menu_category_id"));
+      const incomingCatId = toPositiveId(fields.event_menu_category_id);
+      const effectiveCatId = incomingCatId ?? currentCatId ?? 0;
       reset({
         ...getValues(),
         is_rooms: 1,
         ...fields,
+        event_menu_category_id: effectiveCatId,
         rooms: syncedRooms,
       });
       lastHydratedRoomIndexRef.current = resolvedRoomIndex;
@@ -296,10 +305,11 @@ export default function CateringTab() {
       setLocalMenuCategories(dedupeMenuCategoriesById(eventMenuCategories));
       return;
     }
+    if (isMenuCategoriesLoading) return;
     if (isRoomsEnabled) {
       setLocalMenuCategories([]);
     }
-  }, [eventMenuCategories, isRoomsEnabled, activeRoomIdForCategories]);
+  }, [eventMenuCategories, isRoomsEnabled, activeRoomIdForCategories, isMenuCategoriesLoading]);
 
   // Keep menu details visibility in sync with catering_option (room switches, API hydrate).
   const cateringOption = watch("catering_option");
@@ -481,6 +491,44 @@ export default function CateringTab() {
     getValues,
   ]);
 
+  // Auto-link: when menus exist and there is a matching category in DB, set category id
+  useEffect(() => {
+    if (readOnly) return;
+    if (normalizeCateringOptionFlag(getValues("catering_option")) !== 1) return;
+
+    const menus = getValues("menus") || [];
+    const hasNamedMenus = menus.some(
+      (menu) => String(menu?.name ?? "").trim().length > 0,
+    );
+    if (!hasNamedMenus) return;
+
+    const currentId = toPositiveId(getValues("event_menu_category_id"));
+    if (currentId != null) return;
+
+    const matchedId = findMenuCategoryIdForMenus(localMenuCategories, menus);
+    if (matchedId != null) {
+      setValue("event_menu_category_id", matchedId, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      if (isRoomsEnabled && stepTwoRooms.length > 0) {
+        persistActiveRoomMenuToGlobal(resolvedRoomIndex, {
+          ...getValues(),
+          event_menu_category_id: matchedId,
+        });
+      }
+    }
+  }, [
+    getValues,
+    isRoomsEnabled,
+    localMenuCategories,
+    persistActiveRoomMenuToGlobal,
+    readOnly,
+    resolvedRoomIndex,
+    setValue,
+    stepTwoRooms.length,
+  ]);
+
   const handleMenuCategoryCreated = useCallback(
     (newCategory?: { id: number; name: string }) => {
       if (!newCategory) return;
@@ -520,7 +568,18 @@ export default function CateringTab() {
         return [...prev, category];
       });
 
-      setValue("event_menu_category_id", newCategory.id);
+      setValue("event_menu_category_id", newCategory.id, {
+        shouldDirty: true,
+        shouldValidate: true,
+        shouldTouch: true,
+      });
+
+      if (isRoomsEnabled && stepTwoRooms.length > 0) {
+        persistActiveRoomMenuToGlobal(resolvedRoomIndex, {
+          ...getValues(),
+          event_menu_category_id: newCategory.id,
+        });
+      }
 
       const existingMenuIndex = (getValues("menus") || []).findIndex(
         (menu) =>
@@ -691,6 +750,62 @@ export default function CateringTab() {
 
   const attemptSubmit = useCallback(
     async (applyToAllRooms: boolean) => {
+      // Self-heal: ensure event_menu_category_id is resolved before validating
+      const currentValues = getValues();
+      if (normalizeCateringOptionFlag(currentValues.catering_option) === 1) {
+        let currentCatId = toPositiveId(currentValues.event_menu_category_id);
+        const menus = currentValues.menus || [];
+        if (currentCatId == null && menus.length > 0) {
+          const matchedId = findMenuCategoryIdForMenus(
+            localMenuCategories,
+            menus,
+          );
+          if (matchedId != null) {
+            currentCatId = matchedId;
+            setValue("event_menu_category_id", matchedId, {
+              shouldValidate: true,
+              shouldDirty: true,
+            });
+            if (isRoomsEnabled && stepTwoRooms.length > 0) {
+              persistActiveRoomMenuToGlobal(resolvedRoomIndex, {
+                ...getValues(),
+                event_menu_category_id: matchedId,
+              });
+            }
+          } else if (eventId > 0) {
+            try {
+              const createdId = await ensureEventMenuCategoriesForRoom(
+                eventId,
+                activeRoomIdForCategories,
+                menus,
+              );
+              const positiveCreatedId = toPositiveId(createdId);
+              if (positiveCreatedId != null) {
+                currentCatId = positiveCreatedId;
+                setValue("event_menu_category_id", positiveCreatedId, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
+                if (isRoomsEnabled && stepTwoRooms.length > 0) {
+                  persistActiveRoomMenuToGlobal(resolvedRoomIndex, {
+                    ...getValues(),
+                    event_menu_category_id: positiveCreatedId,
+                  });
+                }
+                await queryClient.invalidateQueries({
+                  queryKey: eventKeys.menuCategories(
+                    eventId,
+                    activeRoomIdForCategories,
+                  ),
+                });
+              }
+            } catch (err) {
+              console.warn("Failed to ensure menu category before submit:", err);
+            }
+          }
+        }
+      }
+
       const isValid = await form.trigger();
       if (!isValid) {
         focusFirstMenuValidationError();
@@ -698,7 +813,21 @@ export default function CateringTab() {
       }
       await handleSubmit(getValues(), { applyToAllRooms });
     },
-    [focusFirstMenuValidationError, form, getValues, handleSubmit],
+    [
+      activeRoomIdForCategories,
+      eventId,
+      focusFirstMenuValidationError,
+      form,
+      getValues,
+      handleSubmit,
+      isRoomsEnabled,
+      localMenuCategories,
+      persistActiveRoomMenuToGlobal,
+      queryClient,
+      resolvedRoomIndex,
+      setValue,
+      stepTwoRooms.length,
+    ],
   );
 
   return (
@@ -856,36 +985,45 @@ export default function CateringTab() {
                       <FormControl>
                         <MenuCategoryDropdown
                           categories={localMenuCategories}
+                          value={field.value}
+                          initialValue={toPositiveId(field.value)}
                           onSelect={(value) => {
-                            field.onChange(Number(value));
+                            const numVal = toPositiveId(value);
+                            if (numVal != null) {
+                              field.onChange(numVal);
+                              if (isRoomsEnabled && stepTwoRooms.length > 0) {
+                                persistActiveRoomMenuToGlobal(
+                                  resolvedRoomIndex,
+                                  {
+                                    ...getValues(),
+                                    event_menu_category_id: numVal,
+                                  },
+                                );
+                              }
 
-                            // Add the selected category to the menu items if it doesn't exist
-                            const selectedCategory = localMenuCategories.find(
-                              (cat) => cat.id === Number(value),
-                            );
+                              // Add the selected category to the menu items if it doesn't exist
+                              const selectedCategory = [
+                                ...localMenuCategories,
+                              ].find((cat) => Number(cat.id) === numVal);
 
-                            if (selectedCategory) {
-                              const existingMenuIndex = (
-                                getValues("menus") || []
-                              ).findIndex(
-                                (menu) =>
-                                  String(menu?.name ?? "")
-                                    .trim()
-                                    .toLowerCase() ===
-                                  selectedCategory.name.trim().toLowerCase(),
-                              );
+                              if (selectedCategory) {
+                                const existingMenuIndex = (
+                                  getValues("menus") || []
+                                ).findIndex(
+                                  (menu) =>
+                                    String(menu?.name ?? "")
+                                      .trim()
+                                      .toLowerCase() ===
+                                    selectedCategory.name.trim().toLowerCase(),
+                                );
 
-                              if (existingMenuIndex === -1) {
-                                createMenuEntry(selectedCategory.name);
+                                if (existingMenuIndex === -1) {
+                                  createMenuEntry(selectedCategory.name);
+                                }
                               }
                             }
                           }}
                           isLoading={isMenuCategoriesLoading}
-                          initialValue={
-                            typeof field.value === "number"
-                              ? field.value
-                              : undefined
-                          }
                           onCategoryCreated={handleMenuCategoryCreated}
                           disabled={menuFields.length >= 4}
                           eventId={eventId}

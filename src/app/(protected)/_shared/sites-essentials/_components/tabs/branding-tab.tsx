@@ -213,6 +213,68 @@ export function BrandingTab({
       setPreviewScope(previewScopeForTab(brandingScope));
     }
   }, [brandingScope, hasMultipleLocations, setPreviewScope, isAdmin]);
+
+  const formErrors = form.formState.errors;
+  const subtabsWithErrors = {
+    siteIdentity: Boolean(
+      formErrors.name ||
+      formErrors.copyright ||
+      formErrors.footer_brand_description ||
+      formErrors.logo ||
+      formErrors.favicon
+    ),
+    mainHome: Boolean(
+      formErrors.main_landing_cover_image ||
+      formErrors.main_landing_banner_heading ||
+      formErrors.main_landing_banner_sub_heading ||
+      formErrors.main_landing_locations_list_title ||
+      formErrors.main_landing_locations_list_subtitle
+    ),
+    locationPage: Boolean(
+      formErrors.banner_heading ||
+      formErrors.banner_sub_heading ||
+      formErrors.banner_heading_accent ||
+      formErrors.banner_heading_align ||
+      formErrors.banner_heading_valign ||
+      formErrors.cover_image ||
+      formErrors.cover_video ||
+      formErrors.about_title ||
+      formErrors.about_description ||
+      formErrors.about_link_title ||
+      formErrors.about_cta_link ||
+      Object.keys(formErrors).some((k) => k.startsWith("home_"))
+    ),
+    infoPages: Boolean(
+      formErrors.terms_and_conditions ||
+      formErrors.privacy_policy ||
+      formErrors.refund_policy ||
+      formErrors.cookie_policy ||
+      formErrors.vendor_terms ||
+      formErrors.about_page_content ||
+      formErrors.how_it_works_page_content ||
+      formErrors.contact_page_content ||
+      formErrors.company_legal_name ||
+      formErrors.company_number ||
+      formErrors.company_registered_office ||
+      formErrors.company_phone ||
+      formErrors.company_email
+    ),
+  };
+
+  useEffect(() => {
+    if (form.formState.submitCount > 0 && Object.keys(formErrors).length > 0) {
+      if (subtabsWithErrors.siteIdentity) {
+        setBrandingScope("site-identity");
+      } else if (hasMultipleLocations && subtabsWithErrors.mainHome) {
+        setBrandingScope("main-home");
+      } else if (subtabsWithErrors.locationPage) {
+        setBrandingScope("location-page");
+      } else if (subtabsWithErrors.infoPages) {
+        setBrandingScope("info-pages");
+      }
+    }
+  }, [form.formState.submitCount]);
+
   const headerBackgroundColor =
     useWatch({ control: form.control, name: "colors.header" }) ??
     defaultThemeConstants.colors.header;
@@ -584,29 +646,49 @@ export function BrandingTab({
           <TabsList className="inline-flex h-auto w-max min-w-full gap-1 rounded-lg bg-muted/60 p-1">
             <TabsTrigger
               value="site-identity"
-              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+              className="relative flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
             >
               Site identity
+              {subtabsWithErrors.siteIdentity && (
+                <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                </span>
+              )}
             </TabsTrigger>
             {hasMultipleLocations ? (
               <TabsTrigger
                 value="main-home"
-                className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+                className="relative flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
               >
                 Main home page
+                {subtabsWithErrors.mainHome && (
+                  <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                  </span>
+                )}
               </TabsTrigger>
             ) : null}
             <TabsTrigger
               value="location-page"
-              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+              className="relative flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
             >
               {hasMultipleLocations ? "Location page" : "Home page"}
+              {subtabsWithErrors.locationPage && (
+                <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger
               value="info-pages"
-              className="flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
+              className="relative flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
             >
               Info pages
+              {subtabsWithErrors.infoPages && (
+                <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
         </div>
