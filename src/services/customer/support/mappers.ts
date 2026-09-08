@@ -8,7 +8,7 @@ import type {
   SupportConversation,
   SupportMessage,
 } from "@/app/(protected)/customer/support/_lib/types";
-import { normalizeSupportStatus } from "@/app/(protected)/customer/support/_lib/utils";
+import { mapSupportTicketStatus } from "@/app/(protected)/customer/support/_lib/utils";
 import type {
   CustomerSupportMessageGroup,
   CustomerSupportMessageItem,
@@ -35,14 +35,21 @@ export function formatAttachmentSize(bytes: number): string {
 export function mapCustomerSupportTicketToConversation(
   ticket: CustomerSupportTicket
 ): SupportConversation {
+  const { status, statusLabel, reopened } = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
+
   return {
     id: ticket.ticket_key,
     ref: ticket.ticket_key,
     subject: ticket.subject,
     category: mapCategoryLabel(ticket.category_label),
     priority: ticket.priority,
-    status: normalizeSupportStatus(ticket.status),
-    statusLabel: ticket.status_label,
+    status,
+    statusLabel,
+    reopened,
     openedAt: ticket.last_message_at,
     lastMessage: ticket.last_message_preview,
     lastMessageAt: ticket.last_message_at,
@@ -143,6 +150,11 @@ export function mapTicketDetailToConversation(
     undefined;
 
   const lastMessage = messages[messages.length - 1];
+  const { status, statusLabel, reopened } = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
 
   return {
     id: ticket.ticket_key,
@@ -150,8 +162,9 @@ export function mapTicketDetailToConversation(
     subject: ticket.subject,
     category: mapCategoryLabel(ticket.category_label),
     priority: ticket.priority,
-    status: normalizeSupportStatus(ticket.status),
-    statusLabel: ticket.status_label,
+    status,
+    statusLabel,
+    reopened,
     bookingRef,
     bookingTitle,
     openedAt: lastMessage?.createdAt ?? new Date().toISOString(),
@@ -165,12 +178,22 @@ export function mapTicketDetailToConversation(
 
 export function mapRecentTicketToConversation(
   ticket: CustomerSupportRecentTicket
-): Pick<SupportConversation, "id" | "ref" | "subject" | "status" | "statusLabel"> {
+): Pick<
+  SupportConversation,
+  "id" | "ref" | "subject" | "status" | "statusLabel" | "reopened"
+> {
+  const { status, statusLabel, reopened } = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
+
   return {
     id: ticket.ticket_key,
     ref: ticket.ticket_key,
     subject: ticket.subject,
-    status: normalizeSupportStatus(ticket.status),
-    statusLabel: ticket.status_label,
+    status,
+    statusLabel,
+    reopened,
   };
 }

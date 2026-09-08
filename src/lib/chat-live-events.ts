@@ -246,6 +246,8 @@ export function extractLiveEventTheme(text: string): LiveEventTheme | null {
 export type RequestedEventWindow = {
   key: "weekend" | "next-weekend" | "week" | "next-week" | "month";
   label: string;
+  start: string;
+  end: string;
 };
 
 const WELL_KNOWN_CITIES = [
@@ -286,6 +288,10 @@ function formatDayMonth(date: Date): string {
   return format(date, "d MMM");
 }
 
+function formatIsoDay(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
 /** “this weekend”, “upcoming weekend”, “next week”. */
 export function extractRequestedEventWindow(
   text: string,
@@ -308,6 +314,8 @@ export function extractRequestedEventWindow(
     return {
       key: nextWeekend ? "next-weekend" : "weekend",
       label: `${nextWeekend ? "next weekend" : "this weekend"} (${formatDayMonth(weekendStart)}–${formatDayMonth(weekendEnd)})`,
+      start: formatIsoDay(weekendStart),
+      end: formatIsoDay(weekendEnd),
     };
   }
 
@@ -317,6 +325,8 @@ export function extractRequestedEventWindow(
     return {
       key: "next-week",
       label: `next week (${formatDayMonth(start)}–${formatDayMonth(end)})`,
+      start: formatIsoDay(start),
+      end: formatIsoDay(end),
     };
   }
   if (/\b(this|the|upcoming|coming)\s+week\b/.test(query)) {
@@ -325,12 +335,35 @@ export function extractRequestedEventWindow(
     return {
       key: "week",
       label: `this week (${formatDayMonth(start)}–${formatDayMonth(end)})`,
+      start: formatIsoDay(start),
+      end: formatIsoDay(end),
     };
   }
   if (/\b(this|the)\s+month\b/.test(query)) {
-    return { key: "month", label: format(now, "MMMM") };
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      key: "month",
+      label: format(now, "MMMM"),
+      start: formatIsoDay(start),
+      end: formatIsoDay(end),
+    };
   }
   return null;
+}
+
+/**
+ * “What about next weekend?” after a booking is already open — not a new
+ * catalogue dump. City / “which events” questions stay as browse.
+ */
+export function isEventWindowFollowUp(text: string): boolean {
+  const t = normalizeChatBookingQuery(text);
+  if (!extractRequestedEventWindow(t)) return false;
+  if (extractAskedPlace(t, [])) return false;
+  if (/\bwhat about\b/i.test(t)) return true;
+  if (/\b(which|what)\s+events?\b/i.test(t)) return false;
+  if (/\b(what'?s\s+on|whats\s+on|anything\s+on)\b/i.test(t)) return false;
+  return t.split(/\s+/).filter(Boolean).length <= 8;
 }
 
 export type AskedPlace = {
@@ -1171,7 +1204,11 @@ export function matchLiveEventsFromConversation(
   if (askedPlace && !askedPlace.catalogCity) {
     return [];
   }
-  if (extractRequestedEventWindow(userText) && !currentTheme) {
+  if (
+    extractRequestedEventWindow(userText) &&
+    !currentTheme &&
+    !isEventWindowFollowUp(userText)
+  ) {
     return matchLiveEvents(userText, liveEvents);
   }
   const fromCurrentTheme = matchLiveEvents(userText, liveEvents);
@@ -1706,7 +1743,7 @@ When the guest asks about an event by name, category, city, or time (this weeken
 1. Answer from this list only — never invent events, cities, dates, or URLs.
 2. Event titles are often people's names. The type is category_name. Match category_name when they ask for Christmas, Halloween, weddings, etc. If category_name is null, only match the title.
 3. If they named a city, only offer events in that city. If that city is not on this list, say so and name the cities you can book. Never pretend a Bristol or Porthcawl event is in London.
-4. This list has no dates. If they ask what’s on this weekend / next week / this month, list matching events and ask them to tap one so you can check those dates. Never claim an event runs that weekend.
+4. This list has no dates. If they ask what’s on this weekend / next week / this month and no event is already loaded, list matching events and ask them to tap one so you can check those dates. Never claim an event runs that weekend. If EVENT BOOKING DATA is loaded, “what about this/next weekend” checks that event’s dates only.
 5. If they named a category, only offer matching events. If none match, say so in one sentence, then offer at most ${MAX_LIVE_EVENT_CHAT_CHOICES} alternatives in that city (or at this venue). Never start booking a different category.
 6. Event buttons MUST be unique — never repeat “Book now”. Use [Event name · City](chat:Book Event name in City).
 7. Location-only picks stay in chat: [Book in City](chat:Book in City)

@@ -207,6 +207,7 @@ export default function VendorConversationSidebar({
                     <StatusBadge
                       status={ticket.status}
                       label={ticket.statusLabel}
+                      reopened={ticket.reopened}
                     />
                   </div>
                 </Link>

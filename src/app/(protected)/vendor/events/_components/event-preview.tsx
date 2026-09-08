@@ -482,6 +482,7 @@ export function EventPreview({
 
   const showTimeline =
     String(activePackage?.event_schedular_title ?? "").trim().length > 0 ||
+    String(activePackage?.event_schedule_subtitle ?? "").trim().length > 0 ||
     timelineRows.length > 0;
 
   const eventLocationLabel = formatEventLocationLabel(slices.eventAddress);

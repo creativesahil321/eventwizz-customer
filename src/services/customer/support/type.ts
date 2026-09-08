@@ -39,6 +39,8 @@ export interface CustomerSupportTicket {
   subject: string;
   status: CustomerSupportTicketStatus;
   status_label: string;
+  /** True when an open ticket was previously closed and reopened */
+  reopened?: boolean;
   priority: CustomerSupportTicketPriority;
   category_label: string;
   last_message_at: string;
@@ -170,6 +172,7 @@ export interface CustomerSupportTicketDetail {
   ticket_key: string;
   status: CustomerSupportTicketStatus;
   status_label: string;
+  reopened?: boolean;
   priority: CustomerSupportTicketPriority;
   category_label: string;
   subject: string;
@@ -197,6 +200,7 @@ export interface CustomerSupportRecentTicket {
   subject: string;
   status: CustomerSupportTicketStatus;
   status_label: string;
+  reopened?: boolean;
 }
 
 export interface CustomerSupportMessagesParams {

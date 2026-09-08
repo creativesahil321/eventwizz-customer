@@ -48,10 +48,10 @@ export type AdminSupportQuickFilter =
   | string;
 
 export interface AdminSupportDashboardQueues {
-  general_support?: number;
   customer_tickets?: number;
   vendor_tickets?: number;
-  technical_support?: number;
+  closed?: number;
+  waiting_for_your_reply?: number;
 }
 
 export interface AdminSupportDashboardLiveConversation {
@@ -62,15 +62,17 @@ export interface AdminSupportDashboardLiveConversation {
   venue_name: string;
   venue_id: string;
   status: string;
+  status_label?: string;
+  reopened?: boolean;
   priority: AdminSupportTicketPriority | string;
   date: string;
 }
 
 export interface AdminSupportDashboardData {
-  total_open: number;
-  total_resolved: number;
-  customer_open: number;
-  vendor_open: number;
+  total_tickets: number;
+  customer_tickets: number;
+  vendor_tickets: number;
+  open: number;
   queues: AdminSupportDashboardQueues;
   live_conversations: AdminSupportDashboardLiveConversation[];
   inbox_count?: number;
@@ -97,6 +99,7 @@ export interface AdminSupportTicket {
   subject: string;
   status: AdminSupportTicketStatus;
   status_label: string;
+  reopened?: boolean;
   priority: AdminSupportTicketPriority | string;
   category_label: string;
   last_message_at: string;
@@ -294,6 +297,7 @@ export interface AdminSupportTicketDetail {
   ticket_key: string;
   status: AdminSupportTicketStatus;
   status_label: string;
+  reopened?: boolean;
   priority: AdminSupportTicketPriority | string;
   category_label: string;
   subject: string;
@@ -334,6 +338,7 @@ export interface AdminSupportRecentTicket {
   subject: string;
   status: AdminSupportTicketStatus;
   status_label: string;
+  reopened?: boolean;
 }
 
 export interface AdminSupportMessagesParams {

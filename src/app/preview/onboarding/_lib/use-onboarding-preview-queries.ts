@@ -29,6 +29,7 @@ export type OnboardingPreviewEventData = SiteEssentials & {
     about_event_description?: string;
     /** Flat single-event payload (`is_rooms: false`) — same fields as room entries. */
     event_schedular_title?: string;
+    event_schedule_subtitle?: string;
     event_schedular_background_image?: string | null;
     event_schedular?: Array<{ time: string; title: string }>;
     package_title?: string;
@@ -68,6 +69,7 @@ export type OnboardingPreviewEventData = SiteEssentials & {
       {
         room_id?: number;
         event_schedular_title?: string;
+        event_schedule_subtitle?: string;
         event_schedular_background_image?: string | null;
         event_schedular?: Array<{ time: string; title: string }>;
         package_title?: string;

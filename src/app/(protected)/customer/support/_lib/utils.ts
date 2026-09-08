@@ -81,15 +81,15 @@ export const SUPPORT_STATUSES: SupportStatus[] = [
   "closed",
 ];
 
-/** Customer inbox status filter — excludes internal waiting queues. */
-export const CUSTOMER_INBOX_STATUS_FILTERS: SupportStatus[] = [
+/** Customer inbox status filter — New, Open, Closed only. */
+export const CUSTOMER_INBOX_STATUS_FILTERS = [
   "new",
   "open",
-  "reopen",
-  "waiting_customer",
-  "resolved",
   "closed",
-];
+] as const;
+
+export type CustomerInboxStatusFilter =
+  (typeof CUSTOMER_INBOX_STATUS_FILTERS)[number];
 
 export const STATUS_LABELS: Record<SupportStatus, string> = {
   new: "New",
@@ -98,21 +98,34 @@ export const STATUS_LABELS: Record<SupportStatus, string> = {
   waiting_customer: "Awaiting your reply",
   waiting_general_support: "With our support team",
   waiting_platform_support: "With technical support",
-  resolved: "Resolved",
+  resolved: "Closed",
   closed: "Closed",
 };
 
 export const CLOSED_TICKET_STATUSES: SupportStatus[] = ["closed", "resolved"];
 
+function toStatusKey(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+export function isReopenedStatusKey(
+  status: string | null | undefined
+): boolean {
+  const key = toStatusKey(status);
+  return key === "reopen" || key === "reopened";
+}
+
 export function normalizeSupportStatus(
   status: string | null | undefined
 ): SupportStatus {
-  const normalized = (status ?? "").trim().toLowerCase().replace(/\s+/g, "_");
-  if (normalized === "reopened") return "reopen";
+  const normalized = toStatusKey(status);
+  if (normalized === "resolved") return "closed";
+  if (normalized === "reopened" || normalized === "reopen") return "open";
   // Legacy / alias keys → current API contract
   if (
     normalized === "waiting_event_admin" ||
-    normalized === "waiting_you"
+    normalized === "waiting_you" ||
+    normalized === "waiting_for_you"
   ) {
     return "waiting_general_support";
   }
@@ -132,17 +145,49 @@ export function normalizeSupportStatus(
   return "new";
 }
 
+export function sanitizeSupportStatusLabel(
+  label: string | null | undefined
+): string | undefined {
+  const trimmed = label?.trim();
+  if (!trimmed) return undefined;
+  const key = toStatusKey(trimmed);
+  if (key === "resolved") return STATUS_LABELS.closed;
+  if (key === "reopened" || key === "reopen") return STATUS_LABELS.open;
+  return trimmed;
+}
+
+export function mapSupportTicketStatus(
+  status: string | null | undefined,
+  statusLabel?: string | null,
+  reopened?: unknown
+): {
+  status: SupportStatus;
+  statusLabel?: string;
+  reopened: boolean;
+} {
+  return {
+    status: normalizeSupportStatus(status),
+    statusLabel: sanitizeSupportStatusLabel(statusLabel),
+    reopened: isTicketReopened(reopened) || isReopenedStatusKey(status),
+  };
+}
+
 export function getStatusLabel(
   status: string | null | undefined,
   fallbackLabel?: string | null
 ): string {
-  // Badge text should come from API `status_label`. This is only a last-resort for status keys.
-  if (fallbackLabel?.trim()) return fallbackLabel.trim();
-  return STATUS_LABELS[normalizeSupportStatus(status)];
+  return (
+    sanitizeSupportStatusLabel(fallbackLabel) ||
+    STATUS_LABELS[normalizeSupportStatus(status)]
+  );
 }
 
 export function isClosedTicketStatus(status: SupportStatus): boolean {
   return CLOSED_TICKET_STATUSES.includes(status);
+}
+
+export function isTicketReopened(value: unknown): boolean {
+  return value === true || value === 1 || value === "1" || value === "true";
 }
 
 export function getPriorityClass(priority: SupportPriority): string {

@@ -33,23 +33,30 @@ export function PriorityBadge({ priority, className }: PriorityBadgeProps) {
   );
 }
 
+const badgeClassName =
+  "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-1.5 py-0.5 text-[9px] font-medium sm:text-[10px]";
+
 interface StatusBadgeProps {
   status: SupportStatus | string;
   label?: string | null;
+  reopened?: boolean;
   className?: string;
 }
 
-export function StatusBadge({ status, label, className }: StatusBadgeProps) {
-  const safeStatus = normalizeSupportStatus(status);
-  const text = label?.trim() || STATUS_LABELS[safeStatus];
+export function StatusBadge({
+  status,
+  label,
+  reopened,
+  className,
+}: StatusBadgeProps) {
+  const safeStatus = reopened ? "reopen" : normalizeSupportStatus(status);
+  const text = reopened
+    ? STATUS_LABELS.reopen
+    : label?.trim() || STATUS_LABELS[safeStatus];
 
   return (
     <span
-      className={cn(
-        "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-1.5 py-0.5 text-[9px] font-medium sm:text-[10px]",
-        getStatusClass(safeStatus),
-        className
-      )}
+      className={cn(badgeClassName, getStatusClass(safeStatus), className)}
     >
       {text}
     </span>

@@ -5,14 +5,15 @@ import Link from "next/link";
 import type { DateRange } from "react-day-picker";
 import {
   ArrowRight,
-  CheckCircle2,
   Inbox,
   Layers3,
   Loader2,
+  MessageSquare,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   PriorityBadge,
   SourceBadge,
@@ -21,7 +22,6 @@ import {
 } from "./support-badges";
 import type { DashboardDateRange } from "../_lib/types";
 import {
-  ADMIN_QUEUE_LABELS,
   DASHBOARD_DATE_LABELS,
   formatDashboardPeriodLabel,
   formatRelativeTime,
@@ -43,19 +43,25 @@ function StatCard({
   hint,
   icon: Icon,
   iconClassName,
+  isLoading,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   icon: React.ElementType;
   iconClassName: string;
+  isLoading?: boolean;
 }) {
   return (
     <div className="min-w-0 rounded-xl border border-[var(--color-border)] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+          {isLoading ? (
+            <Skeleton className="mt-1 h-8 w-16" />
+          ) : (
+            <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+          )}
           {hint ? (
             <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
           ) : null}
@@ -73,7 +79,15 @@ function StatCard({
   );
 }
 
-function QueueCard({ title, open }: { title: string; open: number }) {
+function QueueCard({
+  title,
+  count,
+  isLoading,
+}: {
+  title: string;
+  count: number;
+  isLoading?: boolean;
+}) {
   return (
     <div className="min-w-0 rounded-xl border border-[var(--color-border)] bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2">
@@ -81,8 +95,11 @@ function QueueCard({ title, open }: { title: string; open: number }) {
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
       <div className="mt-4">
-        <p className="text-xs text-muted-foreground">Open</p>
-        <p className="mt-1 text-xl font-bold text-foreground">{open}</p>
+        {isLoading ? (
+          <Skeleton className="h-7 w-12" />
+        ) : (
+          <p className="text-xl font-bold text-foreground">{count}</p>
+        )}
       </div>
     </div>
   );
@@ -110,10 +127,10 @@ export default function AdminSupportDashboard() {
       data?.data
         ? mapAdminSupportDashboardStats(data.data)
         : {
-            totalOpen: 0,
-            totalResolved: 0,
+            totalTickets: 0,
             customerTickets: 0,
             vendorTickets: 0,
+            open: 0,
           },
     [data?.data]
   );
@@ -199,29 +216,28 @@ export default function AdminSupportDashboard() {
 
       <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
-          label="Total open"
-          value={isLoading ? "—" : stats.totalOpen}
-          hint="Active conversations"
+          label="Total Tickets"
+          value={stats.totalTickets}
+          hint="All tickets in period"
           icon={Inbox}
           iconClassName="bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
-        />
-        <StatCard
-          label="Total resolved"
-          value={isLoading ? "—" : stats.totalResolved}
-          hint={`In ${periodLabel.toLowerCase()}`}
-          icon={CheckCircle2}
-          iconClassName="bg-emerald-50 text-emerald-600"
+          isLoading={isLoading}
         />
         <StatCard
           label="Customer / vendor"
-          value={
-            isLoading
-              ? "—"
-              : `${stats.customerTickets} / ${stats.vendorTickets}`
-          }
-          hint="Open tickets by source"
+          value={`${stats.customerTickets} / ${stats.vendorTickets}`}
+          hint="Tickets by source"
           icon={Users}
           iconClassName="bg-sky-50 text-sky-600"
+          isLoading={isLoading}
+        />
+        <StatCard
+          label="Open tickets"
+          value={stats.open}
+          hint={`In ${periodLabel.toLowerCase()}`}
+          icon={MessageSquare}
+          iconClassName="bg-emerald-50 text-emerald-600"
+          isLoading={isLoading}
         />
       </div>
 
@@ -235,12 +251,13 @@ export default function AdminSupportDashboard() {
             </Link>
           </Button>
         </div>
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           {queues.map((queue) => (
             <QueueCard
-              key={queue.queue}
-              title={ADMIN_QUEUE_LABELS[queue.queue]}
-              open={isLoading ? 0 : queue.open}
+              key={queue.id}
+              title={queue.title}
+              count={queue.count}
+              isLoading={isLoading}
             />
           ))}
         </div>
@@ -304,6 +321,7 @@ export default function AdminSupportDashboard() {
                       <StatusBadge
                         status={conversation.status}
                         label={conversation.statusLabel}
+                        reopened={conversation.reopened}
                       />
                       <PriorityBadge priority={conversation.priority} />
                     </div>

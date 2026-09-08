@@ -204,15 +204,14 @@ function setTicketAssigneeInCaches(
 function applyCloseToCaches(
   queryClient: ReturnType<typeof useQueryClient>,
   ticketKey: string,
-  status: string = "resolved",
+  status: string = "closed",
   options?: { can_reply?: boolean }
 ) {
+  const nextStatus = status === "resolved" ? "closed" : status;
   const statusLabel =
-    status === "resolved"
-      ? "Resolved"
-      : status === "closed"
-        ? "Closed"
-        : status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    nextStatus === "closed"
+      ? "Closed"
+      : nextStatus.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   queryClient.setQueriesData<AdminSupportTicketsResponse>(
     { queryKey: adminSupportKeys.lists() },
@@ -224,7 +223,7 @@ function applyCloseToCaches(
           ticket.ticket_key === ticketKey
             ? {
                 ...ticket,
-                status,
+                status: nextStatus,
                 status_label: statusLabel,
               }
             : ticket
@@ -251,7 +250,7 @@ function applyCloseToCaches(
       can_pin: false,
       ticket: {
         ...page.ticket,
-        status,
+        status: nextStatus,
         status_label: statusLabel,
       },
     };
@@ -465,7 +464,7 @@ export function useCloseAdminSupportTicket() {
       const status =
         typeof response.data?.status === "string"
           ? response.data.status
-          : "resolved";
+          : "closed";
       applyCloseToCaches(queryClient, payload.ticketKey, status, {
         can_reply: response.data?.can_reply ?? false,
       });

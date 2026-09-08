@@ -73,7 +73,11 @@ export default function AdminConversationHeader({
               {conversation.bookingRef ? (
                 <BookingBadge bookingRef={conversation.bookingRef} />
               ) : null}
-              <StatusBadge status={status} label={conversation.statusLabel} />
+              <StatusBadge
+                status={status}
+                label={conversation.statusLabel}
+                reopened={conversation.reopened}
+              />
               <PriorityBadge priority={conversation.priority} />
               <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-700">
                 {ADMIN_CATEGORY_LABELS[conversation.category]}

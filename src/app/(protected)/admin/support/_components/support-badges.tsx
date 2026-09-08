@@ -1,12 +1,49 @@
 import { Building2, Ticket, UserRound, Store } from "lucide-react";
-import type { SupportSource } from "../_lib/types";
-import { ADMIN_SOURCE_LABELS } from "../_lib/utils";
+import type { SupportSource, SupportStatus } from "../_lib/types";
+import {
+  ADMIN_SOURCE_LABELS,
+  STATUS_LABELS,
+  getStatusClass,
+} from "../_lib/utils";
 import { cn } from "@/lib/utils";
-
-export {
+import {
   PriorityBadge,
-  StatusBadge,
+  StatusBadge as CustomerStatusBadge,
 } from "@/app/(protected)/customer/support/_components/support-badges";
+
+export { PriorityBadge };
+
+const badgeClassName =
+  "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-1.5 py-0.5 text-[9px] font-medium sm:text-[10px]";
+
+interface StatusBadgeProps {
+  status: SupportStatus | string;
+  label?: string | null;
+  reopened?: boolean;
+  className?: string;
+}
+
+export function StatusBadge({
+  status,
+  label,
+  reopened,
+  className,
+}: StatusBadgeProps) {
+  return (
+    <>
+      <CustomerStatusBadge
+        status={status}
+        label={label}
+        className={className}
+      />
+      {reopened ? (
+        <span className={cn(badgeClassName, getStatusClass("reopen"))}>
+          {STATUS_LABELS.reopen}
+        </span>
+      ) : null}
+    </>
+  );
+}
 
 interface SourceBadgeProps {
   source: SupportSource;

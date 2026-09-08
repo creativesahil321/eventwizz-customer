@@ -72,6 +72,21 @@ export function normalizeVendorChatText(rawText: string): string {
   text = text.replace(/\b(tody|todday|todaay|tday)\b/gi, "today");
   text = text.replace(/\b(yestarday|yesterdy|yesturday)\b/gi, "yesterday");
   text = text.replace(/\b(tommorow|tomorow|tomrw)\b/gi, "tomorrow");
+  text = text.replace(/\b(cncel|cancle|cancal)\b/gi, "cancel");
+  text = text.replace(/\b(chnage|chage|chagne)\b/gi, "change");
+  text = text.replace(/\b(tikcet|ticekt|tcket|ticet)\b/gi, "ticket");
+  text = text.replace(/\b(tikcets|ticekts|tckets)\b/gi, "tickets");
+  text = text.replace(/\b(paymant|paymnt|pament|paymet)\b/gi, "payment");
+  text = text.replace(/\b(refundd|refnd|reund)\b/gi, "refund");
+  text = text.replace(/\b(menue|menuee)\b/gi, "menu");
+  text = text.replace(/\b(wher|whre)\b/gi, "where");
+  text = text.replace(/\b(whn|wen)\b/gi, "when");
+  text = text.replace(/\b(evnts|evnt)\b/gi, (m) =>
+    m.toLowerCase().endsWith("s") ? "events" : "event",
+  );
+  text = text.replace(/\b(reservtions?|reservatons?)\b/gi, (m) =>
+    m.toLowerCase().endsWith("s") ? "reservations" : "reservation",
+  );
 
   // Merged Words & Spacing Typos
   text = text.replace(/\b(activecurrently|activecurrenly|activecurrentaly)\b/gi, "active currently");

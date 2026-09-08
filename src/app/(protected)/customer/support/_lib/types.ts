@@ -37,6 +37,8 @@ export interface SupportConversation {
   status: SupportStatus;
   /** Optional display label from API (`status_label`) */
   statusLabel?: string;
+  /** True when status is open and the ticket was previously closed */
+  reopened?: boolean;
   bookingRef?: string;
   bookingTitle?: string;
   openedAt: string;

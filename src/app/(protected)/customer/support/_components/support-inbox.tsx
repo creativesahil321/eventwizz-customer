@@ -35,9 +35,9 @@ import {
 import { useDebounce } from "@/hooks/data-table/use-debounce";
 import {
   CATEGORY_LABELS,
+  CUSTOMER_INBOX_STATUS_FILTERS,
   formatRelativeTime,
   isClosedTicketStatus,
-  SUPPORT_STATUSES,
 } from "../_lib/utils";
 import type { SupportConversation, SupportStatus } from "../_lib/types";
 import { cn } from "@/lib/utils";
@@ -165,6 +165,7 @@ function ConversationListItem({
             <StatusBadge
               status={conversation.status}
               label={conversation.statusLabel}
+              reopened={conversation.reopened}
             />
             <PriorityBadge priority={conversation.priority} />
             <span className="ml-auto text-[10px] font-medium text-muted-foreground">
@@ -216,7 +217,17 @@ function ConversationDetail({
 
   const conversation = useMemo(() => {
     if (latestPayload.ticket) {
-      return mapTicketDetailToConversation(latestPayload.ticket, messages);
+      const mapped = mapTicketDetailToConversation(
+        latestPayload.ticket,
+        messages
+      );
+      return {
+        ...mapped,
+        reopened:
+          latestPayload.ticket.reopened != null
+            ? mapped.reopened
+            : Boolean(mapped.reopened || fallback?.reopened),
+      };
     }
     if (fallback) {
       return { ...fallback, messages };
@@ -308,6 +319,7 @@ function ConversationDetail({
               <StatusBadge
                 status={status}
                 label={conversation.statusLabel}
+                reopened={conversation.reopened}
               />
               <PriorityBadge priority={conversation.priority} />
               <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
@@ -389,8 +401,14 @@ interface SupportInboxProps {
 
 function getInitialFilters(searchParams: URLSearchParams): InboxFilters {
   const status = searchParams.get("status");
-  if (status && SUPPORT_STATUSES.includes(status as SupportStatus)) {
-    return { ...DEFAULT_INBOX_FILTERS, status: status as SupportStatus };
+  if (
+    status &&
+    (CUSTOMER_INBOX_STATUS_FILTERS as readonly string[]).includes(status)
+  ) {
+    return {
+      ...DEFAULT_INBOX_FILTERS,
+      status: status as InboxFilters["status"],
+    };
   }
   return DEFAULT_INBOX_FILTERS;
 }

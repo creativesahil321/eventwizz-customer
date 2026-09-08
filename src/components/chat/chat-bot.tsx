@@ -63,6 +63,7 @@ import {
   extractRequestedEventWindow,
   liveEventMatchesRequestedTheme,
   isBroadEventListIntent,
+  isEventWindowFollowUp,
   isLiveEventAvailabilityQuestion,
   asWeakMatches,
   canonicalizeLiveEventHref,
@@ -78,6 +79,7 @@ import {
   asksToChangeOrPickRoom,
   buildBookingKickoffCopy,
   buildBookingRecoveryCopy,
+  buildPinnedEventWindowReply,
   buildExistingCartBookingGateActions,
   buildExistingCartBookingGateCopy,
   buildGuestBookingGateActions,
@@ -188,6 +190,14 @@ import {
   isVendorFollowUpQuery,
   resolveVendorTopicFromHistory,
 } from "@/lib/chat-vendor-on-demand";
+import {
+  detectCustomerOnDemandQueryType,
+  fetchCustomerOnDemandChatReply,
+  isCustomerFollowUpQuery,
+  resolveCustomerTopicFromHistory,
+  buildCustomerForbiddenReply,
+  buildCustomerLoginReply,
+} from "@/lib/chat-customer-on-demand";
 import { usePermissionStore } from "@/store/permission.store";
 import {
   hasPermissionForDomain,
@@ -2265,6 +2275,77 @@ export function ChatBot() {
       }
     }
 
+    if (!isLoggedInVendor) {
+      let customerQueryType = detectCustomerOnDemandQueryType(userText);
+      if (
+        !customerQueryType &&
+        isLoggedInCustomer &&
+        isCustomerFollowUpQuery(userText)
+      ) {
+        customerQueryType = resolveCustomerTopicFromHistory(messages, userText);
+      }
+      const isCatalogueBrowse =
+        isBroadEventListIntent(userText) ||
+        isLiveEventBookingIntent(userText) ||
+        isLiveEventAvailabilityQuestion(userText);
+      if (
+        customerQueryType &&
+        customerQueryType !== "forbidden" &&
+        isCatalogueBrowse &&
+        !/\b(my (booking|bookings|reservation|ticket)|VE-|EV-|BK-)\b/i.test(
+          userText,
+        )
+      ) {
+        customerQueryType = null;
+      }
+      if (customerQueryType === "forbidden") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: buildCustomerForbiddenReply(userName),
+          },
+        ]);
+        return;
+      }
+      if (customerQueryType && !isLoggedInCustomer) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: buildCustomerLoginReply(userName),
+          },
+        ]);
+        return;
+      }
+      const skipForOpenBooking =
+        Boolean(eventBookingBriefRef.current) &&
+        customerQueryType === "change_request" &&
+        !/\bmy\s+booking\b/i.test(userText);
+      if (customerQueryType && isLoggedInCustomer && !skipForOpenBooking) {
+        setIsLoading(true);
+        try {
+          const result = await fetchCustomerOnDemandChatReply({
+            userText,
+            userName,
+            queryType: customerQueryType,
+            currencySymbol,
+          });
+          if (result?.reply) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: result.reply },
+            ]);
+            setIsLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error("Customer on-demand chat failed:", error);
+        }
+        setIsLoading(false);
+      }
+    }
+
     const isPlatformEventBookingQuestion =
       !isVendorStorefront &&
       (isLiveEventBookingIntent(userText) ||
@@ -2467,6 +2548,7 @@ Is there anything else I can help you with?`,
       !isLoggedInVendor &&
       liveEvents.length > 0 &&
       !parseBookEventInCitySendText(userText) &&
+      !(catalogueBrief && isEventWindowFollowUp(userText)) &&
       (isBroadEventListIntent(userText) ||
         isLiveEventAvailabilityQuestion(userText) ||
         (isBrochureQuestion(userText) && !catalogueBrief))
@@ -2976,9 +3058,12 @@ Is there anything else I can help you with?`,
         pinnedBrief &&
         !namedOtherEvent &&
         !pinnedWrongTheme &&
-        !isBroadEventListIntent(userText) &&
-        !isLiveEventAvailabilityQuestion(userText) &&
-        !extractRequestedEventWindow(userText)
+        !(
+          (isBroadEventListIntent(userText) ||
+            isLiveEventAvailabilityQuestion(userText) ||
+            Boolean(extractRequestedEventWindow(userText))) &&
+          !isEventWindowFollowUp(userText)
+        )
       ) {
         eventBookingBrief = pinnedBrief;
       }
@@ -3119,6 +3204,36 @@ Is there anything else I can help you with?`,
             {
               role: "assistant",
               ...inChatChoiceMessage(direct.content),
+            },
+          ]);
+          return;
+        }
+      }
+
+      if (
+        isVendorStorefront &&
+        !isLoggedInVendor &&
+        eventBookingBrief &&
+        isEventWindowFollowUp(userText)
+      ) {
+        const windowTurn = buildPinnedEventWindowReply({
+          brief: eventBookingBrief,
+          userText,
+          userName,
+        });
+        if (windowTurn) {
+          const windowActions = publicBookingQuickActions({
+            content: windowTurn.content,
+            brief: eventBookingBrief,
+            conversation: [...messages, userMessage],
+          });
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              ...inChatChoiceMessage(windowTurn.content),
+              quickActions:
+                windowActions.length > 0 ? windowActions : undefined,
             },
           ]);
           return;

@@ -41,6 +41,7 @@ export type PublicEventActiveSlices = {
   rooms: PublicEventRoomRef[];
   activeRoom: PublicEventRoomRef | null;
   event_schedular_title: string;
+  event_schedule_subtitle: string;
   event_schedular: Array<{ time: string; title: string }>;
   event_schedular_background_image: string | null;
   package_title: string;
@@ -208,6 +209,7 @@ function flatSlicesFromEvent(event: EventDetail): PublicEventActiveSlices {
     rooms: [],
     activeRoom: null,
     event_schedular_title: event.event_schedular_title ?? "",
+    event_schedule_subtitle: String(event.event_schedule_subtitle ?? "").trim(),
     event_schedular: event.event_schedular ?? [],
     event_schedular_background_image: event.event_schedular_background_image ?? null,
     package_title: event.package_title ?? "",
@@ -248,6 +250,9 @@ function roomSlicesFromPayload(
     rooms: listPublicEventRooms(event),
     activeRoom: room,
     event_schedular_title: payload.event_schedular_title ?? "",
+    event_schedule_subtitle: String(
+      payload.event_schedule_subtitle ?? "",
+    ).trim(),
     event_schedular: payload.event_schedular ?? [],
     event_schedular_background_image:
       payload.event_schedular_background_image ?? null,

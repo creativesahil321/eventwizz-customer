@@ -30,9 +30,9 @@ import type {
   SupportStatus,
 } from "../_lib/types";
 import {
+  ADMIN_INBOX_STATUS_FILTERS,
   formatRelativeTime,
   isClosedTicketStatus,
-  SUPPORT_STATUSES,
 } from "../_lib/utils";
 import {
   flattenAdminSupportMessages,
@@ -178,6 +178,7 @@ function ConversationListItem({
             <StatusBadge
               status={conversation.status}
               label={conversation.statusLabel}
+              reopened={conversation.reopened}
             />
             <PriorityBadge priority={conversation.priority} />
             {assignee ? (
@@ -480,8 +481,11 @@ function getInitialFilters(searchParams: URLSearchParams): AdminInboxFilters {
   const venue = searchParams.get("venue");
   const next = { ...DEFAULT_ADMIN_INBOX_FILTERS };
 
-  if (status && SUPPORT_STATUSES.includes(status as SupportStatus)) {
-    next.status = status as SupportStatus;
+  if (
+    status &&
+    (ADMIN_INBOX_STATUS_FILTERS as readonly string[]).includes(status)
+  ) {
+    next.status = status as AdminInboxFilters["status"];
   }
   if (venue) {
     next.venue = venue;

@@ -257,6 +257,7 @@ function applyCloseToCaches(
   ticketKey: string,
   status: string = "closed"
 ) {
+  const nextStatus = status === "resolved" ? "closed" : status;
   queryClient.setQueriesData<VendorSupportTicketsResponse>(
     { queryKey: vendorSupportKeys.lists() },
     (current) => {
@@ -267,7 +268,7 @@ function applyCloseToCaches(
           ticket.ticket_key === ticketKey
             ? {
               ...ticket,
-              status,
+              status: nextStatus,
               status_label: "Closed",
             }
             : ticket
@@ -292,7 +293,7 @@ function applyCloseToCaches(
       can_pin: false,
       ticket: {
         ...page.ticket,
-        status,
+        status: nextStatus,
         status_label: "Closed",
       },
     };

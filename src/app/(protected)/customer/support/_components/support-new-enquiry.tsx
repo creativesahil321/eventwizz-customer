@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
@@ -49,6 +49,13 @@ export default function SupportNewEnquiry() {
   const [priority, setPriority] = useState<SupportPriority>("medium");
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
+  const didHydratePhone = useRef(false);
+
+  useEffect(() => {
+    if (didHydratePhone.current || !customer.phone) return;
+    setContactNumber(customer.phone);
+    didHydratePhone.current = true;
+  }, [customer.phone]);
 
   const showBookingDetails = category === "general_support";
 
@@ -60,8 +67,6 @@ export default function SupportNewEnquiry() {
         ? bookingLocation
         : null
     );
-
-  const contactNumberValue = contactNumber || customer.phone || "";
 
   const locationOptions = useMemo(
     () =>
@@ -117,7 +122,7 @@ export default function SupportNewEnquiry() {
       toast.error("Please enter a subject and description.");
       return;
     }
-    if (!contactNumberValue.trim()) {
+    if (!contactNumber.trim()) {
       toast.error("Please enter your telephone number.");
       return;
     }
@@ -135,7 +140,7 @@ export default function SupportNewEnquiry() {
       const response = await createTicket.mutateAsync({
         subject: subject.trim(),
         category,
-        contact_number: contactNumberValue.trim(),
+        contact_number: contactNumber.trim(),
         vendor_location_id:
           vendorLocationId != null && !Number.isNaN(vendorLocationId)
             ? vendorLocationId
@@ -219,7 +224,7 @@ export default function SupportNewEnquiry() {
                   id="contactNumber"
                   type="tel"
                   placeholder="e.g. 07700 900123"
-                  value={contactNumberValue}
+                  value={contactNumber}
                   onChange={(e) => setContactNumber(e.target.value)}
                   className="h-11 min-w-0 max-w-full bg-gray-50"
                 />

@@ -214,7 +214,7 @@ export default function VendorSupportDashboard() {
               iconClassName="bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
             />
             <StatCard
-              label="Total resolved"
+              label="Total closed"
               value={stats.totalResolved}
               hint={`In ${periodLabel.toLowerCase()}`}
               icon={CheckCircle2}

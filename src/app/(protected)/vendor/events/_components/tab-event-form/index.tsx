@@ -153,6 +153,35 @@ function eventStatusBadgeClass(status?: string | null): string {
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
+function VendorEventPreviewButton({
+  canPreview,
+  disabled,
+  onPreview,
+}: {
+  canPreview: boolean;
+  disabled: boolean;
+  onPreview: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="event-outline"
+      size="sm"
+      className="flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs sm:text-sm"
+      disabled={!canPreview || disabled}
+      onClick={onPreview}
+      title={
+        canPreview
+          ? "Preview how this event will look to customers"
+          : "Save the Event name step to enable preview"
+      }
+    >
+      <Eye size={14} />
+      Preview
+    </Button>
+  );
+}
+
 type RoomRecord = {
   name: string;
   roomId?: number;
@@ -884,36 +913,43 @@ export default function TabEventForm() {
                       })}
                     </TabsList>
                   </div>
-                  <div
-                    className="order-3 flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:order-none sm:w-auto sm:shrink-0"
-                    aria-label={`Step ${displayedStep} of 8`}
-                  >
-                    <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-slate-700">
-                      Step {displayedStep} of 8
-                    </span>
+                  <div className="order-3 flex w-full min-w-0 flex-wrap items-center gap-2 sm:order-none sm:w-auto sm:shrink-0 sm:flex-nowrap">
                     <div
-                      role="progressbar"
-                      aria-valuemin={1}
-                      aria-valuemax={8}
-                      aria-valuenow={displayedStep}
-                      aria-label={`Event setup progress: step ${displayedStep} of 8`}
-                      className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200"
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:flex-none"
+                      aria-label={`Step ${displayedStep} of 8`}
                     >
+                      <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-slate-700">
+                        Step {displayedStep} of 8
+                      </span>
                       <div
-                        className="h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-300"
-                        style={{ width: `${(displayedStep / 8) * 100}%` }}
-                      />
+                        role="progressbar"
+                        aria-valuemin={1}
+                        aria-valuemax={8}
+                        aria-valuenow={displayedStep}
+                        aria-label={`Event setup progress: step ${displayedStep} of 8`}
+                        className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200 sm:w-20"
+                      >
+                        <div
+                          className="h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-300"
+                          style={{ width: `${(displayedStep / 8) * 100}%` }}
+                        />
+                      </div>
                     </div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "shrink-0 px-2.5 py-0.5 text-xs font-semibold capitalize",
+                        eventStatusBadgeClass(eventStatus),
+                      )}
+                    >
+                      {formatEventStatusLabel(eventStatus)}
+                    </Badge>
+                    <VendorEventPreviewButton
+                      canPreview={canPreview}
+                      disabled={finalizeBusy}
+                      onPreview={openEventPreview}
+                    />
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "mt-1 shrink-0 px-2.5 py-0.5 text-xs font-semibold capitalize",
-                      eventStatusBadgeClass(eventStatus),
-                    )}
-                  >
-                    {formatEventStatusLabel(eventStatus)}
-                  </Badge>
                 </div>
               </div>
 
@@ -1124,22 +1160,11 @@ export default function TabEventForm() {
                           {Math.min(currentStep, 8)}/8
                         </div>
                       ) : null}
-                      <Button
-                        type="button"
-                        variant="event-outline"
-                        size="sm"
-                        className="flex items-center gap-2 text-xs sm:text-sm"
-                        disabled={!canPreview || finalizeBusy}
-                        onClick={openEventPreview}
-                        title={
-                          canPreview
-                            ? "Preview how this event will look to customers"
-                            : "Save the Event name step to enable preview"
-                        }
-                      >
-                        <Eye size={14} />
-                        Preview
-                      </Button>
+                      <VendorEventPreviewButton
+                        canPreview={canPreview}
+                        disabled={finalizeBusy}
+                        onPreview={openEventPreview}
+                      />
                       {isPublishTab ? (
                         <Button
                           type="submit"

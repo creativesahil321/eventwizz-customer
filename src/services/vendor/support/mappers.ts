@@ -2,7 +2,7 @@
  * Maps vendor support API DTOs → UI models
  */
 
-import { normalizeSupportStatus } from "@/app/(protected)/customer/support/_lib/utils";
+import { mapSupportTicketStatus } from "@/app/(protected)/customer/support/_lib/utils";
 import {
   formatAttachmentSize,
   mapCategoryLabel,
@@ -108,18 +108,24 @@ export function mapVendorSupportDashboardStats(
 export function mapVendorSupportNeedsAttention(
   items: VendorSupportDashboardNeedsAttentionItem[]
 ): VendorSupportNeedsAttentionItem[] {
-  return (items ?? []).map((item) => ({
-    id: item.ticket_id,
-    ref: item.ticket_id,
-    subject: item.subject,
-    customerName: item.customer_name,
-    status: normalizeSupportStatus(item.status),
-    statusLabel: item.status_label?.trim() || null,
-    priority: (["low", "medium", "high"].includes(item.priority)
-      ? item.priority
-      : "medium") as SupportPriority,
-    date: item.date,
-  }));
+  return (items ?? []).map((item) => {
+    const { status, statusLabel } = mapSupportTicketStatus(
+      item.status,
+      item.status_label
+    );
+    return {
+      id: item.ticket_id,
+      ref: item.ticket_id,
+      subject: item.subject,
+      customerName: item.customer_name,
+      status,
+      statusLabel: statusLabel ?? null,
+      priority: (["low", "medium", "high"].includes(item.priority)
+        ? item.priority
+        : "medium") as SupportPriority,
+      date: item.date,
+    };
+  });
 }
 
 export function mapVendorSupportRecentActivity(
@@ -144,6 +150,11 @@ export function mapVendorSupportTicketToConversation(
       : null;
 
   const lastSender = ticket.last_sender_name?.trim() || "Unknown";
+  const { status, statusLabel, reopened } = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
 
   return {
     id: ticket.ticket_key,
@@ -153,8 +164,9 @@ export function mapVendorSupportTicketToConversation(
     priority: (["low", "medium", "high"].includes(ticket.priority)
       ? ticket.priority
       : "medium") as SupportPriority,
-    status: normalizeSupportStatus(ticket.status),
-    statusLabel: ticket.status_label,
+    status,
+    statusLabel,
+    reopened,
     direction: mapVendorTicketDirection(ticket.direction),
     openedAt: ticket.last_message_at,
     lastMessage: ticket.last_message_preview,
@@ -288,6 +300,11 @@ export function mapVendorTicketDetailToConversation(
 
   const lastMessage = messages[messages.length - 1];
   const direction = mapVendorDirectionFromTicket(ticket);
+  const { status, statusLabel, reopened } = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
 
   return {
     id: ticket.ticket_key,
@@ -297,8 +314,9 @@ export function mapVendorTicketDetailToConversation(
     priority: (["low", "medium", "high"].includes(ticket.priority)
       ? ticket.priority
       : "medium") as SupportPriority,
-    status: normalizeSupportStatus(ticket.status),
-    statusLabel: ticket.status_label,
+    status,
+    statusLabel,
+    reopened,
     direction,
     bookingRef,
     bookingTitle,
@@ -321,13 +339,20 @@ export function mapVendorRecentTicketToConversation(
   ticket: VendorSupportRecentTicket
 ): Pick<
   VendorSupportConversation,
-  "id" | "ref" | "subject" | "status" | "statusLabel"
+  "id" | "ref" | "subject" | "status" | "statusLabel" | "reopened"
 > {
+  const { status, statusLabel, reopened } = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
+
   return {
     id: ticket.ticket_key,
     ref: ticket.ticket_key,
     subject: ticket.subject,
-    status: normalizeSupportStatus(ticket.status),
-    statusLabel: ticket.status_label,
+    status,
+    statusLabel,
+    reopened,
   };
 }

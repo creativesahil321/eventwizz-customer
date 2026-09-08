@@ -1,6 +1,7 @@
 import type { SupportPriority, SupportStatus } from "../_lib/types";
 import {
   PRIORITY_LABELS,
+  STATUS_LABELS,
   getPriorityClass,
   getStatusClass,
   getStatusLabel,
@@ -33,25 +34,37 @@ export function PriorityBadge({ priority, className }: PriorityBadgeProps) {
   );
 }
 
+const badgeClassName =
+  "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-1.5 py-0.5 text-[9px] font-medium sm:text-[10px]";
+
 interface StatusBadgeProps {
   status: SupportStatus | string;
   label?: string | null;
+  reopened?: boolean;
   className?: string;
 }
 
-export function StatusBadge({ status, label, className }: StatusBadgeProps) {
+export function StatusBadge({
+  status,
+  label,
+  reopened,
+  className,
+}: StatusBadgeProps) {
   const safeStatus = normalizeSupportStatus(status);
   const text = getStatusLabel(safeStatus, label);
 
   return (
-    <span
-      className={cn(
-        "inline-flex max-w-full shrink-0 items-center truncate rounded-full border px-1.5 py-0.5 text-[9px] font-medium sm:text-[10px]",
-        getStatusClass(safeStatus),
-        className,
-      )}
-    >
-      {text}
-    </span>
+    <>
+      <span
+        className={cn(badgeClassName, getStatusClass(safeStatus), className)}
+      >
+        {text}
+      </span>
+      {reopened ? (
+        <span className={cn(badgeClassName, getStatusClass("reopen"))}>
+          {STATUS_LABELS.reopen}
+        </span>
+      ) : null}
+    </>
   );
 }

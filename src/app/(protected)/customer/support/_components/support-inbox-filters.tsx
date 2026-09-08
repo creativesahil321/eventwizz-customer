@@ -12,19 +12,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { SupportCategory, SupportPriority, SupportStatus } from "../_lib/types";
+import type { SupportCategory, SupportPriority } from "../_lib/types";
 import {
   CATEGORY_LABELS,
   CUSTOMER_INBOX_STATUS_FILTERS,
   PRIORITY_LABELS,
   STATUS_LABELS,
   SUPPORT_PRIORITIES,
+  type CustomerInboxStatusFilter,
 } from "../_lib/utils";
 import { cn } from "@/lib/utils";
 
 export type InboxSort = "newest" | "oldest";
 export type InboxDateFilter = "all" | "today" | "week" | "month";
-export type InboxStatusFilter = SupportStatus | "all";
+export type InboxStatusFilter = CustomerInboxStatusFilter | "all";
 
 export interface InboxFilters {
   status: InboxStatusFilter;

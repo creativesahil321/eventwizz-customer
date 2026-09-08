@@ -45,6 +45,8 @@ export interface VendorSupportConversation {
   priority: SupportPriority;
   status: SupportStatus;
   statusLabel?: string;
+  /** True when the ticket was previously closed and reopened */
+  reopened?: boolean;
   /** received = customer → vendor; sent = vendor → admin */
   direction: VendorTicketDirection;
   bookingRef?: string;

@@ -198,6 +198,7 @@ export interface EventDetailRoom {
   /** May be omitted on empty room shells (`{}`) returned when a named room has no content yet. */
   room_id?: number;
   event_schedular_title: string;
+  event_schedule_subtitle?: string;
   event_schedular_background_image: string | null;
   event_schedular: Array<{
     time: string;
@@ -287,6 +288,7 @@ export interface EventDetail {
   about_event_sub_heading: string;
   about_event_description: string;
   event_schedular_title?: string;
+  event_schedule_subtitle?: string;
   event_schedular?: Array<{
     time: string;
     title: string;

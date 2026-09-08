@@ -2,7 +2,10 @@
  * Maps admin support API DTOs → UI models
  */
 
-import { normalizeSupportStatus } from "@/app/(protected)/customer/support/_lib/utils";
+import {
+  mapSupportTicketStatus,
+  normalizeSupportStatus,
+} from "@/app/(protected)/customer/support/_lib/utils";
 import {
   formatAttachmentSize,
   mapCategoryLabel,
@@ -44,6 +47,7 @@ export interface AdminSupportLiveConversationItem {
   venue: { id: string; name: string };
   status: ReturnType<typeof normalizeSupportStatus>;
   statusLabel: string;
+  reopened: boolean;
   priority: SupportPriority;
   lastMessageAt: string;
 }
@@ -85,10 +89,10 @@ export function mapAdminSupportDashboardStats(
   data: AdminSupportDashboardData
 ): AdminSupportStats {
   return {
-    totalOpen: data.total_open ?? 0,
-    totalResolved: data.total_resolved ?? 0,
-    customerTickets: data.customer_open ?? 0,
-    vendorTickets: data.vendor_open ?? 0,
+    totalTickets: data.total_tickets ?? 0,
+    customerTickets: data.customer_tickets ?? 0,
+    vendorTickets: data.vendor_tickets ?? 0,
+    open: data.open ?? 0,
   };
 }
 
@@ -97,16 +101,14 @@ export function mapAdminSupportQueueStats(
 ): AdminSupportQueueStats[] {
   return [
     {
-      queue: "general_support",
-      open: queues?.general_support ?? 0,
+      id: "closed",
+      title: "Closed tickets",
+      count: queues?.closed ?? 0,
     },
     {
-      queue: "customer",
-      open: queues?.customer_tickets ?? 0,
-    },
-    {
-      queue: "vendor",
-      open: queues?.vendor_tickets ?? 0,
+      id: "waiting_for_your_reply",
+      title: "Waiting for Your Reply",
+      count: queues?.waiting_for_your_reply ?? 0,
     },
   ];
 }
@@ -115,7 +117,11 @@ export function mapAdminSupportLiveConversations(
   items: AdminSupportDashboardLiveConversation[] | null | undefined
 ): AdminSupportLiveConversationItem[] {
   return (items ?? []).map((item) => {
-    const status = normalizeSupportStatus(item.status);
+    const { status, statusLabel, reopened } = mapSupportTicketStatus(
+      item.status,
+      item.status_label,
+      item.reopened
+    );
     return {
       id: item.ticket_id,
       ref: item.ticket_id,
@@ -127,7 +133,8 @@ export function mapAdminSupportLiveConversations(
         name: item.venue_name?.trim() || "Unknown venue",
       },
       status,
-      statusLabel: getStatusLabel(status),
+      statusLabel: statusLabel || getStatusLabel(status),
+      reopened,
       priority: mapPriority(item.priority),
       lastMessageAt: item.date,
     };
@@ -182,7 +189,11 @@ export function mapAdminCustomerToContact(
 export function mapAdminSupportTicketToConversation(
   ticket: AdminSupportTicket
 ): AdminSupportConversation {
-  const status = normalizeSupportStatus(ticket.status);
+  const { status, statusLabel, reopened } = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
   const contactName = ticket.last_sender_name?.trim() || "Unknown";
   const venueName = ticket.venue_name?.trim() || "";
   const venueId =
@@ -207,7 +218,8 @@ export function mapAdminSupportTicketToConversation(
       typeof ticket.priority === "string" ? ticket.priority : undefined
     ),
     status,
-    statusLabel: ticket.status_label?.trim() || getStatusLabel(status),
+    statusLabel: statusLabel || getStatusLabel(status),
+    reopened,
     source: mapSource(ticket.source),
     venue: {
       id: venueId,
@@ -340,7 +352,11 @@ export function mapAdminTicketDetailToConversation(
 
   const lastMessage = messages[messages.length - 1];
   const source = mapAdminSourceFromTicket(ticket, fallback?.source);
-  const status = normalizeSupportStatus(ticket.status);
+  const mappedStatus = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
 
   const venueId =
     ticket.venue_id != null && String(ticket.venue_id).trim()
@@ -357,8 +373,12 @@ export function mapAdminTicketDetailToConversation(
     priority: mapPriority(
       typeof ticket.priority === "string" ? ticket.priority : undefined
     ),
-    status,
-    statusLabel: ticket.status_label?.trim() || getStatusLabel(status),
+    status: mappedStatus.status,
+    statusLabel: mappedStatus.statusLabel || getStatusLabel(mappedStatus.status),
+    reopened:
+      ticket.reopened != null
+        ? mappedStatus.reopened
+        : Boolean(mappedStatus.reopened || fallback?.reopened),
     source,
     venue: {
       id: venueId,
@@ -389,13 +409,20 @@ export function mapAdminRecentTicketToConversation(
   ticket: AdminSupportRecentTicket
 ): Pick<
   AdminSupportConversation,
-  "id" | "ref" | "subject" | "status" | "statusLabel"
+  "id" | "ref" | "subject" | "status" | "statusLabel" | "reopened"
 > {
+  const { status, statusLabel, reopened } = mapSupportTicketStatus(
+    ticket.status,
+    ticket.status_label,
+    ticket.reopened
+  );
+
   return {
     id: ticket.ticket_key,
     ref: ticket.ticket_key,
     subject: ticket.subject,
-    status: normalizeSupportStatus(ticket.status),
-    statusLabel: ticket.status_label,
+    status,
+    statusLabel,
+    reopened,
   };
 }

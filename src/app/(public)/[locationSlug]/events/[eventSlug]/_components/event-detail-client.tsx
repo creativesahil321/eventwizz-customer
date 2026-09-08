@@ -252,6 +252,7 @@ export default function EventDetailClient({
 
   const showTimeline =
     String(slices.event_schedular_title ?? "").trim().length > 0 ||
+    String(slices.event_schedule_subtitle ?? "").trim().length > 0 ||
     timelineRows.length > 0;
 
   // The schedule is live-tracked only on the event's actual date(s); before/after
@@ -488,6 +489,7 @@ export default function EventDetailClient({
               <Timeline
                 eventSchedular={timelineRows}
                 eventSchedularTitle={slices.event_schedular_title}
+                eventSchedularCopy={slices.event_schedule_subtitle}
                 eventDates={scheduleEventDates}
                 eventSchedularBackgroundImage={
                   typeof slices.event_schedular_background_image === "string"

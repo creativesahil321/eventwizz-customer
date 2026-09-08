@@ -69,7 +69,7 @@ export default function CloseTicketDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <Label className="text-slate-900">Resolution</Label>
+          <Label className="text-slate-900">Closure reason</Label>
           <RadioGroup
             value={reason}
             onValueChange={(value) => setReason(value as CloseTicketReason)}
@@ -111,7 +111,7 @@ export default function CloseTicketDialog({
           <Button
             type="button"
             variant="event-primary"
-            disabled={closeTicket.isPending}
+            disabled={closeTicket.isPending || !reason}
             onClick={handleConfirm}
             className="w-full sm:w-auto"
           >

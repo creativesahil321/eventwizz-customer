@@ -8,6 +8,7 @@ export {
   getStatusClass,
   groupMessagesByDate,
   isClosedTicketStatus,
+  isTicketReopened,
   PRIORITY_LABELS,
   SUPPORT_PRIORITIES,
   SUPPORT_STATUSES,
@@ -17,6 +18,7 @@ export {
 import {
   STATUS_LABELS as CUSTOMER_STATUS_LABELS,
   normalizeSupportStatus,
+  sanitizeSupportStatusLabel,
 } from "@/app/(protected)/customer/support/_lib/utils";
 import type { SupportStatus } from "@/app/(protected)/customer/support/_lib/types";
 import { endOfDay, format, startOfDay } from "date-fns";
@@ -38,24 +40,28 @@ export const STATUS_LABELS: Record<SupportStatus, string> = {
   waiting_platform_support: "Waiting for You",
 };
 
-/** Admin inbox status filter — excludes non-admin waiting queues wording. */
-export const ADMIN_INBOX_STATUS_FILTERS: SupportStatus[] = [
+/**
+ * Admin inbox status filter.
+ * New = untouched tickets. Open = not closed or resolved. Closed = closed.
+ * Reopened is a badge (`reopened`), not a filter.
+ */
+export const ADMIN_INBOX_STATUS_FILTERS = [
   "new",
   "open",
-  "reopen",
-  "waiting_customer",
-  "waiting_platform_support",
-  "waiting_general_support",
-  "resolved",
   "closed",
-];
+] as const;
+
+export type AdminInboxStatusFilter =
+  (typeof ADMIN_INBOX_STATUS_FILTERS)[number];
 
 export function getStatusLabel(
   status: string | null | undefined,
   fallbackLabel?: string | null
 ): string {
-  if (fallbackLabel?.trim()) return fallbackLabel.trim();
-  return STATUS_LABELS[normalizeSupportStatus(status)];
+  return (
+    sanitizeSupportStatusLabel(fallbackLabel) ||
+    STATUS_LABELS[normalizeSupportStatus(status)]
+  );
 }
 
 export const ADMIN_CATEGORY_LABELS = {

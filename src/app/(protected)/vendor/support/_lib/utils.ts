@@ -8,15 +8,31 @@ export {
   getStatusClass,
   groupMessagesByDate,
   isClosedTicketStatus,
+  isTicketReopened,
   PRIORITY_LABELS,
   SUPPORT_PRIORITIES,
   SUPPORT_STATUSES,
   normalizeSupportStatus,
 } from "@/app/(protected)/customer/support/_lib/utils";
 
+/**
+ * Vendor inbox status filter.
+ * New = untouched tickets. Open = not closed or resolved. Closed = closed.
+ * Reopened is a badge (`reopened`), not a filter.
+ */
+export const VENDOR_INBOX_STATUS_FILTERS = [
+  "new",
+  "open",
+  "closed",
+] as const;
+
+export type VendorInboxStatusFilter =
+  (typeof VENDOR_INBOX_STATUS_FILTERS)[number];
+
 import {
   STATUS_LABELS as CUSTOMER_STATUS_LABELS,
   normalizeSupportStatus,
+  sanitizeSupportStatusLabel,
 } from "@/app/(protected)/customer/support/_lib/utils";
 import type { SupportStatus } from "@/app/(protected)/customer/support/_lib/types";
 import { endOfDay, format, startOfDay } from "date-fns";
@@ -40,8 +56,10 @@ export function getStatusLabel(
   status: string | null | undefined,
   fallbackLabel?: string | null
 ): string {
-  if (fallbackLabel?.trim()) return fallbackLabel.trim();
-  return STATUS_LABELS[normalizeSupportStatus(status)];
+  return (
+    sanitizeSupportStatusLabel(fallbackLabel) ||
+    STATUS_LABELS[normalizeSupportStatus(status)]
+  );
 }
 
 export const VENDOR_CATEGORY_LABELS: Record<SupportCategory, string> = {

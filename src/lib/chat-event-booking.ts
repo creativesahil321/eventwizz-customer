@@ -1,7 +1,9 @@
 import { format, isValid, parseISO } from "date-fns";
 import {
+  extractRequestedEventWindow,
   isBroadEventListIntent,
   isBrochureQuestion,
+  isEventWindowFollowUp,
   isLiveEventBookingIntent,
 } from "@/lib/chat-live-events";
 import type { GuestBookableLink } from "@/lib/chat-live-events";
@@ -690,6 +692,7 @@ export function isBookingConciergeFollowUp(text: string): boolean {
       return true;
     }
   }
+  if (isEventWindowFollowUp(text)) return true;
   return /\b(date|dates|available|25th|26th|december|dec\b|room|rooms|hall|space|difference|different|compare|which room|office|snowball|drink|drinks|package|packages|table|tables|ticket|tickets|group|persons?|people|guests?|coupon|discount|promo|code|deposit|pay|payment|checkout|both days|already logg|logged in|book for me|make a booking|that'?s all|that'?s everything|no more|same as last|no drinks|(and|also|what about)\s+(the\s+)?\d{1,2}(st|nd|rd|th)?)\b/i.test(
     text,
   );
@@ -955,7 +958,11 @@ export function buildDateChoiceMarkdown(
   brief: ChatEventBookingBrief | null | undefined,
   roomId?: number | null,
 ): string {
-  return listChatDatesForRoom(brief, roomId)
+  return formatDateChoiceMarkdown(listChatDatesForRoom(brief, roomId));
+}
+
+function formatDateChoiceMarkdown(dates: ChatBookingDate[]): string {
+  return dates
     .slice(0, 8)
     .map((date) => {
       const label = date.roomName
@@ -964,6 +971,46 @@ export function buildDateChoiceMarkdown(
       return `[${label}](chat:${formatChatDateChoiceSendText(date)})`;
     })
     .join(" ");
+}
+
+function dateIsoDay(date: ChatBookingDate): string {
+  const raw = date.date?.trim() ?? "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const parsed = parseISO(raw);
+  return isValid(parsed) ? format(parsed, "yyyy-MM-dd") : raw.slice(0, 10);
+}
+
+/** After an event is already open, check this/next weekend against its dates. */
+export function buildPinnedEventWindowReply(options: {
+  brief: ChatEventBookingBrief;
+  userText: string;
+  userName?: string | null;
+  now?: Date;
+}): { content: string } | null {
+  const window = extractRequestedEventWindow(options.userText, options.now);
+  if (!window) return null;
+  const nameBit = options.userName?.trim()
+    ? `, ${options.userName.trim()}`
+    : "";
+  const city = options.brief.locationCity?.trim();
+  const cityBit = city ? ` in **${city}**` : "";
+  const dates = listChatDatesForRoom(options.brief);
+  const hits = dates.filter((date) => {
+    const iso = dateIsoDay(date);
+    return iso >= window.start && iso <= window.end;
+  });
+  if (hits.length > 0) {
+    return {
+      content: `Yes${nameBit} — **${options.brief.title}**${cityBit} has dates on **${window.label}**:\n\n${formatDateChoiceMarkdown(hits)}\n\nTap a date and I’ll continue the booking here.`,
+    };
+  }
+  const available = formatDateChoiceMarkdown(dates);
+  const fallback = available
+    ? `Here are the dates I can book for this event:\n\n${available}`
+    : "I don’t have dates loaded for this event just now.";
+  return {
+    content: `**${options.brief.title}**${cityBit} doesn’t have dates on **${window.label}**${nameBit}. ${fallback}\n\nIf you meant other events that weekend, tell me a city and I’ll list what’s on there.`,
+  };
 }
 
 export function isEventPageBrushOff(text: string): boolean {
@@ -1584,6 +1631,7 @@ EVENT BOOKING DATA:
 - Do not invent dates, rooms, prices, drinks, or coupon codes.
 - If they want to book, use LIVE EVENTS links to identify the event, then ask the next booking question.
 - If they ask what’s on this weekend / next week / in a city, list only matching LIVE EVENTS. If that city is not listed, say so. Never invent weekend dates — ask them to tap an event so you can check.
+- If EVENT BOOKING DATA is already loaded and they say “what about this weekend / next weekend”, that is a date check for THIS event — do not dump other events. If those dates are not listed, say so and offer this event’s real dates.
 `;
   }
 

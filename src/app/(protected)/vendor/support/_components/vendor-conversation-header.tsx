@@ -109,6 +109,7 @@ export default function VendorConversationHeader({
               <StatusBadge
                 status={status}
                 label={conversation.statusLabel}
+                reopened={conversation.reopened}
               />
               <PriorityBadge priority={conversation.priority} />
               <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">

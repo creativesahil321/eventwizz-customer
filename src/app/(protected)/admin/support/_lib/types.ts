@@ -60,6 +60,8 @@ export interface AdminSupportConversation {
   status: SupportStatus;
   /** Optional display label from API (`status_label`) */
   statusLabel?: string;
+  /** True when the ticket was previously closed and reopened */
+  reopened?: boolean;
   source: SupportSource;
   venue: AdminSupportVenue;
   bookingRef?: string;
@@ -95,15 +97,18 @@ export interface DashboardDateFilter {
 }
 
 export interface AdminSupportStats {
-  totalOpen: number;
-  totalResolved: number;
+  totalTickets: number;
   customerTickets: number;
   vendorTickets: number;
+  open: number;
 }
 
+export type AdminDashboardQueueId = "closed" | "waiting_for_your_reply";
+
 export interface AdminSupportQueueStats {
-  queue: AdminSupportQueue;
-  open: number;
+  id: AdminDashboardQueueId;
+  title: string;
+  count: number;
 }
 
 export interface AdminSupportActivity {

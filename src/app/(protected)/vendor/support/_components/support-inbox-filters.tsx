@@ -15,22 +15,22 @@ import {
 import type {
   SupportAssignee,
   SupportPriority,
-  SupportStatus,
   VendorTicketDirection,
 } from "../_lib/types";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
   SUPPORT_PRIORITIES,
-  SUPPORT_STATUSES,
   VENDOR_DIRECTION_LABELS,
+  VENDOR_INBOX_STATUS_FILTERS,
+  type VendorInboxStatusFilter,
 } from "../_lib/utils";
 import type { VendorSupportQuickFilter } from "@/services/vendor/support";
 import { cn } from "@/lib/utils";
 
 export type InboxSort = "newest" | "oldest";
 export type InboxDateFilter = "all" | "today" | "week" | "month";
-export type InboxStatusFilter = SupportStatus | "all";
+export type InboxStatusFilter = VendorInboxStatusFilter | "all";
 export type InboxAssigneeFilter = string | "all";
 export type InboxDirectionFilter = VendorTicketDirection | "all";
 
@@ -237,7 +237,7 @@ export default function VendorSupportInboxFilters({
               }
             >
               <DropdownMenuRadioItem value="all">All statuses</DropdownMenuRadioItem>
-              {SUPPORT_STATUSES.map((status) => (
+              {VENDOR_INBOX_STATUS_FILTERS.map((status) => (
                 <DropdownMenuRadioItem key={status} value={status}>
                   {STATUS_LABELS[status]}
                 </DropdownMenuRadioItem>

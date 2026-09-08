@@ -17,19 +17,19 @@ import type {
   SupportAssignee,
   SupportPriority,
   SupportSource,
-  SupportStatus,
 } from "../_lib/types";
 import {
   ADMIN_INBOX_STATUS_FILTERS,
   PRIORITY_LABELS,
   STATUS_LABELS,
   SUPPORT_PRIORITIES,
+  type AdminInboxStatusFilter,
 } from "../_lib/utils";
 import { cn } from "@/lib/utils";
 
 export type InboxSort = "newest" | "oldest";
 export type InboxDateFilter = "all" | "today" | "week" | "month";
-export type InboxStatusFilter = SupportStatus | "all";
+export type InboxStatusFilter = AdminInboxStatusFilter | "all";
 export type InboxAssigneeFilter = string | "all";
 export type InboxVenueFilter = string | "all";
 export type InboxSourceFilter = SupportSource | "all";

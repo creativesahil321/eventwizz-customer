@@ -9,6 +9,7 @@ export type VendorSupportTicketStatus =
   | "new"
   | "open"
   | "reopen"
+  | "waiting_for_you"
   | "waiting_customer"
   | "waiting_general_support"
   | "waiting_platform_support"
@@ -87,6 +88,7 @@ export interface VendorSupportTicket {
   subject: string;
   status: VendorSupportTicketStatus;
   status_label: string;
+  reopened?: boolean;
   priority: VendorSupportTicketPriority;
   category_label: string;
   last_message_at: string;
@@ -315,6 +317,7 @@ export interface VendorSupportTicketDetail {
   ticket_key: string;
   status: VendorSupportTicketStatus;
   status_label: string;
+  reopened?: boolean;
   priority: VendorSupportTicketPriority;
   category_label: string;
   subject: string;
@@ -351,6 +354,7 @@ export interface VendorSupportRecentTicket {
   subject: string;
   status: VendorSupportTicketStatus;
   status_label: string;
+  reopened?: boolean;
 }
 
 export interface VendorSupportMessagesParams {

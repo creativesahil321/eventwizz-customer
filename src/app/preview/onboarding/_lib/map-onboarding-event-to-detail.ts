@@ -8,6 +8,7 @@ import type { OnboardingPreviewEventData } from "./use-onboarding-preview-querie
 type EventContentSlice = {
   room_id?: number;
   event_schedular_title?: string;
+  event_schedule_subtitle?: string;
   event_schedular_background_image?: string | null;
   event_schedular?: Array<{ time: string; title: string }>;
   package_title?: string;
@@ -127,6 +128,7 @@ export function mapOnboardingEventToDetailData(
       package_details: roomData.package_details,
       gallery: roomData.event_galley?.map((g) => ({ id: 0, url: g.url })),
       event_schedular_title: roomData.event_schedular_title,
+      event_schedule_subtitle: roomData.event_schedule_subtitle,
       event_schedular: roomData.event_schedular,
       event_schedular_background_image:
         roomData.event_schedular_background_image,
@@ -177,6 +179,7 @@ export function mapOnboardingEventToDetailData(
     about_event_sub_heading: event.about_event_sub_heading,
     about_event_description: event.about_event_description,
     event_schedular_title: primary?.event_schedular_title,
+    event_schedule_subtitle: primary?.event_schedule_subtitle,
     event_schedular: primary?.event_schedular,
     event_schedular_background_image:
       primary?.event_schedular_background_image,
@@ -192,6 +195,7 @@ export function mapOnboardingEventToDetailData(
     package_details: primary?.package_details,
     gallery: primary?.event_galley?.map((g) => ({ id: 0, url: g.url })),
     event_schedular_title: primary?.event_schedular_title,
+    event_schedule_subtitle: primary?.event_schedule_subtitle,
     event_schedular: primary?.event_schedular,
     event_schedular_background_image:
       primary?.event_schedular_background_image,

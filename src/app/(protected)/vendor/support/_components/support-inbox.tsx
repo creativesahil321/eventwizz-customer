@@ -26,8 +26,8 @@ import VendorSupportInboxFilters, {
 import {
   formatRelativeTime,
   isClosedTicketStatus,
-  SUPPORT_STATUSES,
   VENDOR_DIRECTION_LABELS,
+  VENDOR_INBOX_STATUS_FILTERS,
 } from "../_lib/utils";
 import type {
   SupportAssignee,
@@ -186,6 +186,7 @@ function ConversationListItem({
             <StatusBadge
               status={conversation.status}
               label={conversation.statusLabel}
+              reopened={conversation.reopened}
             />
             <PriorityBadge priority={conversation.priority} />
             {conversation.direction === "sent" ? (
@@ -267,14 +268,21 @@ function ConversationDetail({
       );
       // Only borrow list assignee when messages omitted the field entirely.
       // Explicit `assignee: null` means Unassigned — do not resurrect list value.
+      const withReopened = {
+        ...mapped,
+        reopened:
+          latestPayload.ticket.reopened != null
+            ? mapped.reopened
+            : Boolean(mapped.reopened || fallback?.reopened),
+      };
       if (
         latestPayload.assignee === undefined &&
         !mapped.assignee &&
         fallback?.assignee
       ) {
-        return { ...mapped, assignee: fallback.assignee };
+        return { ...withReopened, assignee: fallback.assignee };
       }
-      return mapped;
+      return withReopened;
     }
     if (fallback) {
       return { ...fallback, messages };
@@ -515,8 +523,14 @@ interface VendorSupportInboxProps {
 
 function getInitialFilters(searchParams: URLSearchParams): VendorInboxFilters {
   const status = searchParams.get("status");
-  if (status && SUPPORT_STATUSES.includes(status as SupportStatus)) {
-    return { ...DEFAULT_VENDOR_INBOX_FILTERS, status: status as SupportStatus };
+  if (
+    status &&
+    (VENDOR_INBOX_STATUS_FILTERS as readonly string[]).includes(status)
+  ) {
+    return {
+      ...DEFAULT_VENDOR_INBOX_FILTERS,
+      status: status as VendorInboxFilters["status"],
+    };
   }
   return DEFAULT_VENDOR_INBOX_FILTERS;
 }

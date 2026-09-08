@@ -1132,9 +1132,7 @@ export default function Timeline({
     setTimeout(checkScrollability, 320);
   };
 
-  const subtitle =
-    eventSchedularCopy?.trim() ||
-    "Experience every moment of the evening";
+  const subtitle = eventSchedularCopy?.trim() || "";
   const scheduleTitle = eventSchedularTitle?.trim() || "What to Expect";
   const hasScheduleRows = displaySchedules.length > 0;
 
@@ -1178,7 +1176,9 @@ export default function Timeline({
               align="center"
               className="!mx-auto !block !text-3xl !font-black tracking-tight md:!text-4xl"
             />
-            <p className="tl-header__subtitle">{subtitle}</p>
+            {subtitle ? (
+              <p className="tl-header__subtitle">{subtitle}</p>
+            ) : null}
           </header>
 
           {!hasScheduleRows ? (
