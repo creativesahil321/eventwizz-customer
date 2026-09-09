@@ -88,18 +88,12 @@ export function buildCreateTicketFormData(
   formData.append("subject", payload.subject.trim());
   formData.append("category", CATEGORY_TO_API[payload.category]);
   formData.append("contact_number", payload.contact_number.trim());
-  formData.append(
-    "vendor_location_id",
-    payload.vendor_location_id != null && payload.vendor_location_id > 0
-      ? String(payload.vendor_location_id)
-      : ""
-  );
-  formData.append(
-    "booking_id",
-    payload.booking_id != null && payload.booking_id > 0
-      ? String(payload.booking_id)
-      : ""
-  );
+  if (payload.vendor_location_id != null && payload.vendor_location_id > 0) {
+    formData.append("vendor_location_id", String(payload.vendor_location_id));
+  }
+  if (payload.booking_id != null && payload.booking_id > 0) {
+    formData.append("booking_id", String(payload.booking_id));
+  }
   formData.append("priority", payload.priority);
   formData.append("message", payload.message.trim());
 

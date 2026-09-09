@@ -91,6 +91,13 @@ export interface CustomerSupportTicketsResponse {
   meta: CustomerSupportTicketsPaginationMeta;
   inbox_count: number;
   unread_count?: number;
+  bookings?: CustomerSupportListBooking[];
+}
+
+export interface CustomerSupportListBooking {
+  booking_id: number;
+  booking_number: string;
+  event_name: string;
 }
 
 /** Payload for POST /customer/support-tickets/store */

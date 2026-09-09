@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from "react";
 import {
-  FileText,
   Image as ImageIcon,
   Lock,
   Paperclip,
@@ -20,11 +19,12 @@ import {
   collectSupportAttachments,
   formatSupportFileSize,
 } from "@/app/(protected)/_shared/support/message-attachments";
+import SupportAttachmentCards from "@/app/(protected)/_shared/support/support-attachment-cards";
 import SupportMessageAvatar from "@/app/(protected)/_shared/support/support-message-avatar";
 import SupportMessageScroller from "@/app/(protected)/_shared/support/support-message-scroller";
 import { useSession } from "next-auth/react";
 import { useAuthStore } from "@/store/auth.store";
-import type { SupportAttachment, SupportMessage } from "../_lib/types";
+import type { SupportMessage } from "../_lib/types";
 import {
   formatSupportMessageTimestamp,
   groupMessagesByDate,
@@ -38,77 +38,6 @@ import {
 } from "@/app/(protected)/_shared/support/use-optimistic-messages";
 
 type ThreadMessage = SupportMessage & { optimisticStatus?: OptimisticStatus };
-
-function AttachmentCards({
-  attachments,
-  align,
-}: {
-  attachments: SupportAttachment[];
-  align: "left" | "right";
-}) {
-  return (
-    <div
-      className={cn(
-        "mt-1 flex max-w-full flex-wrap gap-1.5",
-        align === "right" ? "justify-end" : "justify-start"
-      )}
-    >
-      {attachments.map((file) => {
-        const isImage =
-          file.mimeType?.startsWith("image/") ||
-          /\.(png|jpe?g|gif|webp)$/i.test(file.name);
-
-        const content = (
-          <>
-            <div
-              className={cn(
-                "flex size-6 shrink-0 items-center justify-center rounded-md",
-                isImage ? "bg-blue-50" : "bg-red-50"
-              )}
-            >
-              {isImage ? (
-                <ImageIcon className="size-3.5 text-blue-600" />
-              ) : (
-                <FileText className="size-3.5 text-red-600" />
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[11px] font-medium text-foreground">
-                {file.name}
-              </p>
-              {file.size ? (
-                <p className="text-[10px] text-muted-foreground">{file.size}</p>
-              ) : null}
-            </div>
-          </>
-        );
-
-        if (file.url) {
-          return (
-            <a
-              key={`${file.name}-${file.url}`}
-              href={file.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex min-w-[120px] max-w-[180px] flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
-            >
-              {content}
-            </a>
-          );
-        }
-
-        return (
-          <div
-            key={file.name}
-            className="flex min-w-[120px] max-w-[180px] flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm"
-          >
-            {content}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function SystemMessagePill({ message }: { message: SupportMessage }) {
   return (
@@ -164,7 +93,7 @@ function CustomerMessage({
       ) : null}
 
       {message.attachments && message.attachments.length > 0 ? (
-        <AttachmentCards attachments={message.attachments} align="right" />
+        <SupportAttachmentCards attachments={message.attachments} align="right" />
       ) : null}
     </div>
   );
@@ -194,7 +123,7 @@ function AgentMessage({ message }: { message: SupportMessage }) {
       ) : null}
 
       {message.attachments && message.attachments.length > 0 ? (
-        <AttachmentCards attachments={message.attachments} align="left" />
+        <SupportAttachmentCards attachments={message.attachments} align="left" />
       ) : null}
     </div>
   );

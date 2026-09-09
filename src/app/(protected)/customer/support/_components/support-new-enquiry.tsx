@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Paperclip, Send, X } from "lucide-react";
+import { Check, ChevronsUpDown, Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -15,12 +16,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { SupportCategory, SupportPriority } from "../_lib/types";
 import { useSupportCustomerProfile } from "../_lib/use-support-customer-profile";
 import {
   useCreateCustomerSupportTicket,
-  useCustomerSupportLocationBookings,
-  useCustomerSupportLocations,
+  useCustomerSupportTickets,
+  type CustomerSupportListBooking,
 } from "@/services/customer/support";
 import {
   MAX_SUPPORT_ATTACHMENTS,
@@ -31,20 +45,116 @@ import {
 import { cn } from "@/lib/utils";
 
 const NONE_BOOKING = "none";
-const NONE_LOCATION = "none";
-
 const PRIORITIES: SupportPriority[] = ["low", "medium", "high"];
+
+function bookingLabel(booking: CustomerSupportListBooking): string {
+  return `${booking.booking_number} — ${booking.event_name}`;
+}
+
+function BookingSelect({
+  bookings,
+  value,
+  onChange,
+  isLoading,
+}: {
+  bookings: CustomerSupportListBooking[];
+  value: string;
+  onChange: (value: string) => void;
+  isLoading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = bookings.find((item) => String(item.booking_id) === value);
+
+  if (isLoading) {
+    return <Skeleton className="h-11 w-full rounded-md" />;
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-11 w-full min-w-0 justify-between bg-gray-50 px-3 font-normal shadow-none"
+        >
+          <span className="truncate text-left">
+            {selected
+              ? bookingLabel(selected)
+              : "Select a booking (optional)"}
+          </span>
+          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+      >
+        <Command>
+          <CommandInput placeholder="Search booking number or event…" />
+          <CommandList>
+            <CommandEmpty>
+              {bookings.length === 0
+                ? "No recent bookings"
+                : "No matching bookings"}
+            </CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="no booking selected"
+                onSelect={() => {
+                  onChange(NONE_BOOKING);
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  className={cn(
+                    "size-4",
+                    value === NONE_BOOKING ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                No booking selected
+              </CommandItem>
+              {bookings.map((item) => {
+                const id = String(item.booking_id);
+                return (
+                  <CommandItem
+                    key={id}
+                    value={`${item.booking_number} ${item.event_name} ${id}`}
+                    onSelect={() => {
+                      onChange(id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "size-4",
+                        value === id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {bookingLabel(item)}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function SupportNewEnquiry() {
   const router = useRouter();
   const customer = useSupportCustomerProfile();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createTicket = useCreateCustomerSupportTicket();
+  const { data: ticketsResponse, isLoading: isLoadingBookings } =
+    useCustomerSupportTickets({ sort: "newest" });
 
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<SupportCategory>("general_support");
   const [contactNumber, setContactNumber] = useState("");
-  const [bookingLocation, setBookingLocation] = useState(NONE_LOCATION);
   const [booking, setBooking] = useState(NONE_BOOKING);
   const [priority, setPriority] = useState<SupportPriority>("medium");
   const [description, setDescription] = useState("");
@@ -59,44 +169,16 @@ export default function SupportNewEnquiry() {
 
   const showBookingDetails = category === "general_support";
 
-  const { data: locationsResponse, isLoading: isLoadingLocations } =
-    useCustomerSupportLocations({ enabled: showBookingDetails });
-  const { data: bookingsResponse, isLoading: isLoadingBookings } =
-    useCustomerSupportLocationBookings(
-      showBookingDetails && bookingLocation !== NONE_LOCATION
-        ? bookingLocation
-        : null
-    );
-
-  const locationOptions = useMemo(
-    () =>
-      (locationsResponse?.data ?? []).map((location) => ({
-        id: String(location.location_id),
-        name: location.location_name,
-      })),
-    [locationsResponse?.data]
-  );
-
-  const bookingOptions = useMemo(
-    () =>
-      (bookingsResponse?.data ?? []).map((item) => ({
-        id: String(item.booking_id),
-        label: `${item.booking_number} — ${item.event_name}`,
-      })),
-    [bookingsResponse?.data]
+  const bookings = useMemo(
+    () => ticketsResponse?.bookings ?? [],
+    [ticketsResponse?.bookings]
   );
 
   const handleCategoryChange = (value: SupportCategory) => {
     setCategory(value);
     if (value === "technical_support") {
-      setBookingLocation(NONE_LOCATION);
       setBooking(NONE_BOOKING);
     }
-  };
-
-  const handleLocationChange = (locationId: string) => {
-    setBookingLocation(locationId);
-    setBooking(NONE_BOOKING);
   };
 
   const handleFilesSelected = (fileList: FileList | null) => {
@@ -127,10 +209,6 @@ export default function SupportNewEnquiry() {
       return;
     }
 
-    const vendorLocationId =
-      showBookingDetails && bookingLocation !== NONE_LOCATION
-        ? Number.parseInt(bookingLocation, 10)
-        : null;
     const bookingId =
       showBookingDetails && booking !== NONE_BOOKING
         ? Number.parseInt(booking, 10)
@@ -141,10 +219,6 @@ export default function SupportNewEnquiry() {
         subject: subject.trim(),
         category,
         contact_number: contactNumber.trim(),
-        vendor_location_id:
-          vendorLocationId != null && !Number.isNaN(vendorLocationId)
-            ? vendorLocationId
-            : null,
         booking_id:
           bookingId != null && !Number.isNaN(bookingId) ? bookingId : null,
         priority,
@@ -165,8 +239,6 @@ export default function SupportNewEnquiry() {
   };
 
   const isSubmitting = createTicket.isPending;
-  const bookingSelectDisabled =
-    bookingLocation === NONE_LOCATION || isLoadingBookings;
 
   return (
     <div className="min-w-0 max-w-full">
@@ -235,76 +307,30 @@ export default function SupportNewEnquiry() {
               <div className="min-w-0 space-y-3 rounded-lg border border-[var(--color-border)] bg-slate-50/40 p-4">
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    Booking details{" "}
+                    Booking{" "}
                     <span className="font-normal text-muted-foreground">
                       (optional)
                     </span>
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Only complete this if your enquiry relates to a specific
-                    booking or venue. Leave blank for account or login issues.
+                    Link this enquiry to a recent booking if it relates to one.
+                    Leave blank for account or login issues.
                   </p>
                 </div>
 
-                <div className="grid min-w-0 gap-5 sm:grid-cols-2">
-                  <div className="min-w-0 space-y-2">
-                    <Label>Venue</Label>
-                    <Select
-                      value={bookingLocation}
-                      onValueChange={handleLocationChange}
-                      disabled={isLoadingLocations}
-                    >
-                      <SelectTrigger className="h-11 bg-gray-50">
-                        <SelectValue
-                          placeholder={
-                            isLoadingLocations
-                              ? "Loading venues…"
-                              : "Select a venue (optional)"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NONE_LOCATION}>
-                          No venue selected
-                        </SelectItem>
-                        {locationOptions.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="min-w-0 space-y-2">
-                    <Label>Booking</Label>
-                    <Select
-                      value={booking}
-                      onValueChange={setBooking}
-                      disabled={bookingSelectDisabled}
-                    >
-                      <SelectTrigger className="h-11 bg-gray-50">
-                        <SelectValue
-                          placeholder={
-                            bookingLocation === NONE_LOCATION
-                              ? "Please select a venue first"
-                              : isLoadingBookings
-                                ? "Loading bookings…"
-                                : "Select a booking (optional)"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NONE_BOOKING}>
-                          No booking selected
-                        </SelectItem>
-                        {bookingOptions.map((opt) => (
-                          <SelectItem key={opt.id} value={opt.id}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="min-w-0 space-y-2">
+                  <Label>Booking</Label>
+                  <BookingSelect
+                    bookings={bookings}
+                    value={booking}
+                    onChange={setBooking}
+                    isLoading={isLoadingBookings}
+                  />
+                  {!isLoadingBookings && bookings.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No recent bookings
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : null}

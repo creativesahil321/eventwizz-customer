@@ -1,5 +1,6 @@
 import type { LiveEvent, LocationData } from "@/types/theme.types";
 import { isDisallowedChatSafetyIntent } from "@/lib/chat-safety";
+import { normalizeVendorChatText } from "@/lib/chat-typo-normalizer";
 import { addDays, format, nextSaturday, startOfWeek } from "date-fns";
 
 const STOP_WORDS = new Set([
@@ -353,16 +354,23 @@ export function extractRequestedEventWindow(
 }
 
 /**
- * “What about next weekend?” after a booking is already open — not a new
- * catalogue dump. City / “which events” questions stay as browse.
+ * “What about this/next weekend?” after a booking is already open — check
+ * that event’s dates. “Upcoming weekend events”, city, or “what’s on”
+ * stay as catalogue browse.
  */
 export function isEventWindowFollowUp(text: string): boolean {
   const t = normalizeChatBookingQuery(text);
   if (!extractRequestedEventWindow(t)) return false;
   if (extractAskedPlace(t, [])) return false;
+  if (
+    /\bevents\b/i.test(t) ||
+    /\b(which|what)\s+event\b/i.test(t) ||
+    /\b(what'?s\s+on|whats\s+on|anything\s+on)\b/i.test(t) ||
+    /\b(show|find|list)\s+(me\s+)?(something|anything)?\b/i.test(t)
+  ) {
+    return false;
+  }
   if (/\bwhat about\b/i.test(t)) return true;
-  if (/\b(which|what)\s+events?\b/i.test(t)) return false;
-  if (/\b(what'?s\s+on|whats\s+on|anything\s+on)\b/i.test(t)) return false;
   return t.split(/\s+/).filter(Boolean).length <= 8;
 }
 
@@ -549,8 +557,56 @@ export function isBrochureQuestion(text: string): boolean {
     .some((word) => isBrochureLikeWord(word));
 }
 
+/** Picker tap: `Book Christmas 2026 in Bristol` — not a city browse. */
+export function isBookEventInCityTap(text: string): boolean {
+  const match = normalizeChatBookingQuery(text).match(
+    /^book\s+(.+?)\s+in\s+(.+)$/i,
+  );
+  if (!match) return false;
+  const title = match[1].trim();
+  const city = match[2].trim();
+  if (!title || !city || /^in$/i.test(title)) return false;
+  return !/^(an?\s+)?events?$/i.test(title);
+}
+
+export function isSwitchLiveEventIntent(text: string): boolean {
+  const t = normalizeChatBookingQuery(text);
+  if (isBookEventInCityTap(t)) return false;
+  if (/\breschedule\b/i.test(t)) return false;
+  return (
+    /\b(another|a different|different|other)\s+event\b/i.test(t) ||
+    /\bstart (over|again|a new booking)\b/i.test(t)
+  );
+}
+
+export function isNearMeEventsIntent(text: string): boolean {
+  const t = normalizeChatBookingQuery(text);
+  if (
+    /\b(near me|near my (location|area|place)|closest to me|in my area|around me)\b/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  return (
+    /\b(nearest|nearby)\s+events?\b/i.test(t) ||
+    /\bevents?\s+(nearby|nearest)\b/i.test(t)
+  );
+}
+
+export function isBudgetEventsIntent(text: string): boolean {
+  const t = normalizeChatBookingQuery(text);
+  return (
+    /\b(low price|low.?cost|cheap(?:est)?|budget|under\s*[£$]|inexpensive|affordable)\b/i.test(
+      t,
+    ) && /\b(event|events|something)\b/i.test(t)
+  );
+}
+
 export function isBroadEventListIntent(text: string): boolean {
   const t = normalizeChatBookingQuery(text);
+  if (isBookEventInCityTap(t) || /\breschedule\b/i.test(t)) return false;
+  if (isNearMeEventsIntent(t) || isBudgetEventsIntent(t)) return false;
   if (extractRequestedEventDate(t)) return false;
   const theme = extractLiveEventTheme(t);
   if (extractRequestedEventWindow(t) && !theme) return true;
@@ -568,7 +624,7 @@ export function isBroadEventListIntent(text: string): boolean {
 
 /** Fix glued words / typos so “bookchristmas” and “nwat to book” still match. */
 export function normalizeChatBookingQuery(text: string): string {
-  return text
+  return normalizeVendorChatText(text)
     .replace(/\bnwat\b/gi, "want")
     .replace(/\bwana\b/gi, "want to")
     .replace(/\bwhicj\b/gi, "which")
@@ -585,6 +641,8 @@ export function normalizeChatBookingQuery(text: string): string {
     .replace(/\b(weekned|weeknd|wekeend|wekend)\b/gi, "weekend")
     .replace(/\bweek\s+end\b/gi, "weekend")
     .replace(/\b(londn|londan|londom)\b/gi, "london")
+    .replace(/\b(nearme|near-me)\b/gi, "near me")
+    .replace(/\beventsnearme\b/gi, "events near me")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -594,6 +652,7 @@ export function isLiveEventBookingIntent(text: string): boolean {
   const t = normalizeChatBookingQuery(text);
   if (!t) return false;
   if (isDisallowedChatSafetyIntent(t)) return false;
+  if (/\breschedule\b/i.test(t) && !isBookEventInCityTap(t)) return false;
 
   if (isBroadEventListIntent(t)) {
     return true;
@@ -1168,7 +1227,7 @@ export function matchLiveEvents(
   }
 
   if (scored.length > 0) {
-    const top = scored[0].score;
+  const top = scored[0].score;
     const close = scored.filter((m) => m.score >= Math.max(18, top - 25));
     return close;
   }
@@ -1312,6 +1371,9 @@ export function needsLiveEventLocationChoice(
   allLiveEvents: LiveEvent[],
 ): boolean {
   if (!matches.length) return false;
+  if (isBookEventInCityTap(userText) && matches.some((item) => item.score >= 90)) {
+    return false;
+  }
   if (extractRequestedEventWindow(userText)) return true;
   const theme = extractLiveEventTheme(userText);
   if (
@@ -1511,8 +1573,8 @@ export function buildLiveEventsDirectReply(options: {
               city ? `${item.event.title} · ${city}` : item.event.title,
               eventBookSendText(item.event),
             );
-          });
-      return {
+    });
+    return {
         content: `${intro}\n\n${linkLines.join("\n")}\n\n${
           sameTitle
             ? "Which location would you like? I’ll help you book it here."
@@ -1697,6 +1759,57 @@ export function buildLiveEventsNoMatchReply(options: {
   };
 }
 
+export function buildNearMeEventsReply(options: {
+  allLiveEvents: LiveEvent[];
+  siteName?: string | null;
+  userName?: string | null;
+  reason?: "no_location" | "empty" | "error";
+  detail?: string | null;
+  radiusKm?: number;
+}): { content: string } {
+  const nameBit = options.userName?.trim()
+    ? `, ${options.userName.trim()}`
+    : "";
+  const cityLabels = uniqueCatalogCityLabels(options.allLiveEvents);
+  const cities = formatCityList(cityLabels);
+  const cityChoices = cityLabels
+    .slice(0, MAX_LIVE_EVENT_CHAT_CHOICES)
+    .map((city) => chatChoiceMarkdown(city, `events in ${city}`))
+    .join("\n");
+  const radiusKm = options.radiusKm ?? 50;
+  let intro: string;
+  if (options.reason === "empty") {
+    intro = `I couldn’t find events within ${radiusKm} km of you${nameBit}.`;
+  } else if (options.detail?.trim()) {
+    intro = `I can’t use Near Me right now${nameBit}. ${options.detail.trim()}`;
+  } else {
+    intro = `I don’t have your map location in chat${nameBit}, so I can’t honestly say what’s “near you”.`;
+  }
+  const body = `Tell me a city and I’ll list events there. I can book in **${cities || "the cities on this site"}**.`;
+  return {
+    content: cityChoices ? `${intro}\n\n${body}\n\n${cityChoices}` : `${intro}\n\n${body}`,
+  };
+}
+
+export function buildBudgetEventsReply(options: {
+  allLiveEvents: LiveEvent[];
+  siteName?: string | null;
+  userName?: string | null;
+}): { content: string } {
+  const nameBit = options.userName?.trim()
+    ? `, ${options.userName.trim()}`
+    : "";
+  const brand = options.siteName?.trim() || "our venue";
+  return {
+    content: buildEventPickerReply({
+      intro: `I can’t sort this list by price${nameBit} — cost depends on the date, table or tickets you pick. Tap an event and I’ll quote real prices. I won’t guess which ones are cheapest.`,
+      events: options.allLiveEvents,
+      totalCount: options.allLiveEvents.length,
+      footer: `These are the events currently listed at **${brand}**, not a cheap-to-expensive ranking.`,
+    }),
+  };
+}
+
 /** Compact block when EVENT BOOKING DATA is already loaded — avoid blowing the context window. */
 export function buildCompactLiveEventsPromptBlock(
   liveEvents: LiveEvent[] | null | undefined,
@@ -1743,13 +1856,13 @@ When the guest asks about an event by name, category, city, or time (this weeken
 1. Answer from this list only — never invent events, cities, dates, or URLs.
 2. Event titles are often people's names. The type is category_name. Match category_name when they ask for Christmas, Halloween, weddings, etc. If category_name is null, only match the title.
 3. If they named a city, only offer events in that city. If that city is not on this list, say so and name the cities you can book. Never pretend a Bristol or Porthcawl event is in London.
-4. This list has no dates. If they ask what’s on this weekend / next week / this month and no event is already loaded, list matching events and ask them to tap one so you can check those dates. Never claim an event runs that weekend. If EVENT BOOKING DATA is loaded, “what about this/next weekend” checks that event’s dates only.
+4. This list has no dates. If they ask what’s on this weekend / next week / this month, or “upcoming weekend events”, list matching events and ask them to tap one so you can check those dates. Never claim an event runs that weekend. If EVENT BOOKING DATA is loaded, “what about this/next weekend” (no “events”) checks that event’s dates only.
 5. If they named a category, only offer matching events. If none match, say so in one sentence, then offer at most ${MAX_LIVE_EVENT_CHAT_CHOICES} alternatives in that city (or at this venue). Never start booking a different category.
 6. Event buttons MUST be unique — never repeat “Book now”. Use [Event name · City](chat:Book Event name in City).
 7. Location-only picks stay in chat: [Book in City](chat:Book in City)
 8. NEVER write /chat: or /chat — the prefix is chat: with no slash. Dates: [Thu 27 Aug](chat:Thu 27 Aug 2026)
 9. NEVER send [Book in City](/location-slug/events/event-slug) — that leaves chat.
-10. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room when this event has rooms → guests → tables/tickets → which table types and quantities → which ticket types and quantities → drinks, then another date if they want, or another room only when rooms exist → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
+10. If EVENT BOOKING DATA is loaded, stay in chat: one question at a time (dates labelled with room when this event has rooms → tables/tickets if both exist → guests only for tables → table types, or ticket types and quantities with no guest-count question → drinks, then another date if they want, or another room only when rooms exist → summary/coupon → pay in chat). Do not send them to the event page, cart, or Checkout.
 11. Dates must show the room name only when this event has rooms. Guests can pick more than one drink and more than one date (and more than one room when rooms exist). Quote prices. Coupon last — after they apply a code, repeat it on the summary with the discount. Visit the event page only if chat cannot continue. Never invent table counts. Never show stock unless they ask for more than is available.
 
 ${lines.join("\n")}

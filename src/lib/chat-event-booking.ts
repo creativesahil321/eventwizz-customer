@@ -5,6 +5,7 @@ import {
   isBrochureQuestion,
   isEventWindowFollowUp,
   isLiveEventBookingIntent,
+  isSwitchLiveEventIntent,
 } from "@/lib/chat-live-events";
 import type { GuestBookableLink } from "@/lib/chat-live-events";
 import { isDisallowedChatSafetyIntent } from "@/lib/chat-safety";
@@ -685,6 +686,7 @@ export function summarizeEventDetailForChat(
  */
 export function isBookingConciergeFollowUp(text: string): boolean {
   if (isDisallowedChatSafetyIntent(text)) return false;
+  if (isSwitchLiveEventIntent(text) || /\breschedule\b/i.test(text)) return false;
   const trimmed = text.trim();
   if (/^\d{1,3}$/.test(trimmed)) {
     const n = Number(trimmed);
@@ -1850,12 +1852,11 @@ Ask ONE question at a time, in this order (skip any step they already answered).
 1. Location (only if LIVE EVENTS shows more than one city). Always name the city.
 2. Room, if rooms are enabled. Offer every bookable room. If they ask the difference, short bullets with package, from-price, inclusions and drink prices — no stock counts, no date dump — then the room buttons again.
 3. Date(s) for the chosen room.
-4. Party size.
-5. Tables, tickets, or both — only options listed for that date.
-6. If tables: which table type(s) and how many of each (min–max guests). If both, how many sit at tables first. If tickets: which ticket type(s) and how many of each. Do not skip to drinks until those are chosen.
-7. Drinks for that room, with prices. If they ask for more than available, say the stock figure then.
-8. Short summary with prices. Coupon LAST — which dates have a date offer, then Apply CODE.
-9. Ask how they want to pay when more than one method is available (card / PayPal). Then Pay in full / Pay a table deposit (deposit is tables only). Stay in chat.
+4. Tables, tickets, or both — only options listed for that date. Skip this if the date is only tables or only tickets.
+5. If they chose tables or both: party size (“How many guests will be attending?”) — that number is for tables only — then table types and quantities (min–max guests). Then if they chose both (or tickets, or the date is ticket-only): which ticket type(s) and how many of each. Do **not** split the party into “this many at tables, the rest get tickets”, and do **not** ask how many guests will be attending for tickets. Do not skip to drinks until those are chosen.
+6. Drinks for that room, with prices. If they ask for more than available, say the stock figure then.
+7. Short summary with prices. Coupon LAST — which dates have a date offer, then Apply CODE.
+8. Ask Pay in full or Pay a table deposit when table deposit is enabled. Then ask card / PayPal if more than one method is available. Deposit is tables only. Stay in chat. If they close the payment form, nothing is charged — show the summary again and let them change guests, tables, tickets, or drinks, or pay again.
 
 CHOICE BUTTONS:
 - In-chat only: [Label](chat:the exact reply)

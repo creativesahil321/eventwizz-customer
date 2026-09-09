@@ -19,6 +19,7 @@ import {
   chatDateNeedsInventoryHydrate,
   chatDateSlotKey,
   chatInventoryFromCartBucket,
+  listChatDrinks,
   withChatDateInventory,
   type ChatDateInventory,
   type ChatEventBookingBrief,
@@ -29,7 +30,10 @@ import {
   resolveCheckoutPaymentAction,
   type CheckoutPaymentAction,
 } from "@/services/customer/checkout/checkout-payment";
-import type { CheckoutRequest } from "@/services/customer/checkout/type";
+import type {
+  CheckoutDateData,
+  CheckoutRequest,
+} from "@/services/customer/checkout/type";
 import type { ApiEventCartData } from "@/lib/types/cart.types";
 import type { CouponStripSource } from "@/lib/coupon-strip-props";
 import { useCartEditStore } from "@/store/cart-edit.store";
@@ -183,8 +187,234 @@ export function bookingChoicesReadyForPay(
       return false;
     }
     if (!slot.date?.date) return false;
-    if (slot.guestCount == null || slot.guestCount < 1) return false;
-    return Boolean(slot.seating);
+    if (!slot.seating) return false;
+    if (slot.seating === "tickets" || slot.seating === "both") {
+      const tickets = slot.ticketTitles.reduce(
+        (sum, title) => sum + Math.max(0, slot.ticketQuantities[title] ?? 0),
+        0,
+      );
+      if (tickets < 1) return false;
+    }
+    if (slot.seating === "tables" || slot.seating === "both") {
+      if (slot.guestCount == null || slot.guestCount < 1) return false;
+      if (!slot.tablePlan.some((item) => item.quantity > 0)) return false;
+    }
+    return true;
+  });
+}
+
+function sameCatalogTitle(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
+function pricesMatch(catalog: number, quoted: number): boolean {
+  return (
+    Number.isFinite(catalog) &&
+    Number.isFinite(quoted) &&
+    Math.abs(catalog - quoted) <= 0.02
+  );
+}
+
+export function chatBookingFingerprint(
+  choices: ChatBookingChoices,
+  payMode: "full" | "deposit",
+): string {
+  const slots = checkoutSlots(choices).map((slot) => ({
+    date: slot.date.date.slice(0, 10),
+    roomId: slot.roomId ?? null,
+    seating: slot.seating,
+    guests: slot.guestCount,
+    tables: slot.tablePlan
+      .filter((item) => item.quantity > 0)
+      .map((item) => ({
+        id: item.tableId,
+        qty: item.quantity,
+        min: item.minPersons,
+        max: item.maxPersons,
+      })),
+    tickets: slot.ticketTitles
+      .map((title) => ({
+        title,
+        qty: Math.max(0, slot.ticketQuantities[title] ?? 0),
+      }))
+      .filter((item) => item.qty > 0),
+    drinks: slot.drinkTitles
+      .map((title) => ({
+        title,
+        qty: Math.max(0, slot.drinkQuantities[title] ?? 0),
+      }))
+      .filter((item) => item.qty > 0),
+  }));
+  return JSON.stringify({
+    payMode,
+    coupon: Boolean(choices.couponApplied),
+    slots,
+  });
+}
+
+export function chatChoicesMatchCatalog(
+  brief: ChatEventBookingBrief,
+  choices: ChatBookingChoices,
+): { ok: true } | { ok: false; reason: ChatCheckoutFailureReason; message: string } {
+  for (const slot of checkoutSlots(choices)) {
+    const date = slot.date;
+    if (slot.seating === "tickets" || slot.seating === "both") {
+      let picked = 0;
+      for (const title of slot.ticketTitles) {
+        const qty = Math.max(0, slot.ticketQuantities[title] ?? 0);
+        if (qty < 1) continue;
+        const ticket = date.tickets.find((item) =>
+          sameCatalogTitle(item.title, title),
+        );
+        if (!ticket) {
+          return {
+            ok: false,
+            reason: "incomplete",
+            message:
+              "That ticket type isn’t listed for this date, so I can’t take payment for it.",
+          };
+        }
+        if (ticket.remaining != null && qty > ticket.remaining) {
+          return {
+            ok: false,
+            reason: "capacity",
+            message: `We only have **${ticket.remaining}** ${ticket.title} left — I can’t book ${qty}.`,
+          };
+        }
+        picked += qty;
+      }
+      if (picked < 1) {
+        return {
+          ok: false,
+          reason: "incomplete",
+          message: "Pick how many tickets you want before I can take payment.",
+        };
+      }
+    }
+    if (slot.seating === "tables" || slot.seating === "both") {
+      const tables = slot.tablePlan.filter((item) => item.quantity > 0);
+      if (tables.length === 0) {
+        return {
+          ok: false,
+          reason: "incomplete",
+          message: "Choose a table plan before I can take payment.",
+        };
+      }
+      for (const item of tables) {
+        const table = date.tables.find(
+          (row) =>
+            row.id === item.tableId ||
+            (row.minPersons === item.minPersons &&
+              row.maxPersons === item.maxPersons),
+        );
+        if (!table) {
+          return {
+            ok: false,
+            reason: "incomplete",
+            message:
+              "That table type isn’t listed for this date, so I can’t take payment for it.",
+          };
+        }
+        if (table.remaining != null && item.quantity > table.remaining) {
+          return {
+            ok: false,
+            reason: "capacity",
+            message: `We only have **${table.remaining}** of that table left — I can’t book ${item.quantity}.`,
+          };
+        }
+      }
+    }
+    const drinks = listChatDrinks(brief, slot.roomId);
+    for (const title of slot.drinkTitles) {
+      const qty = Math.max(0, slot.drinkQuantities[title] ?? 0);
+      if (qty < 1) continue;
+      const drink = drinks.find((item) => sameCatalogTitle(item.title, title));
+      if (!drink) {
+        return {
+          ok: false,
+          reason: "incomplete",
+          message:
+            "That drink package isn’t listed for this booking, so I can’t take payment for it.",
+        };
+      }
+      if (drink.availableQuantity != null && qty > drink.availableQuantity) {
+        return {
+          ok: false,
+          reason: "capacity",
+          message: `We only have **${drink.availableQuantity}** ${drink.title} left — I can’t add ${qty}.`,
+        };
+      }
+    }
+  }
+  return { ok: true };
+}
+
+function iterateCheckoutPayloadDates(
+  payload: CheckoutRequest,
+  visit: (dateData: CheckoutDateData, roomId: number | null) => string | null,
+): string | null {
+  if (payload.is_rooms) {
+    for (const room of payload.rooms ?? []) {
+      for (const dateData of room.dates) {
+        const error = visit(dateData, room.room_id);
+        if (error) return error;
+      }
+    }
+    return null;
+  }
+  for (const dateData of payload.dates ?? []) {
+    const error = visit(dateData, null);
+    if (error) return error;
+  }
+  return null;
+}
+
+function assertPayloadUsesCatalogPrices(
+  payload: CheckoutRequest,
+  event: ApiEventCartData,
+): string | null {
+  return iterateCheckoutPayloadDates(payload, (dateData, roomId) => {
+    const iso = String(dateData.event_date ?? "").slice(0, 10);
+    const bucket = cartBucketForChatSlot(event, iso, roomId);
+    if (!bucket) {
+      return "A date in this payment isn’t on the venue list.";
+    }
+    for (const ticket of dateData.tickets ?? []) {
+      const catalog = bucket.tickets.find((item) => item.id === ticket.id);
+      if (!catalog) {
+        return "A ticket in this payment isn’t listed for that date.";
+      }
+      if (!pricesMatch(Number(catalog.price), ticket.price_per_ticket)) {
+        return "Ticket prices didn’t match the venue list, so I can’t take payment.";
+      }
+    }
+    for (const table of dateData.tables ?? []) {
+      const catalog = bucket.tables.find((item) => item.id === table.id);
+      if (!catalog) {
+        return "A table in this payment isn’t listed for that date.";
+      }
+      if (!pricesMatch(Number(catalog.price), table.price_per_person)) {
+        return "Table prices didn’t match the venue list, so I can’t take payment.";
+      }
+    }
+    for (const drink of dateData.drink_package ?? []) {
+      const catalogDrinks = [
+        ...(event.drinks ?? []),
+        ...(event.rooms ?? []).flatMap((room) => room.drinks ?? []),
+      ];
+      const catalogDrink = catalogDrinks.find(
+        (item) =>
+          item.id === drink.id ||
+          sameCatalogTitle(String(item.title ?? ""), drink.title),
+      );
+      if (!catalogDrink) {
+        return "A drink package in this payment isn’t listed for this event.";
+      }
+      if (!pricesMatch(Number(catalogDrink.price), drink.price)) {
+        return "Drink prices didn’t match the venue list, so I can’t take payment.";
+      }
+    }
+    return null;
   });
 }
 
@@ -226,6 +456,37 @@ function cartBucketForChatSlot(
       ? buildCartDateLookupKey(isoDate, roomId)
       : isoDate;
   return getApiDateData(event, dateKey);
+}
+
+/** Same rule as checkout: table deposit only when the date enables it. */
+export function chatTableDepositAvailable(
+  event: ApiEventCartData | null | undefined,
+  choices: ChatBookingChoices,
+): boolean | null {
+  if (!event) return null;
+  const slots = checkoutSlots(choices);
+  const tableSlots = slots.filter((slot) => slot.seating !== "tickets");
+  if (tableSlots.length === 0) return false;
+
+  let sawBucket = false;
+  for (const slot of tableSlots) {
+    const hasTables =
+      slot.tablePlan.some((item) => item.quantity > 0) ||
+      Object.values(slot.tableMix).some((qty) => qty > 0);
+    if (!hasTables) continue;
+    const bucket = cartBucketForChatSlot(
+      event,
+      slot.date.date.slice(0, 10),
+      slot.roomId,
+    );
+    const payment = bucket?.payment;
+    if (!payment) continue;
+    sawBucket = true;
+    if (payment.is_deposit_enabled || payment.type === "deposit") {
+      return true;
+    }
+  }
+  return sawBucket ? false : null;
 }
 
 /**
@@ -764,15 +1025,18 @@ export async function runChatCheckout(options: {
       ok: false,
       reason: "incomplete",
       message:
-        "I still need a room, date, guest count and seating before I can take payment.",
+        "I still need the date and the tables or tickets you picked before I can take payment.",
     };
   }
+
+  const catalog = chatChoicesMatchCatalog(brief, choices);
+  if (!catalog.ok) return catalog;
 
   const synced = await syncChatBookingToCart({
     brief,
     choices,
     payMode,
-    fillUnpickedTickets: true,
+    fillUnpickedTickets: false,
     requireLineItems: true,
   });
   if (!synced.ok) return synced;
@@ -813,12 +1077,19 @@ export async function runChatCheckout(options: {
     };
   }
 
+  if (payMode === "deposit" && chatTableDepositAvailable(event, choices) === false) {
+    return {
+      ok: false,
+      reason: "checkout",
+      message:
+        "Table deposit isn’t available for this booking. Pay in full, or visit the event page.",
+    };
+  }
+
   const couponSource = resolveCartCoupon(event);
-  const couponCode = choices.couponApplied
-    ? couponSource?.coupon_code?.trim().toUpperCase() ||
-    brief.coupon?.code?.trim().toUpperCase() ||
-    null
-    : null;
+  const officialCoupon = couponSource?.coupon_code?.trim().toUpperCase() || null;
+  const couponCode =
+    choices.couponApplied && officialCoupon ? officialCoupon : null;
   if (couponCode) {
     useCheckoutPromoStore.getState().setCouponCode(couponCode);
   } else {
@@ -857,10 +1128,26 @@ export async function runChatCheckout(options: {
     };
   }
 
+  const catalogPriceError = assertPayloadUsesCatalogPrices(payload, checkoutEvent);
+  if (catalogPriceError) {
+    return { ok: false, reason: "checkout", message: catalogPriceError };
+  }
+
+  const validation = checkoutService.validateCheckoutData(payload);
+  if (!validation.isValid) {
+    return {
+      ok: false,
+      reason: "checkout",
+      message:
+        "This booking couldn’t be verified against the venue list. Visit the event page to finish.",
+    };
+  }
+
+  const fingerprint = chatBookingFingerprint(choices, payMode);
   const payStore = useCheckoutPaymentUiStore.getState();
   const pendingNumber = event.pending_payment?.booking_number?.trim();
   const storedNumber = payStore.stripePaymentSession?.bookingNumber?.trim();
-  const resumeNumber =
+  const resumeCandidate =
     pendingNumber &&
     !payStore.isBookingCompleted(pendingNumber) &&
     !payStore.isPendingPaymentExpired(pendingNumber)
@@ -870,6 +1157,13 @@ export async function runChatCheckout(options: {
           !payStore.isPendingPaymentExpired(storedNumber)
         ? storedNumber
         : null;
+  const sameOrder =
+    Boolean(payStore.chatCheckoutFingerprint) &&
+    payStore.chatCheckoutFingerprint === fingerprint;
+  const resumeNumber = sameOrder ? resumeCandidate : null;
+  if (resumeCandidate && !sameOrder) {
+    payStore.clearPaymentSession();
+  }
 
   try {
     const response = resumeNumber
@@ -894,6 +1188,19 @@ export async function runChatCheckout(options: {
         reason: "checkout",
         message: "Payment couldn’t be started. Visit the event page to finish.",
       };
+    }
+    const charged = Number(response.data.amount);
+    if (Number.isFinite(charged) && charged + 0.05 < payload.total) {
+      return {
+        ok: false,
+        reason: "checkout",
+        message:
+          "The payment amount didn’t match this booking, so I didn’t open the form. Try again, or finish on the event page.",
+      };
+    }
+    payStore.setChatCheckoutFingerprint(fingerprint);
+    if (action.type === "stripe") {
+      action.session.clientQuotedAmount = payload.total;
     }
     return { ok: true, action, payload };
   } catch (error) {

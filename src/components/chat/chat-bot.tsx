@@ -63,6 +63,12 @@ import {
   extractRequestedEventWindow,
   liveEventMatchesRequestedTheme,
   isBroadEventListIntent,
+  isBookEventInCityTap,
+  isSwitchLiveEventIntent,
+  isNearMeEventsIntent,
+  isBudgetEventsIntent,
+  buildNearMeEventsReply,
+  buildBudgetEventsReply,
   isEventWindowFollowUp,
   isLiveEventAvailabilityQuestion,
   asWeakMatches,
@@ -72,6 +78,10 @@ import {
   normalizeLiveEventSlug,
   type LiveEventChatMatch,
 } from "@/lib/chat-live-events";
+import {
+  buildNearMeSearchReply,
+  fetchNearMeEventsForChat,
+} from "@/lib/chat-near-me";
 import type { LiveEvent, LocationData } from "@/types/theme.types";
 import {
   extractBookingQuickActions,
@@ -109,15 +119,18 @@ import {
   summarizeEventDetailForChat,
   withDateChoiceQuickActions,
   withGuaranteedDateChoiceCopy,
-  withGuaranteedRoomChoiceCopy, 
+  withGuaranteedRoomChoiceCopy,
   withRoomChoiceQuickActions,
   withVisitEventQuickAction,
   type ChatEventBookingBrief,
   type ChatQuickActionDraft,
 } from "@/lib/chat-event-booking";
 import {
+  buildBookingVenueEnquiryDraft,
+  buildChatPaymentClosedTurn,
   buildHostBookingTurn,
   chatChoicesHaveLineItems,
+  isChatBookingVenueEnquiryIntent,
   isChatCheckoutHandoffIntent,
   isChatExistingCartBookingIntent,
   isGuestBookingConciergeText,
@@ -126,10 +139,14 @@ import {
   parseChatPayMode,
   parseChatPaymentGatewaySlug,
   toChatQuickActions,
+  type ChatBookingChoices,
+  type ChatBookingSummaryCard,
 } from "@/lib/chat-booking-choices";
+import { ChatBookingSummaryCardView } from "@/components/chat/chat-booking-summary";
 import {
   bookingChoicesReadyForPay,
   chatCartConflictsWithEvent,
+  chatTableDepositAvailable,
   hydrateChatBriefCatalogs,
   listChatPaymentGateways,
   runChatCheckout,
@@ -144,9 +161,7 @@ import type { CheckoutStripePaymentSession } from "@/services/customer/checkout"
 
 const CheckoutStripePaymentModal = dynamic(
   () =>
-    import(
-      "@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal"
-    ),
+    import("@/app/(public)/vendor/checkout/_components/checkout-stripe-payment-modal"),
   { ssr: false },
 );
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
@@ -245,11 +260,14 @@ type Message = {
   };
   /** Interactive buttons under an assistant message (guided support) */
   quickActions?: QuickAction[];
+  bookingSummary?: ChatBookingSummaryCard;
 };
 
 type SupportFlowStep =
   | "idle"
   | "category"
+  | "review_draft"
+  | "edit_draft"
   | "phone"
   | "description"
   | "confirm"
@@ -262,6 +280,8 @@ type SupportFlowState = {
   description: string;
   /** Original customer issue used as subject seed */
   issueSummary: string;
+  /** True when we drafted the enquiry from the booking — skip category. */
+  prefilledDraft: boolean;
 };
 
 const INITIAL_FLOW: SupportFlowState = {
@@ -270,6 +290,7 @@ const INITIAL_FLOW: SupportFlowState = {
   phone: "",
   description: "",
   issueSummary: "",
+  prefilledDraft: false,
 };
 
 function vendorGreetingActions(options?: {
@@ -285,6 +306,11 @@ function vendorGreetingActions(options?: {
       id: "start-whats-on",
       label: "What’s on",
       sendText: "What events are on?",
+    },
+    {
+      id: "start-near-me",
+      label: "Near Me",
+      sendText: "events near me",
     },
     {
       id: "ask-question",
@@ -434,7 +460,8 @@ function getInitialChatGreeting(options: {
   userName?: string | null;
   userPermissions?: string[] | null;
 }): { content: string; quickActions?: QuickAction[] } {
-  const { isVendorStorefront, accountType, userName, userPermissions } = options;
+  const { isVendorStorefront, accountType, userName, userPermissions } =
+    options;
   const nameBit = userName ? `, ${userName}` : "";
 
   if (isVendorStorefront) {
@@ -739,7 +766,7 @@ function buildSubject(
 function renderInlineSpans(
   content: string,
   isUser: boolean,
-  keyPrefix = "span"
+  keyPrefix = "span",
 ): ReactNode[] {
   const linkClass = isUser
     ? "underline underline-offset-2 font-medium opacity-95"
@@ -778,7 +805,7 @@ function renderInlineSpans(
           }
         >
           {match[4]}
-        </code>
+        </code>,
       );
     } else {
       const label = match[5];
@@ -794,9 +821,9 @@ function renderInlineSpans(
         !isUser &&
         Boolean(
           label &&
-            /^(open|manage|view|go to|take me to|check|book)\b/i.test(
-              label.trim()
-            )
+          /^(open|manage|view|go to|take me to|check|book)\b/i.test(
+            label.trim(),
+          ),
         );
 
       if (parsed?.kind === "chat") {
@@ -931,7 +958,7 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
                       {renderInlineSpans(
                         cell,
                         isUser,
-                        `td-${key}-${rIdx}-${cIdx}`
+                        `td-${key}-${rIdx}-${cIdx}`,
                       )}
                     </td>
                   ))}
@@ -939,7 +966,7 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
               ))}
             </tbody>
           </table>
-        </div>
+        </div>,
       );
       tableLines = [];
     } else if (tableLines.length > 0) {
@@ -1005,9 +1032,7 @@ function ChatAvatar({
     <span
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-black/5",
-        branded
-          ? "bg-[color:var(--color-header,#1e293b)]"
-          : "bg-slate-800",
+        branded ? "bg-[color:var(--color-header,#1e293b)]" : "bg-slate-800",
         sizeClass,
         className,
       )}
@@ -1025,9 +1050,7 @@ function ChatAvatar({
         <MessageCircle
           className={cn(
             "h-3.5 w-3.5",
-            branded
-              ? "text-[color:var(--color-on-header,#fff)]"
-              : "text-white",
+            branded ? "text-[color:var(--color-on-header,#fff)]" : "text-white",
           )}
           strokeWidth={2}
         />
@@ -1114,11 +1137,7 @@ export function ChatBot() {
     if (pathname?.startsWith("/vendor")) return "vendor";
     if (pathname?.startsWith("/customer")) return "customer";
     return null;
-  }, [
-    session?.user,
-    authUser,
-    pathname,
-  ]);
+  }, [session?.user, authUser, pathname]);
 
   const accountType = effectiveRole;
   const isAuthenticated =
@@ -1233,6 +1252,8 @@ export function ChatBot() {
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
   const eventBookingBriefRef = useRef<ChatEventBookingBrief | null>(null);
   const chatPayGatewaysRef = useRef<ChatPaymentGatewayOption[]>([]);
+  const chatPayModeRef = useRef<"full" | "deposit">("full");
+  const chatDepositAvailableRef = useRef<boolean | null>(null);
   const checkoutInProgressRef = useRef(false);
   const paymentCompletedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1327,6 +1348,8 @@ export function ChatBot() {
     checkoutInProgressRef.current = false;
     eventBookingBriefRef.current = null;
     chatPayGatewaysRef.current = [];
+    chatPayModeRef.current = "full";
+    chatDepositAvailableRef.current = null;
     keepComposerFocusRef.current = false;
     setIsOpen(false);
     setIsMinimized(false);
@@ -1352,6 +1375,52 @@ export function ChatBot() {
         quickActions: postPaymentGreetingActions(),
       },
     ]);
+  }
+
+  function resumeBookingAfterPaymentClosed() {
+    if (paymentCompletedRef.current) return;
+    const brief = eventBookingBriefRef.current ?? pageBookingBrief;
+    setIsOpen(true);
+    setIsMinimized(false);
+    setMessages((prev) => {
+      if (!brief) {
+        return [
+          ...clearQuickActions(prev),
+          {
+            role: "assistant",
+            content:
+              "Payment is closed — nothing was charged. Tell me what you’d like to change, or pay when you’re ready.",
+          },
+        ];
+      }
+      const choices = parseChatBookingChoices(
+        prev.map(({ role, content }) => ({ role, content })),
+        brief,
+      );
+      const turn = buildChatPaymentClosedTurn({
+        brief,
+        choices,
+        userName,
+        depositAvailable:
+          chatDepositAvailableRef.current === true ||
+          choices.slots.some((slot) => slot.seating !== "tickets"),
+      });
+      const hostActions = publicBookingQuickActions({
+        content: turn.content,
+        brief,
+        conversation: prev,
+        hostActions: turn.actions,
+      });
+      return [
+        ...clearQuickActions(prev),
+        {
+          role: "assistant",
+          content: turn.content,
+          quickActions: hostActions.length > 0 ? hostActions : undefined,
+          bookingSummary: turn.summary,
+        },
+      ];
+    });
   }
 
   useEffect(() => {
@@ -1392,6 +1461,72 @@ export function ChatBot() {
         content:
           "I can raise a support enquiry for you. Please choose a category (or No thanks to cancel):",
         quickActions: CATEGORY_ACTIONS,
+      },
+    ]);
+  }
+
+  function startBookingVenueEnquiry(
+    brief: ChatEventBookingBrief,
+    choices: ChatBookingChoices,
+    issueText: string,
+  ) {
+    const draft = buildBookingVenueEnquiryDraft({
+      brief,
+      choices,
+      userName,
+    });
+    const slot = choices.slots[choices.slots.length - 1];
+    const guests = slot?.guestCount ?? choices.guestCount;
+    const when = slot
+      ? [slot.date.label, slot.roomName || slot.date.roomName]
+          .filter(Boolean)
+          .join(" · ")
+      : "";
+    const issueSummary =
+      guests != null
+        ? `Group of ${guests} for ${brief.title}${when ? ` — ${when}` : ""}`
+        : issueText;
+    const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
+    setSupportFlow({
+      ...INITIAL_FLOW,
+      step: "review_draft",
+      category: "general_support",
+      description: draft,
+      issueSummary,
+      prefilledDraft: true,
+    });
+    setMessages((prev) => [
+      ...clearQuickActions(prev),
+      {
+        role: "assistant",
+        content: `I’ve drafted an **Event & booking** enquiry for the venue${nameBit}. Check it — send this, or type a change and I’ll update it.\n\n${draft}`,
+        quickActions: [
+          { id: "confirm_draft", label: "Looks good" },
+          { id: "edit_draft", label: "I’ll edit this" },
+          { id: "cancel_flow", label: "Cancel" },
+        ],
+      },
+    ]);
+  }
+
+  function showEnquiryDraft(draft: string) {
+    setSupportFlow((prev) => ({
+      ...prev,
+      step: "review_draft",
+      description: draft,
+      category: prev.category ?? "general_support",
+      prefilledDraft: true,
+    }));
+    setMessages((prev) => [
+      ...clearQuickActions(prev),
+      {
+        role: "assistant",
+        content: `Updated. Does this look right to send to the venue?\n\n${draft}`,
+        quickActions: [
+          { id: "confirm_draft", label: "Looks good" },
+          { id: "edit_draft", label: "I’ll edit this" },
+          { id: "cancel_flow", label: "Cancel" },
+        ],
       },
     ]);
   }
@@ -1516,7 +1651,9 @@ export function ChatBot() {
       ...clearQuickActions(prev),
       {
         role: "assistant",
-        content: "Thank you. What’s the best telephone number to reach you on?",
+        content: supportFlow.prefilledDraft
+          ? "Thank you. What’s the best telephone number to reach you on? I’ll send this enquiry to the venue as soon as I have it."
+          : "Thank you. What’s the best telephone number to reach you on?",
       },
     ]);
   }
@@ -1597,6 +1734,10 @@ export function ChatBot() {
       const result = await syncChatBookingToCart({ brief, choices });
       if (result.ok && "event" in result) {
         chatPayGatewaysRef.current = listChatPaymentGateways(result.event);
+        chatDepositAvailableRef.current = chatTableDepositAvailable(
+          result.event,
+          choices,
+        );
         try {
           await refetchCustomerCart();
         } catch {
@@ -1691,6 +1832,7 @@ export function ChatBot() {
   ) {
     const lastUserText = extraMessages[extraMessages.length - 1]?.content ?? "";
     const gatewaySlug = parseChatPaymentGatewaySlug(lastUserText);
+    chatPayModeRef.current = payMode;
 
     if (isPaymentSuccessPath(pathname)) {
       setMessages((prev) => [
@@ -1803,8 +1945,10 @@ export function ChatBot() {
           {
             role: "assistant",
             content:
-              result.message.trim() ||
-              "How would you like to pay? Choose a payment method to continue.",
+              payMode === "deposit"
+                ? "Table deposit is available for this booking. How would you like to pay the deposit?"
+                : result.message.trim() ||
+                  "How would you like to pay? Choose a payment method to continue.",
             quickActions: toUiQuickActions(
               gateways.map((gateway) => ({
                 id: `pay-gateway-${gateway.slug}`,
@@ -1997,6 +2141,29 @@ export function ChatBot() {
       return;
     }
 
+    if (action.id === "confirm_draft") {
+      setMessages((prev) => [...prev, { role: "user", content: action.label }]);
+      askForPhone(supportFlow.category ?? "general_support");
+      return;
+    }
+
+    if (action.id === "edit_draft") {
+      setMessages((prev) => [...prev, { role: "user", content: action.label }]);
+      setSupportFlow((prev) => ({ ...prev, step: "edit_draft" }));
+      setMessages((prev) => [
+        ...clearQuickActions(prev),
+        {
+          role: "assistant",
+          content:
+            "Type the enquiry you’d like us to send — I’ll replace the draft with your words.",
+          quickActions: [{ id: "cancel_flow", label: "Cancel" }],
+        },
+      ]);
+      keepComposerFocusRef.current = true;
+      focusComposer();
+      return;
+    }
+
     if (action.id === "confirm_submit" || action.id === "retry_submit") {
       setMessages((prev) => [...prev, { role: "user", content: action.label }]);
       await submitGuidedSupport(supportFlow);
@@ -2031,6 +2198,61 @@ export function ChatBot() {
       return;
     }
 
+    if (supportFlow.step === "review_draft") {
+      if (/\b(looks good|yes|ok|okay|sure|send|confirm|continue)\b/i.test(userText)) {
+        askForPhone(supportFlow.category ?? "general_support");
+        return;
+      }
+      if (/\b(edit|change|update|rewrite)\b/i.test(userText) && userText.trim().length < 40) {
+        setSupportFlow((prev) => ({ ...prev, step: "edit_draft" }));
+        setMessages((prev) => [
+          ...clearQuickActions(prev),
+          {
+            role: "assistant",
+            content:
+              "Type the enquiry you’d like us to send — I’ll replace the draft with your words.",
+            quickActions: [{ id: "cancel_flow", label: "Cancel" }],
+          },
+        ]);
+        return;
+      }
+      if (userText.trim().length >= 8) {
+        showEnquiryDraft(userText.trim());
+        return;
+      }
+      setMessages((prev) => [
+        ...clearQuickActions(prev),
+        {
+          role: "assistant",
+          content:
+            "Tap **Looks good** to send this, **I’ll edit this**, or type the message you want the venue to receive.",
+          quickActions: [
+            { id: "confirm_draft", label: "Looks good" },
+            { id: "edit_draft", label: "I’ll edit this" },
+            { id: "cancel_flow", label: "Cancel" },
+          ],
+        },
+      ]);
+      return;
+    }
+
+    if (supportFlow.step === "edit_draft") {
+      if (userText.trim().length < 8) {
+        setMessages((prev) => [
+          ...clearQuickActions(prev),
+          {
+            role: "assistant",
+            content:
+              "Please type the full enquiry so the venue knows what you need. Or tap Cancel.",
+            quickActions: [{ id: "cancel_flow", label: "Cancel" }],
+          },
+        ]);
+        return;
+      }
+      showEnquiryDraft(userText.trim());
+      return;
+    }
+
     if (supportFlow.step === "phone") {
       if (!isValidPhone(userText)) {
         setMessages((prev) => [
@@ -2044,7 +2266,16 @@ export function ChatBot() {
         ]);
         return;
       }
-      askForDescription(userText.trim());
+      const phone = userText.trim();
+      if (supportFlow.prefilledDraft && supportFlow.description.trim().length >= 8) {
+        await submitGuidedSupport({
+          ...supportFlow,
+          phone,
+          category: supportFlow.category ?? "general_support",
+        });
+        return;
+      }
+      askForDescription(phone);
       return;
     }
 
@@ -2218,17 +2449,18 @@ export function ChatBot() {
       if (vendorQueryType) {
         // RBAC enforcement for vendor staff
         if (isStaffUser && effectivePermissions.length > 0) {
-          const DOMAIN_MAP: Record<VendorQueryType, RestrictedResourceDomain> = {
-            booking_lookup: "events",
-            payment_lookup: "transactions",
-            customers: "customers",
-            menu_choices: "menus",
-            coupons: "coupons",
-            locations: "locations",
-            staff_roles: "staff",
-            transactions: "transactions",
-            rooms: "events",
-          };
+          const DOMAIN_MAP: Record<VendorQueryType, RestrictedResourceDomain> =
+            {
+              booking_lookup: "events",
+              payment_lookup: "transactions",
+              customers: "customers",
+              menu_choices: "menus",
+              coupons: "coupons",
+              locations: "locations",
+              staff_roles: "staff",
+              transactions: "transactions",
+              rooms: "events",
+            };
           const targetDomain = DOMAIN_MAP[vendorQueryType];
           const hasAccess =
             vendorQueryType === "booking_lookup"
@@ -2240,7 +2472,9 @@ export function ChatBot() {
 
           if (!hasAccess) {
             const rule =
-              RESOURCE_PERMISSION_RULES.find((r) => r.domain === targetDomain) ||
+              RESOURCE_PERMISSION_RULES.find(
+                (r) => r.domain === targetDomain,
+              ) ||
               RESOURCE_PERMISSION_RULES.find((r) => r.domain === "events")!;
             setMessages((prev) => [
               ...prev,
@@ -2284,17 +2518,28 @@ export function ChatBot() {
       ) {
         customerQueryType = resolveCustomerTopicFromHistory(messages, userText);
       }
+      if (isLoggedInCustomer) {
+        const pendingAction = resolveCustomerTopicFromHistory(
+          messages,
+          userText,
+        );
+        if (
+          pendingAction &&
+          (pendingAction === "change_request" ||
+            pendingAction === "cancel_request" ||
+            pendingAction === "refund_request")
+        ) {
+          customerQueryType = pendingAction;
+        }
+      }
       const isCatalogueBrowse =
         isBroadEventListIntent(userText) ||
         isLiveEventBookingIntent(userText) ||
         isLiveEventAvailabilityQuestion(userText);
       if (
-        customerQueryType &&
-        customerQueryType !== "forbidden" &&
+        customerQueryType === "my_bookings" &&
         isCatalogueBrowse &&
-        !/\b(my (booking|bookings|reservation|ticket)|VE-|EV-|BK-)\b/i.test(
-          userText,
-        )
+        !/\bmy\b/i.test(userText)
       ) {
         customerQueryType = null;
       }
@@ -2321,7 +2566,7 @@ export function ChatBot() {
       const skipForOpenBooking =
         Boolean(eventBookingBriefRef.current) &&
         customerQueryType === "change_request" &&
-        !/\bmy\s+booking\b/i.test(userText);
+        !/\b(my\s+booking|reschedule|my\s+event|VE-|EV-|BK-)\b/i.test(userText);
       if (customerQueryType && isLoggedInCustomer && !skipForOpenBooking) {
         setIsLoading(true);
         try {
@@ -2475,16 +2720,27 @@ export function ChatBot() {
       setAwaitingGuestEmail(false);
     }
 
+    // Logged-in customer: group/venue ask from a booking skips category and drafts the ticket
+    if (
+      isVendorStorefront &&
+      isLoggedInCustomer &&
+      isChatBookingVenueEnquiryIntent(userText)
+    ) {
+      const brief = eventBookingBriefRef.current ?? pageBookingBrief;
+      if (brief) {
+        const conversation = [...messages, userMessage];
+        const choices = parseChatBookingChoices(conversation, brief);
+        if (choices.slots.length > 0) {
+          startBookingVenueEnquiry(brief, choices, userText);
+          return;
+        }
+      }
+    }
+
     // Logged-in customer on vendor site: start professional enquiry wizard
     if (isVendorStorefront && isLoggedInCustomer && isSupportIntent(userText)) {
-      const brief = eventBookingBriefRef.current ?? pageBookingBrief;
-      const bookingInProgress = Boolean(
-        brief && parseChatBookingChoices(messages, brief).slots.length > 0,
-      );
-      if (!bookingInProgress) {
-        startGuidedSupport(userText);
-        return;
-      }
+      startGuidedSupport(userText);
+      return;
     }
 
     // Guest on vendor site: offer Register / Log in buttons
@@ -2525,6 +2781,8 @@ Is there anything else I can help you with?`,
         userText,
         eventBookingBriefRef.current ?? pageBookingBrief,
       ) &&
+      !isSwitchLiveEventIntent(userText) &&
+      !/\breschedule\b/i.test(userText) &&
       !shouldSendBrochureForEventPick(userText, messages)
     ) {
       const brief = eventBookingBriefRef.current ?? pageBookingBrief;
@@ -2542,14 +2800,97 @@ Is there anything else I can help you with?`,
       }
     }
 
+    if (isVendorStorefront && isSwitchLiveEventIntent(userText)) {
+      eventBookingBriefRef.current = null;
+    }
+
+    if (
+      isVendorStorefront &&
+      !isLoggedInVendor &&
+      isNearMeEventsIntent(userText)
+    ) {
+      setIsLoading(true);
+      let reply = buildNearMeEventsReply({
+        allLiveEvents: liveEvents,
+        siteName,
+        userName,
+        reason: "error",
+        detail:
+          "I couldn’t load events near you just now. Please try again, or tell me a city.",
+      });
+      try {
+        const nearMe = await fetchNearMeEventsForChat(tenantHost);
+        if (nearMe.status === "ok") {
+          reply = buildNearMeSearchReply({
+            events: nearMe.events,
+            radiusKm: nearMe.radiusKm,
+            userName,
+            siteName,
+            allLiveEvents: liveEvents,
+          });
+        } else if (nearMe.status === "empty") {
+          reply = buildNearMeEventsReply({
+            allLiveEvents: liveEvents,
+            siteName,
+            userName,
+            reason: "empty",
+            radiusKm: nearMe.radiusKm,
+          });
+        } else if (nearMe.status === "no_location") {
+          reply = buildNearMeEventsReply({
+            allLiveEvents: liveEvents,
+            siteName,
+            userName,
+            reason: "no_location",
+            detail: nearMe.message,
+          });
+        } else {
+          reply = buildNearMeEventsReply({
+            allLiveEvents: liveEvents,
+            siteName,
+            userName,
+            reason: "error",
+            detail: nearMe.message,
+          });
+        }
+      } finally {
+        setIsLoading(false);
+      }
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", ...inChatChoiceMessage(reply.content) },
+      ]);
+      return;
+    }
+
+    if (
+      isVendorStorefront &&
+      !isLoggedInVendor &&
+      liveEvents.length > 0 &&
+      isBudgetEventsIntent(userText)
+    ) {
+      const budget = buildBudgetEventsReply({
+        allLiveEvents: liveEvents,
+        siteName,
+        userName,
+      });
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", ...inChatChoiceMessage(budget.content) },
+      ]);
+      return;
+    }
+
     const catalogueBrief = eventBookingBriefRef.current ?? pageBookingBrief;
     if (
       isVendorStorefront &&
       !isLoggedInVendor &&
       liveEvents.length > 0 &&
       !parseBookEventInCitySendText(userText) &&
+      !isBookEventInCityTap(userText) &&
       !(catalogueBrief && isEventWindowFollowUp(userText)) &&
       (isBroadEventListIntent(userText) ||
+        isSwitchLiveEventIntent(userText) ||
         isLiveEventAvailabilityQuestion(userText) ||
         (isBrochureQuestion(userText) && !catalogueBrief))
     ) {
@@ -3350,6 +3691,10 @@ Is there anything else I can help you with?`,
           userText,
           choices: parseChatBookingChoices(conversation, eventBookingBrief),
           userName,
+          venueContact: {
+            phone: contactPhone,
+            email: contactEmail,
+          },
         });
         const kickoff =
           kickoffTurn?.content ??
@@ -3385,7 +3730,11 @@ Is there anything else I can help you with?`,
           conversationForHost,
           eventBookingBrief,
         );
-        const payMode = parseChatPayMode(userText);
+        const payMode =
+          parseChatPayMode(userText) ??
+          (parseChatPaymentGatewaySlug(userText)
+            ? chatPayModeRef.current
+            : null);
         if (
           isChatCheckoutHandoffIntent(userText) &&
           (chatChoicesHaveLineItems(hostChoices) ||
@@ -3420,6 +3769,15 @@ Is there anything else I can help you with?`,
             choices: hostChoices,
             userName,
             paymentGateways: chatPayGatewaysRef.current,
+            depositAvailable:
+              chatDepositAvailableRef.current === false
+                ? false
+                : chatDepositAvailableRef.current === true ||
+                  hostChoices.slots.some((slot) => slot.seating !== "tickets"),
+            venueContact: {
+              phone: contactPhone,
+              email: contactEmail,
+            },
           });
           if (hostTurn) {
             const hostActions = publicBookingQuickActions({
@@ -3434,6 +3792,7 @@ Is there anything else I can help you with?`,
                 role: "assistant",
                 content: hostTurn.content,
                 quickActions: hostActions.length > 0 ? hostActions : undefined,
+                bookingSummary: hostTurn.summary,
               },
             ]);
             return;
@@ -3575,9 +3934,21 @@ Is there anything else I can help you with?`,
               quickActions: [
                 { id: "v-dash", label: "Dashboard", href: "/vendor/dashboard" },
                 { id: "v-events", label: "Events", href: "/vendor/events" },
-                { id: "v-bookings", label: "Bookings", href: "/vendor/booking-history" },
-                { id: "v-txns", label: "Transactions", href: "/vendor/transactions" },
-                { id: "v-custs", label: "Customers", href: "/vendor/customers" },
+                {
+                  id: "v-bookings",
+                  label: "Bookings",
+                  href: "/vendor/booking-history",
+                },
+                {
+                  id: "v-txns",
+                  label: "Transactions",
+                  href: "/vendor/transactions",
+                },
+                {
+                  id: "v-custs",
+                  label: "Customers",
+                  href: "/vendor/customers",
+                },
               ],
             },
           ]);
@@ -3601,9 +3972,21 @@ Is there anything else I can help you with?`,
               content,
               quickActions: [
                 { id: "a-venues", label: "All Venues", href: "/admin/vendors" },
-                { id: "a-comm", label: "Commissions", href: "/admin/commission-overview" },
-                { id: "a-txns", label: "Transactions", href: "/admin/transactions" },
-                { id: "a-disputes", label: "Disputes", href: "/admin/disputes" },
+                {
+                  id: "a-comm",
+                  label: "Commissions",
+                  href: "/admin/commission-overview",
+                },
+                {
+                  id: "a-txns",
+                  label: "Transactions",
+                  href: "/admin/transactions",
+                },
+                {
+                  id: "a-disputes",
+                  label: "Disputes",
+                  href: "/admin/disputes",
+                },
               ],
             },
           ]);
@@ -3707,14 +4090,13 @@ Is there anything else I can help you with?`,
               ],
               offerBookingUi,
             })
-          : extractBookingQuickActions(reply)
-              .map((action) => ({
-                id: action.id,
-                label: action.label,
-                hint: action.hint,
-                sendText: action.sendText,
-                href: action.href,
-              }));
+          : extractBookingQuickActions(reply).map((action) => ({
+              id: action.id,
+              label: action.label,
+              hint: action.hint,
+              sendText: action.sendText,
+              href: action.href,
+            }));
       const eventPageCta = isBareEventPageHref(
         supportCta?.href,
         briefForHandoff,
@@ -3783,11 +4165,13 @@ Is there anything else I can help you with?`,
   const inputPlaceholder =
     supportFlow.step === "phone"
       ? "Enter your telephone number…"
-      : supportFlow.step === "description"
-        ? "Describe your issue…"
-        : awaitingGuestEmail
-          ? "Your email address…"
-          : "Type a message…";
+      : supportFlow.step === "description" || supportFlow.step === "edit_draft"
+        ? "Type or edit your enquiry…"
+        : supportFlow.step === "review_draft"
+          ? "Edit this enquiry or tap Looks good…"
+          : awaitingGuestEmail
+            ? "Your email address…"
+            : "Type a message…";
 
   // Onboarding is a full-screen editor + preview — the floating launcher
   // (site logo avatar) overlaps the right-hand preview panel.
@@ -4051,7 +4435,9 @@ Is there anything else I can help you with?`,
                 <AnimatePresence initial={false}>
                   {messages.map((message, index) => {
                     const isUser = message.role === "user";
-                    const hasBody = message.content.trim().length > 0;
+                    const hasBody =
+                      message.content.trim().length > 0 ||
+                      Boolean(message.bookingSummary);
                     const hasActions =
                       !isUser &&
                       Boolean(
@@ -4110,28 +4496,37 @@ Is there anything else I can help you with?`,
                           {hasBody && (
                             <div
                               className={cn(
-                                "min-w-0 px-3.5 py-2.5 text-sm leading-relaxed",
+                                "min-w-0 text-sm leading-relaxed",
+                                message.bookingSummary && !isUser
+                                  ? "overflow-hidden p-0"
+                                  : "px-3.5 py-2.5",
                                 useDateGrid || useEventList
                                   ? "max-w-[85%]"
                                   : null,
                                 isUser
-                                  ? cn(
-                                      "rounded-2xl rounded-br-md",
-                                      chatChrome,
-                                    )
+                                  ? cn("rounded-2xl rounded-br-md", chatChrome)
                                   : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
                               )}
                             >
-                              <p
-                                className="whitespace-pre-wrap break-words"
-                                style={{
-                                  wordBreak: "break-word",
-                                  overflowWrap: "anywhere",
-                                  color: "inherit",
-                                }}
-                              >
-                                {renderMessageContent(message.content, isUser)}
-                              </p>
+                              {message.bookingSummary && !isUser ? (
+                                <ChatBookingSummaryCardView
+                                  summary={message.bookingSummary}
+                                />
+                              ) : (
+                                <p
+                                  className="whitespace-pre-wrap break-words"
+                                  style={{
+                                    wordBreak: "break-word",
+                                    overflowWrap: "anywhere",
+                                    color: "inherit",
+                                  }}
+                                >
+                                  {renderMessageContent(
+                                    message.content,
+                                    isUser,
+                                  )}
+                                </p>
+                              )}
                             </div>
                           )}
                           {!isUser &&
@@ -4329,7 +4724,10 @@ Is there anything else I can help you with?`,
             if (open) return;
             checkoutInProgressRef.current = false;
             setStripePaymentSession(null);
-            useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
+            useCheckoutPaymentUiStore
+              .getState()
+              .setAwaitingStripePayment(false);
+            resumeBookingAfterPaymentClosed();
           }}
           session={stripePaymentSession}
           onPaymentComplete={() => {

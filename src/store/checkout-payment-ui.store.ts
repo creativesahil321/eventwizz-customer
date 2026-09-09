@@ -27,8 +27,11 @@ interface CheckoutPaymentUiState {
   completedBookingNumbers: string[];
   /** Pending bookings whose payment window expired — blocks re-hydrate loops. */
   expiredPendingBookingNumbers: string[];
+  /** Chat line-items snapshot used to refuse resuming a cheaper unpaid hold. */
+  chatCheckoutFingerprint: string | null;
 
   setAwaitingStripePayment: (value: boolean) => void;
+  setChatCheckoutFingerprint: (value: string | null) => void;
   setStripePaymentSession: (
     session: CheckoutStripePaymentSession | null,
   ) => void;
@@ -53,9 +56,12 @@ export const useCheckoutPaymentUiStore = create<CheckoutPaymentUiState>()(
       stripePaymentSession: null,
       completedBookingNumbers: [],
       expiredPendingBookingNumbers: [],
+      chatCheckoutFingerprint: null,
 
       setAwaitingStripePayment: (value) =>
         set({ isAwaitingStripePayment: value }),
+      setChatCheckoutFingerprint: (value) =>
+        set({ chatCheckoutFingerprint: value }),
 
       setStripePaymentSession: (session) =>
         set({ stripePaymentSession: session }),
@@ -64,6 +70,7 @@ export const useCheckoutPaymentUiStore = create<CheckoutPaymentUiState>()(
         set((state) => ({
           stripePaymentSession: null,
           isAwaitingStripePayment: false,
+          chatCheckoutFingerprint: null,
           // Keep last 10 completed bookings — avoids unbounded growth
           completedBookingNumbers: [
             bookingNumber,
@@ -82,6 +89,7 @@ export const useCheckoutPaymentUiStore = create<CheckoutPaymentUiState>()(
         set((state) => ({
           stripePaymentSession: null,
           isAwaitingStripePayment: false,
+          chatCheckoutFingerprint: null,
           expiredPendingBookingNumbers: [
             bookingNumber,
             ...state.expiredPendingBookingNumbers.filter(
@@ -117,6 +125,7 @@ export const useCheckoutPaymentUiStore = create<CheckoutPaymentUiState>()(
         isAwaitingStripePayment: state.isAwaitingStripePayment,
         completedBookingNumbers: state.completedBookingNumbers,
         expiredPendingBookingNumbers: state.expiredPendingBookingNumbers,
+        chatCheckoutFingerprint: state.chatCheckoutFingerprint,
       }),
     },
   ),

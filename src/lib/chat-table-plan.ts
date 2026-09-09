@@ -161,3 +161,39 @@ export function chatSeatingPlanGuests(items: ChatSeatingPlanItem[]): number {
     0,
   );
 }
+
+export function tableTypeStock(table: ChatBookingTable): number {
+  const remaining = table.remaining ?? table.total;
+  return remaining != null && remaining >= 0 ? remaining : 0;
+}
+
+export function chatTablesSeatCapacity(tables: ChatBookingTable[]): {
+  maxGuests: number;
+  lines: string[];
+} {
+  const lines: string[] = [];
+  let maxGuests = 0;
+  for (const table of tables) {
+    const left = tableTypeStock(table);
+    if (left < 1 || table.maxPersons < 1) continue;
+    const typeMax = left * table.maxPersons;
+    maxGuests += typeMax;
+    lines.push(
+      `- **${chatTableLabel(table)}** — ${table.minPersons}–${table.maxPersons} guests each · **${left}** left · up to **${typeMax}**`,
+    );
+  }
+  return { maxGuests, lines };
+}
+
+export function largestFittingGuestCount(
+  tables: ChatBookingTable[],
+  requested: number,
+): number | null {
+  const { maxGuests } = chatTablesSeatCapacity(tables);
+  if (maxGuests < 1 || requested < 1) return null;
+  const start = Math.min(requested, maxGuests);
+  for (let guests = start; guests >= 1; guests -= 1) {
+    if (recommendedChatTablePlan(tables, guests)) return guests;
+  }
+  return null;
+}

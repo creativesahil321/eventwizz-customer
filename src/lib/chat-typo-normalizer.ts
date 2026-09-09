@@ -75,14 +75,19 @@ export function normalizeVendorChatText(rawText: string): string {
   text = text.replace(/\b(cncel|cancle|cancal)\b/gi, "cancel");
   text = text.replace(/\b(chnage|chage|chagne)\b/gi, "change");
   text = text.replace(/\b(tikcet|ticekt|tcket|ticet)\b/gi, "ticket");
+  text = text.replace(/\b(prople|peopel|peple|ppl)\b/gi, "people");
   text = text.replace(/\b(tikcets|ticekts|tckets)\b/gi, "tickets");
   text = text.replace(/\b(paymant|paymnt|pament|paymet)\b/gi, "payment");
   text = text.replace(/\b(refundd|refnd|reund)\b/gi, "refund");
   text = text.replace(/\b(menue|menuee)\b/gi, "menu");
   text = text.replace(/\b(wher|whre)\b/gi, "where");
   text = text.replace(/\b(whn|wen)\b/gi, "when");
-  text = text.replace(/\b(evnts|evnt)\b/gi, (m) =>
+  text = text.replace(/\b(evnts|evnt|evetn|evnet)\b/gi, (m) =>
     m.toLowerCase().endsWith("s") ? "events" : "event",
+  );
+  text = text.replace(
+    /\b(reschdule|rescedule|reshedule|reschedle|reschule)\b/gi,
+    "reschedule",
   );
   text = text.replace(/\b(reservtions?|reservatons?)\b/gi, (m) =>
     m.toLowerCase().endsWith("s") ? "reservations" : "reservation",
@@ -95,6 +100,8 @@ export function normalizeVendorChatText(rawText: string): string {
   text = text.replace(/\b(showme|shome)\b/gi, "show me");
   text = text.replace(/\b(giveme|gimme)\b/gi, "give me");
   text = text.replace(/\b(tellme)\b/gi, "tell me");
+  text = text.replace(/\b(nearme|near-me)\b/gi, "near me");
+  text = text.replace(/\beventsnearme\b/gi, "events near me");
   text = text.replace(/\b(allcustomers|allcustomer)\b/gi, "all customers");
   text = text.replace(/\b(allbookings|allbooking)\b/gi, "all bookings");
   text = text.replace(/\b(allrooms|allroom)\b/gi, "all rooms");

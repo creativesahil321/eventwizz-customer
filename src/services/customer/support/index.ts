@@ -41,6 +41,7 @@ export type {
   CustomerSupportSort,
   CustomerSupportTimeFilter,
   CustomerSupportQuickFilter,
+  CustomerSupportListBooking,
   CreateCustomerSupportTicketPayload,
   CreateCustomerSupportTicketResponse,
   CustomerSupportLocationOption,

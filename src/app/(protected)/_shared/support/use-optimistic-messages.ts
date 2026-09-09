@@ -35,7 +35,25 @@ export function isOptimisticId(id: string): boolean {
   return id.startsWith(OPTIMISTIC_ID_PREFIX);
 }
 
-/** Build attachment previews (name + size, no URL) for an optimistic bubble. */
+function isOptimisticImageFile(file: File): boolean {
+  return (
+    file.type.startsWith("image/") ||
+    /\.(png|jpe?g|gif|webp|jfif)$/i.test(file.name)
+  );
+}
+
+export function revokeOptimisticAttachmentUrls(
+  attachments?: SupportAttachment[]
+) {
+  if (!attachments?.length) return;
+  for (const file of attachments) {
+    if (file.url?.startsWith("blob:")) {
+      URL.revokeObjectURL(file.url);
+    }
+  }
+}
+
+/** Build attachment previews for an optimistic bubble, with blob URLs for images. */
 export function buildOptimisticAttachments(
   files: File[]
 ): SupportAttachment[] | undefined {
@@ -44,6 +62,7 @@ export function buildOptimisticAttachments(
     name: file.name,
     size: formatSupportFileSize(file.size),
     mimeType: file.type || undefined,
+    url: isOptimisticImageFile(file) ? URL.createObjectURL(file) : undefined,
   }));
 }
 
@@ -82,7 +101,13 @@ export function useOptimisticSupportMessages<T extends OptimisticBaseMessage>(
 
   // Drop any in-flight optimistic messages when switching conversations.
   useEffect(() => {
-    setPending((prev) => (prev.length === 0 ? prev : []));
+    setPending((prev) => {
+      if (prev.length === 0) return prev;
+      prev.forEach((item) =>
+        revokeOptimisticAttachmentUrls(item.message.attachments)
+      );
+      return [];
+    });
   }, [resetKey]);
 
   const isEchoedByServer = useCallback(
@@ -123,7 +148,13 @@ export function useOptimisticSupportMessages<T extends OptimisticBaseMessage>(
     setPending((prev) => {
       if (prev.length === 0) return prev;
       const next = prev.filter((item) => !isEchoedByServer(item));
-      return next.length === prev.length ? prev : next;
+      if (next.length === prev.length) return prev;
+      prev
+        .filter((item) => next.every((kept) => kept.message.id !== item.message.id))
+        .forEach((item) =>
+          revokeOptimisticAttachmentUrls(item.message.attachments)
+        );
+      return next;
     });
   }, [isEchoedByServer]);
 
@@ -149,7 +180,11 @@ export function useOptimisticSupportMessages<T extends OptimisticBaseMessage>(
   }, []);
 
   const removePending = useCallback((id: string) => {
-    setPending((prev) => prev.filter((item) => item.message.id !== id));
+    setPending((prev) => {
+      const removed = prev.find((item) => item.message.id === id);
+      revokeOptimisticAttachmentUrls(removed?.message.attachments);
+      return prev.filter((item) => item.message.id !== id);
+    });
   }, []);
 
   return { messages, addPending, removePending };

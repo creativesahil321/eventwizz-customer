@@ -159,7 +159,10 @@ export function isCustomerChangeIntent(text: string): boolean {
     return /\b(change|modify|reschedule|add|remove)\b/i.test(t);
   }
   return (
-    /\b(change|modify|update|reschedule)\s+(my\s+)?booking\b/i.test(t) ||
+    /\breschedule\b/i.test(t) ||
+    /\b(change|modify|update|reschedule)\s+(my\s+)?(booking|event|reservation)\b/i.test(
+      t,
+    ) ||
     /\b(change the booking date|change my booking date|modify my booking|how do i modify my booking)\b/i.test(
       t,
     ) ||
@@ -200,7 +203,29 @@ export function detectCustomerOnDemandQueryType(
   return null;
 }
 
+export function isBareCustomerBookingRef(text: string): boolean {
+  const t = norm(text).replace(/[?.!]+$/g, "").trim();
+  return Boolean(
+    extractCustomerBookingRef(t) && /^(?:ve|ev|bk|wb|bw)-?\d+$/i.test(t),
+  );
+}
+
+export function needsCustomerBookingRef(
+  queryType: CustomerQueryType,
+  userText: string,
+): boolean {
+  if (
+    queryType !== "change_request" &&
+    queryType !== "cancel_request" &&
+    queryType !== "refund_request"
+  ) {
+    return false;
+  }
+  return !extractCustomerBookingRef(userText);
+}
+
 export function isCustomerFollowUpQuery(text: string): boolean {
+  if (isBareCustomerBookingRef(text)) return true;
   const t = norm(text)
     .toLowerCase()
     .replace(/[?.!]+$/, "");
@@ -217,6 +242,16 @@ export function resolveCustomerTopicFromHistory(
 ): CustomerQueryType | null {
   const follow = norm(followUpText).toLowerCase();
   const recent = [...messages].reverse().slice(0, 8);
+  if (extractCustomerBookingRef(followUpText)) {
+    for (const m of recent) {
+      if (m.role !== "assistant") continue;
+      const text = m.content.toLowerCase();
+      if (!text.includes("booking number")) continue;
+      if (/\b(reschedule|change)\b/.test(text)) return "change_request";
+      if (/\bcancel\b/.test(text)) return "cancel_request";
+      if (/\brefund\b/.test(text)) return "refund_request";
+    }
+  }
   for (const m of recent) {
     if (m.role !== "assistant") continue;
     const text = m.content.toLowerCase();
@@ -302,6 +337,41 @@ export function buildCustomerForbiddenReply(userName?: string | null): string {
 
 function emptyBookingsReply(userName?: string | null): string {
   return `You don’t have any bookings yet${nameBit(userName)}. When you book an event, it will show here.\n\n[Open Bookings](/customer/bookings)`;
+}
+
+function askForBookingRefReply(
+  bookings: BookingItem[],
+  userName: string | null | undefined,
+  action: "reschedule" | "change" | "cancel" | "refund",
+  symbol: string,
+): string {
+  if (!bookings.length) return emptyBookingsReply(userName);
+  const greet = nameBit(userName);
+  const upcoming = bookings.filter((item) => isUpcoming(item));
+  const list = upcoming.length > 0 ? upcoming : bookings;
+  const more =
+    list.length > MAX_LIST ? `\nShowing ${MAX_LIST} of ${list.length}.` : "";
+  const verb =
+    action === "reschedule"
+      ? "reschedule"
+      : action === "cancel"
+        ? "cancel"
+        : action === "refund"
+          ? "look at a refund for"
+          : "change";
+  return `I can help you ${verb} a booking${greet}, but I need the **booking number** first — for example **VE-021**. I won’t pick one for you.\n\n${listBookings(list, symbol)}${more}\n\nReply with the booking number, or [Open Bookings](/customer/bookings).`;
+}
+
+async function loadOwnedBooking(ref: string): Promise<BookingDetailsData | null> {
+  const detail = await bookingsService.getBookingDetails(ref).catch(() => null);
+  return detail?.data ?? null;
+}
+
+function bookingCanReschedule(data: BookingDetailsData): boolean | null {
+  const flags = (data.dates ?? []).map((date) => date.can_reschedule);
+  if (flags.some((flag) => flag === true)) return true;
+  if (flags.length > 0 && flags.every((flag) => flag === false)) return false;
+  return null;
 }
 
 export async function fetchCustomerOnDemandChatReply(options: {
@@ -445,38 +515,66 @@ export async function fetchCustomerOnDemandChatReply(options: {
     }
 
     if (queryType === "cancel_request") {
-      const target =
-        refFromText ||
-        bookings.find((item) => isUpcoming(item))?.booking_number ||
-        bookings[0]?.booking_number;
-      if (!target) {
-        return { reply: emptyBookingsReply(userName) };
+      if (!refFromText) {
+        return { reply: askForBookingRefReply(bookings, userName, "cancel", symbol) };
       }
-      const match = bookings.find((item) => item.booking_number === target);
+      const data = await loadOwnedBooking(refFromText);
+      if (!data) {
+        return {
+          reply: `I couldn’t find **${refFromText}** on your account${greet}. I can only open bookings that belong to you.\n\n[Open Bookings](/customer/bookings)`,
+        };
+      }
+      const ref = data.booking_number || refFromText;
       return {
-        reply: `I found **${target}**${match ? ` for **${match.event_name}**` : ""}${greet}. I can’t cancel a booking from chat.\n\nOpen the booking to cancel if the venue allows it, or start a support enquiry and I’ll let the team handle it.\n\n[Open booking](${bookingHref(target)}) · [New enquiry](/customer/support/new)`,
+        reply: `I found **${ref}** for **${data.event_name}**${greet}. I can’t cancel a booking from chat.\n\nOpen the booking to cancel if the venue allows it, or start a support enquiry and I’ll let the team handle it.\n\n[Open booking](${bookingHref(ref)}) · [New enquiry](/customer/support/new)`,
       };
     }
 
     if (queryType === "change_request") {
-      const target =
-        refFromText ||
-        bookings.find((item) => isUpcoming(item))?.booking_number;
-      if (!target) {
-        return { reply: emptyBookingsReply(userName) };
+      if (!refFromText) {
+        const action = /\breschedule\b/i.test(norm(userText))
+          ? "reschedule"
+          : "change";
+        return { reply: askForBookingRefReply(bookings, userName, action, symbol) };
+      }
+      const data = await loadOwnedBooking(refFromText);
+      if (!data) {
+        return {
+          reply: `I couldn’t find **${refFromText}** on your account${greet}. I can only open bookings that belong to you.\n\n[Open Bookings](/customer/bookings)`,
+        };
+      }
+      const ref = data.booking_number || refFromText;
+      const wantsReschedule =
+        /\breschedule\b/i.test(norm(userText)) || isBareCustomerBookingRef(userText);
+      const canReschedule = bookingCanReschedule(data);
+      if (wantsReschedule && canReschedule === false) {
+        return {
+          reply: `I found **${ref}** for **${data.event_name}**${greet}. This booking **can’t be rescheduled** from the booking page.\n\nStart an enquiry if you need the venue to help.\n\n[Open booking](${bookingHref(ref)}) · [New enquiry](/customer/support/new)`,
+        };
+      }
+      if (wantsReschedule) {
+        return {
+          reply: `I found **${ref}** for **${data.event_name}**${greet}. I can’t reschedule from chat.\n\nOpen that booking and use **Reschedule** if the option is shown.\n\n[Open booking](${bookingHref(ref)}) · [Open Bookings](/customer/bookings)`,
+        };
       }
       return {
-        reply: `I can help you request a change to **${target}**${greet}, but I can’t edit the booking from chat.\n\nUse **Reschedule** or **Add extras for this date** on the booking page if those options are shown. After a booking exists you can’t add or change rooms — that needs a new booking.\n\n[Open booking](${bookingHref(target)}) · [Open Bookings](/customer/bookings)`,
+        reply: `I found **${ref}** for **${data.event_name}**${greet}. I can’t edit the booking from chat.\n\nUse **Reschedule** or **Add extras for this date** on the booking page if those options are shown.\n\n[Open booking](${bookingHref(ref)}) · [Open Bookings](/customer/bookings)`,
       };
     }
 
     if (queryType === "refund_request") {
-      const target = refFromText || bookings[0]?.booking_number;
+      if (!refFromText) {
+        return { reply: askForBookingRefReply(bookings, userName, "refund", symbol) };
+      }
+      const data = await loadOwnedBooking(refFromText);
+      if (!data) {
+        return {
+          reply: `I couldn’t find **${refFromText}** on your account${greet}. I can only open bookings that belong to you.\n\n[Open Bookings](/customer/bookings)`,
+        };
+      }
+      const ref = data.booking_number || refFromText;
       return {
-        reply: `I can’t issue a refund from chat${greet}. Refunds follow the venue’s cancellation policy.\n\n${target
-            ? `If this is about **${target}**, open the booking or start an enquiry.\n\n[Open booking](${bookingHref(target)}) · `
-            : ""
-          }[New enquiry](/customer/support/new)`,
+        reply: `I found **${ref}** for **${data.event_name}**${greet}. I can’t issue a refund from chat. Refunds follow the venue’s cancellation policy.\n\n[Open booking](${bookingHref(ref)}) · [New enquiry](/customer/support/new)`,
       };
     }
 

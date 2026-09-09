@@ -38,22 +38,23 @@ export default function SupportAttachmentCards({
     >
       {attachments.map((file) => {
         const isImage = isImageAttachment(file);
-        const key = `${file.name}-${file.url ?? file.size}`;
+        const url = file.url?.trim() || undefined;
+        const key = `${file.name}-${url ?? file.size}`;
 
-        if (isImage && file.url) {
+        if (isImage && url) {
           return (
             <a
               key={key}
-              href={file.url}
+              href={url}
               target="_blank"
               rel="noopener noreferrer"
               className="group block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- remote storage URLs from API */}
               <img
-                src={file.url}
+                src={url}
                 alt={file.name}
-                className="h-28 w-auto max-w-[200px] object-cover"
+                className="h-40 w-auto max-w-[min(100%,280px)] object-cover"
               />
               <div className="border-t border-slate-100 px-2 py-1">
                 <p className="max-w-[180px] truncate text-[10px] font-medium text-foreground">
@@ -92,11 +93,11 @@ export default function SupportAttachmentCards({
           </>
         );
 
-        if (file.url) {
+        if (url) {
           return (
             <a
               key={key}
-              href={file.url}
+              href={url}
               target="_blank"
               rel="noopener noreferrer"
               className="flex min-w-[120px] max-w-[180px] flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
