@@ -1,4 +1,5 @@
 import type { StepSixType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import { coerceApiFlag } from "@/lib/coerce-api-boolean";
 
 export type VendorStepSixDrinkPackage = {
   id?: number;
@@ -11,10 +12,105 @@ export type VendorStepSixDrinkPackage = {
 
 export type VendorStepSixRoomEntry = {
   room_id: number;
+  drinks_option: 0 | 1;
   drink_title?: string;
   drink_description?: string;
   packages?: VendorStepSixDrinkPackage[];
 };
+
+export function normalizeDrinksOptionFlag(value: unknown): 0 | 1 {
+  return coerceApiFlag(
+    value as boolean | number | string | null | undefined,
+  );
+}
+
+/** Resolve drinks flag from API payloads (boolean strings, missing flag + drink data). */
+export function resolveDrinksOptionFlag(payload: {
+  drinks_option?: unknown;
+  drink_title?: unknown;
+  drink_description?: unknown;
+  packages?: unknown;
+}): 0 | 1 {
+  const raw = payload.drinks_option;
+  const hasExplicitFlag =
+    raw !== undefined && raw !== null && String(raw).trim() !== "";
+
+  if (hasExplicitFlag) {
+    return normalizeDrinksOptionFlag(raw);
+  }
+
+  const hasDrinkContent =
+    hasNonEmpty(payload.drink_title) ||
+    hasNonEmpty(payload.drink_description) ||
+    normalizeVendorDrinkPackages(payload.packages).length > 0;
+
+  return hasDrinkContent ? 1 : 0;
+}
+
+/**
+ * Persist/save drinks as Yes only when the vendor opted in AND there is at
+ * least one real package. AI drafts that set `drinks_option: 1` with empty
+ * packages still resolve to No so Laravel validation is not tripped.
+ */
+export function resolveAiDrinksEnabled(
+  payload: {
+    drinks_option?: unknown;
+    drink_title?: unknown;
+    drink_description?: unknown;
+    packages?: unknown;
+  },
+  options?: { forceOff?: boolean },
+): 0 | 1 {
+  if (options?.forceOff) return 0;
+  if (resolveDrinksOptionFlag(payload) !== 1) return 0;
+  return normalizeVendorDrinkPackages(payload.packages).length > 0 ? 1 : 0;
+}
+
+export function emptyVendorDrinkPackage(): VendorStepSixDrinkPackage {
+  return {
+    title: "",
+    description: "",
+    price: 0,
+    available_quantity: 100,
+  };
+}
+
+export function mapVendorDrinksFieldsForApi(data: {
+  drinks_option?: unknown;
+  drink_title?: unknown;
+  drink_description?: unknown;
+  packages?: Array<{
+    id?: number;
+    title?: string;
+    description?: string;
+    price?: number | string;
+    available_quantity?: number | string;
+  }>;
+}): {
+  drinks_option: 0 | 1;
+  drink_title: string;
+  drink_description: string;
+  packages: ReturnType<typeof mapVendorDrinkPackagesForApi>;
+} {
+  const drinks_option = normalizeDrinksOptionFlag(data.drinks_option);
+  if (drinks_option !== 1) {
+    return {
+      drinks_option: 0,
+      drink_title: "",
+      drink_description: "",
+      packages: [],
+    };
+  }
+
+  return {
+    drinks_option: 1,
+    drink_title: String(data.drink_title ?? "").trim(),
+    drink_description: String(data.drink_description ?? "").trim(),
+    packages: mapVendorDrinkPackagesForApi(
+      data.packages as VendorStepSixDrinkPackage[] | undefined,
+    ),
+  };
+}
 
 const hasNonEmpty = (value: unknown): boolean =>
   String(value ?? "").trim().length > 0;
@@ -47,18 +143,21 @@ export function normalizeVendorDrinkPackages(
             ? qtyRaw
             : 100;
 
-      return {
-        ...(typeof pkg.id === "number" ? { id: pkg.id } : {}),
+      const normalized: VendorStepSixDrinkPackage = {
         title,
         description,
         price: Number.isFinite(price) ? price : 0,
         available_quantity: Number.isFinite(available_quantity)
           ? available_quantity
           : 100,
-        ...(typeof pkg.sold_quantity === "number"
-          ? { sold_quantity: pkg.sold_quantity }
-          : {}),
       };
+      if (typeof pkg.id === "number") {
+        normalized.id = pkg.id;
+      }
+      if (typeof pkg.sold_quantity === "number") {
+        normalized.sold_quantity = pkg.sold_quantity;
+      }
+      return normalized;
     })
     .filter((item): item is VendorStepSixDrinkPackage => item !== null);
 }
@@ -102,6 +201,7 @@ function mapPayloadToRoomEntry(
 
   return {
     room_id: roomId,
+    drinks_option: resolveDrinksOptionFlag(payload),
     drink_title: String(payload.drink_title ?? "").trim(),
     drink_description: String(payload.drink_description ?? "").trim(),
     packages: normalizeVendorDrinkPackages(payload.packages),
@@ -136,16 +236,10 @@ export function defaultVendorStepSixRoomDrinks(): Omit<
   "room_id"
 > {
   return {
+    drinks_option: 0,
     drink_title: "",
     drink_description: "",
-    packages: [
-      {
-        title: "Premium Package",
-        description: "This is a premium service package",
-        price: 20,
-        available_quantity: 100,
-      },
-    ],
+    packages: [],
   };
 }
 
@@ -173,46 +267,67 @@ export function findStepSixDrinksForRoom(
 
 export function roomEntryToStepSixFields(
   entry: VendorStepSixRoomEntry,
-): Pick<StepSixType, "drink_title" | "drink_description" | "packages"> {
+): Pick<
+  StepSixType,
+  "drinks_option" | "drink_title" | "drink_description" | "packages"
+> {
+  const drinks_option = resolveDrinksOptionFlag(entry);
   const packages = normalizeVendorDrinkPackages(entry.packages);
   return {
+    drinks_option,
     drink_title: entry.drink_title ?? "",
     drink_description: entry.drink_description ?? "",
-    packages:
-      packages.length > 0
-        ? packages
-        : defaultVendorStepSixRoomDrinks().packages ?? [],
+    packages: drinks_option === 1 ? packages : [],
   };
 }
 
 export function stepSixFieldsToRoomEntry(
   roomId: number,
-  data: Pick<StepSixType, "drink_title" | "drink_description" | "packages">,
+  data: Pick<
+    StepSixType,
+    "drinks_option" | "drink_title" | "drink_description" | "packages"
+  >,
 ): VendorStepSixRoomEntry {
+  const drinks_option = normalizeDrinksOptionFlag(data.drinks_option);
   return {
     room_id: roomId,
+    drinks_option,
     drink_title: String(data.drink_title ?? "").trim(),
     drink_description: String(data.drink_description ?? "").trim(),
-    packages: normalizeVendorDrinkPackages(data.packages),
+    packages:
+      drinks_option === 1 ? normalizeVendorDrinkPackages(data.packages) : [],
   };
 }
 
 export function cloneVendorStepSixRoomDrinks(
   source: VendorStepSixRoomEntry,
 ): Omit<VendorStepSixRoomEntry, "room_id"> {
+  const drinks_option = resolveDrinksOptionFlag(source);
   return {
+    drinks_option,
     drink_title: source.drink_title ?? "",
     drink_description: source.drink_description ?? "",
-    packages: normalizeVendorDrinkPackages(source.packages).map((pkg) => ({
-      ...pkg,
-    })),
+    packages:
+      drinks_option === 1
+        ? normalizeVendorDrinkPackages(source.packages).map((pkg) => ({
+            ...pkg,
+          }))
+        : [],
   };
 }
 
 export function isVendorRoomDrinksStepComplete(
-  entry: VendorStepSixRoomEntry | undefined,
+  entry:
+    | {
+        drinks_option?: unknown;
+        drink_title?: unknown;
+        drink_description?: unknown;
+        packages?: unknown;
+      }
+    | undefined,
 ): boolean {
   if (!entry) return false;
+  if (resolveDrinksOptionFlag(entry) !== 1) return true;
   if (!hasNonEmpty(entry.drink_title)) return false;
   if (!hasNonEmpty(entry.drink_description)) return false;
 

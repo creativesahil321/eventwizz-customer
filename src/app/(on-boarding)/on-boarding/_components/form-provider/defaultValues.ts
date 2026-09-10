@@ -135,16 +135,10 @@ export const defaultValues: OnboardingFormData = {
     isApproved: false,
     step: 8,
     event_id: 0,
+    drinks_option: 0,
     drink_title: "",
     drink_description: "",
-    packages: [
-      {
-        title: "",
-        description: "",
-        price: 0,
-        available_quantity: 100,
-      },
-    ],
+    packages: [],
   },
 
   stepNine: {

@@ -37,7 +37,11 @@ import {
   mergeVendorLivePreviewData,
   VENDOR_EVENT_PREVIEW_DRAFT_CHANGED,
 } from "@/app/(protected)/vendor/events/_lib/vendor-event-preview-live-data";
-import { requestVendorEventDiscard } from "@/app/(protected)/vendor/events/_lib/event-form-discard";
+import {
+  requestVendorEventDiscard,
+  vendorPreviewDraftHasUnsavedEdits,
+} from "@/app/(protected)/vendor/events/_lib/event-form-discard";
+import { patchEventPayloadFromApi } from "@/app/(protected)/vendor/events/_lib/hydrate-event-from-api";
 import type { EventSchemaType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 
 function resolveEventPreviewLocationSlug(
@@ -242,6 +246,16 @@ function EventPreviewPageContent() {
   };
 
   const eventPayloadRoot = eventData?.data as EventDetailData | undefined;
+  const savedPreviewForm = useMemo(() => {
+    if (!eventPayloadRoot || typeof eventPayloadRoot !== "object") return null;
+    return patchEventPayloadFromApi(
+      eventPayloadRoot as unknown as Record<string, unknown>,
+    );
+  }, [eventPayloadRoot]);
+  const hasUnsavedPreviewDraft = useMemo(
+    () => vendorPreviewDraftHasUnsavedEdits(savedPreviewForm, previewDraft),
+    [savedPreviewForm, previewDraft],
+  );
   const livePreviewData = useMemo(
     () => mergeVendorLivePreviewData(eventPayloadRoot, previewDraft),
     [eventPayloadRoot, previewDraft],
@@ -442,7 +456,7 @@ function EventPreviewPageContent() {
             Back to Editor
           </Button>
           <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-2">
-            {previewDraft ? (
+            {hasUnsavedPreviewDraft ? (
               <Button
                 type="button"
                 variant="outline"

@@ -12,11 +12,70 @@ import {
 import {
   AI_EVENT_MIN_ROOMS,
   parseAiEventVendorIntent,
+  resolveRoomMenuFields,
 } from "./ai-event-vendor-intent";
 import { normalizeVendorStepFourMenus } from "./vendor-step-four-rooms";
+import { resolveAiDrinksEnabled } from "./vendor-step-six-rooms";
 
 function str(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value.trim() : fallback;
+}
+
+const FALLBACK_AI_EVENT_MENUS = [
+  {
+    name: "Starters",
+    items: [
+      {
+        title: "Soup of the day",
+        description: "Chef's seasonal soup with artisan bread",
+      },
+      {
+        title: "Garden salad",
+        description: "Fresh leaves, house dressing, toasted seeds",
+      },
+    ],
+  },
+  {
+    name: "Mains",
+    items: [
+      {
+        title: "Roast chicken",
+        description: "Herb-roasted chicken with seasonal vegetables",
+      },
+      {
+        title: "Pan-seared salmon",
+        description: "With lemon butter and crushed potatoes",
+      },
+    ],
+  },
+  {
+    name: "Dessert",
+    items: [
+      {
+        title: "Seasonal pudding",
+        description: "Chef's dessert of the day",
+      },
+    ],
+  },
+];
+
+function menusHaveItems(menus: unknown): boolean {
+  return normalizeVendorStepFourMenus(menus).some((menu) =>
+    menu.items.some((item) => item.title.length > 0),
+  );
+}
+
+function firstMenusFromStepFour(stepFour: {
+  menus?: unknown;
+  rooms?: Array<{ menus?: unknown }>;
+} | undefined) {
+  const top = normalizeVendorStepFourMenus(stepFour?.menus);
+  if (menusHaveItems(top)) return top;
+  for (const room of stepFour?.rooms ?? []) {
+    const roomMenus = normalizeVendorStepFourMenus(room.menus);
+    if (menusHaveItems(roomMenus)) return roomMenus;
+  }
+  return [];
 }
 
 /**
@@ -103,29 +162,70 @@ export function fillAiEventGeneratedDefaults(
       : [],
   };
 
+  const sharedMenus = menusHaveItems(src.stepFour?.menus)
+    ? normalizeVendorStepFourMenus(src.stepFour?.menus)
+    : firstMenusFromStepFour(src.stepFour);
+  const resolvedSharedMenus =
+    sharedMenus.length > 0 ? sharedMenus : FALLBACK_AI_EVENT_MENUS;
+  const sharedMenuTitle =
+    str(src.stepFour?.menu_title) || "Dining menu";
+  const sharedMenuDescription =
+    str(src.stepFour?.menu_description) ||
+    `Seasonal dishes prepared for ${str(input.eventName, "this event")}.`;
+
   const stepFour = vendorHints.omitCatering
     ? {
         catering_option: 0,
         menu_title: "",
         menu_description: "",
         menus: [],
-        rooms: src.stepFour?.rooms?.map((room) => ({
-          ...room,
-          catering_option: 0,
-          menu_title: "",
-          menu_description: "",
-          menus: [],
-        })),
+        rooms: useRooms
+          ? roomNames.map((room_name) => ({
+              room_name,
+              catering_option: 0,
+              menu_title: "",
+              menu_description: "",
+              menus: [],
+            }))
+          : src.stepFour?.rooms?.map((room) => ({
+              ...room,
+              catering_option: 0,
+              menu_title: "",
+              menu_description: "",
+              menus: [],
+            })),
       }
     : {
-        catering_option: src.stepFour?.catering_option ?? 0,
-        menu_title: src.stepFour?.menu_title ?? "",
-        menu_description: src.stepFour?.menu_description ?? "",
-        menus: normalizeVendorStepFourMenus(src.stepFour?.menus),
-        rooms: src.stepFour?.rooms?.map((room) => ({
-          ...room,
-          menus: normalizeVendorStepFourMenus(room.menus),
-        })),
+        catering_option: 1,
+        menu_title: sharedMenuTitle,
+        menu_description: sharedMenuDescription,
+        menus: resolvedSharedMenus,
+        rooms: useRooms
+          ? roomNames.map((room_name) => {
+              const resolved = resolveRoomMenuFields(
+                room_name,
+                {
+                  catering_option: 1,
+                  menu_title: sharedMenuTitle,
+                  menu_description: sharedMenuDescription,
+                  menus: resolvedSharedMenus,
+                },
+                src.stepFour?.rooms,
+              );
+              return {
+                room_name,
+                catering_option: 1,
+                menu_title: resolved.menu_title,
+                menu_description: resolved.menu_description,
+                menus: normalizeVendorStepFourMenus(resolved.menus),
+              };
+            })
+          : src.stepFour?.rooms?.map((room) => ({
+              ...room,
+              menus: normalizeVendorStepFourMenus(
+                menusHaveItems(room.menus) ? room.menus : resolvedSharedMenus,
+              ),
+            })),
       };
   const hasDrinkPackages =
     (src.stepFive?.packages ?? []).some((p) => str(p.title)) ||
@@ -135,29 +235,45 @@ export function fillAiEventGeneratedDefaults(
   const stepFive =
     vendorHints.omitDrinks || !hasDrinkPackages
       ? {
+          drinks_option: 0 as const,
           drink_title: "",
           drink_description: "",
           packages: [],
           rooms: (src.stepFive?.rooms ?? []).map((room) => ({
             ...room,
+            drinks_option: 0 as const,
             drink_title: "",
             drink_description: "",
             packages: [],
           })),
         }
       : {
+          drinks_option: 1 as const,
           drink_title: str(src.stepFive?.drink_title) || "Drinks & Packages",
           drink_description:
             str(src.stepFive?.drink_description) ||
             "Drink packages available with this event.",
           packages: src.stepFive?.packages ?? [],
-          rooms: src.stepFive?.rooms?.map((room) => ({
-            ...room,
-            drink_title: str(room.drink_title) || "Drinks & Packages",
-            drink_description:
-              str(room.drink_description) ||
-              "Drink packages available with this event.",
-          })),
+          rooms: src.stepFive?.rooms?.map((room) => {
+            const roomEnabled = resolveAiDrinksEnabled(room) === 1;
+            if (!roomEnabled) {
+              return {
+                ...room,
+                drinks_option: 0 as const,
+                drink_title: "",
+                drink_description: "",
+                packages: [],
+              };
+            }
+            return {
+              ...room,
+              drinks_option: 1 as const,
+              drink_title: str(room.drink_title) || "Drinks & Packages",
+              drink_description:
+                str(room.drink_description) ||
+                "Drink packages available with this event.",
+            };
+          }),
         };
 
   const stepSix = {

@@ -14,8 +14,10 @@ import { Loader2 } from "lucide-react";
 import { EventMenuCategory } from "@/services/vendor/events/type";
 import { eventsService } from "@/services/vendor/events/events.service";
 import {
+  DUPLICATE_MENU_CATEGORY_MESSAGE,
   dedupeMenuCategoriesForSelect,
   extractCreatedMenuCategory,
+  normalizeMenuCategoryName,
   toPositiveId,
 } from "@/lib/event-menu-categories";
 import {
@@ -54,6 +56,8 @@ interface MenuCategoryDropdownProps {
   roomId?: number;
   /** Shown when the selected id is not yet in this room's category list. */
   fallbackLabel?: string;
+  /** Menu section names already on this event/room — cannot be selected again. */
+  takenNames?: string[];
 }
 
 // Schema for menu category creation
@@ -77,6 +81,7 @@ export default function MenuCategoryDropdown({
   eventId,
   roomId,
   fallbackLabel,
+  takenNames = [],
 }: MenuCategoryDropdownProps) {
   const [createdCategories, setCreatedCategories] = useState<
     EventMenuCategory[]
@@ -141,7 +146,35 @@ export default function MenuCategoryDropdown({
     }
   }, [value, initialValue]);
 
+  const takenNameKeys = React.useMemo(
+    () =>
+      new Set(
+        takenNames
+          .map((name) => normalizeMenuCategoryName(name))
+          .filter((name) => name.length > 0),
+      ),
+    [takenNames],
+  );
+
   const handleSelectChange = (val: string) => {
+    const selected = allCategories.find(
+      (category) => String(toPositiveId(category.id) ?? "") === val,
+    );
+    const selectedKey = normalizeMenuCategoryName(selected?.name);
+    const currentKey = normalizeMenuCategoryName(
+      allCategories.find(
+        (category) =>
+          String(toPositiveId(category.id) ?? "") === resolvedSelectValue,
+      )?.name,
+    );
+    if (
+      selectedKey &&
+      takenNameKeys.has(selectedKey) &&
+      selectedKey !== currentKey
+    ) {
+      toast.error(DUPLICATE_MENU_CATEGORY_MESSAGE);
+      return;
+    }
     setSelectedValue(val);
     onSelect(val);
   };
@@ -162,6 +195,27 @@ export default function MenuCategoryDropdown({
           description:
             "Please ensure you have an active event before creating a category.",
         });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const nextName = values.name.trim();
+      const nextKey = normalizeMenuCategoryName(nextName);
+      if (takenNameKeys.has(nextKey)) {
+        form.setError("name", { message: DUPLICATE_MENU_CATEGORY_MESSAGE });
+        toast.error(DUPLICATE_MENU_CATEGORY_MESSAGE);
+        setIsSubmitting(false);
+        return;
+      }
+      if (
+        allCategories.some(
+          (category) => normalizeMenuCategoryName(category.name) === nextKey,
+        )
+      ) {
+        const existsMessage =
+          "This category already exists — pick it from the list";
+        form.setError("name", { message: existsMessage });
+        toast.error(existsMessage);
         setIsSubmitting(false);
         return;
       }
@@ -240,9 +294,19 @@ export default function MenuCategoryDropdown({
                   {allCategories.map((category) => {
                     const id = toPositiveId(category.id);
                     if (id == null) return null;
+                    const isCurrent = String(id) === resolvedSelectValue;
+                    const isTaken = takenNameKeys.has(
+                      normalizeMenuCategoryName(category.name),
+                    );
                     return (
-                      <SelectItem key={id} value={String(id)}>
-                        {category.name}
+                      <SelectItem
+                        key={id}
+                        value={String(id)}
+                        disabled={isTaken && !isCurrent}
+                      >
+                        {isTaken && !isCurrent
+                          ? `${category.name} (already added)`
+                          : category.name}
                       </SelectItem>
                     );
                   })}

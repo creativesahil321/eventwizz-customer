@@ -1,4 +1,6 @@
 import type { RoomType } from "../_components/form-provider/schema";
+import { sortMenusForOnboardingDisplay } from "@/lib/event-menu-categories";
+import { resolveDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 
 /** Brochure fields copied to every room on "Apply to all" (matches vendor dashboard). */
 export function cloneOnboardingBrochureForApplyAll(
@@ -51,13 +53,15 @@ export function cloneOnboardingCateringForApplyAll(
     menu_title: String(source.menu_title ?? ""),
     menu_description: String(source.menu_description ?? ""),
     event_menu_category_id: Number(source.event_menu_category_id) || 0,
-    menus: menus.map((menu) => ({
-      name: String(menu.name ?? ""),
-      items: (menu.items ?? []).map((item) => ({
-        title: String(item.title ?? ""),
-        description: String(item.description ?? ""),
+    menus: sortMenusForOnboardingDisplay(
+      menus.map((menu) => ({
+        name: String(menu.name ?? ""),
+        items: (menu.items ?? []).map((item) => ({
+          title: String(item.title ?? ""),
+          description: String(item.description ?? ""),
+        })),
       })),
-    })),
+    ),
   };
 }
 
@@ -76,6 +80,7 @@ export function cloneOnboardingDrinksForApplyAll(
   const packages = Array.isArray(source.packages) ? source.packages : [];
 
   return {
+    drinks_option: resolveDrinksOptionFlag(source),
     drink_title: String(source.drink_title ?? ""),
     drink_description: String(source.drink_description ?? ""),
     packages: packages.map((pkg) => {

@@ -56,7 +56,11 @@ import { PreviewProvider } from "@/contexts/preview-context";
 import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { useEventData } from "../../_lib/hooks/useEventData";
 import { useEventPreviewNavigation } from "../../_lib/use-event-preview-navigation";
-import { mergeVendorLivePreviewData, writeVendorEventPreviewDraft } from "../../_lib/vendor-event-preview-live-data";
+import {
+  clearVendorEventPreviewDraft,
+  mergeVendorLivePreviewData,
+  writeVendorEventPreviewDraft,
+} from "../../_lib/vendor-event-preview-live-data";
 import type { EventDetailData } from "@/services/vendor/events/type";
 import type { EventSchemaType } from "./schema";
 import { useParams } from "next/navigation";
@@ -353,9 +357,21 @@ const TAB_TO_STEP: Record<string, number> = {
   publish: 8,
 };
 
+const STEP_TO_TAB: Record<number, string> = {
+  1: "event-name",
+  2: "package",
+  3: "dates",
+  4: "menu",
+  5: "more-info",
+  6: "drinks",
+  7: "faqs",
+  8: "publish",
+};
+
 export default function TabEventForm() {
   const {
     form: formContext,
+    activeStep,
     currentStep,
     readOnly,
     persistedHydrated,
@@ -367,13 +383,23 @@ export default function TabEventForm() {
     discardUnsavedEventEdits,
   } = useEventFormContext();
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [previewSyncTick, setPreviewSyncTick] = useState(0);
   const { openEventPreview, canPreview } = useEventPreviewNavigation();
   const previewSiteEssentials = useEventPreviewSiteEssentials();
 
-  const [activeTab, setActiveTab] = useState("event-name");
+  useEffect(() => {
+    const subscription = formContext.watch(() => {
+      setPreviewSyncTick((tick) => tick + 1);
+    });
+    return () => subscription.unsubscribe();
+  }, [formContext]);
+
+  const [activeTab, setActiveTab] = useState(
+    () => STEP_TO_TAB[activeStep] ?? "event-name",
+  );
   const [vendorRooms, setVendorRooms] = useState<VendorRoomOption[]>([]);
   const [vendorRoomsLoading, setVendorRoomsLoading] = useState(false);
-  const displayedStep = TAB_TO_STEP[activeTab] ?? currentStep ?? 1;
+  const displayedStep = TAB_TO_STEP[activeTab] ?? activeStep ?? 1;
   const localIsRooms = useWatch({
     control: formContext.control,
     name: "stepTwo.is_rooms",
@@ -412,32 +438,21 @@ export default function TabEventForm() {
   });
   const excessRoomsTrimmedRef = useRef(false);
   const apiExcessRoomsWarnedRef = useRef(false);
+  const leftoverPreviewDraftClearedRef = useRef(false);
 
   const getStepTwoRooms = useCallback((): StepTwoRoom[] => {
     return normalizeVendorStepTwoRooms(formContext.getValues("stepTwo.rooms"));
   }, [formContext]);
 
-  // Set active tab based on current step from server data
+  // Visible tab follows activeStep (Save & Next / load). Unlock stays on currentStep.
   useEffect(() => {
-    if (currentStep && currentStep > 0) {
-      const stepToTabMap: { [key: number]: string } = {
-        1: "event-name",
-        2: "package",
-        3: "dates",
-        4: "menu",
-        5: "more-info",
-        6: "drinks",
-        7: "faqs",
-        8: "publish",
-      };
-
-      const targetTab = stepToTabMap[currentStep];
-
+    if (activeStep && activeStep > 0) {
+      const targetTab = STEP_TO_TAB[activeStep];
       if (targetTab) {
         setActiveTab(targetTab);
       }
     }
-  }, [currentStep]);
+  }, [activeStep]);
 
   // Handle tab navigation
   const handleTabChange = (value: string) => {
@@ -451,7 +466,12 @@ export default function TabEventForm() {
   const navigateToPreviousTab = () => {
     const currentIndex = steps.findIndex((step) => step.value === activeTab);
     if (currentIndex > 0) {
-      setActiveTab(steps[currentIndex - 1].value);
+      const prev = steps[currentIndex - 1];
+      setActiveTab(prev.value);
+      const step = TAB_TO_STEP[prev.value];
+      if (step) {
+        void setActiveStep(step);
+      }
     }
   };
 
@@ -473,22 +493,34 @@ export default function TabEventForm() {
         | EventDetailData
         | undefined) ?? {};
     return mergeVendorLivePreviewData(saved, liveFormValues);
-  }, [eventData, liveFormValues]);
+    // previewSyncTick: RHF watch can reuse the same form object after reorders.
+  }, [eventData, liveFormValues, previewSyncTick]);
 
   // Keep the standalone `/preview/event` tab in sync with unsaved edits.
   // Wait until the editor has restored any IndexedDB draft so the first write
   // cannot replace a File upload with last-saved API URLs.
   useEffect(() => {
+    leftoverPreviewDraftClearedRef.current = false;
+  }, [eventId]);
+
+  useEffect(() => {
     if (!persistedHydrated || isDiscarding) return;
     if (!eventId || !/^\d+$/.test(String(eventId))) return;
     const timer = window.setTimeout(() => {
-      if (!hasUnsavedEventEdits) return;
-      writeVendorEventPreviewDraft(eventId, liveFormValues ?? formContext.getValues());
+      if (hasUnsavedEventEdits) {
+        leftoverPreviewDraftClearedRef.current = false;
+        writeVendorEventPreviewDraft(eventId, formContext.getValues());
+        return;
+      }
+      if (leftoverPreviewDraftClearedRef.current) return;
+      leftoverPreviewDraftClearedRef.current = true;
+      void clearVendorEventPreviewDraft(eventId);
     }, 250);
     return () => window.clearTimeout(timer);
   }, [
     eventId,
     liveFormValues,
+    previewSyncTick,
     formContext,
     persistedHydrated,
     isDiscarding,
@@ -920,10 +952,6 @@ export default function TabEventForm() {
                             disabled={isDisabled}
                             className={`flex-1 min-w-max px-3 sm:px-4 lg:px-5 py-1.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap rounded-md data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm items-center justify-center gap-1 sm:gap-1.5 transition-all duration-300 ease-in-out ${
                               isDisabled ? "opacity-50 cursor-not-allowed" : ""
-                            } ${
-                              currentStep && step.id === currentStep
-                                ? "ring-2 ring-blue-500"
-                                : ""
                             }`}
                           >
                             {step.icon}
@@ -952,8 +980,7 @@ export default function TabEventForm() {
                                 />
                               )}
                             </span>
-                            {currentStep &&
-                              step.id === currentStep &&
+                            {activeTab === step.value &&
                               step.value !== "publish" && (
                               <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 sm:px-1.5 py-0.5 rounded-full hidden sm:inline whitespace-nowrap flex-shrink-0">
                                 Current
@@ -1213,10 +1240,10 @@ export default function TabEventForm() {
                 </Button>
 
                     <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
-                      {currentStep ? (
+                      {displayedStep ? (
                         <div className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs sm:text-sm font-semibold text-slate-700 tabular-nums">
                           <span className="hidden sm:inline">Step </span>
-                          {Math.min(currentStep, 8)}/8
+                          {Math.min(displayedStep, 8)}/8
                         </div>
                       ) : null}
                       <VendorEventDiscardButton

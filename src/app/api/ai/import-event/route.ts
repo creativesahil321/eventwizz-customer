@@ -244,7 +244,7 @@ Return only JSON with this shape:
       "menus": [{ "name": "string", "items": [{ "title": "string", "description": "string" }] }],
       "rooms": [{ "room_name": "string", "catering_option": 0, "menu_title": "string", "menu_description": "string", "menus": [] }]
     },
-    "stepFive": { "drink_title": "string", "drink_description": "string", "packages": [], "rooms": [] },
+    "stepFive": { "drinks_option": "0 or 1 (1 only when drink packages are in the source)", "drink_title": "string", "drink_description": "string", "packages": [], "rooms": [{ "room_name": "string", "drinks_option": 0, "drink_title": "string", "drink_description": "string", "packages": [] }] },
     "stepSix": { "event_address": "string", "price_start_from": "string", "price_start_from_button_text": "string", "rooms": [] },
     "stepSeven": { "faqs": [{ "question": "string", "answer": "string" }] }
   }
@@ -256,6 +256,7 @@ Rules:
 - Dates must be unambiguous ISO dates; otherwise leave them empty.
 - Keep event_name <= 40 chars, banner heading <= ${BANNER_HEADING_MAX_WORDS} words, banner subheading <= 80 chars, About description <= 340 chars.
 - Keep menus to 8 categories with 20 items each, packages to 12, dates to 20, and FAQs to 8.
+- Drinks use drinks_option like catering_option: 1 only when the source has drink packages; otherwise 0 with empty titles and packages [].
 - Do not return HTML tags in any field.`;
 }
 
@@ -321,6 +322,7 @@ function fallbackContent(page: ExtractedEventPage): {
       rooms: [],
     },
     stepFive: {
+      drinks_option: 0,
       drink_title: "",
       drink_description: "",
       packages: [],
@@ -486,6 +488,7 @@ function findMissingSections(
     missing.push("stepFour");
   }
   if (
+    rawContent?.stepFive?.drinks_option !== 1 &&
     !(rawContent?.stepFive?.packages?.length) &&
     !(rawContent?.stepFive?.rooms ?? []).some((room) => room.packages?.length)
   ) {

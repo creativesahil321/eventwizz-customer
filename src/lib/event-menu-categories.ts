@@ -4,6 +4,90 @@ import { toPositiveId } from "@/lib/to-positive-id";
 
 export type MenuNameSource = { name?: string | null };
 
+export const DUPLICATE_MENU_CATEGORY_MESSAGE =
+  "This menu category is already added";
+
+export function normalizeMenuCategoryName(
+  name: string | null | undefined,
+): string {
+  return String(name ?? "").trim().toLowerCase();
+}
+
+export function isMenuCategoryNameTaken(
+  menus: MenuNameSource[] | undefined,
+  name: string,
+): boolean {
+  const key = normalizeMenuCategoryName(name);
+  if (!key) return false;
+  return (menus ?? []).some(
+    (menu) => normalizeMenuCategoryName(menu?.name) === key,
+  );
+}
+
+/** Indexes of extra sections that reuse a category name (first occurrence is kept). */
+export function duplicateMenuCategoryIndexes(
+  menus: MenuNameSource[] | undefined,
+): number[] {
+  const seen = new Set<string>();
+  const duplicates: number[] = [];
+  (menus ?? []).forEach((menu, index) => {
+    const key = normalizeMenuCategoryName(menu?.name);
+    if (!key) return;
+    if (seen.has(key)) duplicates.push(index);
+    else seen.add(key);
+  });
+  return duplicates;
+}
+
+/**
+ * Onboarding display/save order: Starters → Main course → Dessert → anything else.
+ * Custom categories keep the relative order they were added. Does not mutate input.
+ */
+export function onboardingMenuCourseRank(
+  name: string | null | undefined,
+): number {
+  const key = normalizeMenuCategoryName(name);
+  if (!key) return 3;
+  if (key === "starter" || key === "starters" || key.startsWith("starter ")) {
+    return 0;
+  }
+  if (
+    key === "main" ||
+    key === "mains" ||
+    key === "main course" ||
+    key === "main courses" ||
+    key.startsWith("main ")
+  ) {
+    return 1;
+  }
+  if (
+    key === "dessert" ||
+    key === "desserts" ||
+    key === "pudding" ||
+    key === "puddings" ||
+    key.startsWith("dessert ")
+  ) {
+    return 2;
+  }
+  return 3;
+}
+
+export function sortMenusForOnboardingDisplay<T extends MenuNameSource>(
+  menus: T[] | undefined,
+): T[] {
+  if (!menus?.length) return [];
+  return menus
+    .map((menu, index) => ({ menu, index }))
+    .sort((left, right) => {
+      const rankDiff =
+        onboardingMenuCourseRank(left.menu.name) -
+        onboardingMenuCourseRank(right.menu.name);
+      if (rankDiff !== 0) return rankDiff;
+      return left.index - right.index;
+    })
+    .map(({ menu }) => menu);
+}
+
 export { toPositiveId };
 
 /**

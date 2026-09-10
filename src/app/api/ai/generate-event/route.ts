@@ -40,6 +40,7 @@ import {
   type AIEventRoomPackage,
 } from "@/app/(protected)/vendor/events/_lib/ai-event-vendor-intent";
 import { fillAiEventGeneratedDefaults } from "@/app/(protected)/vendor/events/_lib/fill-ai-event-content";
+import { resolveAiDrinksEnabled } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 
 export interface AIEventInput {
   eventName: string;
@@ -146,6 +147,7 @@ export interface AIEventGeneratedContent {
     rooms?: AIEventRoomMenu[];
   };
   stepFive: {
+    drinks_option?: 0 | 1;
     drink_title: string;
     drink_description: string;
     packages: Array<{
@@ -500,12 +502,14 @@ export async function POST(req: NextRequest) {
 
       if (vendorHints.omitDrinks) {
         content.stepFive = {
+          drinks_option: 0,
           drink_title: "",
           drink_description: "",
           packages: [],
           rooms: hasRoomSystem
             ? normalizedRoomNames.map((room_name) => ({
                 room_name,
+                drinks_option: 0 as const,
                 drink_title: "",
                 drink_description: "",
                 packages: [],
@@ -542,8 +546,20 @@ export async function POST(req: NextRequest) {
             ),
           }))
           : [];
+        const drinksEnabled = resolveAiDrinksEnabled(content.stepFive);
+        content.stepFive.drinks_option = drinksEnabled;
+        if (drinksEnabled !== 1) {
+          content.stepFive.drink_title = "";
+          content.stepFive.drink_description = "";
+          content.stepFive.packages = [];
+        }
       } else {
-        content.stepFive = { drink_title: "Drinks & Packages", drink_description: "", packages: [] };
+        content.stepFive = {
+          drinks_option: 0,
+          drink_title: "",
+          drink_description: "",
+          packages: [],
+        };
       }
 
       if (hasRoomSystem && content.stepFive) {
@@ -551,6 +567,7 @@ export async function POST(req: NextRequest) {
           content.stepFive.rooms,
           normalizedRoomNames,
           {
+            drinks_option: content.stepFive.drinks_option,
             drink_title: content.stepFive.drink_title,
             drink_description: content.stepFive.drink_description,
             packages: content.stepFive.packages,

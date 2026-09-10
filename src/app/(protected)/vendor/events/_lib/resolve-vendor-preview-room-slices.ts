@@ -17,6 +17,7 @@ import {
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
 import { resolveEventLocation } from "@/lib/event-location";
+import { resolveDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import {
   findStepThreeDatesForRoom,
   normalizeVendorStepThreeDateRow,
@@ -377,8 +378,39 @@ type PreviewMenuSlice = Pick<
 
 type PreviewDrinksSlice = Pick<
   EventDetailStepSix,
-  "drink_title" | "drink_description" | "packages"
+  "drinks_option" | "drink_title" | "drink_description" | "packages"
 >;
+
+function toPreviewDrinksSlice(
+  payload:
+    | {
+        drinks_option?: unknown;
+        drink_title?: unknown;
+        drink_description?: unknown;
+        packages?: unknown;
+      }
+    | null
+    | undefined,
+): PreviewDrinksSlice | null {
+  if (!payload) return null;
+  const drinks_option = resolveDrinksOptionFlag(payload);
+  if (drinks_option !== 1) {
+    return {
+      drinks_option: 0,
+      drink_title: "",
+      drink_description: "",
+      packages: [],
+    };
+  }
+  return {
+    drinks_option: 1,
+    drink_title: String(payload.drink_title ?? ""),
+    drink_description: String(payload.drink_description ?? ""),
+    packages: Array.isArray(payload.packages)
+      ? (payload.packages as PreviewDrinksSlice["packages"])
+      : [],
+  };
+}
 
 type PreviewBrochureSlice = Pick<
   EventDetailStepFive,
@@ -454,13 +486,7 @@ export function resolveVendorPreviewActiveSlices(
             menu_background_image: s4.menu_background_image,
           }
         : null,
-      drinks: s6
-        ? {
-            drink_title: s6.drink_title,
-            drink_description: s6.drink_description,
-            packages: s6.packages,
-          }
-        : null,
+      drinks: toPreviewDrinksSlice(s6),
       brochure: s5
         ? {
             brochure_pdf: s5.brochure_pdf,
@@ -530,19 +556,21 @@ export function resolveVendorPreviewActiveSlices(
           catering_option: 0,
           menus: [],
         },
-    drinks: drinksPayload
-      ? {
-          drink_title: String(drinksPayload.drink_title ?? ""),
-          drink_description: String(drinksPayload.drink_description ?? ""),
-          packages: Array.isArray(drinksPayload.packages)
-            ? (drinksPayload.packages as PreviewDrinksSlice["packages"])
-            : [],
-        }
-      : {
-          drink_title: "",
-          drink_description: "",
-          packages: [],
-        },
+    drinks: toPreviewDrinksSlice(
+      drinksPayload as
+        | {
+            drinks_option?: unknown;
+            drink_title?: unknown;
+            drink_description?: unknown;
+            packages?: unknown;
+          }
+        | undefined,
+    ) ?? {
+      drinks_option: 0,
+      drink_title: "",
+      drink_description: "",
+      packages: [],
+    },
     brochure: brochurePayload
       ? {
           brochure_pdf:

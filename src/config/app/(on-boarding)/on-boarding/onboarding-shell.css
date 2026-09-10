@@ -1,9 +1,0 @@
-/**
- * Vendor onboarding: no full-viewport theme environment FX.
- * ThemeAnimationManager layers use position:fixed and would cover the stepper + form panel.
- */
-.onboarding-shell .theme-animations-container {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}

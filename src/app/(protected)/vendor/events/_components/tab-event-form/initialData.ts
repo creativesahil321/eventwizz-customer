@@ -108,16 +108,10 @@ export const initialData: EventSchemaType = {
   stepSix: {
     step: 6,
     event_id: 0,
+    drinks_option: 0,
     drink_title: "",
     drink_description: "",
-    packages: [
-      {
-        title: "",
-        description: "",
-        price: 0,
-        available_quantity: 0,
-      },
-    ],
+    packages: [],
   },
   stepSeven: {
     step: 7,

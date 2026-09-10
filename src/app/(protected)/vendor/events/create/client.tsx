@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { openEventPreviewTab } from "../_lib/open-event-preview-tab";
 import { writeVendorEventIsRoomsFlag } from "../_lib/vendor-event-is-rooms";
+import { clearVendorEventPreviewDraft } from "../_lib/vendor-event-preview-live-data";
 import { FormProvider } from "../_components/events-form-provider";
 import TabEventForm from "../_components/tab-event-form";
 import AIEventCreationFlow from "../_components/ai-event-creation";
@@ -62,6 +63,7 @@ export default function CreateEventClientWrapper() {
 
   const handleAIComplete = (eventId: number, isRooms: boolean) => {
     writeVendorEventIsRoomsFlag(eventId, isRooms);
+    void clearVendorEventPreviewDraft(eventId);
     if (!openEventPreviewTab(eventId, isRooms)) {
       router.push(`/vendor/events/${eventId}`);
     }

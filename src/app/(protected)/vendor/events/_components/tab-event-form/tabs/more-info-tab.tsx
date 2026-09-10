@@ -44,6 +44,7 @@ export default function MoreInfoTab() {
   const {
     form: globalForm,
     advanceStep,
+    markEventFormSaved,
     setActiveField,
     readOnly,
   } = useEventFormContext();
@@ -445,11 +446,12 @@ export default function MoreInfoTab() {
                 shouldTouch: false,
               });
               toast.info("Saved. Continue with the next room.");
+              markEventFormSaved(5);
               return;
             }
           }
 
-          await advanceStep(5);
+          await advanceStep(5, response);
         } else {
           console.error("Error saving additional information:", response);
         }
@@ -468,6 +470,7 @@ export default function MoreInfoTab() {
       resolveBrochureFieldsForSubmit,
       resolvedRoomIndex,
       advanceStep,
+      markEventFormSaved,
       setActiveField,
     ],
   );

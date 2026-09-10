@@ -12,6 +12,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useFormContext } from "../../form-provider";
@@ -50,7 +51,11 @@ import {
   cloneOnboardingDrinksForApplyAll,
   selectOnboardingRoomsForApi,
 } from "../../../_lib/onboarding-room-save";
-import { isVendorRoomDrinksStepComplete } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import {
+  isVendorRoomDrinksStepComplete,
+  normalizeDrinksOptionFlag,
+  resolveDrinksOptionFlag,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
 
 export default function StepEight() {
@@ -82,8 +87,6 @@ export default function StepEight() {
   const [loading, setLoading] = useState(false);
   const { update: updateSession } = useSession();
 
-  // Start with one blank package row — placeholders guide input so nothing
-  // dummy (title, price, or a stock number) can be published as-is.
   const predefinedPackage = [
     {
       title: "",
@@ -98,18 +101,31 @@ export default function StepEight() {
     ? rooms[currentRoomIndex]?.drinks
     : globalForm.getValues("stepEight");
 
+  const resolveScopedDrinksOption = (
+    scoped: Record<string, unknown> | undefined,
+  ) =>
+    resolveDrinksOptionFlag({
+      drinks_option: scoped?.drinks_option,
+      drink_title: scoped?.drink_title,
+      drink_description: scoped?.drink_description,
+      packages: scoped?.packages,
+    });
+
   const form = useForm({
     resolver: zodResolver(stepEightSchema),
     defaultValues: {
       step: 8 as unknown as number as StepEightType["step"],
       event_id: eventId,
+      drinks_option: resolveScopedDrinksOption(
+        scopedDrinksDefaults as Record<string, unknown> | undefined,
+      ),
       drink_title: scopedDrinksDefaults?.drink_title || "",
       drink_description: scopedDrinksDefaults?.drink_description || "",
       packages:
         scopedDrinksDefaults?.packages &&
         scopedDrinksDefaults.packages.length > 0
           ? scopedDrinksDefaults.packages
-          : predefinedPackage,
+          : [],
     },
     mode: "onChange",
   });
@@ -123,6 +139,9 @@ export default function StepEight() {
     const resolvedValues = {
       step: 8 as unknown as number as StepEightType["step"],
       event_id: eventId,
+      drinks_option: resolveDrinksOptionFlag(
+        scoped as Record<string, unknown>,
+      ),
       drink_title: String(
         (scoped as Record<string, unknown>)?.drink_title ?? "",
       ),
@@ -133,7 +152,7 @@ export default function StepEight() {
         Array.isArray((scoped as Record<string, unknown>)?.packages) &&
         ((scoped as Record<string, unknown>).packages as unknown[]).length > 0
           ? ((scoped as Record<string, unknown>).packages as StepEightType["packages"])
-          : predefinedPackage,
+          : [],
     };
 
     form.reset(resolvedValues);
@@ -144,6 +163,7 @@ export default function StepEight() {
       globalForm.setValue(
         `multiSpace.rooms.${currentRoomIndex}.drinks` as never,
         {
+          drinks_option: resolvedValues.drinks_option,
           drink_title: resolvedValues.drink_title,
           drink_description: resolvedValues.drink_description,
           packages: resolvedValues.packages,
@@ -159,6 +179,10 @@ export default function StepEight() {
     name: "packages",
   });
 
+  const watchedDrinksOption = useWatch({
+    control: form.control,
+    name: "drinks_option",
+  });
   const watchedDrinkTitle = useWatch({
     control: form.control,
     name: "drink_title",
@@ -175,6 +199,7 @@ export default function StepEight() {
   const canApplyToAllRooms = useMemo(() => {
     if (!isMultiRoom || rooms.length < 2) return false;
     return isVendorRoomDrinksStepComplete({
+      drinks_option: normalizeDrinksOptionFlag(watchedDrinksOption),
       drink_title: watchedDrinkTitle,
       drink_description: watchedDrinkDescription,
       packages: watchedPackages,
@@ -182,15 +207,19 @@ export default function StepEight() {
   }, [
     isMultiRoom,
     rooms.length,
+    watchedDrinksOption,
     watchedDrinkTitle,
     watchedDrinkDescription,
     watchedPackages,
   ]);
 
+  const showDrinksSection =
+    normalizeDrinksOptionFlag(watchedDrinksOption) === 1;
+
   const setScopedDrinksField = useCallback(
     (
-      field: "drink_title" | "drink_description" | "packages",
-      value: string | StepEightType["packages"],
+      field: "drinks_option" | "drink_title" | "drink_description" | "packages",
+      value: number | string | StepEightType["packages"],
     ) => {
       globalForm.setValue(
         `stepEight.${field}` as never,
@@ -287,6 +316,7 @@ export default function StepEight() {
         }
 
         const nextDrinksFromForm = {
+          drinks_option: data.drinks_option,
           drink_title: data.drink_title,
           drink_description: data.drink_description,
           packages: data.packages,
@@ -413,7 +443,7 @@ export default function StepEight() {
       <div className="w-full min-w-0 max-w-none mx-auto relative">
         <OnboardingCard className="w-full mx-auto shadow-sm mb-16">
           <CardHeader className="pb-2 pt-4">
-            <OnboardingTitle>Do you want to add drinks & extras?</OnboardingTitle>
+            <OnboardingTitle>Drinks & extras</OnboardingTitle>
           </CardHeader>
 
           <CardContent className="px-6 py-2 pb-8">
@@ -458,7 +488,18 @@ export default function StepEight() {
                           <Button
                             variant="event-outline"
                             type="button"
-                            onClick={() => setActiveStep(9)}
+                            onClick={() => {
+                              form.setValue("drinks_option", 0);
+                              setScopedDrinksField("drinks_option", 0);
+                              form.clearErrors();
+                              void submitStepEight(
+                                {
+                                  ...form.getValues(),
+                                  drinks_option: 0,
+                                },
+                                false,
+                              );
+                            }}
                             className={guidedOnboardingSkipButtonClass}
                           >
                             Skip
@@ -470,6 +511,94 @@ export default function StepEight() {
                 >
                   {() => (
                     <div className="space-y-6">
+                      <section
+                        className={guidedInsetSectionSurfaceClass(
+                          "w-full mb-4",
+                        )}
+                      >
+                        <FormField
+                          control={form.control}
+                          name="drinks_option"
+                          render={({ field }) => (
+                            <FormItem>
+                              <OnboardingFieldGroupTitle>
+                                Do you want to add drinks & extras?
+                              </OnboardingFieldGroupTitle>
+                              <FormControl>
+                                <RadioGroup
+                                  onValueChange={(value) => {
+                                    const numValue = Number(value);
+                                    field.onChange(numValue);
+                                    setScopedDrinksField(
+                                      "drinks_option",
+                                      numValue,
+                                    );
+                                    if (numValue === 0) {
+                                      form.clearErrors([
+                                        "drink_title",
+                                        "drink_description",
+                                        "packages",
+                                      ]);
+                                    } else if (
+                                      (form.getValues("packages") ?? [])
+                                        .length === 0
+                                    ) {
+                                      form.setValue(
+                                        "packages",
+                                        predefinedPackage,
+                                      );
+                                      setScopedDrinksField(
+                                        "packages",
+                                        predefinedPackage as StepEightType["packages"],
+                                      );
+                                    }
+                                  }}
+                                  value={String(
+                                    normalizeDrinksOptionFlag(field.value),
+                                  )}
+                                  className="flex mt-4 space-x-6"
+                                  onFocus={() =>
+                                    handleFieldFocus("drinks_option")
+                                  }
+                                >
+                                  <FormItem className="flex items-center space-x-3 space-y-0">
+                                    <FormControl>
+                                      <RadioGroupItem
+                                        value="1"
+                                        className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:border-[var(--color-secondary,#009ead)]"
+                                        onFocus={() =>
+                                          handleFieldFocus("drinks_option")
+                                        }
+                                      />
+                                    </FormControl>
+                                    <FormLabel className="text-lg font-medium">
+                                      Yes
+                                    </FormLabel>
+                                  </FormItem>
+                                  <FormItem className="flex items-center space-x-3 space-y-0">
+                                    <FormControl>
+                                      <RadioGroupItem
+                                        value="0"
+                                        className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-secondary,#009ead)] data-[state=checked]:border-[var(--color-secondary,#009ead)]"
+                                        onFocus={() =>
+                                          handleFieldFocus("drinks_option")
+                                        }
+                                      />
+                                    </FormControl>
+                                    <FormLabel className="text-lg font-medium">
+                                      No
+                                    </FormLabel>
+                                  </FormItem>
+                                </RadioGroup>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </section>
+
+                      {showDrinksSection && (
+                        <>
                       <section
                         className={guidedInsetSectionSurfaceClass(
                           "w-full mb-4",
@@ -613,7 +742,7 @@ export default function StepEight() {
                                             field.onChange(e);
                                             // Update global form immediately
                                             const currentPackages =
-                                              form.getValues("packages");
+                                              form.getValues("packages") ?? [];
                                             const updatedPackages = [
                                               ...currentPackages,
                                             ];
@@ -676,7 +805,7 @@ export default function StepEight() {
                                             field.onChange(e);
                                             // Update global form immediately
                                             const currentPackages =
-                                              form.getValues("packages");
+                                              form.getValues("packages") ?? [];
                                             const updatedPackages = [
                                               ...currentPackages,
                                             ];
@@ -735,7 +864,7 @@ export default function StepEight() {
                                             field.onChange("");
                                             // Update global form with empty string temporarily
                                             const currentPackages =
-                                              form.getValues("packages");
+                                              form.getValues("packages") ?? [];
                                             const updatedPackages = [
                                               ...currentPackages,
                                             ];
@@ -759,7 +888,7 @@ export default function StepEight() {
                                             clampDrinkPackagePrice(numValue);
                                           field.onChange(capped);
                                           const currentPackages =
-                                            form.getValues("packages");
+                                            form.getValues("packages") ?? [];
                                           const updatedPackages = [
                                             ...currentPackages,
                                           ];
@@ -812,7 +941,7 @@ export default function StepEight() {
                                           if (value === "" || value === null) {
                                             field.onChange(Number.NaN);
                                             const currentPackages =
-                                              form.getValues("packages");
+                                              form.getValues("packages") ?? [];
                                             const updatedPackages = [
                                               ...currentPackages,
                                             ];
@@ -833,7 +962,7 @@ export default function StepEight() {
                                             clampDrinkPackageQuantity(numValue);
                                           field.onChange(capped);
                                           const currentPackages =
-                                            form.getValues("packages");
+                                            form.getValues("packages") ?? [];
                                           const updatedPackages = [
                                             ...currentPackages,
                                           ];
@@ -912,6 +1041,8 @@ export default function StepEight() {
                           )}
                         </div>
                       </section>
+                        </>
+                      )}
                     </div>
                   )}
                 </WholeStepGuidedShell>

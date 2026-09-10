@@ -12,6 +12,10 @@ import { roomService } from "@/services/vendor/onboarding/room.service";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { writeVendorEventIsRoomsFlag } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
 import { isOnboardingCateringRoomReady } from "../../_lib/onboarding-catering-ready";
+import {
+  isVendorRoomDrinksStepComplete,
+  resolveDrinksOptionFlag,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 
 const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
 
@@ -104,28 +108,12 @@ export const isRoomSectionComplete = (
   }
 
   if (section === "drinks") {
-    const drinks = room.drinks;
-    if (!drinks) return false;
-    const hasTitle = String(drinks.drink_title ?? "").trim().length > 0;
-    const hasDescription =
-      String(drinks.drink_description ?? "").trim().length > 0;
-    const packages = Array.isArray(drinks.packages) ? drinks.packages : [];
-    const hasPackages = packages.some((pkg) => {
-      const hasPkgTitle = String(pkg?.title ?? "").trim().length > 0;
-      const hasPkgDescription =
-        String(pkg?.description ?? "").trim().length > 0;
-      const price = Number(pkg?.price ?? 0);
-      const quantity = Number(pkg?.available_quantity ?? 0);
-      return (
-        hasPkgTitle &&
-        hasPkgDescription &&
-        Number.isFinite(price) &&
-        price > 0 &&
-        Number.isFinite(quantity) &&
-        quantity > 0
-      );
+    return isVendorRoomDrinksStepComplete({
+      drinks_option: resolveDrinksOptionFlag(room.drinks ?? {}),
+      drink_title: room.drinks?.drink_title,
+      drink_description: room.drinks?.drink_description,
+      packages: room.drinks?.packages,
     });
-    return hasTitle && hasDescription && hasPackages;
   }
 
   if (room.isApprovedBrochure === true) return true;
@@ -159,16 +147,10 @@ const blankRoom = (name: string): RoomType => ({
     menus: [],
   },
   drinks: {
+    drinks_option: 0,
     drink_title: "",
     drink_description: "",
-    packages: [
-      {
-        title: "",
-        description: "",
-        price: 0,
-        available_quantity: 100,
-      },
-    ],
+    packages: [],
   },
   brochure: {
     brochure_pdf: null,

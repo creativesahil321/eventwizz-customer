@@ -164,7 +164,7 @@ export default function FaqsTab() {
         const response = await eventsService.storeStepSevenData(data);
 
         if (response && response.status) {
-          await advanceStep(7);
+          await advanceStep(7, response);
         } else {
           console.error("Error saving FAQ details:", response);
         }

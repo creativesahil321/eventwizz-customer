@@ -13,6 +13,7 @@ import {
   normalizeVendorStepTwoRooms,
   parseEventIsRoomsFlag,
 } from "@/lib/event-form-limits";
+import { resolveWizardStepsFromGet } from "@/app/(protected)/vendor/events/_lib/vendor-event-wizard-step";
 import {
   findStepThreeDatesForRoom,
   normalizeVendorStepThreeDateRow,
@@ -37,6 +38,7 @@ import {
   findStepSixDrinksForRoom,
   normalizeVendorDrinkPackages,
   normalizeVendorStepSixRooms,
+  resolveDrinksOptionFlag,
   roomEntryToStepSixFields,
   syncStepSixRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
@@ -114,6 +116,7 @@ export function patchEventPayloadFromApi(
     is_rooms?: boolean | number | string;
     vendor_location_id?: number;
     current_step?: number;
+    completed_step?: number;
   };
   const rootIsRooms = parseEventIsRoomsFlag(
     eventRoot.is_rooms ??
@@ -229,14 +232,15 @@ export function patchEventPayloadFromApi(
       }
     : initialData.stepThree;
 
-  const explicitCurrentStep =
-    coercePositiveEventStep(eventRoot.current_step) ||
-    coercePositiveEventStep(
+  const explicitCurrentStep = resolveWizardStepsFromGet({
+    completed_step: eventRoot.completed_step,
+    current_step:
+      eventRoot.current_step ??
       (eventDataAny as { currentStep?: number }).currentStep,
-    );
+  }).activeStep;
 
   const mappedData: Partial<EventSchemaType> = {
-    currentStep: explicitCurrentStep > 0 ? explicitCurrentStep : 1,
+    currentStep: explicitCurrentStep,
     stepOne: {
       ...(eventDataAny.stepOne || initialData.stepOne),
       about_event_image:
@@ -456,6 +460,7 @@ export function patchEventPayloadFromApi(
             (eventDataAny.stepOne as { event_id?: number })?.event_id ||
             0,
           is_rooms: 0 as const,
+          drinks_option: resolveDrinksOptionFlag(stepSixData),
           packages: normalizeVendorDrinkPackages(stepSixData.packages),
         } as StepSixType;
       }

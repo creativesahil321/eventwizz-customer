@@ -341,11 +341,18 @@ export async function persistVendorEventDraft(
   }
 }
 
+const persistQueueByEvent = new Map<string, Promise<unknown>>();
+
 export function writeVendorEventPreviewDraft(
   eventId: string | number,
   liveForm: Partial<EventSchemaType>,
 ): void {
-  void persistVendorEventDraft(eventId, liveForm);
+  const id = String(eventId);
+  const previous = persistQueueByEvent.get(id) ?? Promise.resolve();
+  const next = previous
+    .catch(() => undefined)
+    .then(() => persistVendorEventDraft(eventId, liveForm));
+  persistQueueByEvent.set(id, next);
 }
 
 export async function loadVendorEventDraft(

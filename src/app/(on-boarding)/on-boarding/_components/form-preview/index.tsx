@@ -50,6 +50,7 @@ import { useEventCategories } from "@/services/vendor/events/query";
 import { normalizeSlug } from "@/lib/utils";
 import { scrollToElementIfNeeded } from "@/lib/scroll-to-element-if-needed";
 import { useRoomManager } from "../rooms/use-room-manager";
+import { normalizeDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { listOnboardingPreviewRoomSummaries } from "../rooms/list-onboarding-preview-room-summaries";
 import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
 import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
@@ -941,7 +942,9 @@ export default function FormPreview() {
     const showDatesPreview = activeStep === 5 || datesPreviewItems.length > 0;
     const showGalleryPreview = galleryPreviewItems.length > 0;
     const showMenuPreview = (activePreviewCatering?.menus?.length ?? 0) > 0;
-    const showDrinksPreview = (activePreviewDrinks?.packages?.length ?? 0) > 0;
+    const showDrinksPreview =
+      normalizeDrinksOptionFlag(activePreviewDrinks?.drinks_option) === 1 &&
+      (activePreviewDrinks?.packages?.length ?? 0) > 0;
     const sectionNavItems = buildEventSectionNavItems({
       about: true,
       rooms: showRoomChooser,
@@ -1346,7 +1349,7 @@ export default function FormPreview() {
             "other-packages",
           )}`}
         >
-          {(activePreviewDrinks?.packages?.length ?? 0) > 0 && (
+          {showDrinksPreview && (
             <PreviewEditHit
               step={8}
               field="drink_title"
@@ -1359,8 +1362,8 @@ export default function FormPreview() {
                   description={activePreviewDrinks?.drink_description || ""}
                   packages={
                     activePreviewDrinks?.packages?.map((pkg) => ({
-                      title: pkg.title,
-                      description: pkg.description,
+                      title: String(pkg.title ?? ""),
+                      description: String(pkg.description ?? ""),
                       price: Number(pkg.price),
                     })) || []
                   }

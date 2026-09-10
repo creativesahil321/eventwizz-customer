@@ -6,7 +6,8 @@ import {
   normalizeStepOneFromApi,
   readHasMultipleLocationsField,
 } from "./schema";
-import { toPositiveId } from "@/lib/event-menu-categories";
+import { toPositiveId, sortMenusForOnboardingDisplay } from "@/lib/event-menu-categories";
+import { resolveDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 
 /**
  * Ask Yes/No whenever persistence has no `has_multiple_locations` yet.
@@ -338,7 +339,11 @@ export function patchOnboardingPayloadFromApi(
           typeof activeCatering.menu_description === "string"
             ? activeCatering.menu_description
             : "",
-        menus: Array.isArray(activeCatering.menus) ? activeCatering.menus : [],
+        menus: Array.isArray(activeCatering.menus)
+          ? sortMenusForOnboardingDisplay(
+              activeCatering.menus as Array<{ name?: string | null }>,
+            )
+          : [],
         ...(toPositiveId(activeCatering.event_menu_category_id) != null
           ? {
               event_menu_category_id: toPositiveId(
@@ -346,6 +351,31 @@ export function patchOnboardingPayloadFromApi(
               ),
             }
           : {}),
+      };
+    }
+
+    const activeDrinks = hydratedMultiSpace.rooms[activeIdx]?.drinks as
+      | Record<string, unknown>
+      | undefined;
+    if (activeDrinks) {
+      const existingStepEight =
+        typeof dataAny.stepEight === "object" && dataAny.stepEight !== null
+          ? (dataAny.stepEight as Record<string, unknown>)
+          : {};
+      dataAny.stepEight = {
+        ...existingStepEight,
+        drinks_option: resolveDrinksOptionFlag(activeDrinks),
+        drink_title:
+          typeof activeDrinks.drink_title === "string"
+            ? activeDrinks.drink_title
+            : "",
+        drink_description:
+          typeof activeDrinks.drink_description === "string"
+            ? activeDrinks.drink_description
+            : "",
+        packages: Array.isArray(activeDrinks.packages)
+          ? activeDrinks.packages
+          : [],
       };
     }
   }
@@ -358,6 +388,16 @@ export function patchOnboardingPayloadFromApi(
     } else {
       delete stepSix.event_menu_category_id;
     }
+    if (Array.isArray(stepSix.menus)) {
+      stepSix.menus = sortMenusForOnboardingDisplay(
+        stepSix.menus as Array<{ name?: string | null }>,
+      );
+    }
+  }
+
+  if (dataAny.stepEight && typeof dataAny.stepEight === "object") {
+    const stepEight = dataAny.stepEight as Record<string, unknown>;
+    stepEight.drinks_option = resolveDrinksOptionFlag(stepEight);
   }
 
   return dataAny;
@@ -739,7 +779,11 @@ function hydrateMultiSpaceFromApi(
           event_menu_category_id: toPositiveId(
             roomVal.event_menu_category_id,
           ),
-          menus: Array.isArray(roomVal.menus) ? roomVal.menus : [],
+          menus: Array.isArray(roomVal.menus)
+            ? sortMenusForOnboardingDisplay(
+                roomVal.menus as Array<{ name?: string | null }>,
+              )
+            : [],
         },
       });
     });
@@ -801,6 +845,7 @@ function hydrateMultiSpaceFromApi(
           (payload.stepEight as Record<string, unknown> | undefined)?.isApproved,
         ),
         drinks: {
+          drinks_option: resolveDrinksOptionFlag(roomVal),
           drink_title:
             typeof roomVal.drink_title === "string"
               ? roomVal.drink_title

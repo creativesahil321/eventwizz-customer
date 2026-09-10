@@ -36,6 +36,7 @@ import {
   parseVendorDescriptionHints,
   sanitizeVendorDescription,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
+import { normalizeDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 
 export interface AIOnboardingInput {
   venueName: string;
@@ -93,6 +94,7 @@ export interface AIRoomDates {
 
 export interface AIRoomDrinks {
   room_name: string;
+  drinks_option?: 0 | 1;
   drink_title: string;
   drink_description: string;
   packages: Array<{
@@ -155,6 +157,7 @@ export interface AIGeneratedContent {
     }>;
   };
   stepSeven: {
+    drinks_option?: 0 | 1;
     drink_title: string;
     drink_description: string;
     packages: Array<{
@@ -538,6 +541,22 @@ export async function POST(req: NextRequest) {
           }))
           : [];
 
+        const skipDrinks =
+          vendorHints.omitDrinks ||
+          (content.stepSeven.drinks_option !== undefined &&
+            content.stepSeven.drinks_option !== null &&
+            String(content.stepSeven.drinks_option).trim() !== "" &&
+            normalizeDrinksOptionFlag(content.stepSeven.drinks_option) === 0);
+
+        if (skipDrinks) {
+          content.stepSeven.drinks_option = 0;
+          content.stepSeven.drink_title = "";
+          content.stepSeven.drink_description = "";
+          content.stepSeven.packages = [];
+        } else if (content.stepSeven.packages.length > 0) {
+          content.stepSeven.drinks_option = 1;
+        }
+
         if (input.has_room_system === true) {
           const rawRooms = Array.isArray(content.stepSeven.rooms)
             ? content.stepSeven.rooms
@@ -545,6 +564,12 @@ export async function POST(req: NextRequest) {
           const filteredRooms = rawRooms
             .map((room) => ({
               room_name: truncate(String(room.room_name || "").trim(), 80),
+              drinks_option:
+                room.drinks_option === undefined ||
+                room.drinks_option === null ||
+                String(room.drinks_option).trim() === ""
+                  ? undefined
+                  : normalizeDrinksOptionFlag(room.drinks_option),
               drink_title: truncate(
                 String(room.drink_title || content.stepSeven.drink_title || ""),
                 40,
@@ -584,6 +609,7 @@ export async function POST(req: NextRequest) {
             filteredRooms,
             normalizeAiRoomNames(input.room_names),
             {
+              drinks_option: content.stepSeven.drinks_option,
               drink_title: content.stepSeven.drink_title,
               drink_description: content.stepSeven.drink_description,
               packages: content.stepSeven.packages,
@@ -595,6 +621,7 @@ export async function POST(req: NextRequest) {
         }
       } else {
         content.stepSeven = {
+          drinks_option: 0,
           drink_title: "",
           drink_description: "",
           packages: [],

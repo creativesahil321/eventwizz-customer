@@ -37,6 +37,7 @@ import {
   normalizeAiRoomNames,
   parseVendorDescriptionHints,
 } from "./ai-onboarding-sanitize";
+import { resolveAiDrinksEnabled } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import {
   EVENT_GALLERY_MAX_IMAGES,
   resolveEventSchedulerItems,
@@ -222,6 +223,7 @@ function normalizeAIGeneratedContent(
       menus: Array.isArray(c.stepSix?.menus) ? c.stepSix.menus : [],
     },
     stepSeven: {
+      drinks_option: 0,
       drink_title: "",
       drink_description: "",
       ...c.stepSeven,
@@ -304,6 +306,7 @@ async function applyAIGeneratedOnboardingContentInner({
     long?: number;
   };
   type DrinkStepLike = {
+    drinks_option?: 0 | 1;
     drink_title?: string;
     drink_description?: string;
     packages?: Array<{
@@ -314,6 +317,7 @@ async function applyAIGeneratedOnboardingContentInner({
     }>;
     rooms?: Array<{
       room_name?: string;
+      drinks_option?: 0 | 1;
       drink_title?: string;
       drink_description?: string;
       packages?: Array<{
@@ -962,52 +966,66 @@ async function applyAIGeneratedOnboardingContentInner({
   const drinkPackages = Array.isArray(drinksSource.packages)
     ? drinksSource.packages
     : [];
-  const resolvedDrinkPackages =
-    drinkPackages.length > 0
-      ? drinkPackages
-      : vendorHints.omitDrinks
-        ? []
-        : [
-          {
-            title: "House pours",
-            description: "Selected beers, wines and soft drinks",
-            price: 25,
-            available_quantity: 80,
-          },
-          {
-            title: "Welcome drink",
-            description: "A drink on arrival for each guest",
-            price: 8,
-            available_quantity: 100,
-          },
-        ];
+  const drinksEnabled = resolveAiDrinksEnabled(
+    {
+      drinks_option: drinksSource.drinks_option,
+      drink_title: drinksSource.drink_title,
+      drink_description: drinksSource.drink_description,
+      packages: drinkPackages,
+    },
+    { forceOff: vendorHints.omitDrinks },
+  );
+  const resolvedDrinkPackages = drinksEnabled === 1 ? drinkPackages : [];
   const stepEightData = {
     step: 8 as const,
     event_id: eventId,
-    drink_title: drinksSource.drink_title ?? "",
-    drink_description: drinksSource.drink_description ?? "",
+    drinks_option: drinksEnabled,
+    drink_title: drinksEnabled === 1 ? (drinksSource.drink_title ?? "") : "",
+    drink_description:
+      drinksEnabled === 1 ? (drinksSource.drink_description ?? "") : "",
     packages: resolvedDrinkPackages,
     isApproved: true,
   };
   globalForm.setValue("stepEight", stepEightData);
   const roomDrinksByName = useRoomSystem
       ? new Map(
-          (drinksSource.rooms ?? []).map((room) => [
-            String(room.room_name ?? "").trim().toLowerCase(),
-            {
-              drink_title: room.drink_title ?? stepEightData.drink_title,
-              drink_description:
-                room.drink_description ?? stepEightData.drink_description,
-              packages:
-                Array.isArray(room.packages) && room.packages.length > 0
-                  ? room.packages
-                  : stepEightData.packages,
-            },
-          ]),
+          (drinksSource.rooms ?? []).map((room) => {
+            const roomPackages =
+              Array.isArray(room.packages) && room.packages.length > 0
+                ? room.packages
+                : stepEightData.packages;
+            const roomEnabled = resolveAiDrinksEnabled(
+              {
+                drinks_option: room.drinks_option,
+                drink_title: room.drink_title,
+                drink_description: room.drink_description,
+                packages: roomPackages,
+              },
+              { forceOff: vendorHints.omitDrinks || drinksEnabled !== 1 },
+            );
+            return [
+              String(room.room_name ?? "").trim().toLowerCase(),
+              roomEnabled === 1
+                ? {
+                    drinks_option: 1 as const,
+                    drink_title: room.drink_title ?? stepEightData.drink_title,
+                    drink_description:
+                      room.drink_description ?? stepEightData.drink_description,
+                    packages: roomPackages,
+                  }
+                : {
+                    drinks_option: 0 as const,
+                    drink_title: "",
+                    drink_description: "",
+                    packages: [],
+                  },
+            ] as const;
+          }),
         )
       : new Map<
           string,
           {
+            drinks_option: 0 | 1;
             drink_title: string;
             drink_description: string;
             packages: typeof stepEightData.packages;
@@ -1023,6 +1041,7 @@ async function applyAIGeneratedOnboardingContentInner({
                 .trim()
                 .toLowerCase(),
             ) ?? {
+              drinks_option: stepEightData.drinks_option,
               drink_title: stepEightData.drink_title,
               drink_description: stepEightData.drink_description,
               packages: stepEightData.packages,

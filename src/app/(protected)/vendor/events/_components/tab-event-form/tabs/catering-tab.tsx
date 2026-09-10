@@ -52,13 +52,21 @@ import {
 import { EventMenuCategory } from "@/services/vendor/events/type";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  DUPLICATE_MENU_CATEGORY_MESSAGE,
   dedupeMenuCategoriesForSelect,
   ensureEventMenuCategoriesForRoom,
   findMenuCategoryIdByName,
   findMenuCategoryIdForMenus,
+  isMenuCategoryNameTaken,
   toPositiveId,
 } from "@/lib/event-menu-categories";
 import MenuCategoryDropdown from "@/app/(on-boarding)/on-boarding/_components/steps/step-6/menu-category-dropdown";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { addCacheBusting } from "@/lib/image-utils";
 import {
@@ -67,6 +75,10 @@ import {
   menuItemTitlePlaceholder,
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/event-form-limits";
+import {
+  SortableMenuCategoryItem,
+  SortableMenuCategoryList,
+} from "./sortable-menu-category-list";
 
 const MENU_TITLE_MAX = 40;
 const MENU_DESCRIPTION_MAX = RICH_DESCRIPTION_MAX_CHARS;
@@ -74,7 +86,12 @@ const MENU_ITEM_TITLE_MAX = 40;
 
 export default function CateringTab() {
   const [isLoading, setIsLoading] = useState(false);
-  const { form: globalForm, advanceStep, readOnly } = useEventFormContext();
+  const {
+    form: globalForm,
+    advanceStep,
+    markEventFormSaved,
+    readOnly,
+  } = useEventFormContext();
   const [menuBackgroundImage, setMenuBackgroundImage] = useState<File[] | null>(
     null,
   );
@@ -92,8 +109,7 @@ export default function CateringTab() {
   const activeRoomIndex = globalForm.watch("stepTwo.active_room_index") ?? 0;
   const watchedStepTwoRooms = globalForm.watch("stepTwo.rooms");
   const stepTwoRooms = useMemo(
-    () =>
-      capEventRoomList(normalizeVendorStepTwoRooms(watchedStepTwoRooms)),
+    () => capEventRoomList(normalizeVendorStepTwoRooms(watchedStepTwoRooms)),
     [watchedStepTwoRooms],
   );
   const resolvedRoomIndex =
@@ -366,7 +382,10 @@ export default function CateringTab() {
       event_menu_category_id: getValues("event_menu_category_id"),
     });
     if (getValues("catering_option") !== resolved) {
-      setValue("catering_option", resolved, { shouldValidate: false });
+      setValue("catering_option", resolved, {
+        shouldValidate: false,
+        shouldDirty: false,
+      });
     }
   }, [eventId, getValues, setValue, resolvedRoomIndex]);
 
@@ -410,18 +429,94 @@ export default function CateringTab() {
     fields: menuFields,
     append: appendMenu,
     remove: removeMenuField,
+    move: moveMenu,
   } = useFieldArray({
     control,
     name: "menus",
   });
 
+  const [openMenuIds, setOpenMenuIds] = useState<string[]>([]);
+  const [isMenuDragging, setIsMenuDragging] = useState(false);
+  const previousMenuFieldIdsRef = useRef<string[]>([]);
+
+  const menuFieldIdsKey = menuFields.map((menu) => menu.id).join("\0");
+
+  useEffect(() => {
+    const ids = menuFieldIdsKey.length > 0 ? menuFieldIdsKey.split("\0") : [];
+    const previousIds = previousMenuFieldIdsRef.current;
+    const addedIds = ids.filter((id) => !previousIds.includes(id));
+    const isFreshList =
+      previousIds.length === 0 ||
+      (ids.length > 0 && addedIds.length === ids.length);
+    previousMenuFieldIdsRef.current = ids;
+
+    setOpenMenuIds((current) => {
+      if (ids.length === 0) return current.length === 0 ? current : [];
+      if (isFreshList) {
+        const next = [ids[0]];
+        return current.length === 1 && current[0] === next[0] ? current : next;
+      }
+      if (addedIds.length > 0) {
+        const next = [addedIds[addedIds.length - 1]];
+        return current.length === 1 && current[0] === next[0] ? current : next;
+      }
+      const next = current.filter((id) => ids.includes(id));
+      if (
+        next.length === current.length &&
+        next.every((id, index) => id === current[index])
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [menuFieldIdsKey]);
+
+  const persistMenusToGlobal = useCallback(
+    (menus = getValues("menus")) => {
+      const nextMenus = [...(menus ?? [])];
+      globalForm.setValue("stepFour.menus", nextMenus, {
+        shouldDirty: true,
+        shouldValidate: false,
+      });
+      if (isRoomsEnabled && stepTwoRooms.length > 0) {
+        persistActiveRoomMenuToGlobal(resolvedRoomIndex, {
+          ...getValues(),
+          menus: nextMenus,
+        });
+      }
+    },
+    [
+      getValues,
+      globalForm,
+      isRoomsEnabled,
+      persistActiveRoomMenuToGlobal,
+      resolvedRoomIndex,
+      stepTwoRooms.length,
+    ],
+  );
+
+  const handleMenuReorder = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex === toIndex
+      ) {
+        return;
+      }
+      moveMenu(fromIndex, toIndex);
+      persistMenusToGlobal(getValues("menus"));
+    },
+    [getValues, moveMenu, persistMenusToGlobal],
+  );
+
   // Custom function to remove menu and update global state
   const removeMenu = useCallback(
     (menuIndex: number) => {
-      // Remove from local form
       removeMenuField(menuIndex);
+      persistMenusToGlobal(getValues("menus"));
     },
-    [removeMenuField],
+    [getValues, persistMenusToGlobal, removeMenuField],
   );
 
   const appendItem = useCallback(
@@ -485,9 +580,10 @@ export default function CateringTab() {
       };
 
       appendMenu(newMenu);
+      persistMenusToGlobal([...currentMenus, newMenu]);
       return newMenu;
     },
-    [appendMenu, getValues],
+    [appendMenu, getValues, persistMenusToGlobal],
   );
 
   // Auto-create menu entry when category is already selected on load
@@ -797,11 +893,12 @@ export default function CateringTab() {
                 nextIncompleteIndex,
                 { shouldDirty: false, shouldTouch: false },
               );
+              markEventFormSaved(4);
               return;
             }
           }
 
-          await advanceStep(4);
+          await advanceStep(4, response);
         }
       } catch (error) {
         console.error("Error saving catering details:", error);
@@ -812,6 +909,7 @@ export default function CateringTab() {
     [
       advanceStep,
       globalForm,
+      markEventFormSaved,
       persistActiveRoomMenuToGlobal,
       queryClient,
       resolvedRoomIndex,
@@ -871,7 +969,10 @@ export default function CateringTab() {
                 });
               }
             } catch (err) {
-              console.warn("Failed to ensure menu category before submit:", err);
+              console.warn(
+                "Failed to ensure menu category before submit:",
+                err,
+              );
             }
           }
         }
@@ -937,9 +1038,7 @@ export default function CateringTab() {
                           globalForm.setValue("stepFour.menus", []);
                         }
                       }}
-                      value={String(
-                        normalizeCateringOptionFlag(field.value),
-                      )}
+                      value={String(normalizeCateringOptionFlag(field.value))}
                       className="flex mt-4 space-x-6"
                     >
                       <FormItem className="flex items-center space-x-3 space-y-0">
@@ -1063,40 +1162,39 @@ export default function CateringTab() {
                               .map((menu) => String(menu?.name ?? "").trim())
                               .find((name) => name.length > 0) || undefined
                           }
+                          takenNames={(watchedMenus ?? [])
+                            .map((menu) => String(menu?.name ?? "").trim())
+                            .filter((name) => name.length > 0)}
                           onSelect={(value) => {
                             const numVal = toPositiveId(value);
-                            if (numVal != null) {
-                              field.onChange(numVal);
-                              if (isRoomsEnabled && stepTwoRooms.length > 0) {
-                                persistActiveRoomMenuToGlobal(
-                                  resolvedRoomIndex,
-                                  {
-                                    ...getValues(),
-                                    event_menu_category_id: numVal,
-                                  },
-                                );
-                              }
+                            if (numVal == null) return;
 
-                              // Add the selected category to the menu items if it doesn't exist
-                              const selectedCategory = [
-                                ...localMenuCategories,
-                              ].find((cat) => Number(cat.id) === numVal);
+                            const selectedCategory = [
+                              ...localMenuCategories,
+                            ].find((cat) => Number(cat.id) === numVal);
 
-                              if (selectedCategory) {
-                                const existingMenuIndex = (
-                                  getValues("menus") || []
-                                ).findIndex(
-                                  (menu) =>
-                                    String(menu?.name ?? "")
-                                      .trim()
-                                      .toLowerCase() ===
-                                    selectedCategory.name.trim().toLowerCase(),
-                                );
+                            if (
+                              selectedCategory &&
+                              isMenuCategoryNameTaken(
+                                getValues("menus"),
+                                selectedCategory.name,
+                              ) &&
+                              numVal !== toPositiveId(field.value)
+                            ) {
+                              toast.error(DUPLICATE_MENU_CATEGORY_MESSAGE);
+                              return;
+                            }
 
-                                if (existingMenuIndex === -1) {
-                                  createMenuEntry(selectedCategory.name);
-                                }
-                              }
+                            field.onChange(numVal);
+                            if (isRoomsEnabled && stepTwoRooms.length > 0) {
+                              persistActiveRoomMenuToGlobal(resolvedRoomIndex, {
+                                ...getValues(),
+                                event_menu_category_id: numVal,
+                              });
+                            }
+
+                            if (selectedCategory) {
+                              createMenuEntry(selectedCategory.name);
                             }
                           }}
                           isLoading={isMenuCategoriesLoading}
@@ -1115,146 +1213,206 @@ export default function CateringTab() {
                   )}
                 </FormItem>
 
-                {menuFields.length > 0 && (
-                  <div className="space-y-6 mt-4">
-                    {menuFields.map((menu, menuIndex) => (
-                      <div
-                        key={menu.id}
-                        className="space-y-4 border border-[#E5E7EB] p-4 rounded-md bg-white"
-                      >
-                        <div className="flex justify-between items-center">
-                          <h3 className="text-md font-semibold text-[#2D2D2D]">
-                            {watch(`menus.${menuIndex}.name`)}
-                          </h3>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeMenu(menuIndex)}
-                            className="h-8 w-8 p-0 rounded-full"
-                          >
-                            <X size={16} />
-                          </Button>
-                        </div>
+                {menuFields.length > 1 && !readOnly && (
+                  <p className="mt-3 text-sm text-gray-500">
+                    Drag the handle to change the order menus appear on your
+                    event page. Categories collapse while you drag so the names
+                    stay visible.
+                  </p>
+                )}
 
-                        <div className="space-y-4">
-                          {watch(`menus.${menuIndex}.items`)?.map(
-                            (item: unknown, itemIndex: number) => (
-                              <div
-                                key={itemIndex}
-                                className="grid grid-cols-1 gap-4 p-4 border border-gray-200 rounded-lg"
+                {menuFields.length > 0 && (
+                  <SortableMenuCategoryList
+                    ids={menuFields.map((menu) => menu.id)}
+                    disabled={readOnly || menuFields.length < 2}
+                    onReorder={handleMenuReorder}
+                    onDraggingChange={setIsMenuDragging}
+                  >
+                    <Accordion
+                      type="multiple"
+                      value={isMenuDragging ? [] : openMenuIds}
+                      onValueChange={(ids) => {
+                        if (!isMenuDragging) setOpenMenuIds(ids);
+                      }}
+                      className="space-y-3"
+                    >
+                      {menuFields.map((menu, menuIndex) => {
+                        const itemCount =
+                          watch(`menus.${menuIndex}.items`)?.length ?? 0;
+                        const canReorder = !readOnly && menuFields.length >= 2;
+                        return (
+                          <SortableMenuCategoryItem
+                            key={menu.id}
+                            id={menu.id}
+                            disabled={!canReorder}
+                          >
+                            {(handle) => (
+                              <AccordionItem
+                                value={menu.id}
+                                className="overflow-hidden rounded-md border border-[#E5E7EB] bg-white last:border-b"
                               >
-                                <div className="flex justify-end">
+                                <div className="flex items-center gap-1 px-2">
+                                  {handle}
+                                  <div className="min-w-0 flex-1">
+                                    <AccordionTrigger className="w-full py-3 hover:no-underline">
+                                      <span className="flex min-w-0 flex-col items-start text-left">
+                                        <span className="text-md font-semibold text-[#2D2D2D]">
+                                          {watch(`menus.${menuIndex}.name`)}
+                                        </span>
+                                        <span className="text-xs font-normal text-gray-500">
+                                          {itemCount}{" "}
+                                          {itemCount === 1 ? "item" : "items"}
+                                        </span>
+                                      </span>
+                                    </AccordionTrigger>
+                                  </div>
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() =>
-                                      handleRemoveItem(menuIndex, itemIndex)
-                                    }
-                                    className="h-8 w-8 p-0 rounded-full border-red-400 text-red-500"
-                                    disabled={
-                                      watch(`menus.${menuIndex}.items`)
-                                        ?.length === 1
-                                    }
+                                    onClick={() => removeMenu(menuIndex)}
+                                    className="h-8 w-8 shrink-0 rounded-full p-0"
                                   >
                                     <X size={16} />
                                   </Button>
                                 </div>
-                                <FormField
-                                  control={control}
-                                  name={`menus.${menuIndex}.items.${itemIndex}.title`}
-                                  render={({ field }) => {
-                                    const v = field.value || "";
-                                    return (
-                                      <FormItem>
-                                        <FormLabel className="text-sm font-medium">
-                                          {menuItemTitleLabel(itemIndex)}
-                                        </FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            {...field}
-                                            placeholder={menuItemTitlePlaceholder(
-                                              itemIndex,
-                                            )}
-                                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                                            maxLength={MENU_ITEM_TITLE_MAX}
-                                            value={v}
-                                            onChange={(e) =>
-                                              field.onChange(
-                                                e.target.value.slice(
-                                                  0,
-                                                  MENU_ITEM_TITLE_MAX,
-                                                ),
-                                              )
-                                            }
+
+                                <AccordionContent className="px-4 pb-4 pt-0">
+                                  <div className="space-y-4">
+                                    {watch(`menus.${menuIndex}.items`)?.map(
+                                      (item: unknown, itemIndex: number) => (
+                                        <div
+                                          key={itemIndex}
+                                          className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4"
+                                        >
+                                          <div className="flex justify-end">
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() =>
+                                                handleRemoveItem(
+                                                  menuIndex,
+                                                  itemIndex,
+                                                )
+                                              }
+                                              className="h-8 w-8 rounded-full border-red-400 p-0 text-red-500"
+                                              disabled={
+                                                watch(
+                                                  `menus.${menuIndex}.items`,
+                                                )?.length === 1
+                                              }
+                                            >
+                                              <X size={16} />
+                                            </Button>
+                                          </div>
+                                          <FormField
+                                            control={control}
+                                            name={`menus.${menuIndex}.items.${itemIndex}.title`}
+                                            render={({ field }) => {
+                                              const v = field.value || "";
+                                              return (
+                                                <FormItem>
+                                                  <FormLabel className="text-sm font-medium">
+                                                    {menuItemTitleLabel(
+                                                      itemIndex,
+                                                    )}
+                                                  </FormLabel>
+                                                  <FormControl>
+                                                    <Input
+                                                      {...field}
+                                                      placeholder={menuItemTitlePlaceholder(
+                                                        itemIndex,
+                                                      )}
+                                                      className="h-10 border-[#E5E7EB] bg-[#F9FAFB]"
+                                                      maxLength={
+                                                        MENU_ITEM_TITLE_MAX
+                                                      }
+                                                      value={v}
+                                                      onChange={(e) =>
+                                                        field.onChange(
+                                                          e.target.value.slice(
+                                                            0,
+                                                            MENU_ITEM_TITLE_MAX,
+                                                          ),
+                                                        )
+                                                      }
+                                                    />
+                                                  </FormControl>
+                                                  <p className="mt-1 text-xs text-muted-foreground">
+                                                    {v.length}/
+                                                    {MENU_ITEM_TITLE_MAX}{" "}
+                                                    characters
+                                                  </p>
+                                                  <FormMessage />
+                                                </FormItem>
+                                              );
+                                            }}
                                           />
-                                        </FormControl>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          {v.length}/{MENU_ITEM_TITLE_MAX}{" "}
-                                          characters
-                                        </p>
-                                        <FormMessage />
-                                      </FormItem>
-                                    );
-                                  }}
-                                />
-                                <FormField
-                                  control={control}
-                                  name={`menus.${menuIndex}.items.${itemIndex}.description`}
-                                  render={({ field }) => {
-                                    const v = field.value || "";
-                                    return (
-                                      <FormItem>
-                                        <FormLabel className="text-sm font-medium">
-                                          Description
-                                        </FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            {...field}
-                                            placeholder="e.g. Spicy, served with rice"
-                                            className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
-                                            maxLength={MENU_DESCRIPTION_MAX}
-                                            value={v}
-                                            onChange={(e) =>
-                                              field.onChange(
-                                                e.target.value.slice(
-                                                  0,
-                                                  MENU_DESCRIPTION_MAX,
-                                                ),
-                                              )
-                                            }
+                                          <FormField
+                                            control={control}
+                                            name={`menus.${menuIndex}.items.${itemIndex}.description`}
+                                            render={({ field }) => {
+                                              const v = field.value || "";
+                                              return (
+                                                <FormItem>
+                                                  <FormLabel className="text-sm font-medium">
+                                                    Description
+                                                  </FormLabel>
+                                                  <FormControl>
+                                                    <Input
+                                                      {...field}
+                                                      placeholder="e.g. Spicy, served with rice"
+                                                      className="h-10 border-[#E5E7EB] bg-[#F9FAFB]"
+                                                      maxLength={
+                                                        MENU_DESCRIPTION_MAX
+                                                      }
+                                                      value={v}
+                                                      onChange={(e) =>
+                                                        field.onChange(
+                                                          e.target.value.slice(
+                                                            0,
+                                                            MENU_DESCRIPTION_MAX,
+                                                          ),
+                                                        )
+                                                      }
+                                                    />
+                                                  </FormControl>
+                                                  <p className="mt-1 text-xs text-muted-foreground">
+                                                    {v.length}/
+                                                    {MENU_DESCRIPTION_MAX}{" "}
+                                                    characters
+                                                  </p>
+                                                  <FormMessage />
+                                                </FormItem>
+                                              );
+                                            }}
                                           />
-                                        </FormControl>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          {v.length}/{MENU_DESCRIPTION_MAX}{" "}
-                                          characters
-                                        </p>
-                                        <FormMessage />
-                                      </FormItem>
-                                    );
-                                  }}
-                                />
-                              </div>
-                            ),
-                          )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => appendItem(menuIndex)}
-                            disabled={
-                              (watch(`menus.${menuIndex}.items`)?.length ||
-                                0) >= 10
-                            }
-                            className="flex items-center gap-2"
-                          >
-                            <PlusCircle className="h-4 w-4" />
-                            Add menu item
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                                        </div>
+                                      ),
+                                    )}
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => appendItem(menuIndex)}
+                                      disabled={
+                                        (watch(`menus.${menuIndex}.items`)
+                                          ?.length || 0) >= 10
+                                      }
+                                      className="flex items-center gap-2"
+                                    >
+                                      <PlusCircle className="h-4 w-4" />
+                                      Add menu item
+                                    </Button>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            )}
+                          </SortableMenuCategoryItem>
+                        );
+                      })}
+                    </Accordion>
+                  </SortableMenuCategoryList>
                 )}
               </div>
             </>

@@ -16,6 +16,7 @@ import {
   type CheckEventNameAvailability,
 } from "@/lib/parse-check-event-name";
 import { isRoomsToFormDataValue } from "@/lib/event-form-limits";
+import { toPositiveVendorEventPathId } from "@/app/(protected)/vendor/events/_lib/vendor-event-wizard-step";
 import { buildVendorEventGetUrl } from "./build-vendor-event-get-url";
 import { filterSchedulerRowsForApi } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
 import {
@@ -33,7 +34,7 @@ import {
   type VendorStepFiveRoomEntry,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-five-rooms";
 import {
-  mapVendorDrinkPackagesForApi,
+  mapVendorDrinksFieldsForApi,
   type VendorStepSixRoomEntry,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { toLocationCoordsPayload } from "@/lib/to-location-coords-payload";
@@ -95,6 +96,14 @@ function appendPackageImageField(
   if (typeof image === "string" && image.trim().length > 0) {
     formData.append(fieldName, image.trim());
   }
+}
+
+function vendorEventUpdateUrl(eventId: unknown): string {
+  const id = toPositiveVendorEventPathId(eventId);
+  if (!id) {
+    throw new Error("A valid event id is required to update an event.");
+  }
+  return API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace("{eventId}", id);
 }
 
 export const eventsService = {
@@ -178,10 +187,7 @@ export const eventsService = {
     data: EventSchemaType
   ): Promise<ApiResponse<EventItem>> => {
     return api.put<ApiResponse<EventItem>>(
-      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        id.toString()
-      ),
+      vendorEventUpdateUrl(id),
       data,
       {
         returnFullResponse: true,
@@ -514,10 +520,7 @@ export const eventsService = {
     // Use the UPDATE endpoint instead of CREATE
     const response = await request<ApiResponse<EventItem>>({
       method: "POST",
-      url: API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        eventId
-      ),
+      url: vendorEventUpdateUrl(eventId),
       data: formData,
       headers: {
         "Content-Type": "multipart/form-data",
@@ -757,10 +760,7 @@ export const eventsService = {
 
     const response = await request<ApiResponse>({
       method: "POST",
-      url: API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        data.event_id.toString()
-      ),
+      url: vendorEventUpdateUrl(data.event_id),
       data: formData,
       headers: {
         "Content-Type": "multipart/form-data",
@@ -812,10 +812,7 @@ export const eventsService = {
         };
 
     const response = await api.post<ApiResponse<EventItem>>(
-      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        data.event_id.toString()
-      ),
+      vendorEventUpdateUrl(data.event_id),
       payload,
       {
         returnFullResponse: true,
@@ -920,10 +917,7 @@ export const eventsService = {
     }
 
     const response = await api.post<ApiResponse>(
-      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        data.event_id.toString()
-      ),
+      vendorEventUpdateUrl(data.event_id),
       formData,
       {
         returnFullResponse: true,
@@ -993,7 +987,7 @@ export const eventsService = {
         : data.event_id.toString();
 
     const response = await api.post<ApiResponse<EventItem>>(
-      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace("{eventId}", eventIdStr),
+      vendorEventUpdateUrl(eventIdStr),
       formData,
       {
         returnFullResponse: true,
@@ -1027,25 +1021,18 @@ export const eventsService = {
             .filter((room) => Number(room.room_id) > 0)
             .map((room) => ({
               room_id: Number(room.room_id),
-              drink_title: String(room.drink_title ?? "").trim(),
-              drink_description: String(room.drink_description ?? "").trim(),
-              packages: mapVendorDrinkPackagesForApi(room.packages),
+              ...mapVendorDrinksFieldsForApi(room),
             })),
         }
         : {
           step: data.step || 6,
           event_id: data.event_id,
           is_rooms: 0 as const,
-          drink_title: data.drink_title,
-          drink_description: data.drink_description,
-          packages: mapVendorDrinkPackagesForApi(data.packages),
+          ...mapVendorDrinksFieldsForApi(data),
         };
 
     const response = await api.post<ApiResponse>(
-      API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        data.event_id.toString(),
-      ),
+      vendorEventUpdateUrl(data.event_id),
       payload,
       {
         returnFullResponse: true,
@@ -1098,10 +1085,7 @@ export const eventsService = {
     // Use the same endpoint as other steps
     const response = await request<ApiResponse>({
       method: "POST",
-      url: API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        data.event_id.toString()
-      ),
+      url: vendorEventUpdateUrl(data.event_id),
       data: formData,
       headers: {
         "Content-Type": "multipart/form-data",
@@ -1186,10 +1170,7 @@ export const eventsService = {
 
     const response = await request<ApiResponse>({
       method: "POST",
-      url: API_ENDPOINTS.VENDOR.EVENT.UPDATE_EVENT.replace(
-        "{eventId}",
-        data.event_id.toString()
-      ),
+      url: vendorEventUpdateUrl(data.event_id),
       data: formData,
       headers: {
         "Content-Type": "multipart/form-data",

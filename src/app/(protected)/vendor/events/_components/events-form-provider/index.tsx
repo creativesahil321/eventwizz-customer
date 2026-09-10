@@ -18,17 +18,25 @@ import { useParams } from "next/navigation";
 import { EventApiResponse } from "@/services/vendor/events/type";
 import { useEventData } from "../../_lib/hooks/useEventData";
 import {
-  coercePositiveEventStep,
   hasPersistedStepOneData,
   patchEventPayloadFromApi,
 } from "../../_lib/hydrate-event-from-api";
+import {
+  consumeStashedWizardStep,
+  readVendorEventUpdateCompletedStep,
+  readVendorEventUpdateCurrentStep,
+  resolveWizardStepsAfterSave,
+  resolveVisibleWizardSteps,
+} from "../../_lib/vendor-event-wizard-step";
 import {
   applyVendorEventDraft,
   clearVendorEventPreviewDraft,
   loadVendorEventDraft,
 } from "../../_lib/vendor-event-preview-live-data";
 import {
+  cloneEventFormSnapshot,
   eventFormHasUnsavedEdits,
+  shouldAdoptPristineEditorAsSaved,
   VENDOR_EVENT_DISCARD_REQUESTED,
 } from "../../_lib/event-form-discard";
 import { resolveVendorEventIsRoomsForFetch } from "../../_lib/vendor-event-is-rooms";
@@ -47,7 +55,10 @@ interface EventFormContextType {
   save: () => Promise<void>;
   next: () => Promise<void>;
   /** Advance wizard after a step tab already persisted via its own API call. */
-  advanceStep: (completedStep?: number) => Promise<void>;
+  advanceStep: (
+    completedStep?: number,
+    updateResponse?: unknown,
+  ) => Promise<void>;
   back: () => Promise<void>;
   isLoading: boolean;
   /** True while Finalize (step 8) publish/draft save is in flight. */
@@ -62,6 +73,8 @@ interface EventFormContextType {
   isDiscarding: boolean;
   discardEpoch: number;
   discardUnsavedEventEdits: () => Promise<void>;
+  /** Call after a step is persisted so Discard hides until the next edit. */
+  markEventFormSaved: (completedStep?: number) => void;
 }
 
 const FormContext = createContext<EventFormContextType | undefined>(undefined);
@@ -109,9 +122,26 @@ export function FormProvider({
     return null;
   }, [serverData, eventData]);
 
-  // Get initial step after component mount
-  const [activeStep, setActiveStep] = useState<number>(1); // Default to 1
-  const [currentStep, setLastCompletedStep] = useState<number>(1); // Track last completed step
+  const maxSteps = 8;
+  const isMounted = useRef(true);
+  const dataLoadAttempted = useRef(false);
+  const hydratedEventIdRef = useRef<string | null>(null);
+  const isDiscardingRef = useRef(false);
+  const hydrationCatchupEnabledRef = useRef(false);
+  const didInitActiveStepFromServer = useRef(false);
+
+  const [activeStep, setActiveStep] = useState(() => {
+    const stashed = consumeStashedWizardStep(eventIdFromUrl);
+    if (stashed > 0) {
+      didInitActiveStepFromServer.current = true;
+      return stashed;
+    }
+    return 1;
+  });
+  const [currentStep, setLastCompletedStep] = useState(() => {
+    const stashed = consumeStashedWizardStep(eventIdFromUrl);
+    return stashed > 0 ? stashed : 1;
+  });
   const [activeField, setActiveField] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
@@ -122,13 +152,6 @@ export function FormProvider({
   );
   const [discardEpoch, setDiscardEpoch] = useState(0);
   const [isDiscarding, setIsDiscarding] = useState(false);
-
-  const maxSteps = 8;
-  const isMounted = useRef(true);
-  const dataLoadAttempted = useRef(false);
-  const didInitActiveStepFromServer = useRef(false);
-  const hydratedEventIdRef = useRef<string | null>(null);
-  const isDiscardingRef = useRef(false);
 
   const mergedDefaults = useMemo(() => {
     if (resolvedServerData?.status && resolvedServerData.data) {
@@ -191,12 +214,17 @@ export function FormProvider({
       if (cancelled) return;
 
       // API snapshot only — leftover preview drafts must stay dirty so Discard shows.
-      setSavedBaseline(mergedDefaults);
+      setSavedBaseline(cloneEventFormSnapshot(mergedDefaults));
 
       const nextValues = applyVendorEventDraft(
         mergedDefaults as unknown as Record<string, unknown>,
         draft,
       ) as EventSchemaType;
+
+      hydrationCatchupEnabledRef.current = !eventFormHasUnsavedEdits(
+        nextValues,
+        mergedDefaults,
+      );
 
       form.reset(nextValues);
       hydratedEventIdRef.current = eventKey;
@@ -205,14 +233,20 @@ export function FormProvider({
         setPersistedHydrated(true);
       }
 
-      const explicitActive = coercePositiveEventStep(
-        (resolvedServerData.data as { current_step?: number }).current_step,
-      );
+      const fromVisible = resolveVisibleWizardSteps({
+        getData: resolvedServerData.data as {
+          current_step?: number;
+          completed_step?: number;
+        },
+        stashedStep: consumeStashedWizardStep(eventIdFromUrl),
+      });
 
-      if (!didInitActiveStepFromServer.current && explicitActive > 0) {
+      if (cancelled) return;
+
+      setLastCompletedStep(fromVisible.unlockStep);
+      if (!didInitActiveStepFromServer.current) {
         didInitActiveStepFromServer.current = true;
-        setActiveStep((prev) => Math.max(prev, explicitActive));
-        setLastCompletedStep((prev) => Math.max(prev, explicitActive));
+        setActiveStep(fromVisible.activeStep);
       }
 
       setInitialDataLoaded(true);
@@ -233,20 +267,8 @@ export function FormProvider({
     }
   }, [eventIdFromUrl, eventQueryLoading]);
 
-  // After a successful step save the GET updates — keep baseline on the new API
-  // without resetting the form (other tabs may still have unsaved Files).
-  useEffect(() => {
-    if (!resolvedServerData?.status || !resolvedServerData.data) return;
-    if (isDiscardingRef.current) return;
-    if (!hydratedEventIdRef.current && !persistedHydrated) return;
-    setSavedBaseline(
-      patchEventPayloadFromApi(
-        resolvedServerData.data as unknown as Record<string, unknown>,
-      ),
-    );
-  }, [resolvedServerData, persistedHydrated]);
-
   const watchedFormValues = form.watch();
+  const isEditorDirty = form.formState.isDirty;
   const hasUnsavedEventEdits = useMemo(() => {
     const canDiscard =
       persistedHydrated &&
@@ -260,6 +282,32 @@ export function FormProvider({
     savedBaseline,
     persistedHydrated,
     readOnly,
+    eventIdFromUrl,
+  ]);
+
+  useEffect(() => {
+    if (
+      !shouldAdoptPristineEditorAsSaved({
+        catchupEnabled: hydrationCatchupEnabledRef.current,
+        isDirty: isEditorDirty,
+        hasUnsavedEdits: hasUnsavedEventEdits,
+      })
+    ) {
+      if (isEditorDirty) {
+        hydrationCatchupEnabledRef.current = false;
+      }
+      return;
+    }
+
+    setSavedBaseline(cloneEventFormSnapshot(form.getValues()));
+    if (eventIdFromUrl && /^\d+$/.test(String(eventIdFromUrl))) {
+      void clearVendorEventPreviewDraft(eventIdFromUrl);
+    }
+  }, [
+    form,
+    hasUnsavedEventEdits,
+    isEditorDirty,
+    watchedFormValues,
     eventIdFromUrl,
   ]);
 
@@ -290,7 +338,8 @@ export function FormProvider({
         keepIsValid: false,
         keepSubmitCount: false,
       });
-      setSavedBaseline(next);
+      hydrationCatchupEnabledRef.current = true;
+      setSavedBaseline(cloneEventFormSnapshot(next));
       setDiscardEpoch((value) => value + 1);
       toast.success("Changes discarded");
     } catch (error) {
@@ -433,23 +482,50 @@ export function FormProvider({
     form.setValue("currentStep", prevStep);
   }, [activeStep, form, isLoading, updateActiveStep]);
 
-  const advanceStep = useCallback(
-    async (completedStep?: number) => {
-      const stepBase = completedStep ?? activeStep;
-      // Already on the last step (e.g. publish save) — nothing further to unlock.
-      if (stepBase >= maxSteps) {
-        return;
-      }
-
-      const nextStep = stepBase + 1;
-      // Only bump progress when completing the furthest step — re-saving an earlier
-      // step must not unlock tabs ahead (e.g. saving step 2 again after step 3 is open).
-      if (nextStep > currentStep) {
-        await updateActiveStep(nextStep);
-        form.setValue("currentStep", nextStep);
-      }
+  const markEventFormSaved = useCallback(
+    (completedStep?: number) => {
+      const current = cloneEventFormSnapshot(form.getValues());
+      setSavedBaseline((previous) => {
+        if (!previous || completedStep == null) return current;
+        const stepKey = (
+          [
+            "stepOne",
+            "stepTwo",
+            "stepThree",
+            "stepFour",
+            "stepFive",
+            "stepSix",
+            "stepSeven",
+            "stepEight",
+          ] as const
+        )[completedStep - 1];
+        if (!stepKey) return current;
+        return {
+          ...cloneEventFormSnapshot(previous),
+          [stepKey]: current[stepKey],
+        };
+      });
     },
-    [activeStep, currentStep, form, maxSteps, updateActiveStep],
+    [form],
+  );
+
+  const advanceStep = useCallback(
+    async (completedStep?: number, updateResponse?: unknown) => {
+      markEventFormSaved(completedStep ?? activeStep);
+      const stepBase = completedStep ?? activeStep;
+      const next = resolveWizardStepsAfterSave({
+        updateCurrentStep: readVendorEventUpdateCurrentStep(updateResponse),
+        updateCompletedStep: readVendorEventUpdateCompletedStep(updateResponse),
+        savedStep: stepBase,
+        previousUnlockStep: currentStep,
+      });
+
+      setActiveStep(next.activeStep);
+      setActiveField(null);
+      setLastCompletedStep(next.unlockStep);
+      form.setValue("currentStep", next.activeStep);
+    },
+    [activeStep, currentStep, form, markEventFormSaved],
   );
 
   const contextValue = useMemo(
@@ -473,6 +549,7 @@ export function FormProvider({
       isDiscarding,
       discardEpoch,
       discardUnsavedEventEdits,
+      markEventFormSaved,
     }),
     [
       form,
@@ -493,6 +570,7 @@ export function FormProvider({
       isDiscarding,
       discardEpoch,
       discardUnsavedEventEdits,
+      markEventFormSaved,
     ]
   );
 

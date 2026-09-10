@@ -478,6 +478,9 @@ export function EventPreview({
   }, [slices.dates, data.stepThree?.dates]);
 
   const menus = activeMenu?.menus ?? [];
+  const menuOrderKey = menus
+    .map((menu) => String(menu?.name ?? ""))
+    .join("\0");
   const showMenu = menus.length > 0;
 
   const drinkPackages = (activeDrinks?.packages ?? []).map((p) => ({
@@ -787,8 +790,9 @@ export function EventPreview({
 
         {showMenu && (
           <div id={EVENT_SECTION_IDS.menu} className={sectionAnchorClass}>
-            <RoomContentTransition roomKey={roomContentKey}>
+            <RoomContentTransition roomKey={`${roomContentKey}:${menuOrderKey}`}>
               <LazyMenuSection
+                key={menuOrderKey}
                 menu_title={activeMenu?.menu_title || ""}
                 menu_description={activeMenu?.menu_description || ""}
                 menus={menus}

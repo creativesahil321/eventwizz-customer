@@ -1,5 +1,6 @@
 import type { StepSixType } from "../_components/form-provider/schema";
 import { coerceApiFlag } from "@/lib/coerce-api-boolean";
+import { sortMenusForOnboardingDisplay } from "@/lib/event-menu-categories";
 
 export function normalizeOnboardingCateringOption(value: unknown): 0 | 1 {
   return coerceApiFlag(
@@ -46,12 +47,14 @@ export function getFilledOnboardingMenuItems(
 export function sanitizeOnboardingMenusForSubmit(
   menus: OnboardingMenu[] | undefined,
 ): Array<{ name: string; items: OnboardingMenuItemFilled[] }> {
-  return (menus ?? [])
-    .map((menu) => ({
-      name: String(menu.name ?? "").trim(),
-      items: getFilledOnboardingMenuItems(menu.items),
-    }))
-    .filter((menu) => menu.name.length > 0 && menu.items.length > 0);
+  return sortMenusForOnboardingDisplay(
+    (menus ?? [])
+      .map((menu) => ({
+        name: String(menu.name ?? "").trim(),
+        items: getFilledOnboardingMenuItems(menu.items),
+      }))
+      .filter((menu) => menu.name.length > 0 && menu.items.length > 0),
+  );
 }
 
 export function getOnboardingEmptyMenuCategoryNames(

@@ -47,6 +47,7 @@ export interface EventItem {
   event_dates?: string[];
   // Legacy fields for backward compatibility
   current_step?: number;
+  completed_step?: number;
   event_id?: number;
 }
 
@@ -201,6 +202,7 @@ export interface EventDetailStepFive {
 export interface EventDetailStepSix {
   event_id: number;
   step: number;
+  drinks_option?: number;
   drink_title?: string;
   drink_description?: string;
   packages?: Array<{
@@ -237,6 +239,8 @@ export interface EventDetailData {
   lat?: string | number | null;
   long?: string | number | null;
   current_step?: number;
+  /** Highest completed wizard step (GET). Optional on older APIs. */
+  completed_step?: number;
   /** Persisted when step 1 is saved with room system enabled (AI + manual). */
   is_rooms?: boolean | number | string;
   approval_status?: string;

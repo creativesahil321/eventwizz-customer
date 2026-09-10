@@ -202,7 +202,7 @@ export default function DatesTab() {
   const lastHydratedRoomIndexRef = useRef<number | null>(null);
   /** Row open state keyed by useFieldArray `field.id` (same collapse pattern as onboarding step 5). */
   const [openDateRowIds, setOpenDateRowIds] = useState<string[]>([]);
-  const { form: globalForm, advanceStep, readOnly } = useEventFormContext();
+  const { form: globalForm, advanceStep, markEventFormSaved, readOnly } = useEventFormContext();
 
   // Get event_id from global form
   const getEventId = (): number => {
@@ -1942,11 +1942,12 @@ export default function DatesTab() {
                 },
               );
               toast.info("Saved. Continue with the next room.");
+              markEventFormSaved(3);
               return;
             }
           }
 
-          await advanceStep(3);
+          await advanceStep(3, response);
         } else {
           console.error("Error saving event dates:", response);
         }
@@ -1964,6 +1965,7 @@ export default function DatesTab() {
       resolvedRoomIndex,
       router,
       advanceStep,
+      markEventFormSaved,
     ],
   );
 

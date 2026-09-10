@@ -162,6 +162,7 @@ export default function PackageTab() {
   const {
     form: globalForm,
     advanceStep,
+    markEventFormSaved,
     isLoading: globalLoading,
     setActiveField,
     readOnly,
@@ -959,12 +960,13 @@ export default function PackageTab() {
                   },
                 );
                 toast.info("Saved. Continue with the next room.");
+                markEventFormSaved(2);
                 return;
               }
             }
           }
 
-          await advanceStep(2);
+          await advanceStep(2, response);
         } else {
           console.error("Error saving package details:", response);
         }
@@ -978,6 +980,7 @@ export default function PackageTab() {
       form,
       globalForm,
       advanceStep,
+      markEventFormSaved,
       setActiveField,
       packageImage,
       isRoomsEnabled,

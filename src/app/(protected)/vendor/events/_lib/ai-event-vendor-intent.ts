@@ -191,7 +191,7 @@ CRITICAL RULES:
    - booking_type "tables" or "both": payment_type required ("full" or "deposit")
    - deposit: is_deposit_enabled true, deposit_type amount|percentage, deposit_value (percentage 20-80), deposit_due_date BEFORE event_date
 9. stepThree.dates: YYYY-MM-DD, ascending, no duplicates, today or future
-10. stepFour/stepFive optional when vendor says no food/drinks — if they say no catering/menus, set catering_option 0 and menus []. If they say no drinks, set packages [].
+10. stepFour/stepFive optional when vendor says no food/drinks — if they say no catering/menus, set catering_option 0 and menus []. If they say no drinks, set drinks_option 0, empty titles, and packages []. If they want drinks, set drinks_option 1 with real packages (price > 0, quantity ≥ 1).
 11. stepSeven.faqs: max ${maxFaqs}; when vendor asks for 10+ FAQs, provide ${maxFaqs} strong relevant FAQs. If they say no FAQs, return faqs [].
 12. ROOM SYSTEM (when YES):
     - Use EXACT room names provided (${AI_EVENT_MIN_ROOMS}-${AI_EVENT_MAX_ROOMS} rooms)
@@ -263,6 +263,7 @@ export function buildAiEventJsonSchemaBlock(
     "rooms": [
       {
         "room_name": "string (EXACT room name)",
+        "drinks_option": 1,
         "drink_title": "string (max 40)",
         "drink_description": "string (max 160)",
         "packages": [{"title": "string (max 25)", "description": "string (max 160)", "price": number, "available_quantity": number}]
@@ -323,6 +324,7 @@ export function buildAiEventJsonSchemaBlock(
     "menus": [{"name": "Starters", "items": [{"title": "Item Title 1", "description": "string (max 160)"}]}]${stepFourRoomBlock}
   },
   "stepFive": {
+    "drinks_option": "0 or 1 (1 = include drinks with packages; 0 = skip, empty titles, packages [])",
     "drink_title": "string (max 40 chars)",
     "drink_description": "string (max 160 chars)",
     "packages": [{"title": "string (max 25)", "description": "string (max 160)", "price": number, "available_quantity": number}]${stepFiveRoomBlock}
@@ -377,12 +379,12 @@ export function buildAiEventUserPrompt(params: {
       : "Shared menu in stepFour unless vendor specifies per-room differences.";
 
   const drinksHint = hints.omitDrinks
-    ? "Vendor does NOT want drink/bar packages — set stepFive.packages [] and empty per-room packages."
+    ? "Vendor does NOT want drink/bar packages — set stepFive.drinks_option 0, empty titles, packages [], and the same per-room. Do not invent drinks."
     : hints.wantsPerRoomDrinks
-      ? "DIFFERENT drink packages per room — use stepFive.rooms (e.g. whisky/beverages in one room, soft drinks only in another)."
+      ? "DIFFERENT drink packages per room — use stepFive.rooms with drinks_option 1 and room-specific packages (e.g. whisky/beverages in one room, soft drinks only in another). A room with no bar uses drinks_option 0 and packages []."
       : hints.wantsSecondRoomNonAlcoholDrinks
-        ? "Second room: non-alcoholic packages only in stepFive.rooms."
-        : "Shared drinks in stepFive unless vendor specifies per-room packages.";
+        ? "Second room: drinks_option 1 with non-alcoholic packages only in stepFive.rooms."
+        : "Include drinks: set stepFive.drinks_option 1 with title, description, and at least one real package unless the vendor said no drinks.";
 
   const packagesHint = hints.wantsPerRoomPackages
     ? "DIFFERENT package features per room — use stepTwo.rooms with distinct package_details (e.g. drink packages vs exclusive packages)."
@@ -456,6 +458,7 @@ export function ensureStepFiveEventDrinkRooms(
   rooms: AIRoomDrinks[] | undefined,
   roomNames: string[],
   shared: {
+    drinks_option?: 0 | 1;
     drink_title: string;
     drink_description: string;
     packages: AIRoomDrinks["packages"];
@@ -511,12 +514,20 @@ export function resolveRoomMenuFields(
 ): typeof shared {
   const match = matchRoomByName(roomMenus, roomName);
   if (!match) return shared;
+  const ownMenus =
+    Array.isArray(match.menus) && match.menus.length > 0
+      ? match.menus
+      : undefined;
   return {
-    catering_option:
-      match.catering_option === 0 ? 0 : match.catering_option === 1 ? 1 : shared.catering_option,
+    // Empty room stubs often arrive as catering_option 0 — inherit the shared menu.
+    catering_option: ownMenus
+      ? match.catering_option === 0
+        ? 0
+        : 1
+      : shared.catering_option,
     menu_title: match.menu_title?.trim() || shared.menu_title,
     menu_description: match.menu_description?.trim() || shared.menu_description,
-    menus: match.menus?.length ? match.menus : shared.menus,
+    menus: ownMenus ?? shared.menus,
   };
 }
 

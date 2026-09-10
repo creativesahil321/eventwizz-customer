@@ -25,6 +25,10 @@ import {
   parseOptionalCoordinate,
 } from "@/lib/to-location-coords-payload";
 import { getOnboardingEmptyMenuCategoryNames } from "../../_lib/onboarding-catering-ready";
+import {
+  DUPLICATE_MENU_CATEGORY_MESSAGE,
+  duplicateMenuCategoryIndexes,
+} from "@/lib/event-menu-categories";
 
 /** API / form state may send null, strings, or numbers — normalize at runtime via parseOptionalCoordinate. */
 export const optionalCoordinateSchema = z.number().optional();
@@ -941,6 +945,14 @@ export const stepSixSchema = z
           path: ["menus", Math.max(menuIndex, 0), "items"],
         });
       });
+
+      duplicateMenuCategoryIndexes(data.menus).forEach((index) => {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: DUPLICATE_MENU_CATEGORY_MESSAGE,
+          path: ["menus", index, "name"],
+        });
+      });
     }
   });
 export type StepSixType = z.infer<typeof stepSixSchema>;
@@ -1053,114 +1065,155 @@ export type StepSevenType = z.infer<typeof stepSevenSchema>;
 
 //#===step-8===#
 
-export const stepEightSchema = z.object({
-  step: z.number(),
-  isApproved: z.boolean().optional(),
-  event_id: z.number(),
-  drink_title: z
-    .string()
-    .min(1, "The drink title field is required")
-    .max(
-      DRINK_SECTION_TITLE_MAX_CHARS,
-      `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`
-    ),
-  drink_description: z
-    .string()
-    .min(1, "The drink description field is required")
-    .max(
-      DRINK_SECTION_DESCRIPTION_MAX_CHARS,
-      `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`
-    ),
-  packages: z
-    .array(
-      z.object({
-        id: z.number().optional(), // Optional for backward compatibility (required when from API)
-        title: z
-          .string()
-          .min(1, "Extra option title is required")
-          .max(
-            DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
-            `Extra option title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`
-          ),
-        description: z
-          .string()
-          .min(1, "Extra option description is required")
-          .refine(
-            (val) =>
-              plainTextCharCount(val) <= RICH_DESCRIPTION_MAX_CHARS,
-            {
-              message: `Extra option description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
-            }
-          ),
-        price: z.union([z.number(), z.string()]).refine(
-          (val) => {
-            // Check if value is empty, null, or undefined
-            if (val === "" || val === null || val === undefined) {
-              return false;
-            }
-            const num = typeof val === "string" ? Number.parseFloat(val) : val;
-            return (
-              !Number.isNaN(num) && num > 0 && num <= DRINK_PACKAGE_PRICE_MAX
-            );
-          },
-          {
+export const stepEightSchema = z
+  .object({
+    step: z.number(),
+    isApproved: z.boolean().optional(),
+    event_id: z.number(),
+    drinks_option: z.number().min(0).max(1),
+    drink_title: z
+      .string()
+      .max(
+        DRINK_SECTION_TITLE_MAX_CHARS,
+        `Drink title must not exceed ${DRINK_SECTION_TITLE_MAX_CHARS} characters`
+      )
+      .optional(),
+    drink_description: z
+      .string()
+      .max(
+        DRINK_SECTION_DESCRIPTION_MAX_CHARS,
+        `Drink description must not exceed ${DRINK_SECTION_DESCRIPTION_MAX_CHARS} characters`
+      )
+      .optional(),
+    packages: z
+      .array(
+        z.object({
+          id: z.number().optional(),
+          title: z
+            .string()
+            .max(
+              DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+              `Extra option title must not exceed ${DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS} characters`
+            )
+            .optional(),
+          description: z
+            .string()
+            .refine(
+              (val) =>
+                plainTextCharCount(val ?? "") <= RICH_DESCRIPTION_MAX_CHARS,
+              {
+                message: `Extra option description must not exceed ${RICH_DESCRIPTION_MAX_CHARS} characters`,
+              }
+            )
+            .optional(),
+          price: z.union([z.number(), z.string()]).optional(),
+          available_quantity: z.union([z.number(), z.string()]).optional(),
+        })
+      )
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.drinks_option !== 1) return;
+
+    if (!data.drink_title || data.drink_title.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "The drink title field is required",
+        path: ["drink_title"],
+      });
+    }
+    if (!data.drink_description || data.drink_description.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "The drink description field is required",
+        path: ["drink_description"],
+      });
+    }
+
+    const packages = data.packages ?? [];
+    if (packages.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one package is required",
+        path: ["packages"],
+      });
+      return;
+    }
+
+    packages.forEach((pkg, index) => {
+      if (!pkg.title || pkg.title.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Extra option title is required",
+          path: ["packages", index, "title"],
+        });
+      }
+      if (!pkg.description || pkg.description.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Extra option description is required",
+          path: ["packages", index, "description"],
+        });
+      }
+      const price = pkg.price;
+      if (price === "" || price === null || price === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Extra price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
+          path: ["packages", index, "price"],
+        });
+      } else {
+        const num =
+          typeof price === "string" ? Number.parseFloat(price) : Number(price);
+        if (!Number.isFinite(num) || num <= 0 || num > DRINK_PACKAGE_PRICE_MAX) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
             message: `Extra price is required and must be between 1 and ${DRINK_PACKAGE_PRICE_MAX}`,
-          }
-        ),
-        available_quantity: z.preprocess(
-          (val) => {
-            // Convert undefined, null, NaN, or empty string to undefined
-            if (
-              val === undefined ||
-              val === null ||
-              val === "" ||
-              (typeof val === "number" && Number.isNaN(val))
-            ) {
-              return undefined;
-            }
-            // Convert string to number
-            if (typeof val === "string") {
-              const num = Number.parseFloat(val);
-              return Number.isNaN(num) ? undefined : num;
-            }
-            return val;
-          },
-          z.union([z.number(), z.undefined()]).superRefine((val, ctx) => {
-            if (val === undefined || val === null) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Available quantity is required",
-              });
-              return;
-            }
-            const num =
-              typeof val === "number" ? val : Number.parseFloat(String(val));
-            if (Number.isNaN(num)) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Available quantity must be a number",
-              });
-              return;
-            }
-            if (num < 1) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Available quantity must be at least 1",
-              });
-              return;
-            }
-            if (num > DRINK_PACKAGE_QTY_MAX) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: `Available quantity cannot exceed ${DRINK_PACKAGE_QTY_MAX}`,
-              });
-            }
-          })
-        ) as z.ZodType<number, z.ZodTypeDef, unknown>,
-      })
-    )
-    .min(1, "At least one package is required"),
-});
+            path: ["packages", index, "price"],
+          });
+        }
+      }
+      const qtyRaw = pkg.available_quantity;
+      if (
+        qtyRaw === undefined ||
+        qtyRaw === null ||
+        qtyRaw === "" ||
+        (typeof qtyRaw === "number" && Number.isNaN(qtyRaw))
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Available quantity is required",
+          path: ["packages", index, "available_quantity"],
+        });
+        return;
+      }
+      const num =
+        typeof qtyRaw === "number" ? qtyRaw : Number.parseFloat(String(qtyRaw));
+      if (Number.isNaN(num)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Available quantity must be a number",
+          path: ["packages", index, "available_quantity"],
+        });
+        return;
+      }
+      if (num < 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Available quantity must be at least 1",
+          path: ["packages", index, "available_quantity"],
+        });
+        return;
+      }
+      if (num > DRINK_PACKAGE_QTY_MAX) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Available quantity cannot exceed ${DRINK_PACKAGE_QTY_MAX}`,
+          path: ["packages", index, "available_quantity"],
+        });
+      }
+    });
+  });
 export type StepEightType = z.infer<typeof stepEightSchema>;
 
 //#===step-9===#
@@ -1481,6 +1534,7 @@ const roomBrochureSchema = z.object({
 });
 
 const roomDrinksSchema = z.object({
+  drinks_option: z.number().min(0).max(1).optional().default(0),
   drink_title: z.string().optional().default(""),
   drink_description: z.string().optional().default(""),
   packages: z

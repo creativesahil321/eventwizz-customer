@@ -66,9 +66,12 @@ import {
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/event-form-limits";
 import {
+  DUPLICATE_MENU_CATEGORY_MESSAGE,
   dedupeMenuCategoriesById,
   ensureEventMenuCategoriesForRoom,
   findMenuCategoryIdForMenus,
+  isMenuCategoryNameTaken,
+  sortMenusForOnboardingDisplay,
   toPositiveId,
 } from "@/lib/event-menu-categories";
 
@@ -165,16 +168,18 @@ export default function StepSix() {
 
     // Only use existing menus if they exist
     return existingMenus.length > 0
-      ? existingMenus
-          .map((menu) => ({
-            ...menu,
-            items: menu.items.filter(
-              (item: { title?: string; description?: string }) =>
-                String(item.title || "").trim() !== "" ||
-                String(item.description || "").trim() !== "",
-            ),
-          }))
-          .filter((menu) => menu.name.trim() !== "" && menu.items.length > 0)
+      ? sortMenusForOnboardingDisplay(
+          existingMenus
+            .map((menu) => ({
+              ...menu,
+              items: menu.items.filter(
+                (item: { title?: string; description?: string }) =>
+                  String(item.title || "").trim() !== "" ||
+                  String(item.description || "").trim() !== "",
+              ),
+            }))
+            .filter((menu) => menu.name.trim() !== "" && menu.items.length > 0),
+        )
       : [];
   }, [activeScopedCatering?.menus, globalForm, roomScope.isMultiRoom]);
 
@@ -290,7 +295,9 @@ export default function StepSix() {
           catering_option: normalizeOnboardingCateringOption(outgoing.catering_option),
           menu_title: outgoing.menu_title ?? "",
           menu_description: outgoing.menu_description ?? "",
-          menus: (outgoing.menus as MenuType[]) ?? [],
+          menus: sortMenusForOnboardingDisplay(
+            (outgoing.menus as MenuType[]) ?? [],
+          ),
           event_menu_category_id: toPositiveId(
             outgoing.event_menu_category_id,
           ),
@@ -311,7 +318,7 @@ export default function StepSix() {
       event_menu_category_id: toPositiveId(scoped.event_menu_category_id),
       menus:
         Array.isArray(scoped.menus) && scoped.menus.length > 0
-          ? (scoped.menus as MenuType[])
+          ? sortMenusForOnboardingDisplay(scoped.menus as MenuType[])
           : emptyMenus,
     });
 
@@ -343,8 +350,8 @@ export default function StepSix() {
   // Setup field array for menus
   const {
     fields: menuFields,
-    append: appendMenu,
     remove: removeMenuField,
+    replace: replaceMenus,
   } = useFieldArray({
     control: form.control,
     name: "menus",
@@ -459,11 +466,12 @@ export default function StepSix() {
       items: [createDefaultMenuItemRow(0)],
     };
 
-    // Add to local form
-    appendMenu(newMenu);
-
-    // Update global form
-    setScopedCateringField("menus", [...currentMenus, newMenu]);
+    const nextMenus = sortMenusForOnboardingDisplay([
+      ...currentMenus,
+      newMenu,
+    ]);
+    replaceMenus(nextMenus);
+    setScopedCateringField("menus", nextMenus);
     return newMenu;
   };
 
@@ -1088,38 +1096,40 @@ export default function StepSix() {
                                         .find((name) => name.length > 0) ||
                                       undefined
                                     }
+                                    takenNames={(watchedMenus ?? [])
+                                      .map((menu) =>
+                                        String(menu?.name ?? "").trim(),
+                                      )
+                                      .filter((name) => name.length > 0)}
                                     onSelect={(value) => {
-                                      field.onChange(Number(value));
-                                      setScopedCateringField(
-                                        "event_menu_category_id",
-                                        Number(value),
-                                      );
-
-                                      // Add the selected category to the menu items if it doesn't exist
+                                      const numVal = Number(value);
                                       const selectedCategory =
                                         localMenuCategories.find(
-                                          (cat) =>
-                                            Number(cat.id) === Number(value),
+                                          (cat) => Number(cat.id) === numVal,
                                         );
+
+                                      if (
+                                        selectedCategory &&
+                                        isMenuCategoryNameTaken(
+                                          form.getValues("menus"),
+                                          selectedCategory.name,
+                                        ) &&
+                                        numVal !== toPositiveId(field.value)
+                                      ) {
+                                        toast.error(
+                                          DUPLICATE_MENU_CATEGORY_MESSAGE,
+                                        );
+                                        return;
+                                      }
+
+                                      field.onChange(numVal);
+                                      setScopedCateringField(
+                                        "event_menu_category_id",
+                                        numVal,
+                                      );
 
                                       if (selectedCategory) {
-                                        const existingMenuIndex = (
-                                          form.getValues("menus") || []
-                                        ).findIndex(
-                                          (menu) =>
-                                            String(menu?.name ?? "")
-                                              .trim()
-                                              .toLowerCase() ===
-                                            selectedCategory.name
-                                              .trim()
-                                              .toLowerCase(),
-                                        );
-
-                                        if (existingMenuIndex === -1) {
-                                          createMenuEntry(
-                                            selectedCategory.name,
-                                          );
-                                        }
+                                        createMenuEntry(selectedCategory.name);
                                       }
                                     }}
                                     isLoading={isMenuCategoriesLoading}

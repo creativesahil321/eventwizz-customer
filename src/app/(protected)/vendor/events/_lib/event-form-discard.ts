@@ -1,10 +1,46 @@
 import type { EventSchemaType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import { applyVendorEventDraft } from "./vendor-event-preview-live-data";
 
 const UI_ONLY_KEYS = new Set([
   "currentStep",
   "active_room_index",
   "activeField",
 ]);
+
+/** Additive GET fields — display order is the menus array index, not this. */
+const IGNORE_COMPARE_KEYS = new Set(["sort_order"]);
+
+/** Copied onto the preview overlay only — real values live on stepOne / stepTwo. */
+const ROOT_MERGE_META_KEYS = new Set(["is_rooms", "vendor_location_id"]);
+
+const NUMERIC_STRING = /^-?\d+(\.\d+)?$/;
+
+export function shouldAdoptPristineEditorAsSaved(options: {
+  catchupEnabled: boolean;
+  isDirty: boolean;
+  hasUnsavedEdits: boolean;
+}): boolean {
+  return (
+    options.catchupEnabled && !options.isDirty && options.hasUnsavedEdits
+  );
+}
+
+function canonicalizeScalar(value: unknown): unknown {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : "";
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return "";
+    if (trimmed === "true") return 1;
+    if (trimmed === "false") return 0;
+    if (NUMERIC_STRING.test(trimmed)) {
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) return numeric;
+    }
+    return trimmed;
+  }
+  return value;
+}
 
 function isEmptyNormalized(value: unknown): boolean {
   if (value === "" || value == null) return true;
@@ -20,30 +56,31 @@ function isEmptyNormalized(value: unknown): boolean {
   return false;
 }
 
-function normalizeForCompare(value: unknown): unknown {
+function normalizeForCompare(value: unknown, depth = 0): unknown {
   if (typeof File !== "undefined" && value instanceof File) {
     return `file:${value.name}:${value.size}:${value.lastModified}`;
   }
   if (value == null) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" || typeof value === "boolean") return value;
   if (Array.isArray(value)) {
     return value
-      .map((item) => normalizeForCompare(item))
+      .map((item) => normalizeForCompare(item, depth + 1))
       .filter((item) => !isEmptyNormalized(item));
   }
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
+    const skipCatalogRoomName = Number(record.room_id) > 0;
     const next: Record<string, unknown> = {};
     for (const key of Object.keys(record).sort()) {
-      if (UI_ONLY_KEYS.has(key)) continue;
-      const normalized = normalizeForCompare(record[key]);
+      if (depth === 0 && ROOT_MERGE_META_KEYS.has(key)) continue;
+      if (UI_ONLY_KEYS.has(key) || IGNORE_COMPARE_KEYS.has(key)) continue;
+      if (key === "name" && skipCatalogRoomName) continue;
+      const normalized = normalizeForCompare(record[key], depth + 1);
       if (isEmptyNormalized(normalized)) continue;
       next[key] = normalized;
     }
     return next;
   }
-  return String(value);
+  return canonicalizeScalar(value);
 }
 
 export function serializeEventFormForCompare(
@@ -62,6 +99,39 @@ export function eventFormHasUnsavedEdits(
     serializeEventFormForCompare(current) !==
     serializeEventFormForCompare(baseline)
   );
+}
+
+/** Preview Discard: a stored draft only counts if it actually changes saved content. */
+export function vendorPreviewDraftHasUnsavedEdits(
+  savedForm: EventSchemaType | Partial<EventSchemaType> | null | undefined,
+  draft: Partial<EventSchemaType> | null | undefined,
+): boolean {
+  if (!draft || !savedForm) return false;
+  const live = applyVendorEventDraft(
+    savedForm as unknown as Record<string, unknown>,
+    draft,
+  ) as EventSchemaType;
+  return eventFormHasUnsavedEdits(live, savedForm);
+}
+
+export function cloneEventFormSnapshot(
+  values: EventSchemaType,
+): EventSchemaType {
+  try {
+    return structuredClone(values);
+  } catch {
+    return {
+      ...values,
+      stepOne: { ...values.stepOne },
+      stepTwo: { ...values.stepTwo },
+      stepThree: { ...values.stepThree },
+      stepFour: { ...values.stepFour },
+      stepFive: { ...values.stepFive },
+      stepSix: { ...values.stepSix },
+      stepSeven: { ...values.stepSeven },
+      stepEight: { ...values.stepEight },
+    };
+  }
 }
 
 export const VENDOR_EVENT_DISCARD_REQUESTED = "vendor-event-discard-requested";

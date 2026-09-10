@@ -40,6 +40,12 @@ import {
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { mapGlobalStepOneToLocal } from "../../../_lib/map-global-step-to-local";
+import {
+  resolveWizardStepAfterSave,
+  readVendorEventUpdateCurrentStep,
+  stashWizardStepForNextMount,
+  toPositiveVendorEventPathId,
+} from "../../../_lib/vendor-event-wizard-step";
 import { useSyncStepFormFromGlobal } from "../../../_lib/use-sync-step-form-from-global";
 import { writeVendorEventPreviewDraft } from "../../../_lib/vendor-event-preview-live-data";
 import AddressAutocomplete from "./_components/address-autocomplete";
@@ -644,12 +650,6 @@ export default function EventNameTab() {
           ...formData,
         });
 
-        // Save data using the global save function
-        await advanceStep(1);
-
-        // Update global form
-        globalForm.setValue("stepOne", formData);
-
         // Check if we already have an event_id from the URL route
         const pathname = window.location.pathname;
         let eventIdFromUrl;
@@ -663,18 +663,13 @@ export default function EventNameTab() {
           eventIdFromUrl = segment !== "create" ? segment : undefined;
         }
 
-        // Fallback to form data if URL doesn't contain event ID
-        const eventIdFromGlobalForm =
-          globalForm.getValues().stepOne &&
-          typeof (globalForm.getValues().stepOne as Record<string, unknown>)
-            .event_id === "number"
-            ? String(
-                (globalForm.getValues().stepOne as Record<string, unknown>)
-                  .event_id,
-              )
-            : undefined;
+        const eventIdFromGlobalForm = toPositiveVendorEventPathId(
+          (globalForm.getValues().stepOne as { event_id?: unknown } | undefined)
+            ?.event_id,
+        );
 
-        const existingEventId = eventIdFromUrl || eventIdFromGlobalForm;
+        const existingEventId =
+          toPositiveVendorEventPathId(eventIdFromUrl) || eventIdFromGlobalForm;
         let response;
 
         if (existingEventId) {
@@ -779,10 +774,15 @@ export default function EventNameTab() {
               });
             }
 
-            // Only redirect if this is a new event
-            // Success message is handled by axios interceptor
             if (!existingEventId) {
+              const nextStep = resolveWizardStepAfterSave({
+                updateCurrentStep: readVendorEventUpdateCurrentStep(response),
+                savedStep: 1,
+              });
+              stashWizardStepForNextMount(eventId, nextStep);
               router.push(`/vendor/events/${eventId}`);
+            } else {
+              await advanceStep(1, response);
             }
           } else {
             console.error("No event_id in response:", response);
@@ -1307,6 +1307,24 @@ export default function EventNameTab() {
                     selectedLocation?.city ?? selectedLocation?.name ?? null
                   }
                   onLocationChange={(location) => {
+                    const prevAddress = String(
+                      globalForm.getValues("stepOne.event_address") ?? "",
+                    ).trim();
+                    const prevLat = Number(
+                      globalForm.getValues("stepOne.latitude"),
+                    );
+                    const prevLng = Number(
+                      globalForm.getValues("stepOne.longitude"),
+                    );
+                    if (
+                      prevAddress === location.address.trim() &&
+                      Number.isFinite(prevLat) &&
+                      Number.isFinite(prevLng) &&
+                      prevLat === location.latitude &&
+                      prevLng === location.longitude
+                    ) {
+                      return;
+                    }
                     form.setValue("event_address", location.address, {
                       shouldDirty: true,
                       shouldValidate: true,

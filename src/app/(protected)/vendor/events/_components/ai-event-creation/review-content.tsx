@@ -1294,7 +1294,7 @@ function StepFiveEditor({
   onChange: (v: AIEventGeneratedContent["stepFive"]) => void;
 }) {
   const currencySymbol = useCurrencySymbol();
-  if (content.packages.length === 0) {
+  if (content.drinks_option === 0 || content.packages.length === 0) {
     return (
       <p className="text-xs text-slate-500 italic">
         No other packages. You can add them later from the manual editor.

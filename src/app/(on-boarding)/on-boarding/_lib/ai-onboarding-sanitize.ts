@@ -4,6 +4,10 @@ import type {
   AIRoomDrinks,
 } from "@/app/api/ai/generate-onboarding/route";
 import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
+import {
+  normalizeDrinksOptionFlag,
+  resolveAiDrinksEnabled,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { sanitizeOnboardingMenusForSubmit } from "./onboarding-catering-ready";
 
 export const AI_ONBOARDING_MIN_ROOMS = 2;
@@ -670,6 +674,7 @@ export function ensureStepSevenRooms(
   rooms: AIRoomDrinks[] | undefined,
   roomNames: string[] | undefined,
   shared: {
+    drinks_option?: 0 | 1;
     drink_title: string;
     drink_description: string;
     packages: Array<{
@@ -692,6 +697,16 @@ export function ensureStepSevenRooms(
 
   return names.map((name, index) => {
     const existing = byLower.get(name.toLowerCase());
+    if (hints.omitDrinks) {
+      return {
+        room_name: name,
+        drinks_option: 0 as const,
+        drink_title: "",
+        drink_description: "",
+        packages: [],
+      };
+    }
+
     const basePackages =
       existing?.packages && existing.packages.length > 0
         ? existing.packages
@@ -703,8 +718,26 @@ export function ensureStepSevenRooms(
       packages = nonAlcohol.length > 0 ? nonAlcohol : basePackages;
     }
 
+    const drinks_option = resolveAiDrinksEnabled({
+      drinks_option: existing?.drinks_option ?? shared.drinks_option,
+      drink_title: existing?.drink_title ?? shared.drink_title,
+      drink_description: existing?.drink_description ?? shared.drink_description,
+      packages,
+    });
+
+    if (drinks_option !== 1) {
+      return {
+        room_name: name,
+        drinks_option: 0 as const,
+        drink_title: "",
+        drink_description: "",
+        packages: [],
+      };
+    }
+
     return {
       room_name: name,
+      drinks_option: 1 as const,
       drink_title: String(existing?.drink_title ?? shared.drink_title ?? ""),
       drink_description: String(
         existing?.drink_description ?? shared.drink_description ?? "",
@@ -725,7 +758,7 @@ export function buildAiOnboardingJsonSchemaBlock(stepNineMaxFaqs: number): strin
     "rooms":[{"room_name":"exact name","dates":[{"event_date":"YYYY-MM-DD","booking_type":"tickets|tables|both","tickets":[{"title":"≤25","description":"≤160","total_capacity":"n","price":"n"}],"tables":[{"min_persons":"n","max_persons":"n","price":"n","total_tables":"n"}],"payment_type":"full|deposit"}]}]
   },
   "stepSix": {"menu_title":"≤40","menu_description":"≤160","menus":[{"name":"≤40","items":[{"title":"≤40","description":"≤160"}]}]},
-  "stepSeven": {"drink_title":"≤40","drink_description":"≤160","packages":[{"title":"≤25","description":"≤160","price":0,"available_quantity":0}],"rooms":[{"room_name":"exact","drink_title":"s","drink_description":"s","packages":[]}]},
+  "stepSeven": {"drinks_option":"0|1 (1 = include drinks with packages; 0 = skip)","drink_title":"≤40","drink_description":"≤160","packages":[{"title":"≤25","description":"≤160","price":0,"available_quantity":0}],"rooms":[{"room_name":"exact","drinks_option":"0|1","drink_title":"s","drink_description":"s","packages":[]}]},
   "stepEight": {"price_start_from":"n","price_start_from_button_text":"Book Now","location":{"title":"≤40","description":"≤160"}},
   "stepNine": {"faqs":[{"question":"≤160","answer":"≤500"}]}
 }
@@ -758,7 +791,7 @@ CRITICAL RULES:
    - stepFour content is shared style; rooms differ mainly in stepFive dates (and optional per-room notes in copy)
    - Drinks (stepSeven) and menu (stepSix) can be shared across rooms unless vendor specifies per-room differences
    - When vendor asks per-room drinks, fill stepSeven.rooms with room-specific drinks
-11. stepSix menus: [] if no catering; stepSeven packages: [] if no drinks. Every menu MUST have a non-empty "name" (the category, e.g. Starters, Mains) with at least one item — never output a menu block without a category name.
+11. stepSix menus: [] if no catering. Drinks (stepSeven) use drinks_option like catering_option: 0 = skip (empty titles, packages []); 1 = include title, description, and at least one real package. Every menu MUST have a non-empty "name" (the category, e.g. Starters, Mains) with at least one item — never output a menu block without a category name.
 12. stepFive.dates: when room system is Yes, still provide template dates in stepFive.dates AND full stepFive.rooms
 13. VENDOR FACTS OVERRIDE DEFAULTS. If Additional Info lists dates, ticket prices, table counts, per-person prices, or a deposit %, use those exact values in stepFive. One date object per listed event date. Never invent different dates or prices when the vendor already specified them.`;
 }
@@ -800,12 +833,12 @@ export function buildAiOnboardingUserPrompt(
     ? "Vendor wants SAME dates on ALL rooms — duplicate the same dates array for every room in stepFive.rooms."
     : "Rooms may have different dates unless vendor specified otherwise.";
   const drinksHint = hints.omitDrinks
-    ? "Vendor does NOT want drink packages — set stepSeven.packages to []."
+    ? "Vendor does NOT want drink packages — set stepSeven.drinks_option 0, empty titles, packages [], and the same per-room. Do not invent drinks."
     : hints.wantsSecondRoomNonAlcoholDrinks
-      ? "Vendor wants SECOND room non-alcohol drinks — keep room 2 packages non-alcoholic and use stepSeven.rooms."
+      ? "Vendor wants SECOND room non-alcohol drinks — set drinks_option 1, keep room 2 packages non-alcoholic, and use stepSeven.rooms."
       : hints.wantsRoomSpecificDrinks
-        ? "Vendor wants different drinks by room — use stepSeven.rooms."
-        : "Drinks can be shared across rooms unless explicitly different.";
+        ? "Vendor wants different drinks by room — use stepSeven.rooms with drinks_option 1 (or 0 for a room with no bar)."
+        : "Include drinks: set stepSeven.drinks_option 1 with title, description, and at least one real package unless the vendor said no drinks.";
   const cateringHint = hints.omitCatering
     ? "Vendor does NOT want catering/menus — set stepSix.menus to []."
     : "stepSix menus: fill a realistic menu unless vendor said no catering.";
@@ -1242,8 +1275,22 @@ export function fillOnboardingContentDefaults(
   const sevenIsBrochure =
     typeof sevenRaw?.event_address === "string" ||
     typeof sevenRaw?.price_start_from === "string";
-  const drinkDefaults = omitHints.omitDrinks
+  const existingDrinkPackages =
+    Array.isArray(next.stepSeven?.packages) && next.stepSeven.packages.length > 0
+      ? next.stepSeven.packages
+      : [];
+  const explicitDrinksFlag = next.stepSeven?.drinks_option;
+  const hasExplicitDrinksFlag =
+    explicitDrinksFlag !== undefined &&
+    explicitDrinksFlag !== null &&
+    String(explicitDrinksFlag).trim() !== "";
+  const skipDrinks =
+    omitHints.omitDrinks ||
+    (hasExplicitDrinksFlag &&
+      normalizeDrinksOptionFlag(explicitDrinksFlag) === 0);
+  const drinkDefaults = skipDrinks
     ? {
+        drinks_option: 0 as const,
         drink_title: "",
         drink_description: "",
         packages: [] as NonNullable<
@@ -1251,14 +1298,14 @@ export function fillOnboardingContentDefaults(
         >["packages"],
       }
     : {
+    drinks_option: 1 as const,
     drink_title: next.stepSeven?.drink_title || "Drinks packages",
     drink_description:
       next.stepSeven?.drink_description ||
       `Bar packages to match ${kind} at ${venue}.`,
     packages:
-      Array.isArray(next.stepSeven?.packages) &&
-      next.stepSeven.packages.length > 0
-        ? next.stepSeven.packages
+      existingDrinkPackages.length > 0
+        ? existingDrinkPackages
         : [
             {
               title: "House pours",
@@ -1385,13 +1432,14 @@ export function fillOnboardingContentDefaults(
     };
   }
 
-  if (useRooms && !sevenIsBrochure && !omitHints.omitDrinks) {
+  if (useRooms && !sevenIsBrochure) {
     next.stepSeven = {
       ...next.stepSeven,
       rooms: ensureStepSevenRooms(
         next.stepSeven?.rooms,
         roomNames,
         {
+          drinks_option: next.stepSeven.drinks_option,
           drink_title: next.stepSeven.drink_title,
           drink_description: next.stepSeven.drink_description,
           packages: next.stepSeven.packages,

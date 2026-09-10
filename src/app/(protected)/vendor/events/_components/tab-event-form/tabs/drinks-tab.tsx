@@ -13,9 +13,12 @@ import {
 } from "@/lib/event-form-limits";
 import {
   cloneVendorStepSixRoomDrinks,
+  emptyVendorDrinkPackage,
   findStepSixDrinksForRoom,
   isVendorRoomDrinksStepComplete,
+  normalizeDrinksOptionFlag,
   normalizeVendorStepSixRooms,
+  resolveDrinksOptionFlag,
   roomEntryToStepSixFields,
   stepSixFieldsToRoomEntry,
   syncStepSixRoomsFromStepTwo,
@@ -33,6 +36,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { X, PlusCircle } from "lucide-react";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import {
@@ -52,6 +57,7 @@ export default function DrinksTab() {
   const {
     form: globalForm,
     advanceStep,
+    markEventFormSaved,
     setActiveField,
     readOnly,
   } = useEventFormContext();
@@ -96,19 +102,15 @@ export default function DrinksTab() {
       };
     }
     return {
+      drinks_option: resolveDrinksOptionFlag({
+        drinks_option: defaults?.drinks_option,
+        drink_title: defaults?.drink_title,
+        drink_description: defaults?.drink_description,
+        packages: defaults?.packages,
+      }),
       drink_title: defaults?.drink_title || "",
       drink_description: defaults?.drink_description || "",
-      packages:
-        (defaults?.packages || []).length > 0
-          ? defaults?.packages
-          : [
-              {
-                title: "Premium Package",
-                description: "Premium package description",
-                price: 20,
-                available_quantity: 100,
-              },
-            ],
+      packages: defaults?.packages || [],
     };
   };
 
@@ -123,29 +125,20 @@ export default function DrinksTab() {
       event_id: getEventId() || 0,
       is_rooms: isRoomsEnabled ? 1 : 0,
       rooms: "rooms" in initialDrinks ? initialDrinks.rooms : undefined,
+      drinks_option: initialDrinks.drinks_option ?? 0,
       drink_title: initialDrinks.drink_title || "",
       drink_description: initialDrinks.drink_description || "",
-      packages:
-        (initialDrinks.packages || []).length > 0
-          ? initialDrinks.packages!.map((pkg) => ({
-              ...pkg,
-              available_quantity:
-                typeof pkg.available_quantity === "number"
-                  ? pkg.available_quantity
-                  : 100,
-            }))
-          : [
-              {
-                title: "Premium Package",
-                description: "Premium package description",
-                price: 20,
-                available_quantity: 100,
-              },
-            ],
+      packages: (initialDrinks.packages || []).map((pkg) => ({
+        ...pkg,
+        available_quantity:
+          typeof pkg.available_quantity === "number"
+            ? pkg.available_quantity
+            : 100,
+      })),
     },
   });
 
-  const { control, getValues, reset } = form;
+  const { control, getValues, reset, setValue, watch } = form;
 
   // Setup field array for packages
   const {
@@ -237,6 +230,10 @@ export default function DrinksTab() {
     stepTwoRooms,
   ]);
 
+  const watchedDrinksOption = useWatch({
+    control: form.control,
+    name: "drinks_option",
+  });
   const watchedDrinkTitle = useWatch({
     control: form.control,
     name: "drink_title",
@@ -253,6 +250,7 @@ export default function DrinksTab() {
   const canApplyToAllRooms = useMemo(() => {
     if (!isRoomsEnabled || stepTwoRooms.length < 2) return false;
     return isVendorRoomDrinksStepComplete({
+      drinks_option: normalizeDrinksOptionFlag(watchedDrinksOption),
       drink_title: watchedDrinkTitle,
       drink_description: watchedDrinkDescription,
       packages: watchedDrinkPackages,
@@ -260,10 +258,29 @@ export default function DrinksTab() {
   }, [
     isRoomsEnabled,
     stepTwoRooms.length,
+    watchedDrinksOption,
     watchedDrinkTitle,
     watchedDrinkDescription,
     watchedDrinkPackages,
   ]);
+
+  const drinksOption = watch("drinks_option");
+  const showDrinksSection = normalizeDrinksOptionFlag(drinksOption) === 1;
+
+  useEffect(() => {
+    const resolved = resolveDrinksOptionFlag({
+      drinks_option: getValues("drinks_option"),
+      drink_title: getValues("drink_title"),
+      drink_description: getValues("drink_description"),
+      packages: getValues("packages"),
+    });
+    if (getValues("drinks_option") !== resolved) {
+      setValue("drinks_option", resolved, {
+        shouldValidate: false,
+        shouldDirty: false,
+      });
+    }
+  }, [getValues, setValue, resolvedRoomIndex]);
 
   // Sync local form with global form (flat mode only)
   useEffect(() => {
@@ -347,6 +364,7 @@ export default function DrinksTab() {
           cleanedData = {
             step: 6,
             event_id: data.event_id,
+            drinks_option: data.drinks_option,
             is_rooms: 1,
             rooms: roomsForApi,
             drink_title: data.drink_title,
@@ -401,11 +419,12 @@ export default function DrinksTab() {
                 nextIncompleteIndex,
                 { shouldDirty: false, shouldTouch: false },
               );
+              markEventFormSaved(6);
               return;
             }
           }
 
-          await advanceStep(6);
+          await advanceStep(6, response);
         } else {
           console.error("Error saving drink details:", response);
         }
@@ -419,6 +438,7 @@ export default function DrinksTab() {
       form,
       globalForm,
       advanceStep,
+      markEventFormSaved,
       persistActiveRoomDrinksToGlobal,
       resolvedRoomIndex,
       setActiveField,
@@ -443,7 +463,72 @@ export default function DrinksTab() {
             attemptSubmit(false);
           }}
           className="space-y-8"
+          noValidate
         >
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold title-header">Drinks & extras</h2>
+            <p className="text-sm text-gray-500 mt-1 mb-4">
+              Optional add-ons for this event. Choose No to skip this step.
+            </p>
+
+            <FormField
+              control={control}
+              name="drinks_option"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-lg font-medium">
+                    Do you want to add drinks & extras for this event?
+                  </FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={(value) => {
+                        const numValue = Number(value);
+                        field.onChange(numValue);
+                        if (numValue === 0) {
+                          setValue("packages", []);
+                          globalForm.setValue("stepSix.packages", []);
+                          form.clearErrors([
+                            "drink_title",
+                            "drink_description",
+                            "packages",
+                          ]);
+                        } else if (
+                          (getValues("packages") ?? []).length === 0
+                        ) {
+                          setValue("packages", [emptyVendorDrinkPackage()]);
+                        }
+                      }}
+                      value={String(normalizeDrinksOptionFlag(field.value))}
+                      className="flex mt-4 space-x-6"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem
+                            value="1"
+                            className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-background,#009ead)] data-[state=checked]:border-[var(--color-background,#009ead)]"
+                          />
+                        </FormControl>
+                        <Label className="text-lg font-medium">Yes</Label>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem
+                            value="0"
+                            className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-background,#009ead)] data-[state=checked]:border-[var(--color-background,#009ead)]"
+                          />
+                        </FormControl>
+                        <Label className="text-lg font-medium">No</Label>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {showDrinksSection && (
+            <>
           {/* Package Options Section */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
@@ -729,6 +814,8 @@ export default function DrinksTab() {
               ))}
             </div>
           </div>
+            </>
+          )}
 
           <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
             {canApplyToAllRooms && (

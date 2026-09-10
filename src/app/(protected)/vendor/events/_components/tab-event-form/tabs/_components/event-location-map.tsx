@@ -374,7 +374,7 @@ export default function EventLocationMap({
           return;
         }
         initializeMapWithCenter(stored, address || "Selected location", {
-          commit: true,
+          commit: false,
         });
         return;
       }

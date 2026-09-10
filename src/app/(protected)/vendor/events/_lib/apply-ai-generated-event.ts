@@ -63,6 +63,7 @@ import {
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import { fillAiEventGeneratedDefaults } from "./fill-ai-event-content";
 import { downloadImportedEventAssets } from "./imported-event-assets";
+import { resolveAiDrinksEnabled } from "./vendor-step-six-rooms";
 
 export const AI_EVENT_APPLY_STEPS = [
   { label: "Event details, location and schedule", icon: "📅" },
@@ -508,18 +509,17 @@ async function applyAIGeneratedEventToBackendInner(params: {
   await sleep(300);
 
   onProgress?.(3);
-  const hasMenuItems = (s.stepFour.menus ?? []).some(
-    (menu) =>
-      String(menu.name ?? "").trim().length > 0 &&
-      Array.isArray(menu.items) &&
-      menu.items.some((item) => String(item.title ?? "").trim().length > 0),
-  );
+  const hasMenuItems =
+    normalizeVendorStepFourMenus(s.stepFour.menus).some((menu) =>
+      menu.items.some((item) => item.title.length > 0),
+    ) ||
+    (s.stepFour.rooms ?? []).some((room) =>
+      normalizeVendorStepFourMenus(room.menus).some((menu) =>
+        menu.items.some((item) => item.title.length > 0),
+      ),
+    );
   const cateringOption =
-    removedSections.has("stepFour") || !hasMenuItems
-      ? 0
-      : s.stepFour.catering_option === 1
-        ? 1
-        : 0;
+    removedSections.has("stepFour") || !hasMenuItems ? 0 : 1;
   const hasCatering = cateringOption === 1;
   const menus = hasCatering
     ? normalizeVendorStepFourMenus(s.stepFour.menus)
@@ -666,6 +666,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
     rooms?: AIEventRoomBrochure[];
   };
   const drinksSource = (legacyAiShape ? stepFiveAny : stepSixAny) as {
+    drinks_option?: 0 | 1;
     drink_title?: string;
     drink_description?: string;
     packages?: Array<{
@@ -673,6 +674,18 @@ async function applyAIGeneratedEventToBackendInner(params: {
       description?: string;
       price?: number;
       available_quantity?: number;
+    }>;
+    rooms?: Array<{
+      room_name?: string;
+      drinks_option?: 0 | 1;
+      drink_title?: string;
+      drink_description?: string;
+      packages?: Array<{
+        title?: string;
+        description?: string;
+        price?: number;
+        available_quantity?: number;
+      }>;
     }>;
   };
 
@@ -739,7 +752,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
       price: p.price ?? 0,
       available_quantity: p.available_quantity ?? 0,
     }));
-  const perRoomDrinks = s.stepFive?.rooms ?? [];
+  const perRoomDrinks = s.stepFive?.rooms ?? drinksSource.rooms ?? [];
   const mapRoomPackages = (
     packages:
       | Array<{
@@ -758,73 +771,80 @@ async function applyAIGeneratedEventToBackendInner(params: {
         price: p.price ?? 0,
         available_quantity: p.available_quantity ?? 0,
       }));
-  const anyRoomDrinkPackages = perRoomDrinks.some(
-    (room) => mapRoomPackages(room.packages).length > 0,
+  const drinksEnabled = resolveAiDrinksEnabled(
+    {
+      drinks_option: drinksSource.drinks_option,
+      drink_title: drinksSource.drink_title,
+      drink_description: drinksSource.drink_description,
+      packages: mappedDrinkPackages,
+    },
+    { forceOff: drinksSectionRemoved },
   );
-  const hasUsableDrinksContent =
-    !drinksSectionRemoved &&
-    (mappedDrinkPackages.length > 0 || anyRoomDrinkPackages);
 
-  if (hasUsableDrinksContent) {
-    const packagesForSave =
-      mappedDrinkPackages.length > 0
-        ? mappedDrinkPackages
-        : mapRoomPackages(
-            perRoomDrinks.find((room) => mapRoomPackages(room.packages).length > 0)
-              ?.packages,
-          );
-    await eventsService.storeStepSixData(
-      useRoomSystem && createdRooms.length > 0
-        ? {
-            step: 6 as const,
-            event_id: eventId,
-            is_rooms: 1,
-            rooms: createdRooms.map((room) => {
-              const aiDrink = matchAiRoomName(
-                perRoomDrinks,
-                room.sourceName ?? room.name,
-              );
-              const roomPackages = mapRoomPackages(aiDrink?.packages);
-              const packages =
-                roomPackages.length > 0 ? roomPackages : packagesForSave;
-              return {
-                room_id: room.id,
-                drink_title: requiredText(
-                  aiDrink?.drink_title ?? drinksSource.drink_title,
-                  FALLBACK_DRINK_TITLE,
-                ),
-                drink_description: requiredText(
-                  aiDrink?.drink_description ?? drinksSource.drink_description,
-                  FALLBACK_DRINK_DESCRIPTION,
-                ),
-                packages,
-              };
-            }),
-            drink_title: requiredText(
-              drinksSource.drink_title,
-              FALLBACK_DRINK_TITLE,
-            ),
-            drink_description: requiredText(
-              drinksSource.drink_description,
-              FALLBACK_DRINK_DESCRIPTION,
-            ),
-            packages: packagesForSave,
-          }
-        : {
-            step: 6 as const,
-            event_id: eventId,
-            is_rooms: 0,
-            drink_title: requiredText(
-              drinksSource.drink_title,
-              FALLBACK_DRINK_TITLE,
-            ),
-            drink_description: requiredText(
-              drinksSource.drink_description,
-              FALLBACK_DRINK_DESCRIPTION,
-            ),
-            packages: packagesForSave,
+  if (useRoomSystem && createdRooms.length > 0) {
+    await eventsService.storeStepSixData({
+      step: 6 as const,
+      event_id: eventId,
+      is_rooms: 1,
+      drinks_option: 0,
+      rooms: createdRooms.map((room) => {
+        const aiDrink = matchAiRoomName(
+          perRoomDrinks,
+          room.sourceName ?? room.name,
+        );
+        const roomPackages = mapRoomPackages(aiDrink?.packages);
+        const roomEnabled = resolveAiDrinksEnabled(
+          {
+            drinks_option: aiDrink?.drinks_option,
+            drink_title: aiDrink?.drink_title,
+            drink_description: aiDrink?.drink_description,
+            packages: roomPackages,
           },
-    );
+          { forceOff: drinksSectionRemoved },
+        );
+        if (roomEnabled !== 1) {
+          return {
+            room_id: room.id,
+            drinks_option: 0 as const,
+            drink_title: "",
+            drink_description: "",
+            packages: [],
+          };
+        }
+        return {
+          room_id: room.id,
+          drinks_option: 1 as const,
+          drink_title: requiredText(
+            aiDrink?.drink_title ?? drinksSource.drink_title,
+            FALLBACK_DRINK_TITLE,
+          ),
+          drink_description: requiredText(
+            aiDrink?.drink_description ?? drinksSource.drink_description,
+            FALLBACK_DRINK_DESCRIPTION,
+          ),
+          packages: roomPackages,
+        };
+      }),
+    });
+  } else {
+    await eventsService.storeStepSixData({
+      step: 6 as const,
+      event_id: eventId,
+      is_rooms: 0,
+      drinks_option: drinksEnabled,
+      drink_title:
+        drinksEnabled === 1
+          ? requiredText(drinksSource.drink_title, FALLBACK_DRINK_TITLE)
+          : "",
+      drink_description:
+        drinksEnabled === 1
+          ? requiredText(
+              drinksSource.drink_description,
+              FALLBACK_DRINK_DESCRIPTION,
+            )
+          : "",
+      packages: drinksEnabled === 1 ? mappedDrinkPackages : [],
+    });
   }
   await sleep(300);
 

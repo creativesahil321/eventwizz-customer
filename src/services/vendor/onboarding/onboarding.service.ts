@@ -28,6 +28,7 @@ import {
   LOCATION_COORDINATES_REQUIRED_MESSAGE,
 } from "@/lib/to-location-coords-payload";
 import { sanitizeOnboardingMenusForSubmit } from "@/app/(on-boarding)/on-boarding/_lib/onboarding-catering-ready";
+import { mapVendorDrinksFieldsForApi } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 // import { OnBoardingPreviewType } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 
 /** Reads the persisted onboarding mode from sessionStorage (client-only, safe). */
@@ -1272,9 +1273,7 @@ export const onboardingService = {
             step: data.step,
             event_id: data.event_id,
             is_rooms: 0,
-            drink_title: data.drink_title,
-            drink_description: data.drink_description,
-            packages: data.packages,
+            ...mapVendorDrinksFieldsForApi(data),
           },
           data.isApproved,
         );
@@ -1311,9 +1310,7 @@ export const onboardingService = {
         const drinks = room.drinks ?? {};
         return {
           room_id: roomId,
-          drink_title: String(drinks.drink_title ?? ""),
-          drink_description: String(drinks.drink_description ?? ""),
-          packages: Array.isArray(drinks.packages) ? drinks.packages : [],
+          ...mapVendorDrinksFieldsForApi(drinks),
         };
       })
       .filter((room): room is NonNullable<typeof room> => room !== null);

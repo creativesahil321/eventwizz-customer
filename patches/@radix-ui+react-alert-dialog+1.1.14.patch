@@ -1,0 +1,26 @@
+diff --git a/node_modules/@radix-ui/react-alert-dialog/dist/index.js b/node_modules/@radix-ui/react-alert-dialog/dist/index.js
+index 7ea58ae..85833b8 100644
+--- a/node_modules/@radix-ui/react-alert-dialog/dist/index.js
++++ b/node_modules/@radix-ui/react-alert-dialog/dist/index.js
+@@ -70,7 +70,7 @@ var useDialogScope = (0, import_react_dialog.createDialogScope)();
+ var AlertDialog = (props) => {
+   const { __scopeAlertDialog, ...alertDialogProps } = props;
+   const dialogScope = useDialogScope(__scopeAlertDialog);
+-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogPrimitive.Root, { ...dialogScope, ...alertDialogProps, modal: true });
++  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogPrimitive.Root, { ...dialogScope, ...alertDialogProps, modal: false });
+ };
+ AlertDialog.displayName = ROOT_NAME;
+ var TRIGGER_NAME = "AlertDialogTrigger";
+diff --git a/node_modules/@radix-ui/react-alert-dialog/dist/index.mjs b/node_modules/@radix-ui/react-alert-dialog/dist/index.mjs
+index add0e0a..7251975 100644
+--- a/node_modules/@radix-ui/react-alert-dialog/dist/index.mjs
++++ b/node_modules/@radix-ui/react-alert-dialog/dist/index.mjs
+@@ -17,7 +17,7 @@ var useDialogScope = createDialogScope();
+ var AlertDialog = (props) => {
+   const { __scopeAlertDialog, ...alertDialogProps } = props;
+   const dialogScope = useDialogScope(__scopeAlertDialog);
+-  return /* @__PURE__ */ jsx(DialogPrimitive.Root, { ...dialogScope, ...alertDialogProps, modal: true });
++  return /* @__PURE__ */ jsx(DialogPrimitive.Root, { ...dialogScope, ...alertDialogProps, modal: false });
+ };
+ AlertDialog.displayName = ROOT_NAME;
+ var TRIGGER_NAME = "AlertDialogTrigger";

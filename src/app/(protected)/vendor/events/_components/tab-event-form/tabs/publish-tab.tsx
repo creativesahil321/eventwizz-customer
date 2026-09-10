@@ -218,7 +218,7 @@ export default function PublishTab() {
         const response = await eventsService.storeStepEightData(submissionData);
 
         if (response && response.status) {
-          await advanceStep(8);
+          await advanceStep(8, response);
           await invalidateCache?.();
           if (data.is_duplicate) {
             const syncedLocations = await syncVendorLocationsCache(queryClient);

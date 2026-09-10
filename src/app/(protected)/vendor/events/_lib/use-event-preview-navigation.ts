@@ -6,11 +6,14 @@ import { toast } from "sonner";
 import { useEventFormContext } from "../_components/events-form-provider";
 import { getEventPreviewUrl, openEventPreviewTab } from "./open-event-preview-tab";
 import { writeVendorEventIsRoomsFlag } from "./vendor-event-is-rooms";
-import { writeVendorEventPreviewDraft } from "./vendor-event-preview-live-data";
+import {
+  clearVendorEventPreviewDraft,
+  writeVendorEventPreviewDraft,
+} from "./vendor-event-preview-live-data";
 import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 
 export function useEventPreviewNavigation() {
-  const { form } = useEventFormContext();
+  const { form, hasUnsavedEventEdits } = useEventFormContext();
   const params = useParams<{ eventID: string }>();
   const eventIdFromUrl = Array.isArray(params?.eventID)
     ? params?.eventID[0]
@@ -29,7 +32,11 @@ export function useEventPreviewNavigation() {
       parseEventIsRoomsFlag(form.getValues().stepOne?.is_rooms) === 1;
 
     writeVendorEventIsRoomsFlag(eventId, isRoomsEnabled);
-    writeVendorEventPreviewDraft(eventId, form.getValues());
+    if (hasUnsavedEventEdits) {
+      writeVendorEventPreviewDraft(eventId, form.getValues());
+    } else {
+      void clearVendorEventPreviewDraft(eventId);
+    }
 
     // Must open synchronously on click — `await` before window.open() makes browsers
     // treat the new tab as a popup and block it.
@@ -39,7 +46,7 @@ export function useEventPreviewNavigation() {
         description: `Allow pop-ups for this site, or paste: ${getEventPreviewUrl(eventId, isRoomsEnabled)}`,
       });
     }
-  }, [eventId, form]);
+  }, [eventId, form, hasUnsavedEventEdits]);
 
   return {
     openEventPreview,
