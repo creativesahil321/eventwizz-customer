@@ -15,7 +15,18 @@ import {
   Circle,
   Eye,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -182,6 +193,33 @@ function VendorEventPreviewButton({
   );
 }
 
+function VendorEventDiscardButton({
+  visible,
+  disabled,
+  onClick,
+}: {
+  visible: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="flex h-8 shrink-0 items-center gap-1.5 border-slate-300 bg-white px-2.5 text-xs text-slate-900 hover:bg-slate-50 sm:text-sm"
+      disabled={disabled}
+      onClick={onClick}
+      title="Revert all unsaved edits on this event"
+    >
+      <RotateCcw size={14} />
+      <span className="hidden sm:inline">Discard changes</span>
+      <span className="sm:hidden">Discard</span>
+    </Button>
+  );
+}
+
 type RoomRecord = {
   name: string;
   roomId?: number;
@@ -323,7 +361,12 @@ export default function TabEventForm() {
     persistedHydrated,
     finalizeBusy,
     setActiveStep,
+    hasUnsavedEventEdits,
+    isDiscarding,
+    discardEpoch,
+    discardUnsavedEventEdits,
   } = useEventFormContext();
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const { openEventPreview, canPreview } = useEventPreviewNavigation();
   const previewSiteEssentials = useEventPreviewSiteEssentials();
 
@@ -436,13 +479,21 @@ export default function TabEventForm() {
   // Wait until the editor has restored any IndexedDB draft so the first write
   // cannot replace a File upload with last-saved API URLs.
   useEffect(() => {
-    if (!persistedHydrated) return;
+    if (!persistedHydrated || isDiscarding) return;
     if (!eventId || !/^\d+$/.test(String(eventId))) return;
     const timer = window.setTimeout(() => {
+      if (!hasUnsavedEventEdits) return;
       writeVendorEventPreviewDraft(eventId, liveFormValues ?? formContext.getValues());
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [eventId, liveFormValues, formContext, persistedHydrated]);
+  }, [
+    eventId,
+    liveFormValues,
+    formContext,
+    persistedHydrated,
+    isDiscarding,
+    hasUnsavedEventEdits,
+  ]);
 
   const normalizedEventData = useMemo(() => {
     const apiResponse = (eventData || {}) as { data?: EventEnvelope };
@@ -944,9 +995,14 @@ export default function TabEventForm() {
                     >
                       {formatEventStatusLabel(eventStatus)}
                     </Badge>
+                    <VendorEventDiscardButton
+                      visible={hasUnsavedEventEdits}
+                      disabled={finalizeBusy || isDiscarding}
+                      onClick={() => setDiscardDialogOpen(true)}
+                    />
                     <VendorEventPreviewButton
                       canPreview={canPreview}
-                      disabled={finalizeBusy}
+                      disabled={finalizeBusy || isDiscarding}
                       onPreview={openEventPreview}
                     />
                   </div>
@@ -1059,7 +1115,10 @@ export default function TabEventForm() {
                     </div>
                   )}
 
-              <div className="space-y-6 relative min-h-[400px]">
+              <div
+                key={discardEpoch}
+                className="space-y-6 relative min-h-[400px]"
+              >
                     <TabsContent value="event-name" className="mt-0 w-full">
                       <div className="bg-white rounded-lg">
                     <Suspense fallback={<TabContentLoader />}>
@@ -1160,9 +1219,14 @@ export default function TabEventForm() {
                           {Math.min(currentStep, 8)}/8
                         </div>
                       ) : null}
+                      <VendorEventDiscardButton
+                        visible={hasUnsavedEventEdits}
+                        disabled={finalizeBusy || isDiscarding}
+                        onClick={() => setDiscardDialogOpen(true)}
+                      />
                       <VendorEventPreviewButton
                         canPreview={canPreview}
-                        disabled={finalizeBusy}
+                        disabled={finalizeBusy || isDiscarding}
                         onPreview={openEventPreview}
                       />
                       {isPublishTab ? (
@@ -1203,6 +1267,39 @@ export default function TabEventForm() {
           </Tabs>
         </RHFFormProvider>
       </div>
+      {hasUnsavedEventEdits ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-end px-4 sm:bottom-6 sm:px-6">
+          <div className="pointer-events-auto shadow-lg">
+            <VendorEventDiscardButton
+              visible
+              disabled={finalizeBusy || isDiscarding}
+              onClick={() => setDiscardDialogOpen(true)}
+            />
+          </div>
+        </div>
+      ) : null}
+      <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Revert all unsaved edits on this event? Every tab will return to
+              the last saved version.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDiscarding}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDiscarding}
+              onClick={() => {
+                void discardUnsavedEventEdits();
+              }}
+            >
+              {isDiscarding ? "Discarding…" : "Discard changes"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -47,11 +47,15 @@ export function buildStepSyncFingerprint(
     return [
       Number(stepOne.event_id) || 0,
       String(stepOne.event_name || "").trim(),
+      String(stepOne.event_banner_heading || "").trim(),
+      String(stepOne.event_banner_sub_heading || "").trim(),
       stepOne.event_category_id,
       mediaSyncToken(stepOne.event_banner_image),
       mediaSyncToken(stepOne.event_banner_video),
+      mediaSyncToken(stepOne.about_event_image),
       stepOne.remove_event_banner_image ? 1 : 0,
       stepOne.remove_event_banner_video ? 1 : 0,
+      stepOne.remove_about_event_image ? 1 : 0,
     ].join(":");
   }
 

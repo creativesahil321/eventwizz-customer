@@ -1116,9 +1116,14 @@ export default function FormPreview() {
                 about_event_description={
                   formState.stepThree?.about_event_description || ""
                 }
-                eventImage={resolvePreviewAssetUrl(
-                  formState.stepThree?.event_banner_image,
-                )}
+                eventImage={
+                  resolvePreviewAssetUrl(
+                    formState.stepThree?.about_event_image,
+                  ) ||
+                  resolvePreviewAssetUrl(
+                    formState.stepThree?.event_banner_image,
+                  )
+                }
                 imageAlt={
                   heroEventLabel ? `${heroEventLabel} event` : "Event image"
                 }

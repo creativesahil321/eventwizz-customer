@@ -10,12 +10,15 @@ import React, {
 
 import type { DownloadItem } from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/brochure-section";
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
+import { resolveAboutEventImage } from "@/lib/resolve-about-event-image";
 import DatesSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
 import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
 import PackageSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/package-sec";
 import Timeline from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Time-line";
 import CommonHeader from "@/components/shared/common-header";
-import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
+import FooterSection, {
+  toFooterSocialLinksOverride,
+} from "@/app/(public)/vendor/_components/EventListPage/footer";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { EventDetailData } from "@/services/vendor/events/type";
 import {
@@ -64,11 +67,11 @@ import {
 } from "@/lib/event-sticky-scroll-offset";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
-  formatEventHeroDateRange,
-  formatEventHeroTimeRange,
+  labelsFromEventHeroSlices,
   readEventCategoryLabel,
 } from "@/lib/event-hero-meta";
 import { formatEventLocationLabel } from "@/lib/event-location";
+import { locationDisplayName } from "@/lib/slug-short-label";
 import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
@@ -88,6 +91,11 @@ interface EventPreviewProps {
    * Disables the header left inset and adds horizontal padding so the bar aligns like the live site.
    */
   embedInShell?: boolean;
+  /**
+   * Shift desktop "Browse Events" right of a floating Back button.
+   * Defaults to off inside embeds (no floating chrome).
+   */
+  previewBackButtonOffset?: boolean;
 }
 
 function mapGalleryForPreview(
@@ -130,6 +138,7 @@ export function EventPreview({
   siteEssentials,
   locationSlug,
   embedInShell = false,
+  previewBackButtonOffset,
 }: EventPreviewProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -278,7 +287,32 @@ export function EventPreview({
     data.vendor_location_id,
     siteEssentials?.locations,
   ]);
-  const footerContactTheme = useMemo(
+  /** Parent venue city (Porthcawl), not the event street address. */
+  const parentLocationLabel = useMemo(() => {
+    const locations = siteEssentials?.locations ?? [];
+    const slug = footerLocationSlug?.trim();
+    const locationId =
+      data.stepOne?.vendor_location_id ?? data.vendor_location_id;
+    const matched =
+      (slug
+        ? locations.find(
+            (loc) => loc.slug?.toLowerCase() === slug.toLowerCase(),
+          )
+        : undefined) ??
+      (locationId != null
+        ? locations.find(
+            (loc) => loc.id != null && Number(loc.id) === Number(locationId),
+          )
+        : undefined);
+    if (!matched && !slug) return "";
+    return locationDisplayName(matched?.city, matched?.slug ?? slug);
+  }, [
+    footerLocationSlug,
+    data.stepOne?.vendor_location_id,
+    data.vendor_location_id,
+    siteEssentials?.locations,
+  ]);
+    const footerContactTheme = useMemo(
     () => buildSiteEssentialsContactTheme(siteEssentials),
     [siteEssentials],
   );
@@ -401,6 +435,8 @@ export function EventPreview({
     data.slug?.trim() ||
     (s1?.event_id != null ? `event-${s1.event_id}` : "preview");
 
+  const offsetBrowseForBackButton =
+    previewBackButtonOffset ?? !embedInShell;
   const headingEmphasisForHero = siteEssentials
     ? normalizeHeadingEmphasis(siteEssentials.typography?.headingEmphasis)
     : undefined;
@@ -415,7 +451,7 @@ export function EventPreview({
       : null;
 
   const datesForSection = useMemo(() => {
-    const dates = slices.roomMode ? slices.dates : data.stepThree?.dates;
+    const dates = slices.dates ?? data.stepThree?.dates;
     return (
       dates?.map((date) => {
         const ticketPrices =
@@ -439,7 +475,7 @@ export function EventPreview({
         };
       }) ?? []
     );
-  }, [slices.dates, slices.roomMode, data.stepThree?.dates]);
+  }, [slices.dates, data.stepThree?.dates]);
 
   const menus = activeMenu?.menus ?? [];
   const showMenu = menus.length > 0;
@@ -470,19 +506,10 @@ export function EventPreview({
     return mapGalleryForPreview(gallery);
   }, [slices.roomMode, activePackage?.gallery, s2?.gallery]);
 
-  const timelineRows = useMemo(() => {
-    const rows = activePackage?.event_schedular ?? [];
-    return rows
-      .map((item) => ({
-        title: String(item.title ?? "").trim(),
-        time: String(item.time ?? "").trim(),
-      }))
-      .filter((item) => item.title || item.time);
-  }, [activePackage?.event_schedular]);
-
+  const timelineRows = slices.event_schedular;
   const showTimeline =
-    String(activePackage?.event_schedular_title ?? "").trim().length > 0 ||
-    String(activePackage?.event_schedule_subtitle ?? "").trim().length > 0 ||
+    String(slices.event_schedular_title ?? "").trim().length > 0 ||
+    String(slices.event_schedule_subtitle ?? "").trim().length > 0 ||
     timelineRows.length > 0;
 
   const eventLocationLabel = formatEventLocationLabel(slices.eventAddress);
@@ -490,11 +517,11 @@ export function EventPreview({
     ...s1,
     category_name: s1?.category_name,
   });
-  const heroDateLabel = formatEventHeroDateRange(
-    (datesForSection ?? []).map((d) => d.event_date),
-  );
-  const heroTimeLabel = formatEventHeroTimeRange(
-    timelineRows.map((row) => row.time),
+  const { date: heroDateLabel, time: heroTimeLabel } = labelsFromEventHeroSlices(
+    {
+      dates: slices.dates,
+      schedule: slices.event_schedular,
+    },
   );
   const aboutHighlights = buildEventAboutHighlights({
     occasion: heroCategoryLabel,
@@ -595,12 +622,18 @@ export function EventPreview({
           contact_number={contactNumber}
           logo={siteEssentials?.logo || data.logo || null}
           variant="preview"
-          previewBackButtonOffset={!embedInShell}
-          className={embedInShell ? "px-3 sm:px-4 md:px-6" : ""}
+          previewBackButtonOffset={offsetBrowseForBackButton}
+          className={
+            embedInShell && !offsetBrowseForBackButton
+              ? "px-3 sm:px-4 md:px-6"
+              : ""
+          }
           headerDownloads={headerDownloads}
           scrollContainerRef={previewContainerRef}
           hideHeaderPhone
           compactGuestAuth
+          overlayHero
+          headerColor={headerHex}
         />
 
         {showRoomSelector ? (
@@ -636,8 +669,8 @@ export function EventPreview({
             imageAlt={eventName}
             breadcrumbs={[
               { label: "Home" },
-              ...(eventLocationLabel
-                ? [{ label: eventLocationLabel }]
+              ...(parentLocationLabel
+                ? [{ label: parentLocationLabel }]
                 : []),
               { label: eventName },
             ]}
@@ -664,7 +697,7 @@ export function EventPreview({
             about_event_heading={s1?.about_event_heading || ""}
             about_event_sub_heading={s1?.about_event_sub_heading || ""}
             about_event_description={s1?.about_event_description || ""}
-            eventImage={bannerImage || null}
+            eventImage={resolveAboutEventImage(s1?.about_event_image, bannerImage)}
             imageAlt={eventName ? `${eventName} event` : "Event image"}
             highlights={aboutHighlights}
             headingEmphasis={headingEmphasisForHero}
@@ -692,14 +725,11 @@ export function EventPreview({
             <RoomContentTransition roomKey={roomContentKey}>
               <Timeline
                 eventSchedular={timelineRows}
-                eventSchedularTitle={activePackage?.event_schedular_title || ""}
-                eventSchedularCopy={
-                  activePackage?.event_schedule_subtitle || ""
-                }
+                eventSchedularTitle={slices.event_schedular_title || ""}
+                eventSchedularCopy={slices.event_schedule_subtitle || ""}
                 eventSchedularBackgroundImage={
-                  typeof activePackage?.event_schedular_background_image ===
-                  "string"
-                    ? activePackage.event_schedular_background_image
+                  typeof slices.event_schedular_background_image === "string"
+                    ? slices.event_schedular_background_image
                     : undefined
                 }
                 headingEmphasis={headingEmphasisForHero}
@@ -815,7 +845,9 @@ export function EventPreview({
           logo={siteEssentials?.logo || data.logo || undefined}
           locationSlug={footerLocationSlug}
           contactTheme={footerContactTheme}
-          socialLinksOverride={siteEssentials?.socialLinks}
+          socialLinksOverride={toFooterSocialLinksOverride(
+            siteEssentials?.socialLinks,
+          )}
           brandDescription={firstFooterBrandDescription(
             siteEssentials?.footer_brand_description,
             data.footer_brand_description,

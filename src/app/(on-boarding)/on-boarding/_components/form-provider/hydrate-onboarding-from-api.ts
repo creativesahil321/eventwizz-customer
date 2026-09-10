@@ -226,6 +226,10 @@ export function patchOnboardingPayloadFromApi(
     dataAny.stepThree = {
       ...defaultValues.stepThree,
       ...persistedStepThree,
+      about_event_image:
+        persistedStepThree.about_event_image ??
+        dataAny.about_event_image ??
+        defaultValues.stepThree.about_event_image,
       ...(eventAddress
         ? {
             event_address: eventAddress,

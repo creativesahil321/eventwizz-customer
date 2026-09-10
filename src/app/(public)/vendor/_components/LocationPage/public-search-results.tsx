@@ -31,6 +31,11 @@ import {
   getEventCardDateLabel,
   getEventCardTimeLabel,
 } from "../EventListPage/event-card-utils";
+import {
+  BookingTypeIcons,
+  bookingOptionLabel,
+  resolveDateCardBookingOption,
+} from "@/components/public/booking-type-icons";
 import { LOCATION_EVENTS_ANCHOR_ID } from "./location-page-hero-search";
 
 const FALLBACK_IMAGE =
@@ -40,6 +45,14 @@ function formatSlotDate(raw: string): string {
   const parsed = parseISO(raw);
   if (!isValid(parsed)) return raw;
   return format(parsed, "EEE d MMM yyyy");
+}
+
+/** Event pin first, then parent city if the API omitted `event_address`. */
+function dateSlotPlaceLabel(slot: SearchDateSlotResult): string | null {
+  const eventAddress = String(slot.location.event_address ?? "").trim();
+  if (eventAddress) return eventAddress;
+  const city = String(slot.location.city ?? "").trim();
+  return city || null;
 }
 
 function resultsHeading(meta: PublicSearchMeta | undefined): string {
@@ -273,7 +286,19 @@ export function PublicSearchResults({
           slot.room?.room_id ?? "na",
         ].join(":");
         const price = formatEventListingPrice(slot.price, currencySym);
+        const bookingType = resolveDateCardBookingOption({
+          soldOut: slot.sold_out,
+          bookingOption: slot.booking_option,
+        });
+        const typeLabel = bookingOptionLabel(bookingType);
+        const typeSuffix = typeLabel ? `, ${typeLabel.toLowerCase()}` : "";
+        const placeLabel = dateSlotPlaceLabel(slot);
         const isBusy = pendingKey === key;
+        const ariaLabel = slot.sold_out
+          ? `${formatSlotDate(slot.date)}, ${slot.event.name}, sold out`
+          : `Book ${formatSlotDate(slot.date)}, ${slot.event.name}${
+              placeLabel ? `, ${placeLabel}` : ""
+            }${price ? `, from ${price}` : ""}${typeSuffix}`;
 
         return (
           <li key={key}>
@@ -281,6 +306,7 @@ export function PublicSearchResults({
               type="button"
               disabled={slot.sold_out || Boolean(pendingKey)}
               aria-busy={isBusy}
+              aria-label={ariaLabel}
               className={cn(
                 "flex w-full items-start gap-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] px-3.5 py-3 text-left transition-colors sm:gap-4 sm:px-4 sm:py-3.5",
                 slot.sold_out
@@ -313,18 +339,27 @@ export function PublicSearchResults({
                   {slot.event.name}
                 </p>
                 <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--color-text-dimmed)]">
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-                    {slot.location.city}
-                  </span>
+                  {placeLabel ? (
+                    <span className="inline-flex min-w-0 items-start gap-1">
+                      <MapPin className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                      <span>{placeLabel}</span>
+                    </span>
+                  ) : null}
                   {slot.room?.room_name ? (
                     <span>· {slot.room.room_name}</span>
                   ) : null}
                 </p>
               </div>
-              {price ? (
-                <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--color-primary)]">
-                  {price}
+              {price || bookingType ? (
+                <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold text-[var(--color-primary)]">
+                  <BookingTypeIcons
+                    bookingType={bookingType}
+                    size={14}
+                    className="shrink-0 text-[var(--color-primary)]"
+                  />
+                  {price ? (
+                    <span className="tabular-nums">{price}</span>
+                  ) : null}
                 </span>
               ) : null}
             </button>
@@ -355,6 +390,7 @@ export function PublicSearchResults({
                 image: event.banner_image || FALLBACK_IMAGE,
                 slug: event.slug || "",
                 distanceKm: item.distance_km,
+                eventAddress: item.location.event_address,
               }}
               locationSlug={item.location.slug.replace(/^\/+/, "")}
               locationLabel={item.location.city}

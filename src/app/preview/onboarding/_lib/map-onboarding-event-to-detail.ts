@@ -173,6 +173,7 @@ export function mapOnboardingEventToDetailData(
     event_name: event.event_name,
     event_banner_image: event.event_banner_image,
     event_banner_video: event.event_banner_video,
+    about_event_image: event.about_event_image,
     event_banner_heading: event.event_banner_heading,
     event_banner_sub_heading: event.event_banner_sub_heading,
     about_event_heading: event.about_event_heading,

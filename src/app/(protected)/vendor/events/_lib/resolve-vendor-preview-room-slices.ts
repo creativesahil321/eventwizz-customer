@@ -17,6 +17,11 @@ import {
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
 import { resolveEventLocation } from "@/lib/event-location";
+import {
+  findStepThreeDatesForRoom,
+  normalizeVendorStepThreeDateRow,
+  normalizeVendorStepThreeRooms,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
 
 export type VendorPreviewRoomRef = {
   room_id: number;
@@ -26,6 +31,16 @@ export type VendorPreviewRoomRef = {
 };
 
 type RoomKeyedStep = { rooms?: Record<string, unknown> };
+
+function pickPublicRootRoomPayload(
+  data: EventDetailData,
+  room: Pick<VendorPreviewRoomRef, "room_id" | "name"> | null,
+): Record<string, unknown> | undefined {
+  if (!room) return undefined;
+  const rooms = (data as { rooms?: unknown }).rooms;
+  if (!rooms || typeof rooms !== "object") return undefined;
+  return pickRoomPayload({ rooms: rooms as Record<string, unknown> }, room);
+}
 
 function pickRoomPayload(
   step: RoomKeyedStep | undefined,
@@ -49,12 +64,162 @@ function pickRoomPayload(
   return undefined;
 }
 
+function readPreviewEventDate(raw: Record<string, unknown>): string {
+  const direct = raw.event_date ?? raw.date;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  if (Array.isArray(raw.event_dates) && raw.event_dates[0] != null) {
+    return String(raw.event_dates[0]).trim();
+  }
+  return "";
+}
+
+function normalizePreviewDates(
+  dates: unknown,
+): NonNullable<EventDetailStepThree["dates"]> {
+  if (!Array.isArray(dates)) return [];
+  return dates
+    .filter((row): row is Record<string, unknown> =>
+      Boolean(row && typeof row === "object"),
+    )
+    .map((row) => {
+      const normalized = normalizeVendorStepThreeDateRow(row);
+      const eventDate = normalized.event_date || readPreviewEventDate(row);
+      return {
+        ...normalized,
+        event_date: eventDate,
+      };
+    })
+    .filter((row) => row.event_date.length > 0) as NonNullable<
+    EventDetailStepThree["dates"]
+  >;
+}
+
+function meaningfulScheduleRows(
+  rows: unknown,
+): Array<{ time: string; title: string }> {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((item) => ({
+      title: String(
+        (item as { title?: string | null } | null)?.title ?? "",
+      ).trim(),
+      time: String((item as { time?: string | null } | null)?.time ?? "").trim(),
+    }))
+    .filter((item) => item.title || item.time);
+}
+
+function resolvePreviewSchedule(
+  roomPackage: VendorStepTwoRoomForm | null,
+  data: EventDetailData,
+  activeRoom: VendorPreviewRoomRef | null = null,
+): {
+  event_schedular: Array<{ time: string; title: string }>;
+  event_schedular_title: string;
+  event_schedule_subtitle: string;
+  event_schedular_background_image: string | null;
+} {
+  const publicRoom = pickPublicRootRoomPayload(data, activeRoom);
+  const roomRows = meaningfulScheduleRows(roomPackage?.event_schedular);
+  const publicRoomRows = meaningfulScheduleRows(publicRoom?.event_schedular);
+  const stepTwoRows = meaningfulScheduleRows(data.stepTwo?.event_schedular);
+  const stepOneRows = meaningfulScheduleRows(data.stepOne?.event_schedular);
+  const rows = roomRows.length
+    ? roomRows
+    : publicRoomRows.length
+      ? publicRoomRows
+      : stepTwoRows.length
+        ? stepTwoRows
+        : stepOneRows;
+
+  const background =
+    (typeof roomPackage?.event_schedular_background_image === "string"
+      ? roomPackage.event_schedular_background_image
+      : null) ||
+    (typeof publicRoom?.event_schedular_background_image === "string"
+      ? publicRoom.event_schedular_background_image
+      : null) ||
+    (typeof data.stepTwo?.event_schedular_background_image === "string"
+      ? data.stepTwo.event_schedular_background_image
+      : null) ||
+    (typeof data.stepOne?.event_schedular_background_image === "string"
+      ? data.stepOne.event_schedular_background_image
+      : null);
+
+  return {
+    event_schedular: rows,
+    event_schedular_title:
+      String(roomPackage?.event_schedular_title ?? "").trim() ||
+      String(publicRoom?.event_schedular_title ?? "").trim() ||
+      String(data.stepTwo?.event_schedular_title ?? "").trim() ||
+      String(data.stepOne?.event_schedular_title ?? "").trim(),
+    event_schedule_subtitle:
+      String(roomPackage?.event_schedule_subtitle ?? "").trim() ||
+      String(publicRoom?.event_schedule_subtitle ?? "").trim() ||
+      String(data.stepTwo?.event_schedule_subtitle ?? "").trim(),
+    event_schedular_background_image: background,
+  };
+}
+
+/**
+ * Room-keyed dates first (live public slices), then the same recoveries the
+ * editor hydrate uses: room_id list, then flat `stepThree.dates`.
+ */
+function resolvePreviewDates(
+  data: EventDetailData,
+  activeRoom: VendorPreviewRoomRef | null,
+  roomMode: boolean,
+): EventDetailStepThree["dates"] {
+  const stepThree = data.stepThree as
+    | (EventDetailStepThree & RoomKeyedStep)
+    | undefined;
+
+  const rootDates = normalizePreviewDates(
+    (data as { dates?: unknown }).dates,
+  );
+
+  if (!roomMode || !activeRoom) {
+    const flat = normalizePreviewDates(stepThree?.dates);
+    return flat.length > 0 ? flat : rootDates;
+  }
+
+  const keyed = pickRoomPayload(stepThree, activeRoom);
+  const keyedDates = normalizePreviewDates(keyed?.dates);
+  if (keyedDates.length > 0) return keyedDates;
+
+  const normalizedRooms = normalizeVendorStepThreeRooms(stepThree?.rooms);
+  const byId = normalizePreviewDates(
+    findStepThreeDatesForRoom(normalizedRooms, activeRoom.room_id),
+  );
+  if (byId.length > 0) return byId;
+
+  const publicRoomDates = normalizePreviewDates(
+    pickPublicRootRoomPayload(data, activeRoom)?.dates,
+  );
+  if (publicRoomDates.length > 0) return publicRoomDates;
+
+  const flat = normalizePreviewDates(stepThree?.dates);
+  if (flat.length > 0) return flat;
+  if (rootDates.length > 0) return rootDates;
+
+  const firstDated = normalizedRooms.find((room) => room.dates.length > 0);
+  return normalizePreviewDates(firstDated?.dates);
+}
+
 function roomHasBookableDates(
-  stepThree: RoomKeyedStep | undefined,
+  stepThree: (RoomKeyedStep & { dates?: unknown }) | undefined,
   room: Pick<VendorPreviewRoomRef, "room_id" | "name">,
 ): boolean {
   const payload = pickRoomPayload(stepThree, room);
-  return Array.isArray(payload?.dates) && payload.dates.length > 0;
+  if (Array.isArray(payload?.dates) && payload.dates.length > 0) return true;
+  const byId = findStepThreeDatesForRoom(
+    normalizeVendorStepThreeRooms(stepThree?.rooms),
+    room.room_id,
+  );
+  if (byId.length > 0) return true;
+  return (
+    Array.isArray(stepThree?.dates) &&
+    normalizePreviewDates(stepThree.dates).length > 0
+  );
 }
 
 export function isVendorEventRoomPreviewMode(data: EventDetailData): boolean {
@@ -226,6 +391,10 @@ export type VendorPreviewActiveSlices = {
   activeRoom: VendorPreviewRoomRef | null;
   package: VendorStepTwoRoomForm | null;
   dates: EventDetailStepThree["dates"];
+  event_schedular: Array<{ time: string; title: string }>;
+  event_schedular_title: string;
+  event_schedule_subtitle: string;
+  event_schedular_background_image: string | null;
   menu: PreviewMenuSlice | null;
   drinks: PreviewDrinksSlice | null;
   brochure: PreviewBrochureSlice | null;
@@ -262,19 +431,20 @@ export function resolveVendorPreviewActiveSlices(
       : null;
 
   if (!roomMode || !activeRoom) {
-    const s3 = data.stepThree;
     const s4 = data.stepFour;
     // Vendor form + API: step 1 = location, step 5 = brochures, step 6 = drinks.
     const s1 = data.stepOne;
     const s5 = data.stepFive;
     const s6 = data.stepSix;
     const eventLocation = resolveEventLocation(s1, s5, data.stepEight);
+    const schedule = resolvePreviewSchedule(null, data);
     return {
       roomMode: false,
       rooms: [],
       activeRoom: null,
       package: null,
-      dates: s3?.dates,
+      dates: resolvePreviewDates(data, null, false),
+      ...schedule,
       menu: s4
         ? {
             menu_title: s4.menu_title,
@@ -304,10 +474,6 @@ export function resolveVendorPreviewActiveSlices(
     };
   }
 
-  const datesPayload = pickRoomPayload(
-    data.stepThree as RoomKeyedStep,
-    activeRoom,
-  );
   const menuPayload = pickRoomPayload(data.stepFour as RoomKeyedStep, activeRoom);
   const brochurePayload = pickRoomPayload(
     data.stepFive as RoomKeyedStep,
@@ -332,14 +498,15 @@ export function resolveVendorPreviewActiveSlices(
     data.stepEight,
   );
 
+  const schedule = resolvePreviewSchedule(activePackage, data, activeRoom);
+
   return {
     roomMode: true,
     rooms,
     activeRoom,
     package: activePackage,
-    dates: Array.isArray(datesPayload?.dates)
-      ? (datesPayload.dates as VendorPreviewActiveSlices["dates"])
-      : [],
+    dates: resolvePreviewDates(data, activeRoom, true),
+    ...schedule,
     menu: menuPayload
       ? {
           menu_title: String(menuPayload.menu_title ?? ""),

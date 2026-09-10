@@ -17,7 +17,7 @@ type OnboardingPreviewHeaderProps = {
 };
 
 /**
- * Shared preview chrome: solid sticky header + optional multi-room pill bar.
+ * Shared preview chrome: live-matching overlay header + optional multi-room pill bar.
  * Keeps scrollContainerRef wiring in one place (DRY for step 2 + event steps).
  */
 export function OnboardingPreviewHeader({
@@ -39,6 +39,7 @@ export function OnboardingPreviewHeader({
         previewBackButtonOffset={false}
         scrollContainerRef={scrollContainerRef}
         headerDownloads={headerDownloads}
+        overlayHero
       />
       {showRoomSelector ? (
         <PreviewRoomFloatingSelector

@@ -148,6 +148,7 @@ export const CHAT_TABLE_MIX_DONE_SEND = "that's the table mix";
 export const CHAT_ALL_AT_TABLES_SEND = "all guests at tables";
 export const CHAT_TYPE_TABLE_GUESTS_SEND = "I'll type how many sit at tables";
 export const CHAT_TICKETS_DONE_SEND = "that's all for tickets";
+export const CHAT_NO_TICKETS_SEND = "no tickets for this date";
 export const CHAT_OPEN_CHECKOUT_SEND = "go to checkout";
 export const CHAT_ASK_VENUE_SEND = "ask the venue about this group";
 export const CHAT_RAISE_ENQUIRY_SEND = "raise a support enquiry";
@@ -230,9 +231,13 @@ function extractGuestCount(text: string): number | null {
 }
 
 function isGuestCountPhrase(text: string): boolean {
-  return /\b(\d{1,3}\s+)?(guests?|people|persons?|pax|prople|ppl|party of|party size|table for|groups?)\b/i.test(
+  return /\b(\d{1,7}\s+)?(guests?|people|persons?|pax|prople|ppl|party of|party size|table for|groups?)\b/i.test(
     text,
   );
+}
+
+function isPartySizeQty(qty: number): boolean {
+  return Number.isFinite(qty) && qty >= 1 && qty <= 9_999_999;
 }
 
 function parsePartySizeChange(
@@ -240,60 +245,60 @@ function parsePartySizeChange(
   options?: { allowImpliedBare?: boolean },
 ): { mode: "set" | "add"; qty: number } | null {
   const add = text.match(
-    /\badd\s+(\d{1,3})\s+(?:more\s+)?(?:guests?|people|persons?|pax)\b/i,
+    /\badd\s+(\d{1,7})\s+(?:more\s+)?(?:guests?|people|persons?|pax)\b/i,
   );
   if (add) {
     const qty = Number(add[1]);
-    if (qty >= 1 && qty <= 500) return { mode: "add", qty };
+    if (isPartySizeQty(qty)) return { mode: "add", qty };
   }
   const more = text.match(
-    /\b(\d{1,3})\s+more\s+(?:guests?|people|persons?|pax)\b/i,
+    /\b(\d{1,7})\s+more\s+(?:guests?|people|persons?|pax)\b/i,
   );
   if (more) {
     const qty = Number(more[1]);
-    if (qty >= 1 && qty <= 500) return { mode: "add", qty };
+    if (isPartySizeQty(qty)) return { mode: "add", qty };
   }
   const withWord = [
     ...text.matchAll(
-      /\b(\d{1,3})\s*(?:guests?|people|persons?|prople|ppl|pax)\b/gi,
+      /\b(\d{1,7})\s*(?:guests?|people|persons?|prople|ppl|pax)\b/gi,
     ),
   ];
   if (withWord.length > 0) {
     const qty = Number(withWord[withWord.length - 1][1]);
-    if (qty >= 1 && qty <= 500) return { mode: "set", qty };
+    if (isPartySizeQty(qty)) return { mode: "set", qty };
   }
-  const groupOf = text.match(/\bgroups?\s+of\s+(\d{1,3})\b/i);
+  const groupOf = text.match(/\bgroups?\s+of\s+(\d{1,7})\b/i);
   if (groupOf) {
     const qty = Number(groupOf[1]);
-    if (qty >= 1 && qty <= 500) return { mode: "set", qty };
+    if (isPartySizeQty(qty)) return { mode: "set", qty };
   }
   const peopleGroup = text.match(
-    /\b(\d{1,3})[-\s]*(?:people|persons?|prople|ppl|guests?)\s+groups?\b/i,
+    /\b(\d{1,7})[-\s]*(?:people|persons?|prople|ppl|guests?)\s+groups?\b/i,
   );
   if (peopleGroup) {
     const qty = Number(peopleGroup[1]);
-    if (qty >= 1 && qty <= 500) return { mode: "set", qty };
+    if (isPartySizeQty(qty)) return { mode: "set", qty };
   }
   const party = text.match(
-    /\b(?:party of|table for|we are|we're|party size|i have (?:a |an )?)\s*(\d{1,3})\b/i,
+    /\b(?:party of|table for|we are|we're|party size|i have (?:a |an )?)\s*(\d{1,7})\b/i,
   );
   if (party) {
     const qty = Number(party[1]);
-    if (qty >= 1 && qty <= 500) return { mode: "set", qty };
+    if (isPartySizeQty(qty)) return { mode: "set", qty };
   }
   if (options?.allowImpliedBare) {
     const implied = text.match(
-      /\b(?:make it|change to|actually|try|what about|how about|can i (?:do|book|have)|instead)\s+(\d{1,3})\b/i,
+      /\b(?:make it|change to|actually|try|what about|how about|can i (?:do|book|have)|instead)\s+(\d{1,7})\b/i,
     );
     if (implied) {
       const qty = Number(implied[1]);
-      if (qty >= 1 && qty <= 500) return { mode: "set", qty };
+      if (isPartySizeQty(qty)) return { mode: "set", qty };
     }
   }
-  const lone = text.trim().match(/^(\d{1,3})$/);
+  const lone = text.trim().match(/^(\d{1,7})$/);
   if (lone) {
     const qty = Number(lone[1]);
-    if (qty >= 1 && qty <= 500 && qty !== 2025 && qty !== 2026 && qty !== 2027) {
+    if (isPartySizeQty(qty) && qty !== 2025 && qty !== 2026 && qty !== 2027) {
       return { mode: "set", qty };
     }
   }
@@ -301,7 +306,7 @@ function parsePartySizeChange(
 }
 
 function applySlotGuestCount(slot: ChatBookingSlot, guests: number): void {
-  if (guests < 1 || guests > 500) return;
+  if (!isPartySizeQty(guests)) return;
   const prev = slot.guestCount;
   slot.guestCount = guests;
   if (slot.seating === "tickets") return;
@@ -416,13 +421,20 @@ function removeTicketSend(title: string): string {
   return `0 × ${title}`;
 }
 
-function isBareTicketQuantityText(text: string): boolean {
+function parseTypedTicketQuantity(text: string): number | null {
   const t = text.trim();
-  if (/^\d{1,3}$/.test(t)) {
-    const n = Number(t);
-    return n >= 0 && n <= 500 && n !== 2025 && n !== 2026 && n !== 2027;
-  }
-  return /^\d{1,3}\s+tickets?$/i.test(t);
+  const match = t.match(/^(\d{1,7})(?:\s+tickets?)?$/i);
+  if (!match) return null;
+  const n = Number(match[1]);
+  if (!Number.isFinite(n) || n < 0 || n > 9_999_999) return null;
+  return n;
+}
+
+function isBareTicketQuantityText(text: string): boolean {
+  const n = parseTypedTicketQuantity(text);
+  if (n == null) return false;
+  if (n === 2025 || n === 2026 || n === 2027) return false;
+  return n <= 500;
 }
 
 function slotHasTicketOverstock(slot: ChatBookingSlot): boolean {
@@ -441,6 +453,18 @@ function slotPickedTicketQty(slot: ChatBookingSlot): number {
     (sum, title) => sum + Math.max(0, slot.ticketQuantities[title] ?? 0),
     0,
   );
+}
+
+function slotHasTablePlan(slot: ChatBookingSlot): boolean {
+  return slot.tablePlan.some((item) => item.quantity > 0);
+}
+
+function finishTicketsIfTablesCover(slot: ChatBookingSlot): void {
+  if (slotPickedTicketQty(slot) > 0) return;
+  if (!slotHasTablePlan(slot)) return;
+  slot.ticketsDone = true;
+  slot.ticketCount = 0;
+  if (slot.seating === "both") slot.seating = "tables";
 }
 
 export function resolveSlotTableAndTicketCounts(slot: ChatBookingSlot): {
@@ -598,6 +622,16 @@ function isSoftDeclineMoreDates(text: string): boolean {
   );
 }
 
+function isNoTicketsText(text: string): boolean {
+  const n = normalize(text);
+  return (
+    n === normalize(CHAT_NO_TICKETS_SEND) ||
+    /\b(no tickets|skip tickets|without tickets|none for tickets|just tables)\b/.test(
+      n,
+    )
+  );
+}
+
 function isTicketsDoneText(text: string): boolean {
   const n = normalize(text);
   return (
@@ -668,23 +702,23 @@ export function parseTicketQtyChange(
   if (n === title) return null;
   const titlePat = title.replace(/ /g, "\\s+");
   const add = n.match(
-    new RegExp(`\\badd\\s+(\\d{1,3})\\s+(?:more\\s+)?(?:x\\s+)?${titlePat}`),
+    new RegExp(`\\badd\\s+(\\d{1,7})\\s+(?:more\\s+)?(?:x\\s+)?${titlePat}`),
   );
   if (add) {
     const qty = Number(add[1]);
-    if (qty >= 1 && qty <= 500) return { mode: "add", qty };
+    if (qty >= 1 && qty <= 9_999_999) return { mode: "add", qty };
   }
-  const after = n.match(new RegExp(`${titlePat}\\s*(?:x|×)?\\s*(\\d{1,3})`));
+  const after = n.match(new RegExp(`${titlePat}\\s*(?:x|×)?\\s*(\\d{1,7})`));
   if (after) {
     const qty = Number(after[1]);
-    if (qty >= 0 && qty <= 500) return { mode: "set", qty };
+    if (qty >= 0 && qty <= 9_999_999) return { mode: "set", qty };
   }
   const before = n.match(
-    new RegExp(`(\\d{1,3})\\s*(?:x|×|of)?\\s*${titlePat}`),
+    new RegExp(`(\\d{1,7})\\s*(?:x|×|of)?\\s*${titlePat}`),
   );
   if (before) {
     const qty = Number(before[1]);
-    if (qty >= 0 && qty <= 500) return { mode: "set", qty };
+    if (qty >= 0 && qty <= 9_999_999) return { mode: "set", qty };
   }
   return null;
 }
@@ -1078,14 +1112,14 @@ export function parseChatBookingChoices(
     if (
       pendingTicketQtyTitle &&
       active &&
-      isBareTicketQuantityText(text) &&
+      parseTypedTicketQuantity(text) != null &&
       !waitingForGuestCount &&
       !askingGuestNumber &&
       !guestPhrase &&
       !askingCapacityOrFit
     ) {
-      const qty = Number(text.trim().match(/^(\d{1,3})/)?.[1]);
-      if (Number.isFinite(qty) && qty >= 0 && qty <= 500) {
+      const qty = parseTypedTicketQuantity(text);
+      if (qty != null) {
         const pendingTitle = pendingTicketQtyTitle;
         const ticket = ticketPool.find(
           (item) => normalize(item.title) === normalize(pendingTitle),
@@ -1099,6 +1133,7 @@ export function parseChatBookingChoices(
             (title) => title !== pendingTicketQtyTitle,
           );
           delete active.ticketQuantities[pendingTicketQtyTitle];
+          finishTicketsIfTablesCover(active);
         } else if (!ticket || stock == null || stock > 0) {
           const nextQty = stock != null ? Math.min(qty, stock) : qty;
           if (!active.ticketTitles.includes(pendingTicketQtyTitle)) {
@@ -1114,7 +1149,8 @@ export function parseChatBookingChoices(
     }
     if (
       pendingTicketQtyTitle &&
-      !n.includes(normalize(pendingTicketQtyTitle))
+      !n.includes(normalize(pendingTicketQtyTitle)) &&
+      parseTypedTicketQuantity(text) == null
     ) {
       pendingTicketQtyTitle = null;
     }
@@ -1149,10 +1185,25 @@ export function parseChatBookingChoices(
     }
 
     if (isTicketsDoneText(text) && active && (askingTickets || !askingDrinks)) {
-      if (!slotHasTicketOverstock(active) && slotPickedTicketQty(active) > 0) {
-        active.ticketsDone = true;
+      if (!slotHasTicketOverstock(active)) {
+        if (slotPickedTicketQty(active) > 0) {
+          active.ticketsDone = true;
+        } else {
+          finishTicketsIfTablesCover(active);
+        }
       }
       pendingTicketQtyTitle = null;
+      continue;
+    }
+    if (
+      (isNoTicketsText(text) || (askingTickets && isSoftNoThanks(text))) &&
+      active &&
+      slotHasTablePlan(active)
+    ) {
+      active.ticketTitles = [];
+      active.ticketQuantities = {};
+      pendingTicketQtyTitle = null;
+      finishTicketsIfTablesCover(active);
       continue;
     }
 
@@ -1181,6 +1232,9 @@ export function parseChatBookingChoices(
     }
     if (isChangeTicketsText(text) && active) {
       active.ticketsDone = false;
+      if (active.seating === "tables" && dateOffersTickets(active.date)) {
+        active.seating = "both";
+      }
       continue;
     }
     if (isChangeDrinksText(text) && active) {
@@ -1394,13 +1448,17 @@ export function parseChatBookingChoices(
           active.tablePlanDone = true;
           active.tableGuestCount = 0;
           active.ticketsDone = false;
-        } else if (seating === "tables" && active.guestCount != null) {
-          active.tableGuestCount = active.guestCount;
+        } else if (seating === "tables") {
           active.ticketCount = 0;
           active.ticketsDone = true;
           active.ticketTitles = [];
           active.ticketQuantities = {};
-          active.tablePlanDone = false;
+          if (active.guestCount != null) {
+            active.tableGuestCount = active.guestCount;
+          }
+          if (!slotHasTablePlan(active)) {
+            active.tablePlanDone = false;
+          }
         } else if (seating === "both") {
           active.tablePlanDone = false;
           active.ticketsDone = false;
@@ -1426,6 +1484,7 @@ export function parseChatBookingChoices(
           pendingTicketQtyTitle = null;
         }
       }
+      finishTicketsIfTablesCover(active);
       continue;
     }
 
@@ -1453,6 +1512,7 @@ export function parseChatBookingChoices(
           if (pendingTicketQtyTitle === ticket.title) {
             pendingTicketQtyTitle = null;
           }
+          finishTicketsIfTablesCover(active);
           continue;
         }
         if (!active.ticketTitles.includes(ticket.title)) {
@@ -1582,6 +1642,7 @@ export function isHostBookingUserText(
     isDrinksDoneText(text) ||
     isNoDrinksText(text) ||
     isTicketsDoneText(text) ||
+    isNoTicketsText(text) ||
     isChatCheckoutHandoffIntent(text) ||
     isDatesDoneText(text) ||
     isSameAsLastText(text) ||
@@ -1603,7 +1664,8 @@ export function isHostBookingUserText(
     n === normalize(CHAT_TYPE_TABLE_GUESTS_SEND) ||
     n.startsWith(normalize("I'll type the quantity for")) ||
     n.startsWith(normalize("I'll type the ticket quantity for")) ||
-    n === normalize(CHAT_TICKETS_DONE_SEND)
+    n === normalize(CHAT_TICKETS_DONE_SEND) ||
+    n === normalize(CHAT_NO_TICKETS_SEND)
   ) {
     return true;
   }
@@ -1887,6 +1949,14 @@ function seatingCannotFitTurn(
       ...venueHelpActions(),
       buildVisitEventQuickAction(brief),
     ],
+  };
+}
+
+function noTicketsTablesAction(): ChatQuickActionDraft {
+  return {
+    id: "no-tickets",
+    label: "No tickets — tables only",
+    sendText: CHAT_NO_TICKETS_SEND,
   };
 }
 
@@ -2593,7 +2663,10 @@ function slotNeedsTicketPick(slot: ChatBookingSlot): boolean {
   if (slotNeedsSeatingPlan(slot)) return false;
   if (slotHasTicketOverstock(slot)) return true;
   const picked = slotPickedTicketQty(slot);
-  if (slot.ticketsDone && picked > 0) return false;
+  if (slot.ticketsDone) {
+    if (picked > 0) return false;
+    return slot.seating === "tickets" || !slotHasTablePlan(slot);
+  }
   return true;
 }
 
@@ -3067,10 +3140,25 @@ export function buildHostBookingTurn(options: {
       };
     }
     if (/i'?ll type the guest number/i.test(last)) {
+      const { maxGuests } = dateOffersTables(active.date)
+        ? chatTablesSeatCapacity(active.date.tables)
+        : { maxGuests: 0 };
+      const maxBit =
+        maxGuests > 0
+          ? ` This date can seat at most **${maxGuests} guests** with the tables left.`
+          : "";
       return {
-        content: `No problem${nameBit} — type how many guests will be attending${choices.slots.length > 1 ? ` on **${slotHeading(active)}**` : ""}.`,
+        content: `No problem${nameBit} — type how many guests will be attending${choices.slots.length > 1 ? ` on **${slotHeading(active)}**` : ""}.${maxBit}`,
         actions: [],
       };
+    }
+    const typedTooBig = extractGuestCount(last);
+    if (
+      typedTooBig != null &&
+      dateOffersTables(active.date) &&
+      !recommendedChatTablePlan(active.date.tables, typedTooBig)
+    ) {
+      return seatingCannotFitTurn(active, brief, typedTooBig, venueContact);
     }
     return {
       content: `Great${nameBit} — **${brief.title}**${venue} on **${slotHeading(active)}**.\n\nHow many guests will be attending?`,
@@ -3256,9 +3344,9 @@ export function buildHostBookingTurn(options: {
           : current
         : change.qty
       : null;
-    if (requested == null && isBareTicketQuantityText(last)) {
-      const qty = Number(last.trim().match(/^(\d{1,3})/)?.[1]);
-      if (Number.isFinite(qty)) {
+    if (requested == null && parseTypedTicketQuantity(last) != null) {
+      const qty = parseTypedTicketQuantity(last);
+      if (qty != null) {
         const pendingMatch =
           Boolean(choices.pendingTicketQtyTitle) &&
           normalize(choices.pendingTicketQtyTitle!) === normalize(ticket.title);
@@ -3382,16 +3470,21 @@ export function buildHostBookingTurn(options: {
     });
     if (selected.length === 0) {
       const tableGuests = active.guestCount ?? party.tableGuests;
-      const ticketLead =
-        active.seating === "both"
+      const canSkipTickets =
+        active.seating === "both" && slotHasTablePlan(active);
+      const ticketLead = canSkipTickets
+        ? `Tables are set for **${tableGuests} guests** on **${slotHeading(active)}**${nameBit}. Tickets are optional — pick a type if you want them, or continue with tables only.`
+        : active.seating === "both"
           ? `Tables are set for **${tableGuests} guests** on **${slotHeading(active)}**${nameBit}. Tickets are separate — pick a type and how many you want.`
           : `Great${nameBit} — **${brief.title}**${venue} on **${slotHeading(active)}**.`;
       return {
         content: `${ticketLead}\n\nWhich ticket type would you like? Each type shows how many are left.`,
-        actions:
-          remainingTypes.length > 0
+        actions: [
+          ...(remainingTypes.length > 0
             ? remainingTypes
-            : [buildVisitEventQuickAction(brief)],
+            : [buildVisitEventQuickAction(brief)]),
+          ...(canSkipTickets ? [noTicketsTablesAction()] : []),
+        ],
       };
     }
     const pickedLines = selected
@@ -3444,6 +3537,7 @@ export function buildHostBookingTurn(options: {
         ...qtyActions,
         ...remainingTypes,
         ...checkoutTicketActions(have),
+        ...(slotHasTablePlan(active) ? [noTicketsTablesAction()] : []),
       ],
     };
   }

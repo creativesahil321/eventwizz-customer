@@ -58,6 +58,23 @@ function filePreviewSrc(file: File): string {
   return URL.createObjectURL(file);
 }
 
+function applyAboutImageToUi(
+  aboutImage: StepOneType["about_event_image"],
+  setAboutImageFile: (files: File[]) => void,
+  setAboutImageUrl: (url: string) => void,
+) {
+  if (typeof File !== "undefined" && aboutImage instanceof File) {
+    setAboutImageFile([aboutImage]);
+    setAboutImageUrl(filePreviewSrc(aboutImage));
+  } else if (typeof aboutImage === "string" && aboutImage.trim()) {
+    setAboutImageUrl(aboutImage);
+    setAboutImageFile([]);
+  } else {
+    setAboutImageUrl("");
+    setAboutImageFile([]);
+  }
+}
+
 function applyBannerMediaToUi(
   values: Pick<StepOneType, "event_banner_image" | "event_banner_video">,
   setBannerImageFile: (files: File[]) => void,
@@ -111,6 +128,7 @@ export default function EventNameTab() {
     setActiveField,
     readOnly,
     persistedHydrated,
+    discardEpoch,
   } = useEventFormContext();
 
   // Get event categories
@@ -120,6 +138,7 @@ export default function EventNameTab() {
   const initialStepOne = globalForm.getValues().stepOne;
   const initialBannerImage = initialStepOne?.event_banner_image;
   const initialBannerVideo = initialStepOne?.event_banner_video;
+  const initialAboutImage = initialStepOne?.about_event_image;
 
   // State for banner files and uploads
   const [bannerType, setBannerType] = useState<"image" | "video">(() => {
@@ -154,6 +173,18 @@ export default function EventNameTab() {
       return filePreviewSrc(initialBannerImage);
     }
     return typeof initialBannerImage === "string" ? initialBannerImage : "";
+  });
+  const [aboutImageFile, setAboutImageFile] = useState<File[]>(() =>
+    typeof File !== "undefined" && initialAboutImage instanceof File
+      ? [initialAboutImage]
+      : [],
+  );
+  const [aboutImageUploading, setAboutImageUploading] = useState(false);
+  const [aboutImageUrl, setAboutImageUrl] = useState(() => {
+    if (typeof File !== "undefined" && initialAboutImage instanceof File) {
+      return filePreviewSrc(initialAboutImage);
+    }
+    return typeof initialAboutImage === "string" ? initialAboutImage : "";
   });
   const [bannerVideoUrl, setBannerVideoUrl] = useState(() => {
     if (typeof File !== "undefined" && initialBannerVideo instanceof File) {
@@ -203,6 +234,7 @@ export default function EventNameTab() {
       event_name: stepOneDefaults?.event_name || "",
       event_banner_image: stepOneDefaults?.event_banner_image,
       event_banner_video: stepOneDefaults?.event_banner_video,
+      about_event_image: stepOneDefaults?.about_event_image,
       event_banner_heading: stepOneDefaults?.event_banner_heading || "",
       event_banner_sub_heading: stepOneDefaults?.event_banner_sub_heading || "",
       about_event_heading: stepOneDefaults?.about_event_heading || "",
@@ -218,6 +250,7 @@ export default function EventNameTab() {
       },
       remove_event_banner_image: false,
       remove_event_banner_video: false,
+      remove_about_event_image: false,
     } as StepOneType,
     mode: "onChange",
   });
@@ -227,6 +260,7 @@ export default function EventNameTab() {
     localForm: form,
     stepKey: "stepOne",
     enabled: persistedHydrated,
+    resyncKey: discardEpoch,
     toLocalValues: (stepOne) =>
       mapGlobalStepOneToLocal(stepOne, vendorLocationId),
     onAfterSync: (values) => {
@@ -238,6 +272,11 @@ export default function EventNameTab() {
         setBannerVideoUrl,
         setBannerType,
       );
+      applyAboutImageToUi(
+        values.about_event_image,
+        setAboutImageFile,
+        setAboutImageUrl,
+      );
     },
   });
 
@@ -248,6 +287,10 @@ export default function EventNameTab() {
   const globalBannerVideo = useWatch({
     control: globalForm.control,
     name: "stepOne.event_banner_video",
+  });
+  const globalAboutImage = useWatch({
+    control: globalForm.control,
+    name: "stepOne.about_event_image",
   });
 
   useEffect(() => {
@@ -273,7 +316,23 @@ export default function EventNameTab() {
       setBannerVideoUrl,
       setBannerType,
     );
-  }, [form, persistedHydrated, globalBannerImage, globalBannerVideo]);
+    form.setValue(
+      "about_event_image",
+      globalAboutImage as StepOneType["about_event_image"],
+      { shouldDirty: false },
+    );
+    applyAboutImageToUi(
+      globalAboutImage as StepOneType["about_event_image"],
+      setAboutImageFile,
+      setAboutImageUrl,
+    );
+  }, [
+    form,
+    persistedHydrated,
+    globalBannerImage,
+    globalBannerVideo,
+    globalAboutImage,
+  ]);
 
   // Update form when vendor_location_id changes
   useEffect(() => {
@@ -507,6 +566,55 @@ export default function EventNameTab() {
     persistUnsavedDraft();
   }, [form, globalForm, persistUnsavedDraft]);
 
+  const handleAboutImageChange = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
+
+      setAboutImageFile(files);
+      setAboutImageUrl("");
+      setAboutImageUploading(true);
+
+      try {
+        form.setValue("about_event_image", files[0], { shouldDirty: true });
+        form.setValue("remove_about_event_image", false, { shouldDirty: true });
+        const currentStepOne = globalForm.getValues().stepOne || {};
+        globalForm.setValue(
+          "stepOne",
+          {
+            ...currentStepOne,
+            about_event_image: files[0],
+            remove_about_event_image: false,
+          },
+          { shouldDirty: true },
+        );
+        persistUnsavedDraft();
+      } catch (error) {
+        console.error("Error handling about image:", error);
+      } finally {
+        setAboutImageUploading(false);
+      }
+    },
+    [form, globalForm, persistUnsavedDraft],
+  );
+
+  const handleRemoveAboutImage = useCallback(() => {
+    setAboutImageFile([]);
+    setAboutImageUrl("");
+    form.setValue("about_event_image", undefined, { shouldDirty: true });
+    form.setValue("remove_about_event_image", true, { shouldDirty: true });
+    const currentStepOne = globalForm.getValues().stepOne || {};
+    globalForm.setValue(
+      "stepOne",
+      {
+        ...currentStepOne,
+        about_event_image: undefined,
+        remove_about_event_image: true,
+      },
+      { shouldDirty: true },
+    );
+    persistUnsavedDraft();
+  }, [form, globalForm, persistUnsavedDraft]);
+
   // Handle form submission
   const handleSubmit = useCallback(
     async (data: StepOneType) => {
@@ -525,6 +633,9 @@ export default function EventNameTab() {
         // SAFETY CHECK: Ensure banner image is included if we have it in state
         if (bannerImageFile.length > 0 && !formData.event_banner_image) {
           formData.event_banner_image = bannerImageFile[0];
+        }
+        if (aboutImageFile.length > 0 && !formData.about_event_image) {
+          formData.about_event_image = aboutImageFile[0];
         }
 
         // Update global form with all fields
@@ -693,7 +804,15 @@ export default function EventNameTab() {
         setIsLoading(false);
       }
     },
-    [globalForm, advanceStep, form, setActiveField, router, bannerImageFile],
+    [
+      globalForm,
+      advanceStep,
+      form,
+      setActiveField,
+      router,
+      bannerImageFile,
+      aboutImageFile,
+    ],
   );
 
   if (globalLoading) {
@@ -778,6 +897,7 @@ export default function EventNameTab() {
                             globalForm.setValue(
                               "stepOne.event_banner_heading",
                               next,
+                              { shouldDirty: true, shouldTouch: true },
                             );
                           }}
                           onBlur={field.onBlur}
@@ -819,6 +939,7 @@ export default function EventNameTab() {
                           globalForm.setValue(
                             "stepOne.event_banner_sub_heading",
                             e.target.value,
+                            { shouldDirty: true, shouldTouch: true },
                           );
                         }}
                         onBlur={field.onBlur}
@@ -1323,6 +1444,70 @@ export default function EventNameTab() {
                           ctaText: form.watch("about_event_sub_heading"),
                         }}
                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="about_event_image"
+                render={() => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">
+                      About image
+                    </FormLabel>
+                    <FormDescription>
+                      This photo appears next to the About title and
+                      description on the event page. Recommended size:
+                      800 × 1000px. If you skip this, the banner image is used.
+                    </FormDescription>
+                    <FormControl>
+                      <div>
+                        {aboutImageUrl ? (
+                          <div className="space-y-2">
+                            <img
+                              src={addCacheBusting(aboutImageUrl)}
+                              alt="About section"
+                              width={240}
+                              height={300}
+                              className="mx-auto max-h-60 object-contain"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={handleRemoveAboutImage}
+                              className="mt-2"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ) : (
+                          <FileUploader
+                            value={aboutImageFile}
+                            onValueChange={handleAboutImageChange}
+                            maxFileCount={1}
+                            maxSize={2 * 1024 * 1024}
+                            disabled={aboutImageUploading}
+                            onRemove={handleRemoveAboutImage}
+                            accept={{
+                              "image/png": [".png"],
+                              "image/jpeg": [".jpg", ".jpeg"],
+                              "image/webp": [".webp"],
+                            }}
+                            enableCropping={true}
+                            aspectRatio={4 / 5}
+                            cropConfig={{
+                              maxSizeKB: 500,
+                              quality: 0.9,
+                              maxWidth: 960,
+                              maxHeight: 1200,
+                            }}
+                          />
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

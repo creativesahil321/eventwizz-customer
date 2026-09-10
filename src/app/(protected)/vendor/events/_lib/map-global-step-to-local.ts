@@ -26,6 +26,7 @@ export function mapGlobalStepOneToLocal(
     event_name: stepOne.event_name || "",
     event_banner_image: stepOne.event_banner_image,
     event_banner_video: stepOne.event_banner_video,
+    about_event_image: stepOne.about_event_image,
     event_banner_heading: stepOne.event_banner_heading || "",
     event_banner_sub_heading: stepOne.event_banner_sub_heading || "",
     about_event_heading: stepOne.about_event_heading || "",
@@ -37,6 +38,7 @@ export function mapGlobalStepOneToLocal(
     location: stepOne.location,
     remove_event_banner_image: stepOne.remove_event_banner_image ?? false,
     remove_event_banner_video: stepOne.remove_event_banner_video ?? false,
+    remove_about_event_image: stepOne.remove_about_event_image ?? false,
   };
 }
 

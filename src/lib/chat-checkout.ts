@@ -188,16 +188,24 @@ export function bookingChoicesReadyForPay(
     }
     if (!slot.date?.date) return false;
     if (!slot.seating) return false;
-    if (slot.seating === "tickets" || slot.seating === "both") {
-      const tickets = slot.ticketTitles.reduce(
-        (sum, title) => sum + Math.max(0, slot.ticketQuantities[title] ?? 0),
-        0,
-      );
-      if (tickets < 1) return false;
-    }
-    if (slot.seating === "tables" || slot.seating === "both") {
+    const tickets = slot.ticketTitles.reduce(
+      (sum, title) => sum + Math.max(0, slot.ticketQuantities[title] ?? 0),
+      0,
+    );
+    const hasTickets = tickets >= 1;
+    const hasTables = slot.tablePlan.some((item) => item.quantity > 0);
+    if (slot.seating === "tickets") {
+      if (!hasTickets) return false;
+    } else if (slot.seating === "tables") {
       if (slot.guestCount == null || slot.guestCount < 1) return false;
-      if (!slot.tablePlan.some((item) => item.quantity > 0)) return false;
+      if (!hasTables) return false;
+    } else if (slot.seating === "both") {
+      if (!hasTables && !hasTickets) return false;
+      if (hasTables && (slot.guestCount == null || slot.guestCount < 1)) {
+        return false;
+      }
+    } else {
+      return false;
     }
     return true;
   });

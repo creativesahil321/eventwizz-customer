@@ -84,6 +84,7 @@ export interface EventDetailStepOne {
   category_name?: string | null;
   event_banner_image?: string | null;
   event_banner_video?: string | null;
+  about_event_image?: string | null;
   event_banner_heading?: string;
   /** Optional accent tail substring (public event page + preview parity with SiteHeading) */
   event_banner_heading_accent?: string | null;

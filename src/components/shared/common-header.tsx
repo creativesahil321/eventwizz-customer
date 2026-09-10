@@ -20,6 +20,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type ReactNode,
@@ -243,6 +244,17 @@ interface CommonHeaderProps {
    * (e.g. location search results). Matches LocationSelectionHeader on main search.
    */
   solidBar?: boolean;
+  /**
+   * Overlay the hero like the live event page (transparent until scroll) instead
+   * of occupying layout space. Required in nested preview scroll panels.
+   */
+  overlayHero?: boolean;
+  /**
+   * Brand header fill used for light-vs-dark chrome. Preview must pass the same
+   * hex as `--color-header` — ServerContext on `/preview/*` is often the
+   * platform default (white), which wrongly forces a solid occupying bar.
+   */
+  headerColor?: string | null;
 }
 
 export default function CommonHeader({
@@ -260,6 +272,8 @@ export default function CommonHeader({
   locationSlug,
   topBanner,
   solidBar = false,
+  overlayHero = false,
+  headerColor,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
   // Theme refetch after logo save updates this → busts browser cache for same URL path
@@ -283,6 +297,8 @@ export default function CommonHeader({
   /** Guest auth CTAs in preview even when the editor session is signed in. */
   const showGuestAuthLinks = isPreviewChrome || !isAuthenticated;
   const headerRootRef = useRef<HTMLElement>(null);
+  const overlayBarInnerRef = useRef<HTMLDivElement>(null);
+  const [overlayPullPx, setOverlayPullPx] = useState(72);
 
   // Handle scroll effect (window or embedded preview scroll container)
   useEffect(() => {
@@ -405,7 +421,8 @@ export default function CommonHeader({
 
   /** Light header themes (e.g. Clean White `#ffffff`) use on-header text — never glass-over-hero. */
   const headerIsLight = (() => {
-    const configuredHeader = vendorTheme?.colors?.header ?? "#FFFFFF";
+    const configuredHeader =
+      headerColor?.trim() || vendorTheme?.colors?.header || "#FFFFFF";
     try {
       return relativeLuminance(getAnchorColor(configuredHeader)) >= 0.88;
     } catch {
@@ -424,10 +441,33 @@ export default function CommonHeader({
       "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
   });
 
+  /** Dark header over a hero: glass until scroll — live event/location pages. */
+  const darkHeroOverlayStyles = (scrolled: boolean) => {
+    const overDarkHero = !scrolled;
+    return {
+      container: scrolled
+        ? "bg-[color:var(--color-header)] shadow-md"
+        : "bg-transparent",
+      textColor: overDarkHero
+        ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]"
+        : "text-[var(--color-on-header)]",
+      borderColor: "border-[color:var(--color-primary)]",
+      hoverColor: overDarkHero
+        ? "hover:text-white/90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
+        : "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
+    };
+  };
+
+  const useLiveHeroOverlay =
+    overlayHero && !solidBar && !topBanner && !headerIsLight;
+
   // Determine styling based on variant
   const getVariantStyles = () => {
     switch (variant) {
       case "preview":
+        if (useLiveHeroOverlay) {
+          return darkHeroOverlayStyles(isScrolled);
+        }
         return solidHeaderBarStyles(isScrolled);
       case "onboarding":
         return {
@@ -447,28 +487,15 @@ export default function CommonHeader({
         if (topBanner || solidBar) {
           return solidHeaderBarStyles(true);
         }
-        // Dark header: transparent bar over hero until scroll (white nav pills).
-        const overDarkHero = !isScrolled;
-        return {
-          container: isScrolled
-            ? "bg-[color:var(--color-header)] shadow-md"
-            : "bg-transparent",
-          textColor: overDarkHero
-            ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]"
-            : "text-[var(--color-on-header)]",
-          borderColor: "border-[color:var(--color-primary)]",
-          hoverColor: overDarkHero
-            ? "hover:text-white/90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"
-            : "hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]",
-        };
+        return darkHeroOverlayStyles(isScrolled);
       }
     }
   };
 
   const styles = getVariantStyles();
-  /** Glass pills over imagery: dark-header live pages over hero + onboarding homepage with cover. */
+  /** Glass pills over imagery: live dark-header + preview overlay + onboarding cover. */
   const pillGlassOnHero =
-    (variant === "default" &&
+    ((variant === "default" || overlayHero) &&
       !topBanner &&
       !solidBar &&
       !isScrolled &&
@@ -591,16 +618,46 @@ export default function CommonHeader({
       : "opacity-90",
   );
 
+  /** Nested / framed previews scroll inside a panel — sticky, not viewport-fixed. */
+  const usesEmbeddedScrollPanel = Boolean(scrollContainerRef);
+  /** Overlay the hero (live look) — do not occupy layout space above the cover. */
+  const overlayHeroBar = overlayHero && !solidBar;
+  const overlayInScrollPanel = overlayHeroBar && usesEmbeddedScrollPanel;
+
+  // sticky + h-0 is ignored by layout (the bar grows to its content and pushes
+  // the hero down). Measure the real chrome and pull the next sibling up.
+  useLayoutEffect(() => {
+    if (!overlayInScrollPanel) return;
+    const el = overlayBarInnerRef.current;
+    if (!el) return;
+    const sync = () => {
+      const next = Math.round(el.getBoundingClientRect().height);
+      if (next > 0) setOverlayPullPx(next);
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [overlayInScrollPanel, topBanner]);
+  const usesStickyHeader =
+    !overlayHeroBar &&
+    (variant === "preview" || usesEmbeddedScrollPanel);
+  const overDarkHeroTransparent =
+    !topBanner &&
+    !solidBar &&
+    !isScrolled &&
+    !headerIsLight &&
+    (variant === "default" || overlayHero);
+
   // Avoid dark:bg-background here: it overrides vendor --color-header and causes dark-on-dark
   // chrome when the app shell is in dark mode (e.g. admin event review iframe preview).
+  // Do not force a fill while the bar is glass over the hero — preview often has `dark` on <html>.
   const headerDarkModeBg =
     variant === "onboarding"
       ? "dark:bg-background"
-      : "dark:bg-[color:var(--color-header)]";
-
-  /** Nested / framed previews scroll inside a panel — sticky, not viewport-fixed. */
-  const usesEmbeddedScrollPanel = Boolean(scrollContainerRef);
-  const usesStickyHeader = variant === "preview" || usesEmbeddedScrollPanel;
+      : overDarkHeroTransparent || overlayInScrollPanel
+        ? ""
+        : "dark:bg-[color:var(--color-header)]";
   /**
    * Only use `@container/preview` when a device frame (or embedded scroll panel)
    * actually provides that container. Full-page `/preview/site` has no frame —
@@ -613,7 +670,9 @@ export default function CommonHeader({
   const usePreviewContainerQueries =
     deviceFramesEnabled ||
     (usesEmbeddedScrollPanel &&
-      (variant === "preview" || variant === "onboarding"));
+      (variant === "preview" ||
+        variant === "onboarding" ||
+        overlayHero));
 
   /**
    * Full header from viewport `xl` (1280px) / container `@7xl` (1280px).
@@ -662,21 +721,35 @@ export default function CommonHeader({
     <section
       ref={headerRootRef}
       className={cn(
-        usesStickyHeader
-          ? "sticky top-0 z-50 w-full transition-all duration-300"
-          : "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        overlayInScrollPanel
+          ? "sticky top-0 z-50 w-full pointer-events-none"
+          : usesStickyHeader
+            ? "sticky top-0 z-50 w-full transition-all duration-300"
+            : "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         // Banner owns its own fill; keep section transparent so strip colour isn't washed.
-        topBanner ? "bg-transparent shadow-none" : styles.container,
+        overlayInScrollPanel || topBanner
+          ? "bg-transparent shadow-none"
+          : styles.container,
         variant !== "default" && styles.textColor,
         headerDarkModeBg,
         className,
       )}
+      style={
+        overlayInScrollPanel ? { marginBottom: -overlayPullPx } : undefined
+      }
     >
-      {topBanner ? <div className="w-full">{topBanner}</div> : null}
+      {topBanner ? (
+        <div className="pointer-events-auto w-full">{topBanner}</div>
+      ) : null}
       <div
+        ref={overlayBarInnerRef}
         className={cn(
           "w-full",
-          topBanner ? styles.container : null,
+          overlayInScrollPanel && "pointer-events-auto transition-all duration-300",
+          overlayInScrollPanel || topBanner ? styles.container : null,
+          overlayInScrollPanel &&
+            !overDarkHeroTransparent &&
+            "dark:bg-[color:var(--color-header)]",
         )}
       >
       <div className="container mx-auto min-w-0 px-2 sm:px-4">

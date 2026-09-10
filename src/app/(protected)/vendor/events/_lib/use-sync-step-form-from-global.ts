@@ -22,6 +22,7 @@ export function useSyncStepFormFromGlobal<
   toLocalValues,
   onAfterSync,
   enabled = true,
+  resyncKey,
 }: {
   globalForm: UseFormReturn<EventSchemaType>;
   localForm: UseFormReturn<T>;
@@ -29,17 +30,25 @@ export function useSyncStepFormFromGlobal<
   toLocalValues: (globalStep: EventSchemaType[K]) => T;
   onAfterSync?: (values: T) => void;
   enabled?: boolean;
+  /** Change this (e.g. after Discard) to force a local rematch even if the fingerprint is unchanged. */
+  resyncKey?: number | string;
 }) {
   const toLocalValuesRef = useRef(toLocalValues);
   toLocalValuesRef.current = toLocalValues;
   const onAfterSyncRef = useRef(onAfterSync);
   onAfterSyncRef.current = onAfterSync;
   const lastSyncedFingerprintRef = useRef<string | null>(null);
+  const lastResyncKeyRef = useRef(resyncKey);
 
   useEffect(() => {
     if (enabled === false) {
       lastSyncedFingerprintRef.current = null;
       return;
+    }
+
+    if (lastResyncKeyRef.current !== resyncKey) {
+      lastResyncKeyRef.current = resyncKey;
+      lastSyncedFingerprintRef.current = null;
     }
 
     const globalStep = globalForm.getValues()[stepKey];
@@ -54,5 +63,5 @@ export function useSyncStepFormFromGlobal<
     );
     localForm.reset(nextValues, { keepDefaultValues: false });
     onAfterSyncRef.current?.(nextValues);
-  }, [enabled, globalForm, localForm, stepKey]);
+  }, [enabled, globalForm, localForm, stepKey, resyncKey]);
 }

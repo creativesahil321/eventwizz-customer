@@ -52,8 +52,18 @@ export type SearchDateSlotResult = {
   date: string;
   price: number | null;
   sold_out: boolean;
+  /**
+   * Remaining bookable inventory for this date (and room, when present).
+   * Omitted when sold out or no tickets/tables left.
+   */
+  booking_option?: "tickets" | "tables" | "both";
   event: { name: string; slug: string };
-  location: { slug: string; city: string };
+  location: {
+    slug: string;
+    city: string;
+    /** Event pin from the event page — shared by all rooms of this event. */
+    event_address?: string | null;
+  };
   room?: { room_id: number | null; room_name: string | null };
   href: { event: string };
   bookable: {

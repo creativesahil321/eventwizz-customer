@@ -239,6 +239,11 @@ export function patchEventPayloadFromApi(
     currentStep: explicitCurrentStep > 0 ? explicitCurrentStep : 1,
     stepOne: {
       ...(eventDataAny.stepOne || initialData.stepOne),
+      about_event_image:
+        (eventDataAny.stepOne as { about_event_image?: unknown } | undefined)
+          ?.about_event_image ??
+        (raw as { about_event_image?: unknown }).about_event_image ??
+        initialData.stepOne.about_event_image,
       vendor_location_id:
         eventDataAny.stepOne?.vendor_location_id ?? eventRoot.vendor_location_id,
       event_address: hydratedEventAddress,

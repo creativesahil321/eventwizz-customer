@@ -31,6 +31,37 @@ import { hasPlainText, toPlainSnippet } from "@/lib/plain-text-length";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
 
+const FOOTER_SOCIAL_PLATFORMS = [
+  "facebook",
+  "twitter",
+  "instagram",
+  "linkedin",
+  "youtube",
+] as const;
+
+export type FooterSocialPlatform = (typeof FOOTER_SOCIAL_PLATFORMS)[number];
+
+/** Site Essentials / API may send `null` for unused platforms. */
+export type FooterSocialLinksOverride = Partial<
+  Record<FooterSocialPlatform, string | null>
+> | null;
+
+/** Drop `null` so footer props stay `string | undefined`. */
+export function toFooterSocialLinksOverride(
+  links:
+    | Partial<Record<FooterSocialPlatform, string | null | undefined>>
+    | null
+    | undefined,
+): Partial<Record<FooterSocialPlatform, string>> | undefined {
+  if (!links) return undefined;
+  const next: Partial<Record<FooterSocialPlatform, string>> = {};
+  for (const platform of FOOTER_SOCIAL_PLATFORMS) {
+    const value = links[platform];
+    if (typeof value === "string") next[platform] = value;
+  }
+  return next;
+}
+
 interface FooterSectionProps {
   copyright?: string | null;
   logo?: string | null;
@@ -48,12 +79,7 @@ interface FooterSectionProps {
    * When provided, replaces theme social links (e.g. onboarding draft — often empty).
    * Pass `{}` / all-empty to hide icons in preview.
    */
-  socialLinksOverride?: Partial<
-    Record<
-      "facebook" | "twitter" | "instagram" | "linkedin" | "youtube",
-      string
-    >
-  > | null;
+  socialLinksOverride?: FooterSocialLinksOverride;
   /**
    * Dedicated footer blurb under the logo (`footer_brand_description`).
    * Preview shells must pass this (or the already-resolved fallback chain)

@@ -78,6 +78,11 @@ interface HeroBannerProps {
    * alignment never moves it.
    */
   heroFooter?: ReactNode;
+  /**
+   * Hide media + copy and pin the footer dock (location search).
+   * Keep the same instance so the search input does not remount mid-keystroke.
+   */
+  collapsed?: boolean;
   /** Small-caps city / region above the title — never the brand/site name. */
   eyebrow?: string | null;
   /** Address, email, and phone under the description (location covers). */
@@ -99,6 +104,7 @@ export default function HeroBanner({
   bannerHeadingAlign: bannerHeadingAlignProp,
   bannerHeadingValign: bannerHeadingValignProp,
   heroFooter,
+  collapsed = false,
   eyebrow,
   heroContact,
 }: HeroBannerProps) {
@@ -183,8 +189,8 @@ export default function HeroBanner({
   const previewFrames = usePreviewDeviceFramesEnabled();
   /** Stack contact details in narrow device frames. */
   const stackHeroContact = isPreviewMobile || (isPreview && previewFrames);
-  const showHeadingContact = hasContact && !heroFooter;
-  const showDockContact = hasContact && Boolean(heroFooter);
+  const showHeadingContact = hasContact && !heroFooter && !collapsed;
+  const showDockContact = hasContact && Boolean(heroFooter) && !collapsed;
   const previewAlign: BannerHeadingAlign = isPreviewMobile
     ? "center"
     : textAlign;
@@ -196,13 +202,18 @@ export default function HeroBanner({
     <section
       id="hero"
       className={cn(
-        "relative mx-auto w-full overflow-hidden",
-        heroBandHeightClass,
-        isPreviewMobile && previewMobileHeroHeightClass,
+        "relative mx-auto w-full",
+        collapsed
+          ? "overflow-visible"
+          : cn(
+              "overflow-hidden",
+              heroBandHeightClass,
+              isPreviewMobile && previewMobileHeroHeightClass,
+            ),
       )}
     >
       {/* Video background if video URL exists and should be used */}
-      {useVideo && (
+      {!collapsed && useVideo && (
         <div className="absolute inset-0 h-full w-full overflow-hidden">
           <video
             autoPlay
@@ -221,7 +232,7 @@ export default function HeroBanner({
       )}
 
       {/* Image background — slight scale for edge bleed; optimized LCP cover */}
-      {!useVideo && finalImageUrl ? (
+      {!collapsed && !useVideo && finalImageUrl ? (
         <div className="absolute inset-0 overflow-hidden">
           <HeroCoverImage
             key={finalImageUrl}
@@ -232,6 +243,7 @@ export default function HeroBanner({
         </div>
       ) : null}
 
+      {!collapsed ? (
       <div
         className={cn(
           heroBandCopyPlacementClass(copyValign),
@@ -300,13 +312,24 @@ export default function HeroBanner({
           ) : null}
         </motion.div>
       </div>
+      ) : null}
       {heroFooter ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
+        <div
+          className={cn(
+            collapsed
+              ? "sticky top-[4.5rem] z-30 border-b border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 px-2.5 py-2 backdrop-blur-md sm:px-4 sm:py-3"
+              : "pointer-events-none absolute inset-x-0 bottom-0 z-20",
+          )}
+        >
           <div
             className={cn(
-              "mx-auto w-full max-w-7xl px-3 pb-3 sm:px-4 sm:pb-5 md:pb-6",
-              "@max-md/preview:!px-2.5 @max-md/preview:!pb-3",
-              isPreviewMobile && "!px-2.5 !pb-3",
+              collapsed
+                ? "mx-auto w-full max-w-3xl"
+                : cn(
+                    "mx-auto w-full max-w-7xl px-3 pb-3 sm:px-4 sm:pb-5 md:pb-6",
+                    "@max-md/preview:!px-2.5 @max-md/preview:!pb-3",
+                    isPreviewMobile && "!px-2.5 !pb-3",
+                  ),
             )}
           >
             <div

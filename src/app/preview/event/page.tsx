@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Rocket } from "lucide-react";
+import { ArrowLeft, Loader2, Rocket, RotateCcw } from "lucide-react";
 import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-preview";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EventDetailData } from "@/services/vendor/events/type";
@@ -32,10 +32,12 @@ import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-e
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { useToast } from "@/components/ui/use-toast";
 import {
+  clearVendorEventPreviewDraft,
   loadVendorEventDraft,
   mergeVendorLivePreviewData,
   VENDOR_EVENT_PREVIEW_DRAFT_CHANGED,
 } from "@/app/(protected)/vendor/events/_lib/vendor-event-preview-live-data";
+import { requestVendorEventDiscard } from "@/app/(protected)/vendor/events/_lib/event-form-discard";
 import type { EventSchemaType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 
 function resolveEventPreviewLocationSlug(
@@ -150,7 +152,9 @@ function EventPreviewPageContent() {
   }, [eventId, refetch]);
 
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
   const [previewDraft, setPreviewDraft] = useState<Partial<EventSchemaType> | null>(
     null,
   );
@@ -204,6 +208,30 @@ function EventPreviewPageContent() {
       );
     };
   }, [eventId]);
+
+  const handleDiscardPreviewDraft = async () => {
+    if (!eventId || !/^\d+$/.test(eventId)) return;
+    setIsDiscarding(true);
+    try {
+      await clearVendorEventPreviewDraft(eventId);
+      requestVendorEventDiscard(eventId);
+      await refetch();
+      setPreviewDraft(null);
+      setDiscardDialogOpen(false);
+      toast({
+        title: "Changes discarded",
+        description: "Preview now shows the last saved event.",
+      });
+    } catch {
+      toast({
+        title: "Could not discard changes",
+        description: "Try again, or go back to the editor.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDiscarding(false);
+    }
+  };
 
   const handleGoBack = () => {
     if (eventId && /^\d+$/.test(eventId)) {
@@ -413,7 +441,20 @@ function EventPreviewPageContent() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Editor
           </Button>
-          <div className="pointer-events-auto flex shrink-0 items-center justify-end">
+          <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-2">
+            {previewDraft ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isDiscarding || isPublishing}
+                onClick={() => setDiscardDialogOpen(true)}
+                className="bg-white shadow-md ring-1 ring-black/10"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Discard changes
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="event-primary"
@@ -428,14 +469,46 @@ function EventPreviewPageContent() {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col pt-14">
+        <div className="flex min-h-0 flex-1 flex-col">
           <EventPreview
             data={previewEventData}
             siteEssentials={siteEssentials}
             locationSlug={previewLocationSlug}
             embedInShell
+            previewBackButtonOffset
           />
         </div>
+
+        <AlertDialog
+          open={discardDialogOpen}
+          onOpenChange={setDiscardDialogOpen}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Revert all unsaved edits on this event? The preview and the
+                editor will return to the last saved version.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDiscarding}>
+                Cancel
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                variant="event-primary"
+                disabled={isDiscarding}
+                onClick={() => void handleDiscardPreviewDraft()}
+              >
+                {isDiscarding ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Discard changes
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog
           open={publishDialogOpen}

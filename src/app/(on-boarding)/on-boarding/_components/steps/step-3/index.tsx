@@ -157,6 +157,7 @@ export default function StepThree() {
       event_name: globalForm.getValues("stepThree.event_name") || "",
       event_banner_image: globalForm.getValues("stepThree.event_banner_image"),
       event_banner_video: globalForm.getValues("stepThree.event_banner_video"),
+      about_event_image: globalForm.getValues("stepThree.about_event_image"),
       event_banner_heading:
         globalForm.getValues("stepThree.event_banner_heading") || "",
       event_banner_sub_heading:
@@ -191,6 +192,7 @@ export default function StepThree() {
       },
       remove_event_banner_image: false,
       remove_event_banner_video: false,
+      remove_about_event_image: false,
     },
     mode: "onChange",
   });
@@ -246,6 +248,8 @@ export default function StepThree() {
   const [headerBannerFile, setHeaderBannerFile] = useState<File[]>([]);
   // Track if we have a string URL from backend
   const [headerBannerUrl, setHeaderBannerUrl] = useState<string | null>(null);
+  const [aboutImageFile, setAboutImageFile] = useState<File[]>([]);
+  const [aboutImageUrl, setAboutImageUrl] = useState<string | null>(null);
 
   // Video state management
   const [bannerType, setBannerType] = useState<"image" | "video">("image");
@@ -279,6 +283,13 @@ export default function StepThree() {
     if (typeof bannerImage === "string" && bannerImage) {
       setHeaderBannerUrl(bannerImage);
       setBannerType("image");
+    }
+
+    const aboutImage = globalForm.getValues("stepThree.about_event_image");
+    if (typeof aboutImage === "string" && aboutImage) {
+      setAboutImageUrl(aboutImage);
+    } else if (aboutImage instanceof File) {
+      setAboutImageFile([aboutImage]);
     }
 
     if (bannerVideo) {
@@ -336,6 +347,7 @@ export default function StepThree() {
           "about_event_heading",
           "about_event_sub_heading",
           "about_event_description",
+          "about_event_image",
         ],
       },
       {
@@ -518,6 +530,37 @@ export default function StepThree() {
     [globalForm, form, setBannerVideoFile, setBannerVideoUrl, setBannerType],
   );
 
+  const handleAboutImageChange = useCallback(
+    (files: File[], onChange: (value: File | undefined) => void) => {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      setAboutImageFile(files);
+      setAboutImageUrl(null);
+      onChange(file);
+      form.setValue("about_event_image", file);
+      form.setValue("remove_about_event_image", false);
+      globalForm.setValue("stepThree.about_event_image", file);
+      globalForm.setValue("stepThree.remove_about_event_image", false);
+    },
+    [form, globalForm],
+  );
+
+  const handleRemoveAboutImage = useCallback(
+    (onChange: (value: File | undefined) => void) => {
+      setAboutImageFile([]);
+      setAboutImageUrl(null);
+      onChange(undefined);
+      form.setValue("about_event_image", undefined);
+      form.setValue("remove_about_event_image", true);
+      globalForm.setValue(
+        "stepThree.about_event_image",
+        undefined as unknown as File,
+      );
+      globalForm.setValue("stepThree.remove_about_event_image", true);
+    },
+    [form, globalForm],
+  );
+
   // Cleanup object URLs when component unmounts
   useEffect(() => {
     const objectUrls: string[] = [];
@@ -637,6 +680,9 @@ export default function StepThree() {
         );
         data.event_banner_image = headerBannerFile[0];
       }
+      if (aboutImageFile.length > 0 && !data.about_event_image) {
+        data.about_event_image = aboutImageFile[0];
+      }
 
       // SAFETY CHECK: Ensure banner video is included
       if (bannerVideoFile.length > 0 && !data.event_banner_video) {
@@ -662,6 +708,7 @@ export default function StepThree() {
           status?: number;
           event_banner_image?: string;
           event_banner_video?: string;
+          about_event_image?: string;
         };
 
         // Update preview URLs with backend response
@@ -681,6 +728,18 @@ export default function StepThree() {
           console.log("🔄 Updating event banner video URL from backend");
           setBannerVideoUrl(responseData.event_banner_video);
           setBannerVideoFile([]);
+        }
+
+        if (
+          responseData?.about_event_image &&
+          typeof responseData.about_event_image === "string"
+        ) {
+          setAboutImageUrl(responseData.about_event_image);
+          setAboutImageFile([]);
+          globalForm.setValue(
+            "stepThree.about_event_image",
+            responseData.about_event_image,
+          );
         }
 
         // CRITICAL FIX: Get event_id from response
@@ -1251,6 +1310,80 @@ export default function StepThree() {
                               event_category_name: currentEventCategoryName,
                             }}
                           />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="about_event_image"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          About image
+                        </FormLabel>
+                        <FormDescription>
+                          This photo appears next to the About title and
+                          description on the event page. Recommended size:
+                          800 × 1000px. If you skip this, the banner image is
+                          used.
+                        </FormDescription>
+                        <FormControl>
+                          <div
+                            className="flex flex-col justify-center items-center space-y-2 bg-white/5 p-4 rounded-lg border border-white/10"
+                            onClick={() =>
+                              handleFieldFocus("about_event_image")
+                            }
+                          >
+                            {aboutImageUrl ? (
+                              <div className="relative w-full space-y-2">
+                                <img
+                                  src={addCacheBusting(aboutImageUrl)}
+                                  alt="About section"
+                                  className="mx-auto mb-2 max-h-48 object-contain"
+                                  width={160}
+                                  height={200}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleRemoveAboutImage(field.onChange)
+                                  }
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ) : (
+                              <FileUploader
+                                value={aboutImageFile}
+                                onValueChange={(files) =>
+                                  handleAboutImageChange(files, field.onChange)
+                                }
+                                maxFileCount={1}
+                                maxSize={2 * 1024 * 1024}
+                                onRemove={() =>
+                                  handleRemoveAboutImage(field.onChange)
+                                }
+                                accept={{
+                                  "image/png": [".png"],
+                                  "image/jpeg": [".jpg", ".jpeg"],
+                                  "image/webp": [".webp"],
+                                }}
+                                enableCropping={true}
+                                aspectRatio={4 / 5}
+                                cropConfig={{
+                                  maxSizeKB: 500,
+                                  quality: 0.9,
+                                  maxWidth: 960,
+                                  maxHeight: 1200,
+                                }}
+                              />
+                            )}
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>

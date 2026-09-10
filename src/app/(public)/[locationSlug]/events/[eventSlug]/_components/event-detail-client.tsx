@@ -31,6 +31,7 @@ import { RoomContentTransition } from "@/components/public/room-content-transiti
 import CommonHeader from "@/components/shared/common-header";
 import FooterSection from "@/app/(public)/vendor/_components/EventListPage/footer";
 import AboutEventSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/About-event-sec";
+import { resolveAboutEventImage } from "@/lib/resolve-about-event-image";
 import DatesSection from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Dates-section";
 import EventGallery from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/Event-gallery";
 import PackageSec from "@/app/(on-boarding)/on-boarding/_components/form-preview/_components/package-sec";
@@ -51,8 +52,7 @@ import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
-  formatEventHeroDateRange,
-  formatEventHeroTimeRange,
+  labelsFromEventHeroSlices,
   readEventCategoryLabel,
 } from "@/lib/event-hero-meta";
 import { formatEventLocationLabel } from "@/lib/event-location";
@@ -344,11 +344,11 @@ export default function EventDetailClient({
     return locationDisplayName(matched?.city, locationSlug);
   }, [vendorTheme?.locations, locationSlug]);
   const heroCategoryLabel = readEventCategoryLabel(eventData);
-  const heroDateLabel = formatEventHeroDateRange(
-    (slices.dates ?? []).map((d) => d.event_date),
-  );
-  const heroTimeLabel = formatEventHeroTimeRange(
-    (slices.event_schedular ?? []).map((row) => row.time),
+  const { date: heroDateLabel, time: heroTimeLabel } = labelsFromEventHeroSlices(
+    {
+      dates: slices.dates,
+      schedule: slices.event_schedular,
+    },
   );
 
   const aboutHighlights = buildEventAboutHighlights({
@@ -452,7 +452,10 @@ export default function EventDetailClient({
             about_event_heading={eventData.about_event_heading}
             about_event_sub_heading={eventData.about_event_sub_heading}
             about_event_description={eventData.about_event_description}
-            eventImage={eventData.event_banner_image || null}
+            eventImage={resolveAboutEventImage(
+              eventData.about_event_image,
+              eventData.event_banner_image,
+            )}
             imageAlt={
               eventData.event_name
                 ? `${eventData.event_name} event`

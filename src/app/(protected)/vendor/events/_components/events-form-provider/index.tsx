@@ -24,8 +24,14 @@ import {
 } from "../../_lib/hydrate-event-from-api";
 import {
   applyVendorEventDraft,
+  clearVendorEventPreviewDraft,
   loadVendorEventDraft,
 } from "../../_lib/vendor-event-preview-live-data";
+import {
+  eventFormHasUnsavedEdits,
+  VENDOR_EVENT_DISCARD_REQUESTED,
+} from "../../_lib/event-form-discard";
+import { resolveVendorEventIsRoomsForFetch } from "../../_lib/vendor-event-is-rooms";
 import { EventSchemaType, eventSchema } from "../tab-event-form/schema";
 import { initialData } from "../tab-event-form/initialData";
 import { useLocationStore } from "@/store/location.store";
@@ -51,6 +57,11 @@ interface EventFormContextType {
   persistedHydrated: boolean;
   /** When true, user can only view (read-event); Save/Submit and edits are disabled */
   readOnly: boolean;
+  /** Last saved API snapshot — Discard restores this. */
+  hasUnsavedEventEdits: boolean;
+  isDiscarding: boolean;
+  discardEpoch: number;
+  discardUnsavedEventEdits: () => Promise<void>;
 }
 
 const FormContext = createContext<EventFormContextType | undefined>(undefined);
@@ -78,13 +89,17 @@ export function FormProvider({
   const readOnly = !canUpdateEvent;
   const selectedLocation = useLocationStore((s) => s.selectedLocation);
 
-  const hasServerDataProp = Boolean(
-    serverData?.status && serverData.data,
-  );
-  const { eventData, isLoading: eventQueryLoading, invalidateCache } =
-    useEventData(eventIdFromUrl, false, {
-      enabled: !hasServerDataProp && Boolean(eventIdFromUrl),
-    });
+  const isRoomsForFetch = eventIdFromUrl
+    ? resolveVendorEventIsRoomsForFetch(eventIdFromUrl)
+    : undefined;
+  const {
+    eventData,
+    isLoading: eventQueryLoading,
+    invalidateCache,
+    refetch,
+  } = useEventData(eventIdFromUrl, isRoomsForFetch, {
+    enabled: Boolean(eventIdFromUrl),
+  });
 
   const resolvedServerData = useMemo((): EventApiResponse | null => {
     if (serverData?.status && serverData.data) return serverData;
@@ -102,12 +117,18 @@ export function FormProvider({
   const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [persistedHydrated, setPersistedHydrated] = useState(false);
+  const [savedBaseline, setSavedBaseline] = useState<EventSchemaType | null>(
+    null,
+  );
+  const [discardEpoch, setDiscardEpoch] = useState(0);
+  const [isDiscarding, setIsDiscarding] = useState(false);
 
   const maxSteps = 8;
   const isMounted = useRef(true);
   const dataLoadAttempted = useRef(false);
   const didInitActiveStepFromServer = useRef(false);
   const hydratedEventIdRef = useRef<string | null>(null);
+  const isDiscardingRef = useRef(false);
 
   const mergedDefaults = useMemo(() => {
     if (resolvedServerData?.status && resolvedServerData.data) {
@@ -169,6 +190,9 @@ export function FormProvider({
         : null;
       if (cancelled) return;
 
+      // API snapshot only — leftover preview drafts must stay dirty so Discard shows.
+      setSavedBaseline(mergedDefaults);
+
       const nextValues = applyVendorEventDraft(
         mergedDefaults as unknown as Record<string, unknown>,
         draft,
@@ -208,6 +232,106 @@ export function FormProvider({
       setPersistedHydrated(false);
     }
   }, [eventIdFromUrl, eventQueryLoading]);
+
+  // After a successful step save the GET updates — keep baseline on the new API
+  // without resetting the form (other tabs may still have unsaved Files).
+  useEffect(() => {
+    if (!resolvedServerData?.status || !resolvedServerData.data) return;
+    if (isDiscardingRef.current) return;
+    if (!hydratedEventIdRef.current && !persistedHydrated) return;
+    setSavedBaseline(
+      patchEventPayloadFromApi(
+        resolvedServerData.data as unknown as Record<string, unknown>,
+      ),
+    );
+  }, [resolvedServerData, persistedHydrated]);
+
+  const watchedFormValues = form.watch();
+  const hasUnsavedEventEdits = useMemo(() => {
+    const canDiscard =
+      persistedHydrated &&
+      savedBaseline != null &&
+      !readOnly &&
+      Boolean(eventIdFromUrl && /^\d+$/.test(String(eventIdFromUrl)));
+    if (!canDiscard) return false;
+    return eventFormHasUnsavedEdits(watchedFormValues, savedBaseline);
+  }, [
+    watchedFormValues,
+    savedBaseline,
+    persistedHydrated,
+    readOnly,
+    eventIdFromUrl,
+  ]);
+
+  const discardUnsavedEventEdits = useCallback(async () => {
+    if (readOnly) return;
+    if (!eventIdFromUrl || !/^\d+$/.test(String(eventIdFromUrl))) return;
+
+    isDiscardingRef.current = true;
+    setIsDiscarding(true);
+    try {
+      await clearVendorEventPreviewDraft(eventIdFromUrl);
+      await invalidateCache();
+      const result = await refetch();
+      const payload =
+        (result.data?.data as Record<string, unknown> | undefined) ??
+        (resolvedServerData?.data as unknown as Record<string, unknown> | undefined);
+      if (!payload) {
+        toast.error("Could not restore the last saved event. Try again.");
+        return;
+      }
+
+      const next = patchEventPayloadFromApi(payload);
+      form.reset(next, {
+        keepErrors: false,
+        keepDirty: false,
+        keepIsSubmitted: false,
+        keepTouched: false,
+        keepIsValid: false,
+        keepSubmitCount: false,
+      });
+      setSavedBaseline(next);
+      setDiscardEpoch((value) => value + 1);
+      toast.success("Changes discarded");
+    } catch (error) {
+      console.error("Error discarding event edits:", error);
+      toast.error("Could not discard changes. Try again.");
+    } finally {
+      isDiscardingRef.current = false;
+      if (isMounted.current) {
+        setIsDiscarding(false);
+      }
+    }
+  }, [
+    readOnly,
+    eventIdFromUrl,
+    invalidateCache,
+    refetch,
+    resolvedServerData,
+    form,
+  ]);
+
+  useEffect(() => {
+    if (!eventIdFromUrl) return;
+
+    const onRequest = (event: Event) => {
+      const changedId = (event as CustomEvent<{ eventId?: string }>).detail
+        ?.eventId;
+      if (changedId && String(changedId) !== String(eventIdFromUrl)) return;
+      void discardUnsavedEventEdits();
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== `vendor-event-discard-ping:${eventIdFromUrl}`) return;
+      void discardUnsavedEventEdits();
+    };
+
+    window.addEventListener(VENDOR_EVENT_DISCARD_REQUESTED, onRequest);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(VENDOR_EVENT_DISCARD_REQUESTED, onRequest);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [eventIdFromUrl, discardUnsavedEventEdits]);
 
   // Custom function to set active step and save to localStorage and session
   const updateActiveStep = useCallback(
@@ -345,6 +469,10 @@ export function FormProvider({
       setFinalizeBusy,
       persistedHydrated,
       readOnly,
+      hasUnsavedEventEdits,
+      isDiscarding,
+      discardEpoch,
+      discardUnsavedEventEdits,
     }),
     [
       form,
@@ -361,6 +489,10 @@ export function FormProvider({
       advanceStep,
       back,
       readOnly,
+      hasUnsavedEventEdits,
+      isDiscarding,
+      discardEpoch,
+      discardUnsavedEventEdits,
     ]
   );
 

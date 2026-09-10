@@ -204,5 +204,6 @@ export function toLocationEventCardModel(
     image: event.banner_image || imageFallback,
     slug: event.slug || "",
     bookingType,
+    eventAddress: firstNonEmpty(event.event_address),
   };
 }

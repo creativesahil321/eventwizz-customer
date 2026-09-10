@@ -586,6 +586,22 @@ export const onboardingService = {
       formData.append("remove_event_banner_video", "true");
     }
 
+    if (data.about_event_image) {
+      if (
+        data.about_event_image instanceof File ||
+        data.about_event_image instanceof Blob
+      ) {
+        formData.append("about_event_image", data.about_event_image);
+      } else if (typeof data.about_event_image === "string") {
+        formData.append("about_event_image_unchanged", "1");
+      }
+    } else {
+      formData.append("about_event_image_unchanged", "1");
+    }
+    if (data.remove_about_event_image) {
+      formData.append("remove_about_event_image", "true");
+    }
+
     appendManualIsApprovedToFormData(formData, data.isApproved);
 
     const response = await request<ApiResponse>({

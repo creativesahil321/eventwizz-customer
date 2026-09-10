@@ -391,6 +391,22 @@ export const eventsService = {
       formData.append("remove_event_banner_video", "true");
     }
 
+    if (data.about_event_image) {
+      if (
+        data.about_event_image instanceof File ||
+        data.about_event_image instanceof Blob
+      ) {
+        formData.append("about_event_image", data.about_event_image);
+      } else {
+        formData.append("about_event_image_unchanged", "1");
+      }
+    } else {
+      formData.append("about_event_image_unchanged", "1");
+    }
+    if (data.remove_about_event_image) {
+      formData.append("remove_about_event_image", "true");
+    }
+
     if (data.is_rooms === 0 || data.is_rooms === 1) {
       formData.append("is_rooms", isRoomsToFormDataValue(data.is_rooms));
     }
@@ -473,6 +489,22 @@ export const eventsService = {
     }
     if (data.remove_event_banner_video) {
       formData.append("remove_event_banner_video", "true");
+    }
+
+    if (data.about_event_image) {
+      if (
+        data.about_event_image instanceof File ||
+        data.about_event_image instanceof Blob
+      ) {
+        formData.append("about_event_image", data.about_event_image);
+      } else {
+        formData.append("about_event_image_unchanged", "1");
+      }
+    } else {
+      formData.append("about_event_image_unchanged", "1");
+    }
+    if (data.remove_about_event_image) {
+      formData.append("remove_about_event_image", "true");
     }
 
     if (data.is_rooms === 0 || data.is_rooms === 1) {

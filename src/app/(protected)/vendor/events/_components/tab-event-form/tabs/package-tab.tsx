@@ -166,6 +166,7 @@ export default function PackageTab() {
     setActiveField,
     readOnly,
     persistedHydrated,
+    discardEpoch,
   } = useEventFormContext();
 
   const getEventId = (): number => {
@@ -224,6 +225,7 @@ export default function PackageTab() {
     localForm: form,
     stepKey: "stepTwo",
     enabled: persistedHydrated,
+    resyncKey: discardEpoch,
     toLocalValues: (stepTwo) => mapGlobalStepTwoToLocal(stepTwo, getEventId()),
     onAfterSync: (values) => {
       const pkg = values.package_image;

@@ -129,11 +129,6 @@ export default function LocationGrid({
               ? location.cover_image
               : null;
 
-          const locationAddress =
-            typeof locationData.address === "string"
-              ? locationData.address.trim()
-              : "";
-
           const upcomingEvent = locationData.latest_upcoming_event
             ? {
                 name: locationData.latest_upcoming_event.name,
@@ -263,27 +258,6 @@ export default function LocationGrid({
                   >
                     {locationName}
                   </h3>
-
-                  {locationAddress ? (
-                    <p
-                      className={cn(
-                        "flex min-w-0 items-center gap-1 text-[11px] text-[var(--color-text-dimmed)]",
-                        !narrowPreview &&
-                          "md:mb-3 md:items-start md:gap-1.5 md:text-sm md:text-white/70",
-                      )}
-                    >
-                      <MapPin
-                        className={cn(
-                          "h-3 w-3 shrink-0 opacity-90",
-                          !narrowPreview && "md:mt-0.5 md:h-3.5 md:w-3.5",
-                        )}
-                        aria-hidden
-                      />
-                      <span className="truncate md:line-clamp-1">
-                        {locationAddress}
-                      </span>
-                    </p>
-                  ) : null}
 
                   {upcomingEvent ? (
                     <>

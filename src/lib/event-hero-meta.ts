@@ -112,6 +112,21 @@ export function formatEventHeroTimeRange(
   return `${clocks[0]} - ${last}`;
 }
 
+/** Live event page + vendor/onboarding preview share this so date/time stay in sync. */
+export function labelsFromEventHeroSlices(input: {
+  dates?: Array<{ event_date?: string | null } | null> | null;
+  schedule?: Array<{ time?: string | null } | null> | null;
+}): { date: string | null; time: string | null } {
+  return {
+    date: formatEventHeroDateRange(
+      (input.dates ?? []).map((row) => row?.event_date),
+    ),
+    time: formatEventHeroTimeRange(
+      (input.schedule ?? []).map((row) => row?.time),
+    ),
+  };
+}
+
 export function readEventCategoryLabel(source: {
   category_name?: string | null;
   event_category_name?: string | null;

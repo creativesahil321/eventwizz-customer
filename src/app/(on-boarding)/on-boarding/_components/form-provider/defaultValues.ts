@@ -45,6 +45,7 @@ export const defaultValues: OnboardingFormData = {
     event_name: "",
     event_banner_image: undefined as unknown as File,
     event_banner_video: undefined as unknown as File,
+    about_event_image: undefined as unknown as File,
     event_banner_heading: "",
     event_banner_sub_heading: "",
     about_event_heading: "",

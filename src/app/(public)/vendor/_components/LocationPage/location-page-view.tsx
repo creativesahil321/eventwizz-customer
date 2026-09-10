@@ -26,7 +26,9 @@ import CommonHeader from "@/components/shared/common-header";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import HeroBanner from "../EventListPage/hero-banner";
 import ExperienceSection from "../EventListPage/experience";
-import FooterSection from "../EventListPage/footer";
+import FooterSection, {
+  type FooterSocialLinksOverride,
+} from "../EventListPage/footer";
 import SubscribeSection from "../EventListPage/subscribe";
 import { LocationEventSearchResults } from "./location-event-search-results";
 import {
@@ -68,12 +70,7 @@ type LocationPageViewProps = {
   forcePreviewSearch?: boolean;
   footerContactOverride?: VenueContactOverride | null;
   footerContactTheme?: Pick<ThemeSchema, "contactDetails" | "locations"> | null;
-  footerSocialLinksOverride?: Partial<
-    Record<
-      "facebook" | "twitter" | "instagram" | "linkedin" | "youtube",
-      string
-    >
-  > | null;
+  footerSocialLinksOverride?: FooterSocialLinksOverride;
   footerBrandDescription?: string | null;
 };
 
@@ -197,78 +194,85 @@ export function LocationPageView({
           headerVariant === "preview" ? false : undefined
         }
         solidBar={isSearchMode}
+        overlayHero={headerVariant === "preview" && !isSearchMode}
       />
 
-      {isSearchMode ? (
-        <div className="min-h-screen bg-[var(--color-background)] pt-[4.5rem]">
-          <div className="sticky top-[4.5rem] z-30 border-b border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 px-2.5 py-2 backdrop-blur-md sm:px-4 sm:py-3">
-            <div className="mx-auto w-full max-w-3xl">{searchBar}</div>
-          </div>
-          {useApi ? (
-            <PublicSearchResults
-              filters={filters}
-              data={searchData}
-              isLoading={isSearchLoading}
-              isError={isSearchError}
-              onClear={clearSearch}
-              emptyHint="Browse this venue’s events below."
-            />
-          ) : (
-            <LocationEventSearchResults
-              events={searchResults}
-              locationSlug={locationSlug}
-              locationLabel={cityLabel || null}
-              filters={filters}
-              onClear={clearSearch}
-            />
+      <div
+        className={
+          isSearchMode
+            ? "min-h-screen bg-[var(--color-background)] pt-[4.5rem]"
+            : undefined
+        }
+      >
+        <HeroBanner
+          collapsed={isSearchMode}
+          locationName={cityLabel}
+          coverImage={locationData.cover_image}
+          coverVideo={locationData.cover_video}
+          bannerHeading={locationData.banner_heading}
+          bannerSubHeading={locationData.banner_sub_heading}
+          bannerHeadingAccent={settings?.banner_heading_accent}
+          headingEmphasis={headingEmphasis}
+          bannerHeadingAlign={normalizeBannerHeadingAlign(
+            locationData.banner_heading_align ??
+              settings?.banner_heading_align,
           )}
-          {(useApi ? searchEmpty : searchResults.length === 0) ? (
-            <LocationMarketingBody
-              className={marketingClassName}
-              style={marketingStyle}
-              latestEvents={latestEvents}
-              upcomingEvents={upcomingEvents}
-              popularSectionTitle={
-                locationData.event_title_1 || "Popular Events"
-              }
-              upcomingSectionTitle={
-                locationData.event_title_2 || "Upcoming Events"
-              }
-              galleryTitle={
-                locationData.event_gallery_title || "Recent Events Glimpse"
-              }
-              galleryImages={galleryImages ?? locationData.event_gallery ?? []}
-              locationSlug={locationSlug}
-              locationLabel={cityLabel || null}
-            />
-          ) : null}
-        </div>
-      ) : (
-        <>
-          <HeroBanner
-            locationName={cityLabel}
-            coverImage={locationData.cover_image}
-            coverVideo={locationData.cover_video}
-            bannerHeading={locationData.banner_heading}
-            bannerSubHeading={locationData.banner_sub_heading}
-            bannerHeadingAccent={settings?.banner_heading_accent}
-            headingEmphasis={headingEmphasis}
-            bannerHeadingAlign={normalizeBannerHeadingAlign(
-              locationData.banner_heading_align ??
-                settings?.banner_heading_align,
+          bannerHeadingValign={normalizeBannerHeadingValign(
+            locationData.banner_heading_valign ??
+              settings?.banner_heading_valign,
+          )}
+          eyebrow={headingEyebrow}
+          heroContact={{
+            address: heroContact.address,
+            email: heroContact.email,
+            phone: heroContact.phone,
+          }}
+          heroFooter={searchBar}
+        />
+        {isSearchMode ? (
+          <>
+            {useApi ? (
+              <PublicSearchResults
+                filters={filters}
+                data={searchData}
+                isLoading={isSearchLoading}
+                isError={isSearchError}
+                onClear={clearSearch}
+                emptyHint="Browse this venue’s events below."
+              />
+            ) : (
+              <LocationEventSearchResults
+                events={searchResults}
+                locationSlug={locationSlug}
+                locationLabel={cityLabel || null}
+                filters={filters}
+                onClear={clearSearch}
+              />
             )}
-            bannerHeadingValign={normalizeBannerHeadingValign(
-              locationData.banner_heading_valign ??
-                settings?.banner_heading_valign,
-            )}
-            eyebrow={headingEyebrow}
-            heroContact={{
-              address: heroContact.address,
-              email: heroContact.email,
-              phone: heroContact.phone,
-            }}
-            heroFooter={searchBar}
-          />
+            {(useApi ? searchEmpty : searchResults.length === 0) ? (
+              <LocationMarketingBody
+                className={marketingClassName}
+                style={marketingStyle}
+                latestEvents={latestEvents}
+                upcomingEvents={upcomingEvents}
+                popularSectionTitle={
+                  locationData.event_title_1 || "Popular Events"
+                }
+                upcomingSectionTitle={
+                  locationData.event_title_2 || "Upcoming Events"
+                }
+                galleryTitle={
+                  locationData.event_gallery_title || "Recent Events Glimpse"
+                }
+                galleryImages={
+                  galleryImages ?? locationData.event_gallery ?? []
+                }
+                locationSlug={locationSlug}
+                locationLabel={cityLabel || null}
+              />
+            ) : null}
+          </>
+        ) : (
           <LocationMarketingBody
             className={marketingClassName}
             style={marketingStyle}
@@ -286,8 +290,8 @@ export function LocationPageView({
             locationSlug={locationSlug}
             locationLabel={cityLabel || null}
           />
-        </>
-      )}
+        )}
+      </div>
 
       <SubscribeSection emphasis={headingEmphasis} />
 

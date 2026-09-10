@@ -21,7 +21,7 @@ export type PublicEventCardCategory = {
 /**
  * Event row on location listings (`latest_events` / `upcoming_events`).
  * Live API: name, slug, banner_image, lowest_price, category, next_available_date,
- * start_time, end_time, booking_option. Extra date/time aliases are preview / older payloads only.
+ * start_time, end_time, event_address, booking_option. Extra date/time aliases are preview / older payloads only.
  */
 export interface Event {
   name: string;
@@ -32,6 +32,11 @@ export interface Event {
   next_available_date?: string | null;
   start_time?: string | null;
   end_time?: string | null;
+  /**
+   * Event pin from the public event page — shared by all rooms.
+   * Omitted when blank. Distinct from the parent venue city/address.
+   */
+  event_address?: string | null;
   /**
    * Remaining bookable inventory on `next_available_date`.
    * Omitted when that date has no tickets/tables left — do not treat as null.
@@ -277,6 +282,8 @@ export interface EventDetail {
   event_category_name?: string | null;
   event_banner_image: string;
   event_banner_video: string | null;
+  /** Optional portrait image for the About section. Falls back to banner. */
+  about_event_image?: string | null;
   event_banner_heading: string;
   /** Optional substring of the hero line: accent tail (heading font + primary) when theme uses accent_tail */
   event_banner_heading_accent?: string | null;

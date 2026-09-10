@@ -19,6 +19,7 @@ export type OnboardingPreviewEventData = SiteEssentials & {
     slug?: string;
     event_banner_image?: string | null;
     event_banner_video?: string | null;
+    about_event_image?: string | null;
     event_banner_heading?: string;
     event_banner_sub_heading?: string;
     /** Parent location hero position on `?event_slug=` payloads. */

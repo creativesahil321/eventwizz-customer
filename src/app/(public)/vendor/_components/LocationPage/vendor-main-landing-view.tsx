@@ -25,7 +25,9 @@ import {
 } from "./_lib/filter-locations";
 import { usePublicSearchFilters } from "./_lib/use-public-search-filters";
 import SubscribeSection from "../EventListPage/subscribe";
-import FooterSection from "../EventListPage/footer";
+import FooterSection, {
+  type FooterSocialLinksOverride,
+} from "../EventListPage/footer";
 import { SiteHeading } from "@/components/public/site-heading";
 import {
   normalizeHeadingEmphasis,
@@ -65,12 +67,7 @@ export type VendorMainLandingViewProps = {
   footerLogo?: string | null;
   contactOverride?: VenueContactOverride | null;
   contactTheme?: Pick<ThemeSchema, "contactDetails" | "locations"> | null;
-  socialLinksOverride?: Partial<
-    Record<
-      "facebook" | "twitter" | "instagram" | "linkedin" | "youtube",
-      string
-    >
-  > | null;
+  socialLinksOverride?: FooterSocialLinksOverride;
   brandDescription?: string | null;
   /** Unique section id for Explore cities scroll target. */
   exploreCitiesSectionId?: string;

@@ -35,6 +35,7 @@ export function normalizeSiteEssentialsEvents(
     event_time: event.event_time ?? null,
     formatted_time: event.formatted_time ?? null,
     time: event.time ?? null,
+    event_address: event.event_address ?? null,
   }));
 }
 

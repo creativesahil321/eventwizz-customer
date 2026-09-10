@@ -100,8 +100,10 @@ export const stepOneSchema = z
       .max(40, "Event name must not exceed 40 characters"),
     remove_event_banner_image: z.boolean().optional(),
     remove_event_banner_video: z.boolean().optional(),
+    remove_about_event_image: z.boolean().optional(),
     event_banner_video: z.any().optional(),
     event_banner_image: z.any().optional(),
+    about_event_image: z.any().optional(),
     event_banner_heading: z
       .string()
       .min(1, "Banner heading is required")

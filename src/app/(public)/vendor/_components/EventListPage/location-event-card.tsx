@@ -39,6 +39,8 @@ export type LocationEventCardModel = {
    * Missing when next available date has no remaining tickets/tables.
    */
   bookingType?: PublicBookingType | null;
+  /** Event pin from listing/search — preferred over parent city. */
+  eventAddress?: string | null;
 };
 
 type LocationEventCardProps = {
@@ -77,7 +79,11 @@ export function LocationEventCard({
   const onPreviewEventSelect = usePreviewEventSelect();
   const isInteractivePreview = isPreview && Boolean(onPreviewEventSelect);
   const href = `/${locationSlug}/events/${event.slug}`;
-  const placeLabel = eventAddress?.trim() || locationLabel?.trim() || null;
+  const eventPin =
+    event.eventAddress?.trim() || eventAddress?.trim() || "";
+  const cityLabel = locationLabel?.trim() || "";
+  const placeLabel = eventPin || cityLabel || null;
+  const showPlace = Boolean(eventPin) || (showLocationChip && Boolean(placeLabel));
   const hasDistance =
     typeof event.distanceKm === "number" && Number.isFinite(event.distanceKm);
   const fromPrice = formatEventCardFromPrice(event.price);
@@ -162,7 +168,7 @@ export function LocationEventCard({
           </div>
         ) : null}
 
-        {showLocationChip && placeLabel ? (
+        {showPlace && placeLabel ? (
           <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-[var(--color-text-dimmed)]">
             <MapPin className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
             <span className="truncate">{placeLabel}</span>
