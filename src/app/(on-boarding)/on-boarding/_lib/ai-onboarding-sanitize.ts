@@ -9,6 +9,8 @@ import {
   resolveAiDrinksEnabled,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { sanitizeOnboardingMenusForSubmit } from "./onboarding-catering-ready";
+import { isEventDateBeforeMinimum } from "@/lib/min-event-date";
+import { padMinRoomNames } from "@/lib/room-name-examples";
 
 export const AI_ONBOARDING_MIN_ROOMS = 2;
 export const AI_ONBOARDING_MAX_ROOMS = 3;
@@ -96,17 +98,11 @@ export function sanitizeVendorDescription(
 export function normalizeAiRoomNames(
   roomNames: string[] | undefined,
 ): string[] {
-  const unique = Array.from(
-    new Set(
-      (roomNames ?? [])
-        .map((name) => name.trim())
-        .filter((name) => name.length > 0),
-    ),
-  ).slice(0, AI_ONBOARDING_MAX_ROOMS);
-
-  if (unique.length >= AI_ONBOARDING_MIN_ROOMS) return unique;
-  if (unique.length === 1) return [unique[0], "Room 2"];
-  return ["Room 1", "Room 2"];
+  return padMinRoomNames(
+    roomNames,
+    AI_ONBOARDING_MIN_ROOMS,
+    AI_ONBOARDING_MAX_ROOMS,
+  );
 }
 
 const MONTH_INDEX: Record<string, number> = {
@@ -153,7 +149,7 @@ function resolveFutureYear(monthIndex: number, day: number, explicitYear?: numbe
   const year = now.getFullYear();
   const candidate = new Date(year, monthIndex, day);
   const today = new Date(year, now.getMonth(), now.getDate());
-  return candidate < today ? year + 1 : year;
+  return candidate <= today ? year + 1 : year;
 }
 
 function parseDayNumbers(chunk: string): number[] {
@@ -168,12 +164,7 @@ function uniqueIsoDates(dates: string[]): string[] {
 
 export function isUsableOnboardingDate(iso: string | undefined): boolean {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
-  const today = new Date();
-  const todayStart = new Date(
-    `${today.toISOString().slice(0, 10)}T00:00:00`,
-  ).getTime();
-  const time = new Date(`${iso}T00:00:00`).getTime();
-  return Number.isFinite(time) && time >= todayStart;
+  return !isEventDateBeforeMinimum(iso);
 }
 
 export function hasUsableOnboardingDates(
@@ -781,7 +772,7 @@ CRITICAL RULES:
    - booking_type "tables" or "both": payment_type REQUIRED ("full" or "deposit")
    - payment_type "full": is_deposit_enabled false; leave deposit_value and deposit_due_date empty
    - payment_type "deposit": is_deposit_enabled MUST be true; deposit_type "amount" or "percentage"; deposit_value required (percentage 20-80); deposit_due_date YYYY-MM-DD strictly BEFORE event_date
-9. stepFive dates: YYYY-MM-DD, ascending, no duplicates, today or future
+9. stepFive dates: YYYY-MM-DD, ascending, no duplicates, tomorrow or later (not today)
 10. ROOM SYSTEM (when enabled):
    - Use EXACT room names provided (spelling/casing as given)
    - Minimum ${AI_ONBOARDING_MIN_ROOMS}, maximum ${AI_ONBOARDING_MAX_ROOMS} rooms — never invent extra rooms

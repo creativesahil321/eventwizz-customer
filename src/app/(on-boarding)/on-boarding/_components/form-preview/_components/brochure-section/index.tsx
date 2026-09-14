@@ -2,10 +2,9 @@
 
 import LocationMap from "./location-map";
 import { cn } from "@/lib/utils";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
-import { PreviewEditHit, type PreviewEditorTarget } from "../../preview-edit-hit";
 
 interface LocationData {
   title: string;
@@ -29,35 +28,20 @@ type BrochureSectionProps = {
   showMapImmediately?: boolean;
   /** Site Essentials `typography.headingEmphasis` — required on platform-host previews. */
   headingEmphasis?: HeadingEmphasis | string | null;
-  /** Preview → Step 3 event location fields. */
-  onEditLocation?: (target: PreviewEditorTarget) => void;
 };
 
 export default function BrochureSection({
   location,
   showMapImmediately = false,
   headingEmphasis,
-  onEditLocation,
 }: BrochureSectionProps) {
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
 
   const defaultLocation = {
     description: location?.description?.trim() || "",
     latitude: location?.latitude || null,
     longitude: location?.longitude || null,
   };
-
-  const locationPanel = (
-    <section className="w-full overflow-hidden rounded-md">
-      <LocationMap
-        address={defaultLocation.description}
-        latitude={defaultLocation.latitude}
-        longitude={defaultLocation.longitude}
-        className="h-full w-full min-h-[280px] sm:min-h-[360px]"
-        showMapImmediately={showMapImmediately}
-      />
-    </section>
-  );
 
   return (
     <section className="bg-[color:var(--color-background)] px-4 py-16">
@@ -78,19 +62,15 @@ export default function BrochureSection({
         <section
           className={cn("grid grid-cols-1 gap-4", narrowPreview && "gap-3")}
         >
-          {onEditLocation ? (
-            <PreviewEditHit
-              step={3}
-              field="event_address"
-              guidedSectionId="event-location"
-              label="Event location"
-              onEdit={onEditLocation}
-            >
-              {locationPanel}
-            </PreviewEditHit>
-          ) : (
-            locationPanel
-          )}
+          <section className="w-full overflow-hidden rounded-md">
+            <LocationMap
+              address={defaultLocation.description}
+              latitude={defaultLocation.latitude}
+              longitude={defaultLocation.longitude}
+              className="w-full"
+              showMapImmediately={showMapImmediately}
+            />
+          </section>
         </section>
       </div>
     </section>

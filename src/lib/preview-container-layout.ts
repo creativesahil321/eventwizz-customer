@@ -24,6 +24,20 @@ export const previewGridCols1UntilMd = "@max-md/preview:!grid-cols-1";
 export const previewFlexOnlyUntilMd =
   "flex md:hidden @max-md/preview:!flex";
 
+/** Mobile peek / carousel: live `md:hidden`, still visible in a 390px frame. */
+export const previewBlockOnlyUntilMd =
+  "md:hidden @max-md/preview:!block";
+
+/** Tablet+ grid: live `hidden md:grid`, stay hidden in a phone frame. */
+export const previewGridFromMd = "hidden md:grid @max-md/preview:!hidden";
+
+/** Tablet+ block: live `hidden md:block`. */
+export const previewBlockFromMd = "hidden md:block @max-md/preview:!hidden";
+
+/** Live `md:flex-row` without leaking desktop rows into a phone frame. */
+export const previewRowFromMd =
+  "md:flex-row @max-md/preview:!flex-col";
+
 /**
  * Tablet/desktop chrome: live `hidden md:flex`, hidden again inside a phone
  * preview frame where viewport `md:` would otherwise keep it visible.
@@ -66,6 +80,18 @@ export const previewStackUntilSm =
 export const previewGridCols1UntilSm = "@max-sm/preview:!grid-cols-1";
 
 export const previewHideUntilSm = "@max-sm/preview:!hidden";
+
+/** Undo viewport `lg:` chrome (1024px) inside tablet/phone frames. */
+export const previewUndoLgSplit =
+  "@max-5xl/preview:!grid-cols-1 @max-5xl/preview:!gap-8";
+
+export const previewUndoLgRule =
+  "@max-5xl/preview:!border-l-0 @max-5xl/preview:!pl-0 @max-5xl/preview:!pr-0";
+
+/** Live phone type: keep `sm:`/`md:` from enlarging copy in a 390px frame. */
+export const previewPhoneText3xl = "@max-md/preview:!text-3xl";
+export const previewPhonePx4 = "@max-md/preview:!px-4";
+export const previewPhonePy12 = "@max-md/preview:!py-12";
 
 /**
  * LocationSearchBar on live is `flex-col` below `sm`. Preview frames sit in a

@@ -25,7 +25,7 @@ import {
 import { EventListingHorizontalScroll } from "../event-listing-horizontal-scroll";
 import { SingleEventShowcase } from "../single-event-showcase";
 import { DualEventShowcase } from "../dual-event-showcase";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { EventSectionHeader } from "../event-section-header";
 
 export default function PopularEvents({
@@ -38,7 +38,7 @@ export default function PopularEvents({
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
   const currencySym = resolveCurrencySymbol(vendorTheme?.currency_symbol);
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
 
   const sectionTitleText =
     sectionTitle || vendorTheme?.event_title_1 || "Popular Events";
@@ -70,6 +70,7 @@ export default function PopularEvents({
         sectionTitle={sectionTitleText}
         event={event}
         locationSlug={locationSlug || ""}
+        locationLabel={locationLabel}
         isPending={pendingEventSlug === event.slug}
         onNavigateStart={() => setPendingEventSlug(event.slug)}
         imageFallback={eventImages[0]}
@@ -85,6 +86,7 @@ export default function PopularEvents({
         sectionTitle={sectionTitleText}
         events={[events[0], events[1]]}
         locationSlug={locationSlug || ""}
+        locationLabel={locationLabel}
         pendingEventSlug={pendingEventSlug}
         onNavigateStart={setPendingEventSlug}
         imageFallbacks={[eventImages[0], eventImages[1]]}
@@ -139,8 +141,10 @@ export default function PopularEvents({
             <div
               className={cn(
                 "hidden gap-5 md:grid",
-                events.length === 3 && "md:grid-cols-2 lg:grid-cols-3",
-                events.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+                events.length === 3 &&
+                  "md:grid-cols-2 lg:grid-cols-3 @max-5xl/preview:!grid-cols-2",
+                events.length === 4 &&
+                  "md:grid-cols-2 lg:grid-cols-4 @max-5xl/preview:!grid-cols-2",
               )}
             >
               {events.map((event, index) => (

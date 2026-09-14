@@ -37,6 +37,7 @@ import {
   sanitizeVendorDescription,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import { normalizeDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import { isEventDateBeforeMinimum } from "@/lib/min-event-date";
 
 export interface AIOnboardingInput {
   venueName: string;
@@ -347,12 +348,10 @@ export async function POST(req: NextRequest) {
           const fallbackDate = futureDate.toISOString().split("T")[0];
 
           const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date.event_date || "");
-          const todayStart = new Date(now.toISOString().split("T")[0] + "T00:00:00").getTime();
-          const eventTime = isValidDate
-            ? new Date(date.event_date + "T00:00:00").getTime()
-            : todayStart;
           const eventDate =
-            isValidDate && eventTime >= todayStart ? date.event_date : fallbackDate;
+            isValidDate && !isEventDateBeforeMinimum(date.event_date, now)
+              ? date.event_date
+              : fallbackDate;
 
           const validBookingTypes = ["tickets", "tables", "both"];
           let bookingType = validBookingTypes.includes(date.booking_type)

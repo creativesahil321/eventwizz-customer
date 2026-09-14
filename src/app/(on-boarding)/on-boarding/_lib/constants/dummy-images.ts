@@ -2,7 +2,7 @@
  * Placeholder images for AI-generated events/onboarding.
  * All images are royalty-free Unsplash photos matched to each event category.
  * Every image within a set is unique (no repeated photo IDs within the same set).
- * Vendors can replace any of these in the editor after the event is created.
+ * Vendors must replace these in the editor before publishing (copyright).
  *
  * Primary lookup: getImagesByCategoryId(categoryId) — maps the exact API category IDs
  * Fallback:       getDummyImages(eventType)          — maps high-level type strings

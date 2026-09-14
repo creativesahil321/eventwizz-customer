@@ -35,7 +35,7 @@ import {
 import { reconcileLocalCartWithApi } from "@/lib/utils/cart-sync-helper";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
@@ -442,7 +442,7 @@ export default function DatesSection({
   const { data: session, status } = useSession();
   const { isOnboarding } = useOnboarding();
   const isPreviewMode = useIsPreviewMode();
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   // Professional API-only approach - no local cart state needed
   const { mutateAsync: storeEventBooking, isPending } = useStoreEventBooking();
   const selectedDrinks = useDrinkSelectionStore(selectScopedDrinks);

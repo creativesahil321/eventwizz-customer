@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Menu, X } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { VendorPublicLocationBookNow } from "@/components/shared/vendor-public-location-book-now";
 import { addCacheBusting } from "@/lib/image-utils";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
@@ -20,15 +21,20 @@ import {
   previewDesktopHeaderFlex,
   previewDesktopHeaderHidden,
 } from "@/lib/preview-container-layout";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
+import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
+import { resolvePreviewMobileMenuHost } from "@/lib/preview-device";
 
 interface LocationSelectionHeaderProps {
   logo?: string;
   name?: string;
+  onEditLogo?: () => void;
 }
 
 export default function LocationSelectionHeader({
   logo,
   name,
+  onEditLogo,
 }: LocationSelectionHeaderProps) {
   const isPreviewMode = useIsPreviewModeFromProvider();
   const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
@@ -44,6 +50,8 @@ export default function LocationSelectionHeader({
    */
   const usesStickyHeader = forceGuestAuthChrome;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [menuHost, setMenuHost] = useState<HTMLElement | null>(null);
+  const headerRootRef = useRef<HTMLElement>(null);
   const { data: session, status: sessionStatus } = useSession();
   const isAuthenticated = sessionStatus === "authenticated";
   const accountType = session?.user?.account_type;
@@ -92,25 +100,32 @@ export default function LocationSelectionHeader({
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]",
   );
 
-  const handleClickOutside = useCallback(
-    (event: MouseEvent) => {
-      if (
-        mobileMenuOpen &&
-        event.target instanceof Element &&
-        !event.target.closest(".mobile-dropdown")
-      ) {
-        setMobileMenuOpen(false);
-      }
-    },
-    [mobileMenuOpen],
-  );
+  const resolveMenuHost = () =>
+    resolvePreviewMobileMenuHost(headerRootRef.current);
+
+  const toggleMobileMenu = (event?: { stopPropagation(): void }) => {
+    event?.stopPropagation();
+    if (!mobileMenuOpen) {
+      const host = resolveMenuHost();
+      if (host) setMenuHost(host);
+    }
+    setMobileMenuOpen((open) => !open);
+  };
+
+  useLayoutEffect(() => {
+    if (!mobileMenuOpen) return;
+    const host = resolveMenuHost();
+    if (host) setMenuHost(host);
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
-    document.addEventListener("click", handleClickOutside);
+    if (!mobileMenuOpen || !menuHost) return;
+    const previousOverflowY = menuHost.style.overflowY;
+    menuHost.style.overflowY = "hidden";
     return () => {
-      document.removeEventListener("click", handleClickOutside);
+      menuHost.style.overflowY = previousOverflowY;
     };
-  }, [handleClickOutside]);
+  }, [menuHost, mobileMenuOpen]);
 
   // Close the drawer when switching Desktop ↔ Tablet/Mobile so chrome stays in sync.
   useEffect(() => {
@@ -254,6 +269,7 @@ export default function LocationSelectionHeader({
 
   return (
     <header
+      ref={headerRootRef}
       className={cn(
         "relative z-50 h-[60px] border-b border-[color:color-mix(in_srgb,var(--color-on-header)_8%,transparent)] text-[var(--color-on-header)]",
         // Solid header so scrolled content (e.g. Explore events) never shows through.
@@ -263,7 +279,12 @@ export default function LocationSelectionHeader({
           : "fixed top-0 left-0 right-0",
       )}
     >
-      <div className="mx-auto flex h-full w-full min-w-0 max-w-[1180px] items-center justify-between px-4 sm:px-6">
+      <div
+        className={cn(
+          PUBLIC_CHROME_CONTAINER_CLASS,
+          "flex h-full items-center justify-between",
+        )}
+      >
         <motion.div
           className="flex min-w-0 items-center"
           initial={{ opacity: 0, x: -20 }}
@@ -271,12 +292,24 @@ export default function LocationSelectionHeader({
           transition={{ duration: 0.5 }}
         >
           {isPreviewMode ? (
-            <div
-              className="inline-flex min-w-0 max-w-full cursor-default items-center gap-2.5"
-              aria-label={name || "Site logo"}
-            >
-              {brandMark}
-            </div>
+            onEditLogo ? (
+              <PreviewEditRegion
+                label="logo"
+                onEdit={onEditLogo}
+                className="inline-flex min-w-0 max-w-full"
+                hoverFrameClassName="rounded-md"
+                badgePositionClassName="-right-1 -top-1"
+              >
+                {brandMark}
+              </PreviewEditRegion>
+            ) : (
+              <div
+                className="inline-flex min-w-0 max-w-full cursor-default items-center gap-2.5"
+                aria-label={name || "Site logo"}
+              >
+                {brandMark}
+              </div>
+            )
           ) : (
             <Link
               href="/"
@@ -304,9 +337,10 @@ export default function LocationSelectionHeader({
             type="button"
             className={cn(
               hamburgerVisibility,
-              "inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 text-[var(--color-on-header)] hover:bg-[color:color-mix(in_srgb,var(--color-on-header)_10%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]",
+              "relative z-[90] inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 text-[var(--color-on-header)] hover:bg-[color:color-mix(in_srgb,var(--color-on-header)_10%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]",
             )}
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={toggleMobileMenu}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenuOpen}
           >
@@ -315,38 +349,66 @@ export default function LocationSelectionHeader({
         </div>
       </div>
 
-      {mobileMenuOpen ? (
-        <motion.div
-          className={cn(
-            mobileMenuVisibility,
-            "absolute top-full left-0 w-full border-b border-[color:color-mix(in_srgb,var(--color-on-header)_10%,transparent)] bg-[var(--color-header)] shadow-lg mobile-dropdown",
-          )}
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="px-4 py-4">
-            <nav className="mb-2 flex flex-col gap-2">
-              <VendorPublicLocationBookNow
-                disabled={isPreviewMode}
-                pillGlassOnHero={false}
-                triggerClassName="!h-11 !w-full !rounded-xl !px-4 justify-center font-semibold"
-                menuContentClassName="!w-full max-w-none"
-                onLocationNavigate={() => {
-                  setMobileMenuOpen(false);
-                }}
-                align="center"
+      {mobileMenuOpen && menuHost
+        ? createPortal(
+            <>
+              <div
+                className={
+                  menuHost !== document.body
+                    ? "absolute inset-0 z-[200] bg-black/50"
+                    : "fixed inset-0 z-[200] bg-black/50"
+                }
+                onClick={toggleMobileMenu}
               />
-              {authChrome(
-                forceGuestAuthChrome,
-                menuSurfaceChromeLinkClass,
-                true,
-              )}
-            </nav>
-          </div>
-        </motion.div>
-      ) : null}
+              <div
+                className={cn(
+                  mobileMenuVisibility,
+                  "isolate flex w-[70%] max-w-xs flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] shadow-2xl",
+                  menuHost !== document.body
+                    ? "absolute top-0 left-0 z-[210] h-full"
+                    : "fixed top-0 left-0 z-[210] h-dvh",
+                )}
+              >
+                <div className="flex items-center justify-between border-b border-[var(--color-on-header)]/20 px-4 py-4">
+                  <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/80">
+                    Menu
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={toggleMobileMenu}
+                    aria-label="Close menu"
+                    className="p-1 text-[var(--color-on-header)]"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <nav
+                  className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
+                  aria-label="Main navigation"
+                >
+                  <div className="flex flex-col gap-2">
+                    <VendorPublicLocationBookNow
+                      disabled={isPreviewMode}
+                      pillGlassOnHero={false}
+                      triggerClassName="!h-11 !w-full !rounded-xl !px-4 justify-center font-semibold"
+                      menuContentClassName="!w-full max-w-none"
+                      onLocationNavigate={() => {
+                        setMobileMenuOpen(false);
+                      }}
+                      align="center"
+                    />
+                    {authChrome(
+                      forceGuestAuthChrome,
+                      menuSurfaceChromeLinkClass,
+                      true,
+                    )}
+                  </div>
+                </nav>
+              </div>
+            </>,
+            menuHost,
+          )
+        : null}
     </header>
   );
 }

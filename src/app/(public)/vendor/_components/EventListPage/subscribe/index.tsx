@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteHeading } from "@/components/public/site-heading";
 import { useIsPreviewMode } from "@/contexts/preview-context";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { cn } from "@/lib/utils";
-import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
+import { PUBLIC_SECTION_PY_CLASS, PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { useAuthStore } from "@/store/auth.store";
 import { useLocationStore } from "@/store/location.store";
@@ -86,7 +86,12 @@ function SubscribeShell({
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,color-mix(in_srgb,var(--color-primary)_8%,transparent),transparent)]"
         aria-hidden
       />
-      <div className="relative z-10 mx-auto w-full max-w-[1180px] px-4 text-center sm:px-6">
+      <div
+        className={cn(
+          PUBLIC_CHROME_CONTAINER_CLASS,
+          "relative z-10 text-center",
+        )}
+      >
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
           Stay updated
         </p>
@@ -115,7 +120,7 @@ function subscribeCardClass(narrowPreview: boolean) {
 }
 
 function SubscribeCardSkeleton() {
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   return (
     <div className={subscribeCardClass(narrowPreview)}>
       <Skeleton className="h-[42px] w-full rounded-xl md:min-w-[160px] md:flex-1" />
@@ -127,7 +132,7 @@ function SubscribeCardSkeleton() {
 }
 
 function CustomerSubscribeCard() {
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const { settings } = useDomain();
   const locationId = useLocationStore((s) => s.getLocationId());
   const email = useAuthStore((s) => s.user?.email) ?? null;
@@ -237,7 +242,7 @@ function GuestSubscribeForm() {
   } | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [lastPayload, setLastPayload] = useState<SubscribePayload | null>(null);
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const locationId = useLocationStore((s) => s.getLocationId());
   const subscribeMutation = usePublicSubscribe();
   const resendMutation = useResendNewsletterConfirmation();

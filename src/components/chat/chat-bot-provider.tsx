@@ -2,6 +2,8 @@
 
 import { useState, createContext, useContext, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
+import { isChatBotHiddenOnPath } from "@/lib/chat-page-context";
 
 const ChatBot = dynamic(
   () => import("./chat-bot").then((mod) => mod.ChatBot),
@@ -34,12 +36,14 @@ export function ChatBotProvider({
   children,
   defaultEnabled = true,
 }: ChatBotProviderProps) {
+  const pathname = usePathname();
+  const hiddenOnRoute = isChatBotHiddenOnPath(pathname);
   const [isEnabled, setIsEnabled] = useState(false);
 
   // Only enable after client-side hydration to avoid SSR issues
   useEffect(() => {
-    setIsEnabled(defaultEnabled);
-  }, [defaultEnabled]);
+    setIsEnabled(defaultEnabled && !hiddenOnRoute);
+  }, [defaultEnabled, hiddenOnRoute]);
 
   const enableChatBot = () => setIsEnabled(true);
   const disableChatBot = () => setIsEnabled(false);
@@ -49,7 +53,7 @@ export function ChatBotProvider({
       value={{ isEnabled, enableChatBot, disableChatBot }}
     >
       {children}
-      {isEnabled && <ChatBot />}
+      {isEnabled && !hiddenOnRoute && <ChatBot />}
     </ChatBotContext.Provider>
   );
 }

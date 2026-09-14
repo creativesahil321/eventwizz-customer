@@ -5,7 +5,12 @@ import React, { useEffect, useRef, useState, DragEvent } from "react";
 import { StepFourType } from "../../form-provider/schema";
 import { useFormContext } from "../../form-provider";
 import { EVENT_GALLERY_MAX_IMAGES } from "@/lib/event-form-limits";
+import {
+  EVENT_GALLERY_MIN_IMAGES_WHEN_USED,
+  EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+} from "@/lib/event-gallery-count";
 import { OnboardingFieldGroupTitle } from "@/components/ui/typography";
+import { GalleryCopyrightNotice } from "@/components/gallery-copyright-notice";
 import { Button } from "@/components/ui/button";
 import { Trash, GripVertical } from "lucide-react";
 
@@ -203,6 +208,11 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({
   return (
     <FormItem className="w-full">
       <OnboardingFieldGroupTitle>Gallery images</OnboardingFieldGroupTitle>
+      <p className="mt-1 text-sm text-slate-400">
+        Optional. Skip the gallery, or add at least{" "}
+        {EVENT_GALLERY_MIN_IMAGES_WHEN_USED} photos.
+      </p>
+      <GalleryCopyrightNotice className="mt-2 mb-4" />
 
       {/* Display gallery preview grid */}
       {galleryItems.length > 0 && (
@@ -295,6 +305,13 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({
           </article>
         </FormControl>
       )}
+
+      {galleryItems.length > 0 &&
+        galleryItems.length < EVENT_GALLERY_MIN_IMAGES_WHEN_USED && (
+          <p className="mt-2 text-sm font-medium text-red-500">
+            {EVENT_GALLERY_PARTIAL_COUNT_MESSAGE}
+          </p>
+        )}
 
       {galleryItems.length >= EVENT_GALLERY_MAX_IMAGES && (
         <p className="text-amber-600 text-sm mt-2">

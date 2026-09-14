@@ -8,6 +8,8 @@ import { ServerContext } from "@/lib/server-context";
 import { useAuthStore } from "@/store/auth.store";
 import { addCacheBusting } from "@/lib/image-utils";
 import BookACallModal from "../book-a-call-modal";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
+import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -44,7 +46,12 @@ export default function AdminHeader() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 bg-[color:var(--color-header)]/90 text-[var(--color-on-header)] backdrop-blur-md z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div
+          className={cn(
+            PUBLIC_CHROME_CONTAINER_CLASS,
+            "flex items-center justify-between py-4",
+          )}
+        >
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center">
               <img
@@ -122,7 +129,12 @@ export default function AdminHeader() {
 
         {mobileMenuOpen && (
           <div className="md:hidden bg-[color:var(--color-header)] border-t">
-            <div className="container mx-auto px-4 py-4 flex flex-col space-y-4">
+            <div
+              className={cn(
+                PUBLIC_CHROME_CONTAINER_CLASS,
+                "flex flex-col space-y-4 py-4",
+              )}
+            >
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.href}

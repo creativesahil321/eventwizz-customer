@@ -30,6 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  EVENT_REMINDER_DEFAULT_DAYS,
+  EVENT_REMINDER_WEEK_OPTIONS,
+  reminderDaysToSelectValue,
+} from "@/lib/event-reminder-weeks";
 import { Input } from "@/components/ui/input";
 import GoogleLocationSearch from "./google-location-search";
 import { cityFromFormattedAddress } from "../step-7/address-autocomplete";
@@ -95,16 +100,6 @@ function subdomainPublicPreviewLabel(
   const fromVenue = slugify(venueName.trim()).slice(0, 63);
   return fromVenue || "yoursubdomain";
 }
-
-// Days options for reminder emails
-const days = Array.from({ length: 31 }, (_, i) => i + 1);
-
-const extraOptions = [
-  { value: 60, label: "2 months before" },
-  { value: 90, label: "3 months before" },
-  { value: 120, label: "4 months before" },
-  { value: 180, label: "6 months before" },
-];
 
 const publishCardClass =
   "rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5 space-y-3";
@@ -199,7 +194,8 @@ export default function StepEleven() {
       isApproved: false,
       event_id: eventId,
       reminder_email_before_days:
-        globalForm.getValues().stepEleven?.reminder_email_before_days || 10,
+        globalForm.getValues().stepEleven?.reminder_email_before_days ||
+        EVENT_REMINDER_DEFAULT_DAYS,
       submit_type: "submit",
       address: globalForm.getValues().stepEleven?.address || "",
       city: globalForm.getValues().stepEleven?.city || "",
@@ -392,7 +388,7 @@ export default function StepEleven() {
 
       if (showReminderDays) {
         payload.reminder_email_before_days =
-          values.reminder_email_before_days || 10;
+          values.reminder_email_before_days || EVENT_REMINDER_DEFAULT_DAYS;
       }
 
       const response = await onboardingService.storeStepElevenData(
@@ -769,7 +765,9 @@ export default function StepEleven() {
                                     <RadioGroup
                                       onValueChange={(value) => {
                                         if (value === "yes") {
-                                          field.onChange(10);
+                                          field.onChange(
+                                            EVENT_REMINDER_DEFAULT_DAYS,
+                                          );
                                         } else {
                                           field.onChange(undefined);
                                         }
@@ -812,58 +810,40 @@ export default function StepEleven() {
                               <FormField
                                 control={form.control}
                                 name="reminder_email_before_days"
-                                render={({ field }) => {
-                                  // Convert the value to string for the Select component
-                                  const defaultValue =
-                                    field.value !== undefined
-                                      ? field.value.toString()
-                                      : "10";
-
-                                  return (
+                                render={({ field }) => (
                                     <FormItem className="relative">
                                       <p className="text-sm font-medium text-slate-300">
-                                        How many days before the event?
+                                        How far before the event?
                                       </p>
                                       <Select
                                         onValueChange={(value) => {
-                                          const numValue = parseInt(value, 10);
-                                          field.onChange(numValue);
+                                          field.onChange(parseInt(value, 10));
                                         }}
-                                        value={defaultValue}
+                                        value={reminderDaysToSelectValue(
+                                          field.value,
+                                        )}
                                       >
                                         <FormControl>
                                           <SelectTrigger className="w-full h-10 bg-white/5 border-white/10 mt-4">
-                                            <SelectValue placeholder="Days" />
+                                            <SelectValue placeholder="Select timing" />
                                           </SelectTrigger>
                                         </FormControl>
-
                                         <SelectContent className="w-full">
-                                          {[
-                                            ...days,
-                                            ...extraOptions.map((o) => o.value),
-                                          ].map((day) => {
-                                            const extra = extraOptions.find(
-                                              (o) => o.value === day,
-                                            );
-                                            return (
+                                          {EVENT_REMINDER_WEEK_OPTIONS.map(
+                                            (option) => (
                                               <SelectItem
-                                                key={day}
-                                                value={day.toString()}
+                                                key={option.days}
+                                                value={option.days.toString()}
                                               >
-                                                {extra
-                                                  ? extra.label
-                                                  : `${day} ${
-                                                      day === 1 ? "Day" : "Days"
-                                                    }`}
+                                                {option.label}
                                               </SelectItem>
-                                            );
-                                          })}
+                                            ),
+                                          )}
                                         </SelectContent>
                                       </Select>
                                       <FormMessage />
                                     </FormItem>
-                                  );
-                                }}
+                                  )}
                               />
                             )}
                           </div>

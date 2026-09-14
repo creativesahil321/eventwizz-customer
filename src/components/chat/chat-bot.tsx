@@ -165,7 +165,10 @@ const CheckoutStripePaymentModal = dynamic(
   { ssr: false },
 );
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
-import { isCustomerFacingChatSurface } from "@/lib/chat-page-context";
+import {
+  isChatBotHiddenOnPath,
+  isCustomerFacingChatSurface,
+} from "@/lib/chat-page-context";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { useLocationStore } from "@/store/location.store";
 import {
@@ -937,7 +940,7 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
                 {headers.map((h, i) => (
                   <th
                     key={i}
-                    className="px-3 py-2 font-semibold whitespace-nowrap"
+                    className="px-3 py-2 font-semibold"
                   >
                     {renderInlineSpans(h, isUser, `th-${key}-${i}`)}
                   </th>
@@ -953,7 +956,7 @@ function renderMessageContent(content: string, isUser: boolean): ReactNode[] {
                   {row.map((cell, cIdx) => (
                     <td
                       key={cIdx}
-                      className="px-3 py-2 text-slate-700 whitespace-nowrap"
+                      className="px-3 py-2 text-slate-700 break-words"
                     >
                       {renderInlineSpans(
                         cell,
@@ -4173,9 +4176,9 @@ Is there anything else I can help you with?`,
             ? "Your email address…"
             : "Type a message…";
 
-  // Onboarding is a full-screen editor + preview — the floating launcher
-  // (site logo avatar) overlaps the right-hand preview panel.
-  if (pathname?.startsWith("/on-boarding")) {
+  // Onboarding editor and `/preview/*` review — the floating launcher
+  // overlaps the device frame and review chrome.
+  if (isChatBotHiddenOnPath(pathname)) {
     return null;
   }
 
@@ -4430,8 +4433,8 @@ Is there anything else I can help you with?`,
               </div>
             </div>
 
-            <ScrollArea className="min-h-0 flex-1 bg-slate-50 px-3.5 py-4">
-              <div className="space-y-4 pb-1">
+            <ScrollArea className="min-h-0 min-w-0 flex-1 overflow-x-hidden bg-slate-50 px-3.5 py-4 [&>[data-slot=scroll-area-viewport]]:max-w-full [&>[data-slot=scroll-area-viewport]]:min-w-0">
+              <div className="w-full min-w-0 max-w-full space-y-4 pb-1">
                 <AnimatePresence initial={false}>
                   {messages.map((message, index) => {
                     const isUser = message.role === "user";
@@ -4452,7 +4455,7 @@ Is there anything else I can help you with?`,
                       message.quickActions?.filter(isEventPickAction).length ??
                       0;
                     const useDateGrid = dateActionCount >= 2;
-                    const useEventList = !useDateGrid && eventPickCount >= 2;
+                    const useEventList = !useDateGrid && eventPickCount >= 1;
                     return (
                       <motion.div
                         key={`msg-${index}-${message.role}-${message.content.slice(0, 24)}`}
@@ -4473,7 +4476,7 @@ Is there anything else I can help you with?`,
                           delay: motionSafe ? 0.03 : 0,
                         }}
                         className={cn(
-                          "flex items-end gap-2 min-w-0",
+                          "flex w-full min-w-0 items-end gap-2",
                           isUser ? "justify-end" : "justify-start",
                         )}
                       >
@@ -4488,21 +4491,21 @@ Is there anything else I can help you with?`,
                         <div
                           className={cn(
                             "flex min-w-0 flex-col gap-2",
-                            useDateGrid || useEventList
-                              ? "w-full"
-                              : "max-w-[85%]",
+                            isUser
+                              ? "max-w-[85%]"
+                              : "min-w-0 flex-1",
                           )}
                         >
                           {hasBody && (
                             <div
                               className={cn(
-                                "min-w-0 text-sm leading-relaxed",
+                                "min-w-0 overflow-hidden text-sm leading-relaxed",
                                 message.bookingSummary && !isUser
-                                  ? "overflow-hidden p-0"
+                                  ? "p-0"
                                   : "px-3.5 py-2.5",
-                                useDateGrid || useEventList
-                                  ? "max-w-[85%]"
-                                  : null,
+                                isUser || useDateGrid || useEventList
+                                  ? null
+                                  : "w-fit max-w-full",
                                 isUser
                                   ? cn("rounded-2xl rounded-br-md", chatChrome)
                                   : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
@@ -4596,7 +4599,7 @@ Is there anything else I can help you with?`,
                                       >
                                         <span
                                           className={cn(
-                                            "block text-xs font-semibold leading-snug",
+                                            "block min-w-0 text-xs font-semibold leading-snug break-words",
                                             isEventChip || isDateChip
                                               ? "whitespace-normal"
                                               : "truncate leading-tight",

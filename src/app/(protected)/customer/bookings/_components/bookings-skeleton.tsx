@@ -1,41 +1,37 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BookingsSkeletonProps {
   count?: number;
+}
+
+export function BookingCardSkeleton() {
+  return (
+    <Card className="flex h-full flex-col overflow-hidden">
+      <Skeleton className="h-48 w-full shrink-0 rounded-none" />
+      <CardContent className="flex flex-col gap-3 p-4">
+        <Skeleton className="h-5 w-3/4" />
+        <div className="flex items-center justify-between border-b border-t py-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-6 w-24" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function BookingsSkeleton({
   count = 10,
 }: BookingsSkeletonProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {Array.from({ length: count }).map((_, index) => (
-        <Card
-          key={index}
-          className="overflow-hidden animate-pulse flex flex-col h-full"
-        >
-          {/* Image Skeleton */}
-          <div className="w-full h-48 bg-muted flex-shrink-0" />
-
-          {/* Content Skeleton */}
-          <CardContent className="p-4 flex flex-col gap-3">
-            {/* Title Skeleton */}
-            <div className="h-5 bg-muted rounded w-3/4" />
-
-            {/* Price Skeleton */}
-            <div className="flex items-center justify-between py-2 border-t border-b">
-              <div className="h-4 bg-muted rounded w-20" />
-              <div className="h-6 bg-muted rounded w-24" />
-            </div>
-
-            {/* Buttons Skeleton */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="h-9 bg-muted rounded" />
-              <div className="h-9 bg-muted rounded" />
-            </div>
-          </CardContent>
-        </Card>
+        <BookingCardSkeleton key={index} />
       ))}
     </div>
   );

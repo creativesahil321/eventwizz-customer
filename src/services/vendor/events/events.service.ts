@@ -17,6 +17,7 @@ import {
 } from "@/lib/parse-check-event-name";
 import { isRoomsToFormDataValue } from "@/lib/event-form-limits";
 import { toPositiveVendorEventPathId } from "@/app/(protected)/vendor/events/_lib/vendor-event-wizard-step";
+import { serializeMenuChoicesReminderDays } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 import { buildVendorEventGetUrl } from "./build-vendor-event-get-url";
 import { filterSchedulerRowsForApi } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
 import {
@@ -1165,6 +1166,16 @@ export const eventsService = {
       formData.append(
         "reminder_email_before_days",
         data.reminder_email_before_days.toString()
+      );
+    }
+
+    const menuChoicesReminderDays = serializeMenuChoicesReminderDays(
+      data.reminder_menu_choices_before_days
+    );
+    if (menuChoicesReminderDays != null) {
+      formData.append(
+        "reminder_menu_choices_before_days",
+        menuChoicesReminderDays.toString()
       );
     }
 

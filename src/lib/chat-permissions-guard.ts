@@ -104,12 +104,13 @@ export const RESOURCE_PERMISSION_RULES: ResourcePermissionRule[] = [
   },
   {
     domain: "locations",
-    label: "Venue Locations & Addresses",
-    primaryPermission: "read-event-location",
+    label: "Locations & Addresses",
+    primaryPermission: "read-location",
     requiredPermissions: [
-      "read-event-location",
-      "create-event-location",
-      "update-event-location",
+      "read-location",
+      "create-location",
+      "update-location",
+      "delete-location",
     ],
     patterns: [
       /\b(venue locations?|event locations?|our addresses?|room locations?|add location)\b/i,

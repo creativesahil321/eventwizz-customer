@@ -1,12 +1,12 @@
 "use client";
 
-import type { ReactNode, MouseEvent } from "react";
+import type { ReactNode } from "react";
 import { EVENT_SECTION_IDS } from "@/components/public/event-section-nav";
 import {
-  PreviewEditHoverBadge,
-  PreviewEditHoverFrame,
+  PreviewEditRegion,
+  shouldIgnorePreviewEditClick,
 } from "@/components/preview/preview-edit-hint";
-import { cn } from "@/lib/utils";
+import type { EventAboutHighlightKey } from "@/lib/event-about-highlights";
 
 export type PreviewEditorTarget = {
   step: number;
@@ -16,6 +16,37 @@ export type PreviewEditorTarget = {
 };
 
 export const ONBOARDING_PREVIEW_EDITOR_TARGETS = {
+  siteLogo: {
+    step: 2,
+    field: "logo",
+    guidedSectionId: "branding",
+  },
+  siteCover: {
+    step: 2,
+    field: "cover_image",
+    guidedSectionId: "branding",
+  },
+  siteBanner: {
+    step: 2,
+    field: "banner_heading",
+    guidedSectionId: "banner",
+  },
+  siteAbout: {
+    step: 2,
+    field: "about_title",
+    guidedSectionId: "about",
+  },
+  siteFooter: {
+    step: 2,
+    field: "footer_brand_description",
+    guidedSectionId: "branding",
+  },
+  /** Phone, email, and address in the footer Enquiries column. */
+  siteEnquiries: {
+    step: 1,
+    field: "contact_number",
+    guidedSectionId: "contact-details",
+  },
   eventBanner: {
     step: 3,
     field: "event_banner_heading",
@@ -24,6 +55,11 @@ export const ONBOARDING_PREVIEW_EDITOR_TARGETS = {
   eventAbout: {
     step: 3,
     field: "about_event_heading",
+    guidedSectionId: "about-event",
+  },
+  eventOccasion: {
+    step: 3,
+    field: "event_category_id",
     guidedSectionId: "about-event",
   },
   eventLocation: {
@@ -46,8 +82,6 @@ export const ONBOARDING_PREVIEW_EDITOR_TARGETS = {
   faqs: { step: 9, field: "question" },
 } as const satisfies Record<string, PreviewEditorTarget>;
 
-const PREVIEW_EDIT_SKIP = "a, [data-preview-no-edit]";
-
 export const PREVIEW_SECTION_EDITOR: Record<string, PreviewEditorTarget> = {
   [EVENT_SECTION_IDS.about]: ONBOARDING_PREVIEW_EDITOR_TARGETS.eventAbout,
   [EVENT_SECTION_IDS.rooms]: ONBOARDING_PREVIEW_EDITOR_TARGETS.rooms,
@@ -60,9 +94,18 @@ export const PREVIEW_SECTION_EDITOR: Record<string, PreviewEditorTarget> = {
   [EVENT_SECTION_IDS.faqs]: ONBOARDING_PREVIEW_EDITOR_TARGETS.faqs,
 };
 
-export function shouldIgnorePreviewEditClick(target: EventTarget | null) {
-  return target instanceof Element && Boolean(target.closest(PREVIEW_EDIT_SKIP));
+export function editorTargetForAboutHighlight(
+  key: EventAboutHighlightKey,
+): PreviewEditorTarget {
+  if (key === "occasion") return ONBOARDING_PREVIEW_EDITOR_TARGETS.eventOccasion;
+  if (key === "dates" || key === "fromPrice") {
+    return ONBOARDING_PREVIEW_EDITOR_TARGETS.dates;
+  }
+  if (key === "time") return ONBOARDING_PREVIEW_EDITOR_TARGETS.schedule;
+  return ONBOARDING_PREVIEW_EDITOR_TARGETS.eventLocation;
 }
+
+export { shouldIgnorePreviewEditClick };
 
 type PreviewEditHitProps = {
   step: number;
@@ -92,39 +135,14 @@ export function PreviewEditHit({
     ...(guidedSectionId ? { guidedSectionId } : {}),
   };
 
-  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (
-      event.target instanceof Element &&
-      event.target.closest("[data-preview-edit-hit]")
-    ) {
-      onEdit(target);
-      return;
-    }
-    if (shouldIgnorePreviewEditClick(event.target)) return;
-    if (
-      skipButtons &&
-      event.target instanceof Element &&
-      event.target.closest("button")
-    ) {
-      return;
-    }
-    onEdit(target);
-  };
-
   return (
-    <div
-      title={`Click to edit ${label}`}
-      onClick={handleClick}
-      className={cn(
-        "group/preview-edit relative cursor-pointer rounded-sm",
-        className,
-      )}
+    <PreviewEditRegion
+      label={label}
+      className={className}
+      skipButtons={skipButtons}
+      onEdit={() => onEdit(target)}
     >
-      <PreviewEditHoverFrame />
-      <div className="pointer-events-none absolute right-3 top-3 z-30">
-        <PreviewEditHoverBadge label={label} />
-      </div>
       {children}
-    </div>
+    </PreviewEditRegion>
   );
 }

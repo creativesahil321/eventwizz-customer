@@ -3,7 +3,7 @@
 import { ArrowRight, Link } from "lucide-react";
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 
 type AboutHeroSectionProps = {
   title?: string;
@@ -19,7 +19,7 @@ function AboutHeroSection({
   link_title,
 }: AboutHeroSectionProps) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
 
   // Trigger layout calculations after component mounts
   React.useEffect(() => {

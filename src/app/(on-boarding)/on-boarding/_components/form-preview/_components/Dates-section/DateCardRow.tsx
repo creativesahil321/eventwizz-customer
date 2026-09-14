@@ -5,7 +5,7 @@
 
 import { DateCard } from "./DateCard";
 import { DatesSectionType } from ".";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 
 interface DateCardRowProps {
@@ -23,7 +23,7 @@ export const DateCardRow = ({
   onDateClick,
   isFirstRow = false,
 }: DateCardRowProps) => {
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const rowDates = dates.slice(startIndex, startIndex + itemsPerRow);
   const rowJustifyClass =
     rowDates.length < itemsPerRow

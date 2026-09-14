@@ -37,6 +37,7 @@ import AddressAutocomplete, {
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import { geocodeLocation } from "../steps/step-11/_lib/actions";
+import { roomNamePlaceholder } from "@/lib/room-name-examples";
 import {
   hasValidLocationCoordinates,
   parseOptionalCoordinate,
@@ -987,7 +988,8 @@ export default function AICollectInfo({
                   Room names <span className="text-red-400">*</span>
                 </label>
                 <p className="text-xs text-slate-500 mb-2">
-                  Name each space (2–3). We’ll draft content per room.
+                  Name each space as guests know it (2–3), e.g. Dining Hall or
+                  Snowball. We’ll draft content per room.
                 </p>
                 <div className="space-y-2">
                   {roomNames.fields.map((field, index) => (
@@ -996,7 +998,7 @@ export default function AICollectInfo({
                         <input
                           {...form.register(`room_names.${index}.name`)}
                           maxLength={40}
-                          placeholder={`Room ${index + 1} name`}
+                          placeholder={roomNamePlaceholder(index)}
                           className={INPUT_CLASS}
                         />
                         {roomNames.fields.length > 2 && (

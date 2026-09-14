@@ -14,6 +14,7 @@ type OnboardingPreviewHeaderProps = {
   roomSelectorVisible?: boolean;
   onRoomChange?: (index: number) => void;
   roomSelectorStickyTop?: string;
+  onEditLogo?: () => void;
 };
 
 /**
@@ -29,6 +30,7 @@ export function OnboardingPreviewHeader({
   roomSelectorVisible = false,
   onRoomChange,
   roomSelectorStickyTop,
+  onEditLogo,
 }: OnboardingPreviewHeaderProps) {
   return (
     <>
@@ -40,6 +42,7 @@ export function OnboardingPreviewHeader({
         scrollContainerRef={scrollContainerRef}
         headerDownloads={headerDownloads}
         overlayHero
+        onEditLogo={onEditLogo}
       />
       {showRoomSelector ? (
         <PreviewRoomFloatingSelector

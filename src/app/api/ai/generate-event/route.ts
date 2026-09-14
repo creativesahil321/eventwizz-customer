@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { padMinRoomNames } from "@/lib/room-name-examples";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import { tryModelsWithFallback, AI_JSON_MAX_TOKENS, type FallbackResult } from "../lib/utils";
 import { AI_JSON_COMPLETION, extractJsonObject } from "../lib/extract-json";
@@ -41,6 +42,7 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/ai-event-vendor-intent";
 import { fillAiEventGeneratedDefaults } from "@/app/(protected)/vendor/events/_lib/fill-ai-event-content";
 import { resolveAiDrinksEnabled } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import { isEventDateBeforeMinimum } from "@/lib/min-event-date";
 
 export interface AIEventInput {
   eventName: string;
@@ -72,17 +74,11 @@ const AI_EVENT_MIN_ROOMS_LOCAL = AI_EVENT_MIN_ROOMS;
 const AI_EVENT_MAX_ROOMS_LOCAL = AI_EVENT_MAX_ROOMS;
 
 function normalizeAiEventRoomNames(roomNames: string[] | undefined): string[] {
-  const unique = Array.from(
-    new Set(
-      (roomNames ?? [])
-        .map((name) => String(name || "").trim())
-        .filter((name) => name.length > 0),
-    ),
-  ).slice(0, AI_EVENT_MAX_ROOMS_LOCAL);
-
-  if (unique.length >= AI_EVENT_MIN_ROOMS_LOCAL) return unique;
-  if (unique.length === 1) return [unique[0], "Room 2"];
-  return ["Room 1", "Room 2"];
+  return padMinRoomNames(
+    roomNames,
+    AI_EVENT_MIN_ROOMS_LOCAL,
+    AI_EVENT_MAX_ROOMS_LOCAL,
+  );
 }
 
 export interface AIEventTicket {
@@ -316,9 +312,10 @@ export async function POST(req: NextRequest) {
           const fallbackDate = futureDate.toISOString().split("T")[0];
 
           const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date.event_date || "");
-          const todayStart = new Date(now.toISOString().split("T")[0] + "T00:00:00").getTime();
-          const eventTime = isValidDate ? new Date(date.event_date + "T00:00:00").getTime() : todayStart;
-          const eventDate = isValidDate && eventTime >= todayStart ? date.event_date : fallbackDate;
+          const eventDate =
+            isValidDate && !isEventDateBeforeMinimum(date.event_date, now)
+              ? date.event_date
+              : fallbackDate;
 
           const validBookingTypes = ["tickets", "tables", "both"];
           const bookingType = validBookingTypes.includes(date.booking_type)

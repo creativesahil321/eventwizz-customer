@@ -11,6 +11,10 @@ import {
   PACKAGE_DETAIL_LINE_MAX_CHARS,
 } from "@/lib/event-form-limits";
 import {
+  EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+  isEventGalleryCountValid,
+} from "@/lib/event-gallery-count";
+import {
   plainTextCharCount,
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/plain-text-length";
@@ -25,6 +29,11 @@ import {
   parseOptionalCoordinate,
 } from "@/lib/to-location-coords-payload";
 import { getOnboardingEmptyMenuCategoryNames } from "../../_lib/onboarding-catering-ready";
+import {
+  EVENT_DATE_MIN_MESSAGE,
+  isEventDateBeforeMinimum,
+} from "@/lib/min-event-date";
+import { getContactNumberIssue } from "@/lib/contact-number";
 import {
   DUPLICATE_MENU_CATEGORY_MESSAGE,
   duplicateMenuCategoryIndexes,
@@ -41,14 +50,12 @@ export const stepOneSchema = z
     isApproved: z.boolean().optional(),
     has_multiple_locations: z.boolean().optional(),
     name: z.string(),
-    contact_number: z
-      .string()
-      .min(1, "Contact number is required")
-      .max(20, "Contact number must not exceed 20 characters")
-      .regex(
-        /^[\d\s\-+()]+$/,
-        "Contact number can only contain numbers and phone formatting characters",
-      ),
+    contact_number: z.string().superRefine((value, ctx) => {
+      const message = getContactNumberIssue(value);
+      if (message) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+      }
+    }),
     email: z.string().email("Invalid email").min(1, "Email is required"),
     address: z.string().min(1, "Address is required"),
     domain: z.string().optional(),
@@ -331,7 +338,10 @@ export const stepFourSchema = z
           }),
         ])
       )
-      .optional(),
+      .optional()
+      .refine((items) => isEventGalleryCountValid(items?.length ?? 0), {
+        message: EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+      }),
   })
   .refine(
     (data) => {
@@ -756,20 +766,14 @@ export const stepFiveSchema = z
   .superRefine((data, ctx) => {
     const dates = data.dates;
     if (!dates || dates.length === 0) return;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTime = today.getTime();
     for (let i = 0; i < dates.length; i++) {
       const d = dates[i].event_date;
-      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        const eventTime = new Date(d + "T00:00:00").getTime();
-        if (eventTime < todayTime) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Event date must be today or in the future.",
-            path: ["dates", i, "event_date"],
-          });
-        }
+      if (d && isEventDateBeforeMinimum(d)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: EVENT_DATE_MIN_MESSAGE,
+          path: ["dates", i, "event_date"],
+        });
       }
     }
     const eventDates = dates.map((d) => d.event_date).filter(Boolean);
@@ -1381,22 +1385,13 @@ export const stepElevenSchema = z.object({
       });
     }
 
-    if (!data.contact_number || data.contact_number.trim() === "") {
+    const contactNumberIssue = getContactNumberIssue(data.contact_number);
+    if (contactNumberIssue) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Contact number is required when duplicating an event",
+        message: contactNumberIssue,
         path: ["contact_number"],
       });
-    } else {
-      // Validate that contact number contains only valid phone characters
-      const phoneRegex = /^[0-9+\-() ]+$/;
-      if (!phoneRegex.test(data.contact_number)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Contact number can only contain numbers and phone formatting characters (+, -, spaces, parentheses)",
-          path: ["contact_number"],
-        });
-      }
     }
 
     if (!hasValidLocationCoordinates(data.latitude, data.longitude)) {
@@ -1479,7 +1474,10 @@ const roomPackageSchema = z.object({
         z.object({ id: z.number(), url: z.string().url() }),
       ]),
     )
-    .optional(),
+    .optional()
+    .refine((items) => isEventGalleryCountValid(items?.length ?? 0), {
+      message: EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+    }),
 });
 
 const roomDatesSchema = z.object({

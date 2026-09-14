@@ -86,6 +86,23 @@ function collectOnboardingPreviewDates(
   return form.stepFive?.dates ?? [];
 }
 
+function collectOnboardingPreviewAddress(form: OnboardingFormData): string | null {
+  const rooms = form.multiSpace?.rooms ?? [];
+  const roomAddress =
+    form.multiSpace?.enabled && rooms.length > 0
+      ? rooms
+          .map((room) => String(room?.brochure?.event_address ?? "").trim())
+          .find(Boolean)
+      : null;
+  const value =
+    form.stepThree?.event_address?.trim() ||
+    form.stepSeven?.event_address?.trim() ||
+    roomAddress ||
+    form.stepOne?.address?.trim() ||
+    "";
+  return value || null;
+}
+
 function collectOnboardingSchedulerTimes(form: OnboardingFormData): {
   start: string | null;
   end: string | null;
@@ -167,6 +184,7 @@ export function buildOnboardingPreviewListingEvents(
       event_date: nextDate,
       start_time: start,
       end_time: end,
+      event_address: collectOnboardingPreviewAddress(form),
     },
   ];
 }
@@ -276,6 +294,15 @@ export function buildOnboardingStepTwoSiteEssentialsValues(
     event_title_2: "",
     event_gallery_title: "",
     upcoming_events: listingEvents,
+    locations: s1?.city?.trim()
+      ? [
+          {
+            city: s1.city.trim(),
+            slug: "preview",
+            address: s1.address?.trim() || null,
+          },
+        ]
+      : undefined,
     event_gallery: gallery,
     domain: null,
     website_role: undefined,

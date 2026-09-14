@@ -224,6 +224,7 @@ export interface EventDetailStepEight {
   event_id: number;
   step: number;
   reminder_email_before_days?: number;
+  reminder_menu_choices_before_days?: number | null;
   city?: string;
   address?: string;
   contact_number?: string;
@@ -241,6 +242,10 @@ export interface EventDetailData {
   current_step?: number;
   /** Highest completed wizard step (GET). Optional on older APIs. */
   completed_step?: number;
+  /** True when the event is publicly bookable. */
+  is_live?: boolean | number | string;
+  /** True when any booking exists on this event. */
+  has_bookings?: boolean | number | string;
   /** Persisted when step 1 is saved with room system enabled (AI + manual). */
   is_rooms?: boolean | number | string;
   approval_status?: string;

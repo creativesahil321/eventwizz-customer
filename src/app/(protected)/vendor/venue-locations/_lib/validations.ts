@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getContactNumberIssue } from "@/lib/contact-number";
 
 /** Hard cap on venue locations a vendor can create. */
 export const MAX_VENDOR_LOCATIONS = 6;
@@ -27,7 +28,12 @@ export const locationSchema = z.object({
         z.string().email("Invalid email format"),
       ]),
     ),
-  contact_number: z.string().min(1, "Contact number is required"),
+  contact_number: z.string().superRefine((value, ctx) => {
+    const message = getContactNumberIssue(value);
+    if (message) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    }
+  }),
   slug: z.string().optional(),
   is_default: z.boolean().default(false),
   latitude: z.number().optional(),

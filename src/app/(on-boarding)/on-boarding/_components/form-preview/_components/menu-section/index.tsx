@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { ChevronRight } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
@@ -38,11 +37,8 @@ type MenuSectionProps = {
  * Preview max-container utilities keep framed Mobile/Tablet from inheriting
  * wide-editor md/lg breakpoints.
  */
-function menuGridClass(
-  count: number,
-  narrowPreview: boolean,
-): string {
-  if (narrowPreview || count <= 1) return "grid-cols-1";
+function menuGridClass(count: number): string {
+  if (count <= 1) return "grid-cols-1";
 
   switch (count) {
     case 2:
@@ -89,7 +85,6 @@ export default function MenuSection({
   headingEmphasis,
 }: MenuSectionProps) {
   const [menuBgImageFailed, setMenuBgImageFailed] = useState(false);
-  const narrowPreview = usePreviewNarrowLayout();
 
   useEffect(() => {
     setMenuBgImageFailed(false);
@@ -159,7 +154,7 @@ export default function MenuSection({
             <div
               className={cn(
                 "grid items-start gap-8 md:gap-8 lg:gap-10",
-                menuGridClass(count, narrowPreview),
+                menuGridClass(count),
               )}
             >
               {filteredMenus.map((menu, index) => (

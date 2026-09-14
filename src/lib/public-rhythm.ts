@@ -1,10 +1,22 @@
 import { cn } from "@/lib/utils";
 
 /** Vertical padding for public marketing / event content sections. */
-export const PUBLIC_SECTION_PY_CLASS = "py-12 md:py-16";
+export const PUBLIC_SECTION_PY_CLASS =
+  "py-12 md:py-16 @max-md/preview:!py-12";
+
+/** Location event listings — live phone `py-16`, tablet+ `md:py-28`. */
+export const PUBLIC_EVENT_LIST_PY_CLASS =
+  "py-16 md:py-28 @max-md/preview:!py-16";
 
 /** Standard content width + horizontal gutters. */
-export const PUBLIC_SECTION_CONTAINER_CLASS = "mx-auto max-w-7xl px-4 md:px-6";
+export const PUBLIC_SECTION_CONTAINER_CLASS =
+  "mx-auto w-full min-w-0 max-w-7xl px-4 md:px-6";
+
+/**
+ * Header, footer, and matching public chrome. Same inner width everywhere
+ * (live site, preview, site essentials) so edges line up.
+ */
+export const PUBLIC_CHROME_CONTAINER_CLASS = PUBLIC_SECTION_CONTAINER_CLASS;
 
 /** Event card title — two-line clamp, consistent weight. */
 export const PUBLIC_CARD_TITLE_CLASS =

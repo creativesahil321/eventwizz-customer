@@ -3,6 +3,33 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 
+export function TransactionLoadMoreCardSkeleton({
+  rows = 3,
+}: {
+  rows?: number;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-white md:hidden">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between border-b border-border p-4 last:border-0"
+        >
+          <div className="flex flex-1 items-center gap-4">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-48" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+          <Skeleton className="h-9 w-28" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function TransactionsListSkeleton() {
   return (
     <div className="space-y-4">

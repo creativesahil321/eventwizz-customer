@@ -27,6 +27,7 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/open-event-preview-tab";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import { hydrateMenuChoicesReminderDays } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
@@ -295,6 +296,9 @@ function EventPreviewPageContent() {
       event_id: Number(stepEventId),
       reminder_email_before_days:
         eventPayloadRoot.stepEight?.reminder_email_before_days ?? 10,
+      reminder_menu_choices_before_days: hydrateMenuChoicesReminderDays(
+        eventPayloadRoot.stepEight?.reminder_menu_choices_before_days,
+      ),
       submit_type: "active" as const,
       is_duplicate: false,
     };

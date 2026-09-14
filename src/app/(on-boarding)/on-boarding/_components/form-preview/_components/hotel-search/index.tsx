@@ -3,7 +3,7 @@
 import React, { useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 
 interface MoreInfo {
@@ -22,7 +22,7 @@ type MoreInfoList = {
 };
 
 export default function HotelSearch({ moreInfo }: MoreInfoList) {
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const filteredInfo = useMemo(() => {
     return moreInfo.filter((info) => {
       return (

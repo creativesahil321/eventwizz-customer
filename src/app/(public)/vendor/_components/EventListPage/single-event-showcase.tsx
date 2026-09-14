@@ -10,6 +10,7 @@ type SingleEventShowcaseProps = {
   sectionTitle: string;
   event: LocationEventCardModel;
   locationSlug: string;
+  locationLabel?: string | null;
   isPending: boolean;
   onNavigateStart: () => void;
   imageFallback: string;
@@ -26,6 +27,7 @@ export function SingleEventShowcase({
   sectionTitle,
   event,
   locationSlug,
+  locationLabel,
   isPending,
   onNavigateStart,
   imageFallback,
@@ -47,6 +49,7 @@ export function SingleEventShowcase({
             <LocationEventHeroCard
               event={event}
               locationSlug={locationSlug}
+              locationLabel={locationLabel}
               isPending={isPending}
               onNavigateStart={onNavigateStart}
               imageFallback={imageFallback}

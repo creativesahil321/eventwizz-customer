@@ -83,7 +83,7 @@ export function LocationEventCard({
     event.eventAddress?.trim() || eventAddress?.trim() || "";
   const cityLabel = locationLabel?.trim() || "";
   const placeLabel = eventPin || cityLabel || null;
-  const showPlace = Boolean(eventPin) || (showLocationChip && Boolean(placeLabel));
+  const showPlace = Boolean(placeLabel);
   const hasDistance =
     typeof event.distanceKm === "number" && Number.isFinite(event.distanceKm);
   const fromPrice = formatEventCardFromPrice(event.price);

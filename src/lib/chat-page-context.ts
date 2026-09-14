@@ -37,7 +37,7 @@ const VENDOR_PAGES: Array<{ prefix: string; label: string; hints?: string }> = [
   { prefix: "/vendor/menu-choices", label: "Menu Choice" },
   { prefix: "/vendor/transactions", label: "Transactions" },
   { prefix: "/vendor/sites-essentials", label: "Sites Essentials" },
-  { prefix: "/vendor/venue-locations", label: "Event Locations" },
+  { prefix: "/vendor/venue-locations", label: "Locations" },
   { prefix: "/vendor/marketing", label: "Marketing" },
   { prefix: "/vendor/newsletter", label: "Newsletter" },
   { prefix: "/vendor/email-logs", label: "Email Logs" },
@@ -188,6 +188,22 @@ export function resolvePageContext(
     area: "other",
     hints: "",
   };
+}
+
+/**
+ * Hide the floating assistant on onboarding and `/preview/*` review screens.
+ * Those surfaces already have their own chrome; the widget overlaps the frame.
+ */
+export function isChatBotHiddenOnPath(
+  pathname: string | null | undefined,
+): boolean {
+  const path = (pathname || "/").split("?")[0] || "/";
+  return (
+    path.startsWith("/on-boarding") ||
+    path.startsWith("/onboarding") ||
+    path === "/preview" ||
+    path.startsWith("/preview/")
+  );
 }
 
 /**

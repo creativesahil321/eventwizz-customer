@@ -15,7 +15,7 @@ interface DataTableToolbarProps {
 export function DataTableToolbar({
   table,
   className = "",
-  title = "Event Locations",
+  title = "Locations",
   children,
 }: DataTableToolbarProps) {
   // Get global filter value from table

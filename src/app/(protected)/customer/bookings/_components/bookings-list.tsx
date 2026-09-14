@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import BookingCard from "./booking-card";
+import { BookingCardSkeleton } from "./bookings-skeleton";
 import { Booking } from "../_lib/types";
 import { ProtectedPageHeader } from "@/app/(protected)/_components/page-header-card";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,9 @@ interface BookingsListProps {
   statusFilter?: string;
   setStatusFilter?: (status: string) => void;
   isFetching?: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
 }
 
 export default function BookingsList({
@@ -55,11 +59,40 @@ export default function BookingsList({
   statusFilter: externalStatusFilter,
   setStatusFilter: setExternalStatusFilter,
   isFetching = false,
+  hasNextPage = false,
+  isFetchingNextPage = false,
+  onLoadMore,
 }: BookingsListProps) {
   const router = useRouter();
   const [internalSearchQuery, setInternalSearchQuery] = React.useState("");
   const [showDateModal, setShowDateModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          onLoadMore?.();
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: "100px",
+      },
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasNextPage, isFetchingNextPage, onLoadMore]);
 
   // Use external state if provided, otherwise use internal state
   const searchQuery = externalSearchQuery ?? internalSearchQuery;
@@ -196,14 +229,21 @@ export default function BookingsList({
           }`}
         >
           {bookings.length > 0 ? (
-            bookings.map((booking) => (
-              <BookingCard
-                key={booking.booking_id}
-                booking={booking}
-                onViewDetails={handleViewDetails}
-                onAddMenu={handleAddMenu}
-              />
-            ))
+            <>
+              {bookings.map((booking) => (
+                <BookingCard
+                  key={booking.booking_id}
+                  booking={booking}
+                  onViewDetails={handleViewDetails}
+                  onAddMenu={handleAddMenu}
+                />
+              ))}
+              {isFetchingNextPage
+                ? Array.from({ length: 4 }).map((_, index) => (
+                    <BookingCardSkeleton key={`load-more-${index}`} />
+                  ))
+                : null}
+            </>
           ) : (
             <div className="col-span-full bg-white rounded-lg border border-[var(--color-border)] p-6 sm:p-12 text-center">
               <div className="flex flex-col items-center gap-3">
@@ -237,6 +277,8 @@ export default function BookingsList({
             </div>
           )}
         </div>
+
+        <div ref={loadMoreRef} className="h-4" aria-hidden />
       </section>
 
       {/* Date Selection Modal */}

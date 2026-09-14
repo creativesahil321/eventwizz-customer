@@ -362,7 +362,7 @@ After selecting a venue on the Welcome page, the vendor sees the **vendor dashbo
 
 8. **Sites Essentials** (/vendor/sites-essentials) — **Site branding and configuration** for the **current location**. Tabs: **Branding** (site name, logo, favicon, copyright, footer brand description, landing banner image/video, about section), **Colors** (primary, secondary, layout, background, status colors), **Typography** (heading and body fonts), **Social Media** (Facebook, Twitter, Instagram, LinkedIn, YouTube), **SEO** (meta title, description, keywords). Optional: gallery title and other location-specific settings. Saves per location. This does **not** include domain or business verification — those are under Domain Settings.
 
-9. **Event Locations** (/vendor/venue-locations) — **Manage venues/locations** on the account. List of all locations (name, address, slug). Add new location (“+ Add Location”), edit, delete. Each location has its own subdomain, events, and Site Essentials. This is the same “locations” list you see on the Welcome page; managing them here lets you add/edit/delete.
+9. **Locations** (/vendor/venue-locations) — **Manage venues/locations** on the account. List of all locations (name, address, slug). Add new location (“+ Add Location”), edit, delete. Each location has its own subdomain, events, and Site Essentials. This is the same “locations” list you see on the Welcome page; managing them here lets you add/edit/delete.
 
 10. **Marketing** (/vendor/marketing) — Marketing tools and campaigns for the venue.
 
@@ -557,7 +557,7 @@ EventWizz is a comprehensive multi-tenant event management platform that serves 
   - **11-step onboarding** for new vendors (Venue → Site → Event → Package → Dates → Catering → Other Packages → Brochure info → FAQs → Payment → Domain). See "Vendor Onboarding (Fresh Vendor)" section.
   - **Dashboard** (/vendor/dashboard): Summary (Total/Active/Past/Draft events), Bookings vs Commissions toggle, recent bookings table.
   - **Events** (/vendor/events): Event list and **Create Event** (header button); multi-step event form.
-  - **Customers** (/vendor/customers), **Bookings** (/vendor/booking-history), **Email Templates** (/vendor/email-templates), **Menu Choice** (/vendor/menu-choices — customer menu choices per booking), **Transactions** (/vendor/transactions — payment history), **Sites Essentials** (/vendor/sites-essentials — branding, colors, typography, SEO), **Event Locations** (/vendor/venue-locations — add/edit venues), **Marketing**, **Newsletter**, **Email Logs**, **System Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings** (/vendor/payment-settings — connect Stripe/PayPal etc.).
+  - **Customers** (/vendor/customers), **Bookings** (/vendor/booking-history), **Email Templates** (/vendor/email-templates), **Menu Choice** (/vendor/menu-choices — customer menu choices per booking), **Transactions** (/vendor/transactions — payment history), **Sites Essentials** (/vendor/sites-essentials — branding, colors, typography, SEO), **Locations** (/vendor/venue-locations — add/edit venues), **Marketing**, **Newsletter**, **Email Logs**, **System Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings** (/vendor/payment-settings — connect Stripe/PayPal etc.).
   - **Domain Settings**: Under **profile dropdown → Settings → Domain Settings** (/vendor/domain-settings), not in sidebar. Manages subdomain and 72-hour verification window; Business Verification tab for VAT and documents.
 
 #### 👥 Customer Portal (website_role="customer")
@@ -724,7 +724,7 @@ The full **11-step vendor onboarding** is described in the "Vendor Onboarding (F
 #### For Vendors (Welcome & Location)
 - **"Where do I go after login?"** - You go to Welcome — Select Location (/welcome/select-location). Pick a venue and click “Continue to Dashboard” to open the dashboard for that venue.
 - **"How do I switch to another venue?"** - Use the location dropdown in the top header (e.g. “Bristol”), or go back to /welcome/select-location and select a different venue then Continue to Dashboard.
-- **"How do I add another venue?"** - On the Welcome page click “+ Add Location”, or in the dashboard go to **Event Locations** (/vendor/venue-locations) and add a new location.
+- **"How do I add another venue?"** - On the Welcome page click “+ Add Location”, or in the dashboard go to **Locations** (/vendor/venue-locations) and add a new location.
 
 #### For Vendors (Dashboard — After Onboarding)
 - **"How do I create more events?"** - Click the blue **Create Event** button in the top header, or go to **Events** (/vendor/events) and create from there. Both use the same multi-step event form.
@@ -1025,7 +1025,7 @@ Manual steps:
 
 ## After vendor login
 - First: **Welcome — Select Location** — pick a venue → **Continue to Dashboard**. (Only when they are on that page — check CURRENT PAGE.)
-- Sidebar: **Dashboard**, **Events**, **Customers**, **Bookings**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Event Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**.
+- Sidebar: **Dashboard**, **Events**, **Customers**, **Bookings**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**.
 - Header: **Create Event**, location selector (if multiple), Help, profile.
 - Domain / VAT verification: profile → **Settings** → **Domain Settings** (not Sites Essentials). 72-hour verify window.
 - Connect payment gateways later: **Payment Settings**.
@@ -1116,7 +1116,7 @@ For CUSTOMERS (event attendees — on venue storefront websites only):
 For VENDORS (venue owners):
 - **Onboarding**: AI-Powered or Manual. Steps in order: Venue, Site, Event, Timeline & Package, Dates, Catering, Brochure info, Other Packages, FAQs, Payment, Domain. Optional **Multiple event spaces** (rooms).
 - **After onboarding**: **Welcome — Select Location** only when they are on that page — then **Continue to Dashboard**. Use CURRENT PAGE if provided.
-- Sidebar labels: **Dashboard**, **Events**, **Customers**, **Bookings**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Event Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**. **Create Event** in the header. **Domain Settings** under profile → Settings (not Sites Essentials).
+- Sidebar labels: **Dashboard**, **Events**, **Customers**, **Bookings**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**. **Create Event** in the header. **Domain Settings** under profile → Settings (not Sites Essentials).
 - **Sites Essentials**: Presets/Branding/Colors/Typography/Social/SEO — public look & copy. Main home page (multi-location hub) vs Location/Home page vs Info pages. Use **Preview** then **Save**.
 - **Dates**: tickets and/or tables; deposits for tables; Brochure Info for address/PDFs.
 

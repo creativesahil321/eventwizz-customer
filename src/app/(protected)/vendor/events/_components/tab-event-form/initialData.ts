@@ -1,7 +1,10 @@
 import { EventSchemaType } from "./schema";
+import { MENU_CHOICES_REMINDER_DEFAULT_DAYS } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 
 export const initialData: EventSchemaType = {
   currentStep: 1,
+  is_live: false,
+  has_bookings: false,
   stepOne: {
     step: 1,
     vendor_location_id: 0,
@@ -131,6 +134,7 @@ export const initialData: EventSchemaType = {
     address: "",
     city: "",
     reminder_email_before_days: 0,
+    reminder_menu_choices_before_days: MENU_CHOICES_REMINDER_DEFAULT_DAYS,
     is_duplicate: false,
     duplicate_target_type: "existing" as "existing" | "new",
     vendor_location_id: undefined,

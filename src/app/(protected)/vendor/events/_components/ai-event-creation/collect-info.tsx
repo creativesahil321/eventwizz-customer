@@ -43,6 +43,11 @@ import {
   AI_EVENT_ADDITIONAL_DETAILS_HINT,
   AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER,
 } from "../../_lib/ai-event-vendor-intent";
+import {
+  padMinRoomNames,
+  roomNamePlaceholder,
+  unnamedRoomLabel,
+} from "@/lib/room-name-examples";
 
 const AI_EVENT_MIN_ROOMS = 2;
 const AI_EVENT_MAX_ROOMS = 3;
@@ -164,17 +169,11 @@ const selectTriggerClass =
 function normalizeRoomNamesFromInput(
   rooms: Array<{ name?: string }> | undefined,
 ): string[] {
-  const unique = Array.from(
-    new Set(
-      (rooms ?? [])
-        .map((room) => String(room?.name || "").trim())
-        .filter((name) => name.length > 0),
-    ),
-  ).slice(0, AI_EVENT_MAX_ROOMS);
-
-  if (unique.length >= AI_EVENT_MIN_ROOMS) return unique;
-  if (unique.length === 1) return [unique[0], "Room 2"];
-  return ["Room 1", "Room 2"];
+  return padMinRoomNames(
+    (rooms ?? []).map((room) => String(room?.name || "")),
+    AI_EVENT_MIN_ROOMS,
+    AI_EVENT_MAX_ROOMS,
+  );
 }
 
 export default function AIEventCollectInfo({
@@ -311,8 +310,8 @@ export default function AIEventCollectInfo({
       vendorRoomsRef.current = [];
       form.setValue("roomInputMode", "edit");
       form.setValue("selectedRoomIds", []);
-      form.setValue("rooms", [{ name: "Room 1" }, { name: "Room 2" }], {
-        shouldValidate: true,
+      form.setValue("rooms", [{ name: "" }, { name: "" }], {
+        shouldValidate: false,
         shouldDirty: true,
       });
     };
@@ -323,9 +322,9 @@ export default function AIEventCollectInfo({
         if (cancelled) return;
         const data = Array.isArray(res?.data) ? res.data : [];
         const fromApi: VendorRoomOption[] = data
-          .map((room, index) => {
+          .map((room) => {
             const id = Number(room.id);
-            const name = String(room?.name ?? "").trim() || `Room ${index + 1}`;
+            const name = String(room?.name ?? "").trim() || unnamedRoomLabel();
             return { id, name };
           })
           .filter(
@@ -783,7 +782,7 @@ export default function AIEventCollectInfo({
                             <FormControl>
                               <Input
                                 {...field}
-                                placeholder={`Room ${index + 1}`}
+                                placeholder={roomNamePlaceholder(index)}
                                 maxLength={40}
                                 className="h-10 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-slate-500"
                               />
@@ -800,7 +799,7 @@ export default function AIEventCollectInfo({
                       className="mt-2 rounded-xl border-white/15 bg-white/5 text-slate-200 hover:bg-white/10"
                       disabled={roomsLoading}
                       onClick={() =>
-                        appendRoom({ name: `Room ${roomFields.length + 1}` })
+                        appendRoom({ name: "" })
                       }
                     >
                       <Plus className="mr-2 h-4 w-4" />
@@ -808,8 +807,9 @@ export default function AIEventCollectInfo({
                     </Button>
                   )}
                   <p className="text-xs text-slate-500">
-                    {AI_EVENT_MIN_ROOMS}–{AI_EVENT_MAX_ROOMS} rooms required.
-                    You can rename or add rooms here.
+                    Name each space as guests will see it (e.g. Dining Hall,
+                    Snowball). {AI_EVENT_MIN_ROOMS}–{AI_EVENT_MAX_ROOMS} rooms
+                    required.
                   </p>
                   {form.formState.errors.rooms?.message ? (
                     <p className="text-sm font-medium text-destructive">

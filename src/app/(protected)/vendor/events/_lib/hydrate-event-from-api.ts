@@ -48,6 +48,8 @@ import {
   normalizePersistedMediaUrl,
   normalizeSchedulerRows,
 } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
+import { resolveVendorEventLifecycle } from "@/app/(protected)/vendor/events/_lib/vendor-event-lifecycle";
+import { hydrateMenuChoicesReminderDays } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 
 /** Positive event editor step from API fields, or 0 if unknown. */
 export function coercePositiveEventStep(value: unknown): number {
@@ -117,7 +119,10 @@ export function patchEventPayloadFromApi(
     vendor_location_id?: number;
     current_step?: number;
     completed_step?: number;
+    is_live?: boolean | number | string;
+    has_bookings?: boolean | number | string;
   };
+  const lifecycle = resolveVendorEventLifecycle(raw);
   const rootIsRooms = parseEventIsRoomsFlag(
     eventRoot.is_rooms ??
       eventDataAny.stepTwo?.is_rooms ??
@@ -241,6 +246,8 @@ export function patchEventPayloadFromApi(
 
   const mappedData: Partial<EventSchemaType> = {
     currentStep: explicitCurrentStep,
+    is_live: lifecycle.isLive,
+    has_bookings: lifecycle.hasBookings,
     stepOne: {
       ...(eventDataAny.stepOne || initialData.stepOne),
       about_event_image:
@@ -489,7 +496,20 @@ export function patchEventPayloadFromApi(
       } as StepSixType;
     })(),
     stepSeven: eventDataAny.stepSeven || initialData.stepSeven,
-    stepEight: eventDataAny.stepEight || initialData.stepEight,
+    stepEight: (() => {
+      const persisted =
+        eventDataAny.stepEight || initialData.stepEight;
+      return {
+        ...initialData.stepEight,
+        ...persisted,
+        submit_type: lifecycle.isLive
+          ? ("active" as const)
+          : persisted.submit_type || initialData.stepEight.submit_type,
+        reminder_menu_choices_before_days: hydrateMenuChoicesReminderDays(
+          persisted.reminder_menu_choices_before_days,
+        ),
+      };
+    })(),
   };
 
   return { ...initialData, ...mappedData };
@@ -524,6 +544,14 @@ export function mergeEventApiIntoGlobalForm(
       shouldTouch: false,
     });
   }
+  form.setValue("is_live", patched.is_live, {
+    shouldDirty: false,
+    shouldTouch: false,
+  });
+  form.setValue("has_bookings", patched.has_bookings, {
+    shouldDirty: false,
+    shouldTouch: false,
+  });
 
   return patched;
 }

@@ -23,6 +23,10 @@ import {
   stepSixFieldsToRoomEntry,
   syncStepSixRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import {
+  isVendorEventStructureLocked,
+  vendorEventStructureLockMessage,
+} from "@/app/(protected)/vendor/events/_lib/vendor-event-lifecycle";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { StepSixType, stepSixSchema } from "../schema";
@@ -71,6 +75,10 @@ export default function DrinksTab() {
   };
 
   const isRoomsEnabled = globalForm.watch("stepTwo.is_rooms") === 1;
+  const lockStructure = isVendorEventStructureLocked({
+    is_live: globalForm.watch("is_live"),
+    has_bookings: globalForm.watch("has_bookings"),
+  });
   const activeRoomIndex = globalForm.watch("stepTwo.active_room_index") ?? 0;
   const stepTwoRooms = capEventRoomList(
     normalizeVendorStepTwoRooms(globalForm.getValues().stepTwo?.rooms),
@@ -482,6 +490,7 @@ export default function DrinksTab() {
                   <FormControl>
                     <RadioGroup
                       onValueChange={(value) => {
+                        if (readOnly || lockStructure) return;
                         const numValue = Number(value);
                         field.onChange(numValue);
                         if (numValue === 0) {
@@ -500,11 +509,13 @@ export default function DrinksTab() {
                       }}
                       value={String(normalizeDrinksOptionFlag(field.value))}
                       className="flex mt-4 space-x-6"
+                      disabled={readOnly || lockStructure}
                     >
                       <FormItem className="flex items-center space-x-3 space-y-0">
                         <FormControl>
                           <RadioGroupItem
                             value="1"
+                            disabled={readOnly || lockStructure}
                             className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-background,#009ead)] data-[state=checked]:border-[var(--color-background,#009ead)]"
                           />
                         </FormControl>
@@ -514,6 +525,7 @@ export default function DrinksTab() {
                         <FormControl>
                           <RadioGroupItem
                             value="0"
+                            disabled={readOnly || lockStructure}
                             className="text-[#009ead] h-5 w-5 data-[state=checked]:bg-[var(--color-background,#009ead)] data-[state=checked]:border-[var(--color-background,#009ead)]"
                           />
                         </FormControl>
@@ -522,6 +534,11 @@ export default function DrinksTab() {
                     </RadioGroup>
                   </FormControl>
                   <FormMessage />
+                  {lockStructure ? (
+                    <p className="text-xs text-muted-foreground">
+                      {vendorEventStructureLockMessage("drinks")}
+                    </p>
+                  ) : null}
                 </FormItem>
               )}
             />

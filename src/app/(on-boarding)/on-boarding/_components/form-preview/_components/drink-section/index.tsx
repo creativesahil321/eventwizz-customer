@@ -5,7 +5,7 @@ import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useHydration } from "@/hooks/useHydration";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { Button } from "@/components/ui/button";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
@@ -55,7 +55,7 @@ export default function DrinkSection({
   const { format: formatMoney } = useCurrencyFormat();
   const [showMore] = useState(defaultExpanded);
   const isHydrated = useHydration();
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const { addDrink, updateDrinkQuantity, getDrinkQuantity, getTotalDrinks } =
     useDrinkSelectionStore();
 

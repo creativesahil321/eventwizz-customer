@@ -5,6 +5,7 @@ import {
   resolveRoomThumbnailUrl,
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 
 /**
  * Card summaries for the onboarding live preview "Choose Your Room" section.
@@ -51,7 +52,7 @@ export function listOnboardingPreviewRoomSummaries(
 
     return {
       room_id: Number(room.id) > 0 ? Number(room.id) : index + 1,
-      name: String(room.name || "").trim() || `Room ${index + 1}`,
+      name: String(room.name || "").trim() || unnamedRoomLabel(),
       index,
       thumbnail:
         resolveRoomThumbnailUrl(pkg?.package_image) || galleryUrl || banner,

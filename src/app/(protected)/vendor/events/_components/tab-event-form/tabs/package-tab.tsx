@@ -29,6 +29,7 @@ import { useEventFormContext } from "../../events-form-provider";
 import { StepTwoType, stepTwoSchema } from "../schema";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { addCacheBusting } from "@/lib/image-utils";
+import { GalleryCopyrightNotice } from "@/components/gallery-copyright-notice";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import {
   EVENT_PACKAGE_MAIN_HEADING_MAX_CHARS,
@@ -46,11 +47,19 @@ import {
   packageDetailLabel,
   packageDetailPlaceholder,
 } from "@/lib/event-form-limits";
+import {
+  EVENT_GALLERY_MIN_IMAGES_WHEN_USED,
+  EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+} from "@/lib/event-gallery-count";
 import { useEventData } from "../../../_lib/hooks/useEventData";
 import {
   notifyVendorEventRoomSystemChanged,
   setVendorEventRoomSystemFlags,
 } from "../../../_lib/vendor-room-system-toggle";
+import {
+  isVendorEventStructureLocked,
+  vendorEventStructureLockMessage,
+} from "../../../_lib/vendor-event-lifecycle";
 import { patchEventPayloadFromApi } from "../../../_lib/hydrate-event-from-api";
 import {
   EVENT_GALLERY_IMAGE_CROP,
@@ -177,6 +186,11 @@ export default function PackageTab() {
     }
     return 0;
   };
+
+  const lockStructure = isVendorEventStructureLocked({
+    is_live: globalForm.watch("is_live"),
+    has_bookings: globalForm.watch("has_bookings"),
+  });
 
   const eventIdForQuery = getEventId();
   const isRoomsEnabled = useWatch({
@@ -1038,7 +1052,7 @@ export default function PackageTab() {
 
   const handleRoomSystemChange = useCallback(
     async (nextValue: 0 | 1) => {
-      if (readOnly) return;
+      if (readOnly || lockStructure) return;
 
       const prevValue = globalForm.getValues().stepTwo?.is_rooms === 1 ? 1 : 0;
       if (nextValue === prevValue) return;
@@ -1079,6 +1093,7 @@ export default function PackageTab() {
     },
     [
       readOnly,
+      lockStructure,
       globalForm,
       form,
       resetLocalFormFromGlobalStepTwo,
@@ -1131,31 +1146,52 @@ export default function PackageTab() {
                     <RadioGroup
                       value={String(isRoomsEnabled === 1 ? 1 : 0)}
                       onValueChange={(value) => {
+                        if (readOnly || lockStructure) return;
                         void handleRoomSystemChange(value === "1" ? 1 : 0);
                       }}
-                      disabled={readOnly}
+                      disabled={readOnly || lockStructure}
                       className="flex items-center gap-6 pt-2"
                     >
                       <FormItem className="flex items-center space-x-2 space-y-0">
                         <FormControl>
-                          <RadioGroupItem value="1" />
+                          <RadioGroupItem
+                            value="1"
+                            disabled={readOnly || lockStructure}
+                          />
                         </FormControl>
-                        <Label className="font-medium cursor-pointer">
+                        <Label
+                          className={
+                            readOnly || lockStructure
+                              ? "font-medium text-muted-foreground"
+                              : "font-medium cursor-pointer"
+                          }
+                        >
                           Yes
                         </Label>
                       </FormItem>
                       <FormItem className="flex items-center space-x-2 space-y-0">
                         <FormControl>
-                          <RadioGroupItem value="0" />
+                          <RadioGroupItem
+                            value="0"
+                            disabled={readOnly || lockStructure}
+                          />
                         </FormControl>
-                        <Label className="font-medium cursor-pointer">No</Label>
+                        <Label
+                          className={
+                            readOnly || lockStructure
+                              ? "font-medium text-muted-foreground"
+                              : "font-medium cursor-pointer"
+                          }
+                        >
+                          No
+                        </Label>
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
                   <p className="text-xs leading-relaxed text-muted-foreground mt-1">
-                    Choose Yes when rooms have different packages, dates,
-                    menus, drinks, or brochures. Choose No for one shared setup
-                    across the venue.
+                    {lockStructure
+                      ? vendorEventStructureLockMessage("rooms")
+                      : "Choose Yes when rooms have different packages, dates, menus, drinks, or brochures. Choose No for one shared setup across the venue."}
                   </p>
                 </FormItem>
               )}
@@ -1713,6 +1749,11 @@ export default function PackageTab() {
             <h3 className="text-lg font-semibold title-header">
               Gallery images
             </h3>
+            <p className="text-sm text-muted-foreground">
+              Optional. Skip the gallery, or add at least{" "}
+              {EVENT_GALLERY_MIN_IMAGES_WHEN_USED} photos.
+            </p>
+            <GalleryCopyrightNotice />
             <FormField
               control={form.control}
               name="gallery"
@@ -1839,6 +1880,15 @@ export default function PackageTab() {
                           cropConfig={EVENT_GALLERY_IMAGE_CROP}
                         />
                       )}
+
+                      {field.value &&
+                        field.value.length > 0 &&
+                        field.value.length <
+                          EVENT_GALLERY_MIN_IMAGES_WHEN_USED && (
+                          <p className="text-red-500 text-sm font-medium mt-2">
+                            {EVENT_GALLERY_PARTIAL_COUNT_MESSAGE}
+                          </p>
+                        )}
 
                       {field.value &&
                         field.value.length >= EVENT_GALLERY_MAX_IMAGES && (

@@ -16,7 +16,7 @@ import { GalleryComponentProps } from "../event-types";
 import { addCacheBusting } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
 import { GalleryLightbox } from "@/components/public/gallery-lightbox";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 
 // Default fallback images
 const defaultEventImages = [
@@ -34,7 +34,7 @@ export default function RecentEventsGlimpse({
   const vendorTheme = theme as ThemeSchema;
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
 
   const galleryTitle =
     propGalleryTitle ||
@@ -203,7 +203,8 @@ export default function RecentEventsGlimpse({
                     key={index}
                     className={cn(
                       "basis-full pl-4",
-                      !narrowPreview && "md:basis-1/2 lg:basis-1/3",
+                      !narrowPreview &&
+                        "md:basis-1/2 lg:basis-1/3 @max-5xl/preview:!basis-1/2",
                     )}
                   >
                     <button

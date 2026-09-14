@@ -12,7 +12,10 @@ import {
   PUBLIC_MOTION_EASE,
   PUBLIC_SECTION_PY_CLASS,
 } from "@/lib/public-rhythm";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import {
+  usePreviewMobileLayout,
+  usePreviewNarrowLayout,
+} from "@/hooks/use-preview-narrow-layout";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 
 type PackageImage = {
@@ -48,8 +51,25 @@ function galleryShellClass(count: number): string {
   return "mx-auto w-full max-w-7xl";
 }
 
-function galleryGridClass(count: number, narrowPreview: boolean): string {
-  if (narrowPreview || count <= 1) return "grid grid-cols-1 gap-4";
+/** Same breakpoints as the live event page: 2-up on phones when there are 4 tiles. */
+function galleryGridClass(
+  count: number,
+  preview: { mobile: boolean; narrow: boolean },
+): string {
+  if (count <= 1) return "grid grid-cols-1 gap-4";
+
+  // Phone frame (390px) — match live `< md` (2 columns for a full row of 4).
+  if (preview.mobile) {
+    return count >= 4 ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4";
+  }
+
+  // Tablet frame (~768px) — match live `md` (2 / 3 / 4 columns).
+  if (preview.narrow) {
+    if (count === 2) return "grid grid-cols-2 gap-4";
+    if (count === 3) return "grid grid-cols-3 gap-4";
+    return "grid grid-cols-4 gap-4";
+  }
+
   if (count === 2) {
     return cn(
       "grid grid-cols-1 gap-4 md:grid-cols-2",
@@ -140,6 +160,8 @@ export default function EventGallery({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const narrowPreview = usePreviewNarrowLayout();
+  const mobilePreview = usePreviewMobileLayout();
+  const previewGrid = { mobile: mobilePreview, narrow: narrowPreview };
 
   const title = galleryTitle || "Captured Moments";
 
@@ -194,7 +216,7 @@ export default function EventGallery({
 
         <div className={galleryShellClass(firstRow.length)}>
           <div
-            className={galleryGridClass(firstRow.length, narrowPreview)}
+            className={galleryGridClass(firstRow.length, previewGrid)}
           >
             {firstRow.map((src, i) => renderTile(src, i))}
           </div>
@@ -203,7 +225,7 @@ export default function EventGallery({
         {secondRow.length > 0 ? (
           <div className={cn(galleryShellClass(secondRow.length), "mt-4")}>
             <div
-              className={galleryGridClass(secondRow.length, narrowPreview)}
+              className={galleryGridClass(secondRow.length, previewGrid)}
             >
               {secondRow.map((src, i) => renderTile(src, i + 4))}
             </div>

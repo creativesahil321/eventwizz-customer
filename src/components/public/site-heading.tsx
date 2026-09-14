@@ -56,13 +56,14 @@ const levelClass: Record<SiteHeadingLevel, string> = {
 const compactLevelClass = {
   mobile: {
     1: "font-semibold tracking-tight !text-[1.65rem] !leading-[1.22] sm:!text-[1.65rem] sm:!leading-[1.22] md:!text-[1.65rem] md:!leading-[1.22] lg:!text-[1.65rem] lg:!leading-[1.22] xl:!text-[1.65rem] xl:!leading-[1.22]",
-    2: "font-semibold tracking-tight !text-xl !leading-snug sm:!text-xl sm:!leading-snug md:!text-xl md:!leading-snug lg:!text-xl lg:!leading-snug xl:!text-xl xl:!leading-snug",
-    3: "font-semibold tracking-tight !text-lg !leading-snug sm:!text-lg sm:!leading-snug md:!text-lg md:!leading-snug lg:!text-lg lg:!leading-snug xl:!text-lg xl:!leading-snug",
+    // Live phone h2 is `text-3xl` — do not shrink About / section titles to xl.
+    2: "tracking-tight !text-3xl !leading-[1.08] sm:!text-3xl sm:!leading-[1.08] md:!text-3xl md:!leading-[1.08] lg:!text-3xl lg:!leading-[1.08] xl:!text-3xl xl:!leading-[1.08]",
+    3: "tracking-tight !text-2xl !leading-snug sm:!text-2xl sm:!leading-snug md:!text-2xl md:!leading-snug lg:!text-2xl lg:!leading-snug xl:!text-2xl xl:!leading-snug",
   },
   tablet: {
     1: "font-semibold tracking-tight !text-[2.15rem] !leading-[1.18] sm:!text-[2.15rem] sm:!leading-[1.18] md:!text-[2.15rem] md:!leading-[1.18] lg:!text-[2.15rem] lg:!leading-[1.18] xl:!text-[2.15rem] xl:!leading-[1.18]",
-    2: "font-semibold tracking-tight !text-2xl !leading-snug sm:!text-2xl sm:!leading-snug md:!text-2xl md:!leading-snug lg:!text-2xl lg:!leading-snug xl:!text-2xl xl:!leading-snug",
-    3: "font-semibold tracking-tight !text-xl !leading-snug sm:!text-xl sm:!leading-snug md:!text-xl md:!leading-snug lg:!text-xl lg:!leading-snug xl:!text-xl xl:!leading-snug",
+    2: "tracking-tight !text-4xl !leading-[1.08] sm:!text-4xl sm:!leading-[1.08] md:!text-4xl md:!leading-[1.08] lg:!text-4xl lg:!leading-[1.08] xl:!text-4xl xl:!leading-[1.08]",
+    3: "tracking-tight !text-3xl !leading-snug sm:!text-3xl sm:!leading-snug md:!text-3xl md:!leading-snug lg:!text-3xl lg:!leading-snug xl:!text-3xl xl:!leading-snug",
   },
 } as const satisfies Record<
   "mobile" | "tablet",

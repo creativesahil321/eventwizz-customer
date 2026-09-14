@@ -11,6 +11,8 @@ const ONBOARDING_PREVIEW_THEME: ThemeSchema = {
   name: "EventWizz",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function OnboardingPreviewLayout({
   children,
 }: {

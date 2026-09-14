@@ -34,6 +34,12 @@ import {
   shouldUseCancelDateAction,
   syncStepThreeRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
+import { hasSchedulableVendorDates } from "@/app/(protected)/vendor/events/_lib/vendor-dates-publish";
+import {
+  firstDateRowErrorIndex,
+  firstReactHookFormMessage,
+  getDateRowErrorNode,
+} from "@/app/(protected)/vendor/events/_lib/date-row-form-errors";
 import { eventKeys as vendorEventDetailKeys } from "../../../_lib/hooks/useEventData";
 import { eventKeys as vendorEventsListKeys } from "../../../_lib/queries";
 import { toast } from "sonner";
@@ -72,12 +78,10 @@ import {
   hasEventDateOrderChanged,
   sortDateFieldArrayWithIds,
 } from "@/lib/event-dates-sort";
-
-// Helper function to get today's date in YYYY-MM-DD format
-const getTodayDateString = () => {
-  const today = new Date();
-  return today.toISOString().split("T")[0];
-};
+import {
+  getMinEventDateString,
+  getTodayLocalDateString,
+} from "@/lib/min-event-date";
 
 // Helper function to format date consistently as DD-MM-YYYY (matches onboarding step-5)
 const formatDateDisplay = (dateString: string | undefined | null): string => {
@@ -202,6 +206,8 @@ export default function DatesTab() {
   const lastHydratedRoomIndexRef = useRef<number | null>(null);
   /** Row open state keyed by useFieldArray `field.id` (same collapse pattern as onboarding step 5). */
   const [openDateRowIds, setOpenDateRowIds] = useState<string[]>([]);
+  const pendingDateErrorRowIdRef = useRef<string | null>(null);
+  const [dateErrorFocusNonce, setDateErrorFocusNonce] = useState(0);
   const { form: globalForm, advanceStep, markEventFormSaved, readOnly } = useEventFormContext();
 
   // Get event_id from global form
@@ -292,6 +298,7 @@ export default function DatesTab() {
 
   const { control, watch, setValue, setError, clearErrors, trigger, getValues, reset } =
     form;
+  const datesFieldErrors = form.formState.errors.dates;
 
   const watchedDates = useWatch({
     control: form.control,
@@ -411,6 +418,25 @@ export default function DatesTab() {
     }
     prevDateFieldCountRef.current = len;
   }, [dateFields]);
+
+  useEffect(() => {
+    const rowId = pendingDateErrorRowIdRef.current;
+    if (!rowId || !openDateRowIds.includes(rowId)) return;
+
+    pendingDateErrorRowIdRef.current = null;
+    const rowEl = document.querySelector(
+      `[data-date-row-id="${CSS.escape(rowId)}"]`,
+    );
+    rowEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const dateIndex = dateFields.findIndex((field) => field.id === rowId);
+    if (dateIndex < 0) return;
+
+    const input = document.querySelector(
+      `[name="dates.${dateIndex}.event_date"]`,
+    ) as HTMLElement | null;
+    input?.focus();
+  }, [openDateRowIds, dateErrorFocusNonce, dateFields]);
 
   const requestCancelDate = useCallback(
     (dateIndex: number) => {
@@ -1212,14 +1238,20 @@ export default function DatesTab() {
       const isReadonlyCancelled = isVendorDateReadonlyCancelled(dateRow);
       const dateLocked = isCancelled || readOnly;
       const cancelReason = String(dateRow?.cancel_reason ?? "").trim();
+      const rowErrorMessage = firstReactHookFormMessage(
+        getDateRowErrorNode(datesFieldErrors, dateIndex),
+      );
 
       return (
         <div
           key={dateRowId}
+          data-date-row-id={dateRowId}
           className={`border rounded-lg mb-6 bg-white shadow-sm hover:shadow-md transition-all ${
-            isCancelled
-              ? "border-red-200 bg-red-50/30"
-              : "border-gray-200"
+            rowErrorMessage
+              ? "border-red-400"
+              : isCancelled
+                ? "border-red-200 bg-red-50/30"
+                : "border-gray-200"
           }`}
         >
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 p-4 sm:p-5 border-b border-gray-100">
@@ -1241,15 +1273,25 @@ export default function DatesTab() {
                 ) : (
                   <ChevronRight className="h-5 w-5 shrink-0" />
                 )}
-                <span className="text-lg font-semibold flex flex-wrap items-center gap-2 min-w-0">
-                  <span className="truncate">
-                    {formatDateDisplay(watch(`dates.${dateIndex}.event_date`))}
-                  </span>
-                  {isCancelled && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200 shrink-0">
-                      Cancelled
+                <span className="text-lg font-semibold flex flex-col items-start gap-1 min-w-0">
+                  <span className="flex flex-wrap items-center gap-2 min-w-0">
+                    <span className="truncate">
+                      {formatDateDisplay(watch(`dates.${dateIndex}.event_date`))}
                     </span>
-                  )}
+                    {isCancelled && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200 shrink-0">
+                        Cancelled
+                      </span>
+                    )}
+                  </span>
+                  {!isOpen && rowErrorMessage ? (
+                    <span
+                      role="alert"
+                      className="text-sm font-medium text-destructive normal-case"
+                    >
+                      {rowErrorMessage}
+                    </span>
+                  ) : null}
                 </span>
               </button>
             </div>
@@ -1341,7 +1383,7 @@ export default function DatesTab() {
                             name={field.name}
                             ref={field.ref}
                             value={field.value ?? ""}
-                            min={getTodayDateString()}
+                            min={getMinEventDateString()}
                             disabled={dateLocked}
                             className="w-full h-10 sm:h-11 bg-[#F9FAFB] border-[#E5E7EB] focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                             onValueCommit={(newDate) =>
@@ -1708,7 +1750,7 @@ export default function DatesTab() {
                                         type="date"
                                         placeholder="Select due date"
                                         {...field}
-                                        min={getTodayDateString()}
+                                        min={getTodayLocalDateString()}
                                         className="w-full"
                                       />
                                       {!field.value && (
@@ -1774,6 +1816,7 @@ export default function DatesTab() {
       requestCancelDate,
       readOnly,
       openDateRowIds,
+      datesFieldErrors,
     ],
   );
 
@@ -1925,7 +1968,7 @@ export default function DatesTab() {
             const nextUnfilledIndex = stepTwoRoomsForSave.findIndex(
               (room, index) =>
                 index !== resolvedRoomIndex &&
-                !hasMeaningfulVendorDates(
+                !hasSchedulableVendorDates(
                   findStepThreeDatesForRoom(
                     mergedRoomsGlobal,
                     Number(room.room_id),
@@ -1945,6 +1988,28 @@ export default function DatesTab() {
               markEventFormSaved(3);
               return;
             }
+          }
+
+          const roomsStillMissingDates =
+            roomsEnabled &&
+            stepTwoRoomsForSave.some(
+              (room) =>
+                !hasSchedulableVendorDates(
+                  findStepThreeDatesForRoom(
+                    mergedRoomsGlobal,
+                    Number(room.room_id),
+                  ),
+                ),
+            );
+          if (
+            roomsStillMissingDates ||
+            (!roomsEnabled && !hasSchedulableVendorDates(cleanedDates))
+          ) {
+            toast.error(
+              'Set a valid event date before continuing. Empty "New Date" rows cannot be saved.',
+            );
+            markEventFormSaved(3);
+            return;
           }
 
           await advanceStep(3, response);
@@ -2010,6 +2075,18 @@ export default function DatesTab() {
       return null;
     })();
 
+    const firstIndex = firstDateRowErrorIndex(errors.dates);
+    if (firstIndex != null) {
+      const rowId = dateFields[firstIndex]?.id;
+      if (rowId) {
+        pendingDateErrorRowIdRef.current = rowId;
+        setOpenDateRowIds((prev) =>
+          prev.includes(rowId) ? prev : [...prev, rowId],
+        );
+        setDateErrorFocusNonce((nonce) => nonce + 1);
+      }
+    }
+
     if (firstPath) {
       const errorElement = document.querySelector(`[name="${firstPath}"]`);
       if (errorElement) {
@@ -2017,7 +2094,7 @@ export default function DatesTab() {
         errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
-  }, [form.formState.errors]);
+  }, [dateFields, form.formState.errors]);
 
   const attemptSubmit = useCallback(
     async (applyToAllRooms: boolean) => {
@@ -2025,6 +2102,14 @@ export default function DatesTab() {
         ? await form.trigger("dates")
         : await form.trigger();
       if (!isValid) {
+        focusFirstDateValidationError();
+        return;
+      }
+      const dates = getValues().dates;
+      if (!hasSchedulableVendorDates(dates) && dates.length > 0) {
+        toast.error(
+          'Set a valid event date before continuing. Empty "New Date" rows cannot be saved.',
+        );
         focusFirstDateValidationError();
         return;
       }
@@ -2123,9 +2208,6 @@ export default function DatesTab() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            const hasManualErrors =
-              Object.keys(form.formState.errors).length > 0;
-            if (hasManualErrors) return;
             void attemptSubmit(false);
           }}
           className="space-y-8"

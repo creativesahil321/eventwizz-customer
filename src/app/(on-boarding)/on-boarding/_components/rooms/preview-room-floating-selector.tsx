@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { FloatingRoomBar } from "@/components/rooms/floating-room-bar";
 import { useRoomManager } from "./use-room-manager";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "../form-preview/preview-layout-constants";
 
 interface PreviewRoomFloatingSelectorProps {
@@ -29,7 +30,7 @@ export function PreviewRoomFloatingSelector({
     <FloatingRoomBar
       rooms={rooms.map((room, index) => ({
         key: `${room.id ?? "new"}-${index}`,
-        label: room.name || `Room ${index + 1}`,
+        label: room.name || unnamedRoomLabel(),
       }))}
       activeIndex={currentRoomIndex}
       onSelect={onRoomChange ?? setCurrentRoomIndex}

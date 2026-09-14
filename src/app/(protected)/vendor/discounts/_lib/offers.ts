@@ -10,6 +10,7 @@ import {
   isDiscountDateOfferReady,
   type DiscountDateFormEntry,
 } from "./schema";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 
 /** Normalize API / legacy flat_mode into store contract values. */
 export function normalizeFlatMode(
@@ -260,7 +261,7 @@ export function listDiscountEventRooms(
       .filter((r) => r?.id != null)
       .map((r) => ({
         roomId: r.id,
-        label: r.name?.trim() || `Room ${r.id}`,
+        label: r.name?.trim() || unnamedRoomLabel(),
       }));
   }
 
@@ -271,7 +272,7 @@ export function listDiscountEventRooms(
     const rooms = (d.rooms ?? []).filter((r) => r?.id != null);
     for (const room of rooms) {
       if (!unique.has(room.id)) {
-        unique.set(room.id, room.name ?? `Room ${room.id}`);
+        unique.set(room.id, room.name ?? unnamedRoomLabel());
       }
     }
     if (rooms.length > richest.length) {
@@ -290,7 +291,7 @@ export function listDiscountEventRooms(
       seen.add(room.id);
       ordered.push({
         roomId: room.id,
-        label: unique.get(room.id) || room.name || `Room ${room.id}`,
+        label: unique.get(room.id) || room.name || unnamedRoomLabel(),
       });
     }
     for (const [roomId, label] of unique) {

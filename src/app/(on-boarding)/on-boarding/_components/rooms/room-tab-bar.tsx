@@ -18,6 +18,7 @@ import {
   useRoomManager,
   type RoomSection,
 } from "./use-room-manager";
+import { roomNamePlaceholder, unnamedRoomLabel } from "@/lib/room-name-examples";
 
 const ROOM_ACCENTS = [
   "bg-emerald-400",
@@ -187,7 +188,7 @@ export function RoomTabBar({ section, className }: RoomTabBarProps) {
                     }}
                     maxLength={40}
                     className="w-[120px] bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
-                    placeholder="Room name"
+                    placeholder={roomNamePlaceholder(index)}
                   />
                 ) : (
                   <button
@@ -199,7 +200,7 @@ export function RoomTabBar({ section, className }: RoomTabBarProps) {
                     )}
                     title={room.name}
                   >
-                    {room.name || `Room ${index + 1}`}
+                    {room.name || unnamedRoomLabel()}
                   </button>
                 )}
 
@@ -267,7 +268,7 @@ export function RoomTabBar({ section, className }: RoomTabBarProps) {
                     setNewRoomName("");
                   }
                 }}
-                placeholder="Room name"
+                placeholder={roomNamePlaceholder(rooms.length)}
                 maxLength={40}
                 className="h-7 w-[150px] border-0 bg-transparent px-1 text-xs text-white outline-none placeholder:text-slate-400"
               />

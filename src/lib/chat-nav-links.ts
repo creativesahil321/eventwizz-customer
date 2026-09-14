@@ -122,9 +122,9 @@ const NAV_RULES: NavRule[] = [
   },
   {
     id: "locations",
-    pattern: /\b(event locations?|venue locations?|add (a )?location|manage locations)\b/i,
-    vendor: { href: "/vendor/venue-locations", label: "Open Event Locations" },
-    requiredPermission: "read-event-location",
+    pattern: /\b(locations?|add (a )?location|manage locations)\b/i,
+    vendor: { href: "/vendor/venue-locations", label: "Open Locations" },
+    requiredPermission: "read-location",
   },
   {
     id: "marketing",
@@ -420,7 +420,7 @@ export function getAllowedNavLinksForPrompt(audience: ChatNavAudience): string {
     if (canAccess("read-email-template")) lines.push("- Email Templates → [Open Email Templates](/vendor/email-templates)");
     if (canAccess("read-email-log")) lines.push("- Email Logs → [Open Email Logs](/vendor/email-logs)");
     if (canAccess("read-transaction")) lines.push("- Transactions → [Open Transactions](/vendor/transactions)");
-    if (canAccess("read-event-location")) lines.push("- Event Locations → [Open Event Locations](/vendor/venue-locations)");
+    if (canAccess("read-location")) lines.push("- Locations → [Open Locations](/vendor/venue-locations)");
     if (canAccess("read-ticket")) lines.push("- Support → [Open Support](/vendor/support/dashboard)");
     if (canAccess("read-dashboard")) lines.push("- Dashboard → [Open Dashboard](/vendor/dashboard)");
     if (canAccess("read-marketing")) lines.push("- Marketing → [Open Marketing](/vendor/marketing)");

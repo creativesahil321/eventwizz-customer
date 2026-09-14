@@ -197,7 +197,8 @@ export interface EventsResponseData {
 export type EventsResponse = BaseApiResponse<EventsResponseData>;
 
 /**
- * Per-room payload on the public event detail API when `is_rooms` is enabled.
+ * Per-room payload when `is_rooms` is enabled.
+ * Location/map fields live on the event root only — not here.
  */
 export interface EventDetailRoom {
   /** May be omitted on empty room shells (`{}`) returned when a named room has no content yet. */
@@ -238,11 +239,6 @@ export interface EventDetailRoom {
     price: string;
     available_quantity?: number;
   }>;
-  event_address?: string | null;
-  lat?: string | number | null;
-  long?: string | number | null;
-  latitude?: string | number | null;
-  longitude?: string | number | null;
   brochure_pdf: string | null;
   brochure_pdf_2: string | null;
 }
@@ -251,7 +247,12 @@ export interface EventDetailRoom {
 export type { PublicEventDateDiscount };
 
 /**
- * Event detail type definition for single event page
+ * Shared public event object (`EventPayload`) from:
+ * - GET /domain/{domain}/events/{slug} → `data`
+ * - GET /vendor/site-essentials?is_onboarding&event_slug → `data.event`
+ *
+ * Map pin is event-level only: `event_address || address`, `lat`, `long`.
+ * Rooms never include location fields.
  */
 export interface EventDetail {
   /** When true, room-specific sections live under `rooms` keyed by room name. */
@@ -266,7 +267,8 @@ export interface EventDetail {
   /** Present on single-room events; room-mode payloads use `rooms` instead. */
   event_schedular_background_image?: string | null;
   menu_background_image?: string | null;
-  address: string;
+  /** Vendor location address. Omitted when the API sends null. */
+  address?: string;
   phone: string;
   email: string;
   package_title?: string;
@@ -329,9 +331,12 @@ export interface EventDetail {
   brochure_pdf?: string | null;
   brochure_pdf_2?: string | null;
   faq_pdf: string | null;
+  /** Event map address text (after about). May be "". */
   event_address?: string | null;
+  /** Event pin from event_details. Omitted when missing / London placeholder. */
   lat?: string | number | null;
   long?: string | number | null;
+  /** Legacy aliases — public map resolution uses `lat` / `long` only. */
   latitude?: string | number | null;
   longitude?: string | number | null;
   faqs: Array<{
@@ -351,3 +356,6 @@ export interface EventDetail {
  * Event detail response type
  */
 export type EventDetailResponse = BaseApiResponse<EventDetail>;
+
+/** Alias for the shared public / onboarding event builder payload. */
+export type EventPayload = EventDetail;

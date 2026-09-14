@@ -1,4 +1,12 @@
+export type EventAboutHighlightKey =
+  | "occasion"
+  | "dates"
+  | "time"
+  | "location"
+  | "fromPrice";
+
 export type EventAboutHighlight = {
+  key: EventAboutHighlightKey;
   label: string;
   value: string;
 };
@@ -24,12 +32,17 @@ export function buildEventAboutHighlights({
   formatPrice,
 }: EventAboutHighlightsInput): EventAboutHighlight[] {
   return [
-    clean(occasion) ? { label: "Occasion", value: clean(occasion) } : null,
-    clean(dates) ? { label: "Dates", value: clean(dates) } : null,
-    clean(time) ? { label: "Time", value: clean(time) } : null,
-    clean(location) ? { label: "Location", value: clean(location) } : null,
+    clean(occasion)
+      ? { key: "occasion", label: "Occasion", value: clean(occasion) }
+      : null,
+    clean(dates) ? { key: "dates", label: "Dates", value: clean(dates) } : null,
+    clean(time) ? { key: "time", label: "Time", value: clean(time) } : null,
+    clean(location)
+      ? { key: "location", label: "Location", value: clean(location) }
+      : null,
     fromPrice != null
       ? {
+          key: "fromPrice" as const,
           label: "From",
           value: `${formatPrice(fromPrice)} per person`,
         }

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { FloatingRoomBar } from "@/components/rooms/floating-room-bar";
 import { ONBOARDING_PREVIEW_HEADER_OFFSET } from "@/app/(on-boarding)/on-boarding/_components/form-preview/preview-layout-constants";
 import type { VendorPreviewRoomRef } from "../_lib/resolve-vendor-preview-room-slices";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 
 type VendorPreviewRoomSelectorProps = {
   rooms: VendorPreviewRoomRef[];
@@ -30,7 +31,7 @@ export function VendorPreviewRoomSelector({
     <FloatingRoomBar
       rooms={rooms.map((room, index) => ({
         key: `${room.room_id}-${index}`,
-        label: room.name || `Room ${index + 1}`,
+        label: room.name || unnamedRoomLabel(),
         disabled: room.disabled,
       }))}
       activeIndex={currentRoomIndex}

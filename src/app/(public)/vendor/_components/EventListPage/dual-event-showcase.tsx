@@ -10,7 +10,7 @@ import {
 } from "./event-carousel-classes";
 import { EventListingHorizontalScroll } from "./event-listing-horizontal-scroll";
 import { EventSectionHeader } from "./event-section-header";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 
 type DualEventShowcaseProps = {
@@ -19,6 +19,7 @@ type DualEventShowcaseProps = {
   sectionTitle: string;
   events: [LocationEventCardModel, LocationEventCardModel];
   locationSlug: string;
+  locationLabel?: string | null;
   pendingEventSlug: string | null;
   onNavigateStart: (slug: string) => void;
   imageFallbacks: [string, string];
@@ -35,12 +36,13 @@ export function DualEventShowcase({
   sectionTitle,
   events,
   locationSlug,
+  locationLabel,
   pendingEventSlug,
   onNavigateStart,
   imageFallbacks,
   footnote,
 }: DualEventShowcaseProps) {
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const scrollWatchKey = useMemo(
     () => events.map((e) => e.slug).join("|"),
     [events],
@@ -77,6 +79,7 @@ export function DualEventShowcase({
                   <LocationEventCard
                     event={event}
                     locationSlug={locationSlug}
+                    locationLabel={locationLabel}
                     isPending={pendingEventSlug === event.slug}
                     onNavigateStart={() => onNavigateStart(event.slug)}
                     imageFallback={imageFallbacks[index]}
@@ -96,6 +99,7 @@ export function DualEventShowcase({
                   key={`grid-${event.slug || index}`}
                   event={event}
                   locationSlug={locationSlug}
+                  locationLabel={locationLabel}
                   isPending={pendingEventSlug === event.slug}
                   onNavigateStart={() => onNavigateStart(event.slug)}
                   imageFallback={imageFallbacks[index]}

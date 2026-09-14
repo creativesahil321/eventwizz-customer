@@ -12,6 +12,7 @@ import type { LocationData } from "@/services/common/events/type";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ThemeSchema } from "@/types/theme.types";
 import { LocationPageView } from "./LocationPage/location-page-view";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 
 interface SingleLocationHomeProps {
   location: ThemeLocationData;
@@ -43,7 +44,7 @@ export function SingleLocationHome({
       <div className="min-h-screen bg-[var(--color-background)]">
         <CommonHeader variant="default" locationSlug={slug} />
         <Skeleton className="mx-auto mt-16 aspect-[21/9] max-w-full" />
-        <div className="container mx-auto max-w-7xl space-y-6 px-4 py-12">
+        <div className={`${PUBLIC_CHROME_CONTAINER_CLASS} space-y-6 py-12`}>
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-24 w-full" />
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

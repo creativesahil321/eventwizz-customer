@@ -2,6 +2,7 @@ import type {
   AIEventGeneratedContent,
   AIEventInput,
 } from "@/app/api/ai/generate-event/route";
+import { padMinRoomNames } from "@/lib/room-name-examples";
 import type {
   EventImportAssets,
   EventImportSectionId,
@@ -147,17 +148,7 @@ function buildAiStepTwoPackageFields(params: {
 }
 
 function normalizeAiEventRoomNames(roomNames: string[] | undefined): string[] {
-  const unique = Array.from(
-    new Set(
-      (roomNames ?? [])
-        .map((name) => String(name || "").trim())
-        .filter((name) => name.length > 0),
-    ),
-  ).slice(0, AI_EVENT_MAX_ROOMS);
-
-  if (unique.length >= AI_EVENT_MIN_ROOMS) return unique;
-  if (unique.length === 1) return [unique[0], "Room 2"];
-  return ["Room 1", "Room 2"];
+  return padMinRoomNames(roomNames, AI_EVENT_MIN_ROOMS, AI_EVENT_MAX_ROOMS);
 }
 
 function matchAiRoomName<T extends { room_name?: string }>(

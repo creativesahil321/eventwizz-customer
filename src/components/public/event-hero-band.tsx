@@ -23,7 +23,7 @@ import {
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import {
   PreviewEditHoverBadge,
   PreviewEditHoverFrame,
@@ -129,7 +129,7 @@ export function EventHeroBand({
   onEditHero,
   onEditMeta,
 }: EventHeroBandProps) {
-  const previewNarrow = usePreviewNarrowLayout();
+  const previewNarrow = usePreviewMobileLayout();
   const syncBgUrl = useMemo(
     () => syncImageUrlFromInput(bannerImage, cacheBustImage),
     [bannerImage, cacheBustImage],
@@ -204,7 +204,7 @@ export function EventHeroBand({
     <section
       ref={sectionRef}
       className={cn(
-        "relative mx-auto flex w-full flex-col overflow-hidden",
+        "relative z-0 mx-auto flex w-full flex-col overflow-hidden",
         "min-h-[480px] md:min-h-[520px]",
         "h-auto md:h-[min(68dvh,720px)]",
         onEditHero && "group/preview-edit cursor-pointer",

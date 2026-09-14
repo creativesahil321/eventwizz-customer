@@ -61,12 +61,10 @@ import {
   hasEventDateOrderChanged,
   sortDateFieldArrayWithIds,
 } from "@/lib/event-dates-sort";
-
-// Helper function to get today's date in YYYY-MM-DD format
-const getTodayDateString = () => {
-  const today = new Date();
-  return today.toISOString().split("T")[0];
-};
+import {
+  getMinEventDateString,
+  getTodayLocalDateString,
+} from "@/lib/min-event-date";
 
 // Helper function to format date consistently as DD-MM-YYYY
 const formatDateDisplay = (dateString: string | undefined | null): string => {
@@ -1336,7 +1334,7 @@ export default function StepFive() {
                             name={field.name}
                             ref={field.ref}
                             value={field.value ?? ""}
-                            min={getTodayDateString()}
+                            min={getMinEventDateString()}
                             className="w-full h-11 bg-white/5 border-white/10 focus:ring-2 focus:ring-blue-500"
                             onFocus={() =>
                               handleFieldFocus(`dates.${dateIndex}.event_date`)
@@ -1638,7 +1636,7 @@ export default function StepFive() {
                                       type="date"
                                       placeholder="Select due date"
                                       {...field}
-                                      min={getTodayDateString()}
+                                      min={getTodayLocalDateString()}
                                       className="w-full h-11 bg-white/5 border-white/10"
                                       onFocus={() =>
                                         handleFieldFocus(

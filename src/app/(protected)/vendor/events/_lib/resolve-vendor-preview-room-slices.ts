@@ -17,6 +17,7 @@ import {
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
 import { resolveEventLocation } from "@/lib/event-location";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 import { resolveDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import {
   findStepThreeDatesForRoom,
@@ -244,10 +245,10 @@ export function listVendorPreviewRooms(
     (data.stepTwo as { rooms?: unknown })?.rooms,
   )
     .filter((room) => Number(room.room_id) > 0)
-    .map((room, index) => {
+    .map((room) => {
       const ref = {
         room_id: Number(room.room_id),
-        name: String(room.name || "").trim() || `Room ${index + 1}`,
+        name: String(room.name || "").trim() || unnamedRoomLabel(),
       };
       return {
         ...ref,
@@ -519,8 +520,12 @@ export function resolveVendorPreviewActiveSlices(
   const stepFiveRoot = data.stepFive as { event_address?: string } | undefined;
   const eventLocation = resolveEventLocation(
     stepOneRoot,
-    brochurePayload,
     stepFiveRoot,
+    {
+      event_address: stepOneRoot?.event_address,
+      lat: data.lat,
+      long: data.long,
+    },
     data.stepEight,
   );
 

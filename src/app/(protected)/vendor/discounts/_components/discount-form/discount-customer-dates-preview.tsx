@@ -10,6 +10,7 @@ import {
   type DateCardOffer,
 } from "@/components/public/date-card-offer";
 import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 
 export type DiscountDatePreviewItem = {
   key: string;
@@ -86,7 +87,7 @@ export function DiscountCustomerDatesPreview({
         seen.add(room.roomId);
         ordered.push({
           roomId: room.roomId,
-          label: room.label || present.get(room.roomId) || `Room ${room.roomId}`,
+          label: room.label || present.get(room.roomId) || unnamedRoomLabel(),
         });
       }
       for (const [roomId, label] of present) {

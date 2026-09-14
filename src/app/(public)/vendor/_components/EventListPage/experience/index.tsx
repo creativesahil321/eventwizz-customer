@@ -4,8 +4,10 @@ import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { cn } from "@/lib/utils";
-import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import {
+  usePreviewMobileLayout,
+  usePreviewNarrowLayout,
+} from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 
 interface ExperienceSectionProps {
@@ -19,7 +21,8 @@ export default function ExperienceSection({
 }: ExperienceSectionProps) {
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
-  const narrowPreview = usePreviewNarrowLayout();
+  const framedBelowLg = usePreviewNarrowLayout();
+  const phoneFrame = usePreviewMobileLayout();
 
   const venueName = vendorTheme?.name || "EventWizz";
 
@@ -37,22 +40,30 @@ export default function ExperienceSection({
   return (
     <section
       className={cn(
-        "w-full scroll-mt-28 bg-[color:var(--color-background)] px-4 md:px-6",
-        PUBLIC_SECTION_PY_CLASS,
-        "@max-5xl/preview:!py-12",
+        "w-full scroll-mt-28 bg-[color:var(--color-background)] px-4",
+        phoneFrame ? "py-12" : "py-12 md:px-6 md:py-16",
       )}
     >
       <div className="mx-auto min-w-0 max-w-7xl">
         <div
           className={cn(
-            "grid grid-cols-1 items-start gap-8 text-[var(--color-text)] md:gap-10",
-            !narrowPreview &&
-              "lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16 @max-5xl/preview:!grid-cols-1 @max-5xl/preview:!gap-8",
+            "grid grid-cols-1 items-start gap-8 text-[var(--color-text)]",
+            !phoneFrame && "md:gap-10",
+            !framedBelowLg &&
+              "lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16",
           )}
         >
-          <div className="relative w-full min-w-0 lg:pr-8">
+          <div
+            className={cn(
+              "relative w-full min-w-0",
+              !framedBelowLg && "lg:pr-8",
+            )}
+          >
             <div
-              className="mb-5 h-1 w-12 rounded-full bg-[var(--color-primary)] sm:mb-6"
+              className={cn(
+                "h-1 w-12 rounded-full bg-[var(--color-primary)]",
+                phoneFrame ? "mb-5" : "mb-5 sm:mb-6",
+              )}
               aria-hidden="true"
             />
             <SiteHeading
@@ -60,17 +71,23 @@ export default function ExperienceSection({
               title={titleText}
               variant="onSurface"
               className={cn(
-                "!mt-0 !leading-[1.08] break-words !text-3xl !font-black tracking-tight sm:!text-4xl",
-                !narrowPreview &&
-                  "lg:!text-5xl @max-5xl/preview:!text-3xl",
+                "!mt-0 !leading-[1.08] break-words !text-3xl !font-black tracking-tight",
+                !phoneFrame && "sm:!text-4xl",
+                !framedBelowLg && "lg:!text-5xl",
               )}
             />
           </div>
-          <div className="flex w-full min-w-0 flex-col lg:border-l lg:border-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] lg:pl-10">
+          <div
+            className={cn(
+              "flex w-full min-w-0 flex-col",
+              !framedBelowLg &&
+                "lg:border-l lg:border-[color:color-mix(in_srgb,var(--color-primary)_22%,transparent)] lg:pl-10",
+            )}
+          >
             <div
               className={cn(
-                "max-w-[60ch] break-words text-base leading-8 text-[var(--color-text-dimmed)] [&_p+p]:mt-4",
-                !narrowPreview && "lg:text-lg @max-5xl/preview:!text-base",
+                "max-w-[60ch] break-words text-base leading-8 text-[var(--color-text-dimmed)] [&_p]:my-0 [&_p+p]:mt-4",
+                !framedBelowLg && "lg:text-lg",
               )}
               dangerouslySetInnerHTML={{ __html: descriptionHtml }}
             />

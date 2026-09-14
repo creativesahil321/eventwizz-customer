@@ -19,7 +19,7 @@ const CreateLocationDialog = dynamic(
   () => import("./_components/_location-create"),
   {
     ssr: false,
-  }
+  },
 );
 
 // Simple wrapper component for the dialog.
@@ -58,68 +58,68 @@ export default function VenueLocationsPage() {
 
   return (
     <PermissionRoute
-      permissionKey="read-event-location"
+      permissionKey="read-location"
       fallbackPath="/vendor/dashboard"
     >
       <section className="page text-black min-w-0 max-w-full overflow-x-hidden">
         <Shell className="gap-2 overflow-x-hidden">
-        <div className="flex flex-col gap-4 min-w-0 max-w-full">
-          <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 mb-4 min-w-0 max-w-full overflow-hidden">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl title-header font-bold">
-                    Event Locations
-                  </h1>
-                  <AllLocationsBadge />
+          <div className="flex flex-col gap-4 min-w-0 max-w-full">
+            <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 mb-4 min-w-0 max-w-full overflow-hidden">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4 min-w-0">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-2xl title-header font-bold">
+                      Locations
+                    </h1>
+                    <AllLocationsBadge />
+                  </div>
+                  <p className="text-muted-foreground mt-2">
+                    All venues on your account. Each location is a physical
+                    address where you run events — this list is not filtered by
+                    the header selector.
+                  </p>
                 </div>
-                <p className="text-muted-foreground mt-2">
-                  All venues on your account. Each location is a physical
-                  address where you run events — this list is not filtered by
-                  the header selector.
-                </p>
-              </div>
-              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:shrink-0 min-w-0">
-                <div className="relative w-full sm:w-auto sm:max-w-md min-w-0">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <Input
-                    placeholder="Search locations..."
-                    value={globalFilterValue}
-                    onChange={(e) => setGlobalFilterValue(e.target.value)}
-                    className="pl-8 w-full min-w-0"
-                    disabled={isFetching}
-                  />
-                </div>
-                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-initial">
-                  {hasActiveFilters && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleResetAllFilters}
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:shrink-0 min-w-0">
+                  <div className="relative w-full sm:w-auto sm:max-w-md min-w-0">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <Input
+                      placeholder="Search locations..."
+                      value={globalFilterValue}
+                      onChange={(e) => setGlobalFilterValue(e.target.value)}
+                      className="pl-8 w-full min-w-0"
                       disabled={isFetching}
-                      className="gap-2 shrink-0"
-                      aria-label="Reset all filters"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Reset all
-                    </Button>
-                  )}
-                  <CreateLocationButton />
+                    />
+                  </div>
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-initial">
+                    {hasActiveFilters && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResetAllFilters}
+                        disabled={isFetching}
+                        className="gap-2 shrink-0"
+                        aria-label="Reset all filters"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset all
+                      </Button>
+                    )}
+                    <CreateLocationButton />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <VenueLocationsDataTable
-            initialData={[]}
-            search={searchParams}
-            globalFilterValue={globalFilterValue}
-            hideToolbar
-            hideAddButton
-          />
-        </div>
-      </Shell>
-    </section>
+            <VenueLocationsDataTable
+              initialData={[]}
+              search={searchParams}
+              globalFilterValue={globalFilterValue}
+              hideToolbar
+              hideAddButton
+            />
+          </div>
+        </Shell>
+      </section>
     </PermissionRoute>
   );
 }

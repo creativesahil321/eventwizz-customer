@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useRef, useEffect, useState, useMemo, type CSSProperties } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
@@ -991,7 +991,7 @@ export default function Timeline({
   eventDates,
   headingEmphasis,
 }: EventSchedulerProps) {
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);

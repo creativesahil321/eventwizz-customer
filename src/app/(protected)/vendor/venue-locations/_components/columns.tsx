@@ -264,7 +264,7 @@ export const getColumns = ({
             >
               View details
             </DropdownMenuItem>
-            <PermissionGuard permissionKey="update-event-location">
+            <PermissionGuard permissionKey="update-location">
               <DropdownMenuItem
                 onClick={() => setRowAction({ type: "update", row })}
               >
@@ -272,7 +272,7 @@ export const getColumns = ({
               </DropdownMenuItem>
             </PermissionGuard>
             {toggleStatusMutation && (
-              <PermissionGuard permissionKey="update-event-location">
+              <PermissionGuard permissionKey="update-location">
                 {row.original.status === false ? (
                   <DropdownMenuItem
                     className="text-green-600 focus:text-green-600"
@@ -307,7 +307,7 @@ export const getColumns = ({
               </PermissionGuard>
             )}
             {!row.original.is_default && row.original.status !== false && (
-              <PermissionGuard permissionKey="update-event-location">
+              <PermissionGuard permissionKey="update-location">
                 <DropdownMenuItem
                   onClick={() => setRowAction({ type: "setDefault", row })}
                 >
@@ -316,7 +316,7 @@ export const getColumns = ({
               </PermissionGuard>
             )}
             {!row.original.is_default ? (
-              <PermissionGuard permissionKey="update-event-location">
+              <PermissionGuard permissionKey="delete-location">
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-red-600 focus:text-red-600"

@@ -2,7 +2,7 @@
 
 import { useContext, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Phone, Mail } from "lucide-react";
+import { MapPin, Phone, Mail, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
@@ -37,8 +37,11 @@ import {
   type BannerHeadingValign,
 } from "@/lib/banner-heading-align";
 import {
-  previewFlexOnlyUntilMd,
-} from "@/lib/preview-container-layout";
+  PreviewEditHoverBadge,
+  PreviewEditHoverFrame,
+  shouldIgnorePreviewEditClick,
+} from "@/components/preview/preview-edit-hint";
+import { previewFlexOnlyUntilMd } from "@/lib/preview-container-layout";
 // Default fallback media
 // const FALLBACK_VIDEO_URL =
 //   "https://www.bestpartiesever.com/wp-content/uploads/2025/03/Website-video-combined-edit-online-video-cutter.com-1.mp4";
@@ -91,6 +94,10 @@ interface HeroBannerProps {
     email?: string | null;
     phone?: string | null;
   } | null;
+  /** Onboarding preview: click the cover to edit branding. */
+  onEditCover?: () => void;
+  /** Onboarding preview: click the heading/subheading to edit banner text. */
+  onEditBanner?: () => void;
 }
 
 export default function HeroBanner({
@@ -107,6 +114,8 @@ export default function HeroBanner({
   collapsed = false,
   eyebrow,
   heroContact,
+  onEditCover,
+  onEditBanner,
 }: HeroBannerProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
   const vendorTheme = theme as ThemeSchema | null;
@@ -195,14 +204,14 @@ export default function HeroBanner({
     ? "center"
     : textAlign;
   const previewAlignScope = { fromMd: !isPreviewMobile };
-  const copyValign =
-    isPreviewMobile && heroFooter ? "top" : heroValign;
+  const copyValign = heroValign;
+  const canEditCover = Boolean(onEditCover) && !collapsed;
 
   return (
     <section
       id="hero"
       className={cn(
-        "relative mx-auto w-full",
+        "relative z-0 mx-auto w-full",
         collapsed
           ? "overflow-visible"
           : cn(
@@ -210,8 +219,32 @@ export default function HeroBanner({
               heroBandHeightClass,
               isPreviewMobile && previewMobileHeroHeightClass,
             ),
+        canEditCover && "group/preview-edit cursor-pointer",
       )}
+      title={canEditCover ? "Click to edit cover" : undefined}
+      onClick={
+        canEditCover
+          ? (event) => {
+              if (shouldIgnorePreviewEditClick(event.target)) return;
+              if (
+                event.target instanceof Element &&
+                event.target.closest("[data-hero-banner-edit]")
+              ) {
+                return;
+              }
+              onEditCover?.();
+            }
+          : undefined
+      }
     >
+      {canEditCover ? (
+        <>
+          <PreviewEditHoverFrame className="z-[25]" />
+          <div className="pointer-events-none absolute right-4 top-4 z-30">
+            <PreviewEditHoverBadge label="cover" />
+          </div>
+        </>
+      ) : null}
       {/* Video background if video URL exists and should be used */}
       {!collapsed && useVideo && (
         <div className="absolute inset-0 h-full w-full overflow-hidden">
@@ -253,7 +286,10 @@ export default function HeroBanner({
           heroBandContentPadClass(copyValign, {
             withBottomChrome: Boolean(heroFooter),
           }),
-          isPreviewMobile && heroFooter && previewMobileHeroPadClass,
+          isPreviewMobile &&
+            heroFooter &&
+            copyValign === "top" &&
+            previewMobileHeroPadClass,
         )}
         style={heroBandCopyPlacementStyle(copyValign)}
       >
@@ -279,26 +315,48 @@ export default function HeroBanner({
             </p>
           ) : null}
 
-          <SiteHeading
-            level={1}
-            title={bannerHeading}
-            accentHint={bannerAccentHint}
-            emphasis={headingEmphasis}
-            variant="onDark"
-            align={previewAlign}
-            alignFromMd={!isPreviewMobile}
+          <div
+            data-hero-banner-edit=""
+            title={onEditBanner ? "Click to edit banner text" : undefined}
+            onClick={
+              onEditBanner
+                ? (event) => {
+                    event.stopPropagation();
+                    onEditBanner();
+                  }
+                : undefined
+            }
             className={cn(
-              "font-black tracking-tight",
-              heroBannerHeadingTypeClass,
-              previewAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
+              onEditBanner &&
+                "group/banner-edit relative cursor-pointer rounded-sm",
             )}
-          />
+          >
+            <SiteHeading
+              level={1}
+              title={bannerHeading}
+              accentHint={bannerAccentHint}
+              emphasis={headingEmphasis}
+              variant="onDark"
+              align={previewAlign}
+              alignFromMd={!isPreviewMobile}
+              className={cn(
+                "font-black tracking-tight",
+                heroBannerHeadingTypeClass,
+                previewAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
+              )}
+            />
 
-          {bannerSubheading ? (
-            <p className={heroBannerBodyClass(previewAlign, previewAlignScope)}>
-              {bannerSubheading}
-            </p>
-          ) : null}
+            {bannerSubheading ? (
+              <p className={heroBannerBodyClass(previewAlign, previewAlignScope)}>
+                {bannerSubheading}
+              </p>
+            ) : null}
+            {onEditBanner ? (
+              <span className="pointer-events-none absolute -right-1 -top-1 inline-flex rounded-full bg-slate-950/80 p-1 text-white opacity-0 shadow ring-1 ring-white/15 transition-opacity group-hover/banner-edit:opacity-100">
+                <Pencil className="h-3 w-3" aria-hidden />
+              </span>
+            ) : null}
+          </div>
 
           {showHeadingContact ? (
             <div>
@@ -315,6 +373,8 @@ export default function HeroBanner({
       ) : null}
       {heroFooter ? (
         <div
+          data-preview-no-edit=""
+          onClick={(event) => event.stopPropagation()}
           className={cn(
             collapsed
               ? "sticky top-[4.5rem] z-30 border-b border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 px-2.5 py-2 backdrop-blur-md sm:px-4 sm:py-3"
@@ -335,7 +395,7 @@ export default function HeroBanner({
             <div
               className={cn(
                 heroFooterDockClass(previewAlign),
-                "flex flex-col gap-3 sm:gap-3.5",
+                "pointer-events-auto flex flex-col gap-3 sm:gap-3.5",
                 isPreviewMobile && "!gap-2.5",
               )}
             >

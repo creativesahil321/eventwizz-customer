@@ -73,10 +73,47 @@ import {
 import { formatEventLocationLabel } from "@/lib/event-location";
 import { locationDisplayName } from "@/lib/slug-short-label";
 import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
+import type { EventAboutHighlightKey } from "@/lib/event-about-highlights";
+import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
 
 import "@/app/(public)/[locationSlug]/events/[eventSlug]/event-detail.css";
 
 const HEADER_OFFSET_PX = 72;
+
+export type EventPreviewEditHandlers = {
+  onEditHero?: () => void;
+  onEditMeta?: (key: "date" | "time" | "location") => void;
+  onEditAbout?: () => void;
+  onEditHighlight?: (key: EventAboutHighlightKey) => void;
+  onEditRooms?: () => void;
+  onEditSchedule?: () => void;
+  onEditPackages?: () => void;
+  onEditDates?: () => void;
+  onEditGallery?: () => void;
+  onEditMenu?: () => void;
+  onEditDrinks?: () => void;
+  onEditFaqs?: () => void;
+  onEditLocation?: () => void;
+};
+
+function PreviewEditWrap({
+  label,
+  onEdit,
+  skipButtons,
+  children,
+}: {
+  label: string;
+  onEdit?: () => void;
+  skipButtons?: boolean;
+  children: React.ReactNode;
+}) {
+  if (!onEdit) return children;
+  return (
+    <PreviewEditRegion label={label} onEdit={onEdit} skipButtons={skipButtons}>
+      {children}
+    </PreviewEditRegion>
+  );
+}
 
 interface EventPreviewProps {
   data: EventDetailData;
@@ -96,6 +133,8 @@ interface EventPreviewProps {
    * Defaults to off inside embeds (no floating chrome).
    */
   previewBackButtonOffset?: boolean;
+  /** Vendor dashboard preview tab — click a region to open the matching form tab. */
+  previewEdit?: EventPreviewEditHandlers;
 }
 
 function mapGalleryForPreview(
@@ -139,6 +178,7 @@ export function EventPreview({
   locationSlug,
   embedInShell = false,
   previewBackButtonOffset,
+  previewEdit,
 }: EventPreviewProps) {
   const { format: formatMoney } = useCurrencyFormat();
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -683,6 +723,8 @@ export function EventPreview({
               time: heroTimeLabel,
               location: eventLocationLabel,
             }}
+            onEditHero={previewEdit?.onEditHero}
+            onEditMeta={previewEdit?.onEditMeta}
           />
         </div>
 
@@ -692,20 +734,38 @@ export function EventPreview({
             stickyTop={sectionNavStickyTop}
             headerOffsetPx={HEADER_OFFSET_PX}
             scrollContainerRef={previewContainerRef}
+            onItemClick={
+              previewEdit
+                ? (id) => {
+                    if (id === EVENT_SECTION_IDS.about) previewEdit.onEditAbout?.();
+                    else if (id === EVENT_SECTION_IDS.rooms) previewEdit.onEditRooms?.();
+                    else if (id === EVENT_SECTION_IDS.schedule) previewEdit.onEditSchedule?.();
+                    else if (id === EVENT_SECTION_IDS.packages) previewEdit.onEditPackages?.();
+                    else if (id === EVENT_SECTION_IDS.dates) previewEdit.onEditDates?.();
+                    else if (id === EVENT_SECTION_IDS.gallery) previewEdit.onEditGallery?.();
+                    else if (id === EVENT_SECTION_IDS.menu) previewEdit.onEditMenu?.();
+                    else if (id === EVENT_SECTION_IDS.drinks) previewEdit.onEditDrinks?.();
+                    else if (id === EVENT_SECTION_IDS.faqs) previewEdit.onEditFaqs?.();
+                  }
+                : undefined
+            }
           />
         ) : null}
 
         <div id={EVENT_SECTION_IDS.about} className={sectionAnchorClass}>
-          <AboutEventSec
-            about_event_heading={s1?.about_event_heading || ""}
-            about_event_sub_heading={s1?.about_event_sub_heading || ""}
-            about_event_description={s1?.about_event_description || ""}
-            eventImage={resolveAboutEventImage(s1?.about_event_image, bannerImage)}
-            imageAlt={eventName ? `${eventName} event` : "Event image"}
-            highlights={aboutHighlights}
-            headingEmphasis={headingEmphasisForHero}
-            aboutHeadingAccentHint={heroAccentHint}
-          />
+          <PreviewEditWrap label="About" onEdit={previewEdit?.onEditAbout}>
+            <AboutEventSec
+              about_event_heading={s1?.about_event_heading || ""}
+              about_event_sub_heading={s1?.about_event_sub_heading || ""}
+              about_event_description={s1?.about_event_description || ""}
+              eventImage={resolveAboutEventImage(s1?.about_event_image, bannerImage)}
+              imageAlt={eventName ? `${eventName} event` : "Event image"}
+              highlights={aboutHighlights}
+              onEditHighlight={previewEdit?.onEditHighlight}
+              headingEmphasis={headingEmphasisForHero}
+              aboutHeadingAccentHint={heroAccentHint}
+            />
+          </PreviewEditWrap>
         </div>
 
         {showRoomSelector ? (
@@ -714,29 +774,37 @@ export function EventPreview({
             id={EVENT_SECTION_IDS.rooms}
             className={sectionAnchorClass}
           >
-            <EventRoomChooser
-              rooms={roomSummaries}
-              currentRoomIndex={currentRoomIndex}
-              onRoomChange={handleRoomChange}
-              headingEmphasis={headingEmphasisForHero}
-            />
+            <PreviewEditWrap
+              label="Rooms"
+              onEdit={previewEdit?.onEditRooms}
+              skipButtons
+            >
+              <EventRoomChooser
+                rooms={roomSummaries}
+                currentRoomIndex={currentRoomIndex}
+                onRoomChange={handleRoomChange}
+                headingEmphasis={headingEmphasisForHero}
+              />
+            </PreviewEditWrap>
           </div>
         ) : null}
 
         {showTimeline ? (
           <div id={EVENT_SECTION_IDS.schedule} className={sectionAnchorClass}>
             <RoomContentTransition roomKey={roomContentKey}>
-              <Timeline
-                eventSchedular={timelineRows}
-                eventSchedularTitle={slices.event_schedular_title || ""}
-                eventSchedularCopy={slices.event_schedule_subtitle || ""}
-                eventSchedularBackgroundImage={
-                  typeof slices.event_schedular_background_image === "string"
-                    ? slices.event_schedular_background_image
-                    : undefined
-                }
-                headingEmphasis={headingEmphasisForHero}
-              />
+              <PreviewEditWrap label="Timeline" onEdit={previewEdit?.onEditSchedule}>
+                <Timeline
+                  eventSchedular={timelineRows}
+                  eventSchedularTitle={slices.event_schedular_title || ""}
+                  eventSchedularCopy={slices.event_schedule_subtitle || ""}
+                  eventSchedularBackgroundImage={
+                    typeof slices.event_schedular_background_image === "string"
+                      ? slices.event_schedular_background_image
+                      : undefined
+                  }
+                  headingEmphasis={headingEmphasisForHero}
+                />
+              </PreviewEditWrap>
             </RoomContentTransition>
           </div>
         ) : null}
@@ -746,17 +814,19 @@ export function EventPreview({
           className={showPackages ? sectionAnchorClass : undefined}
         >
           <RoomContentTransition roomKey={roomContentKey}>
-            <PackageSec
-              heading={activePackage?.package_title || ""}
-              subHeading={activePackage?.package_description || ""}
-              image={activePackage?.package_image || null}
-              packageDetails={(activePackage?.package_details ?? []).map(
-                (detail) => ({
-                  title: String(detail.title ?? ""),
-                }),
-              )}
-              headingEmphasis={headingEmphasisForHero}
-            />
+            <PreviewEditWrap label="Packages" onEdit={previewEdit?.onEditPackages}>
+              <PackageSec
+                heading={activePackage?.package_title || ""}
+                subHeading={activePackage?.package_description || ""}
+                image={activePackage?.package_image || null}
+                packageDetails={(activePackage?.package_details ?? []).map(
+                  (detail) => ({
+                    title: String(detail.title ?? ""),
+                  }),
+                )}
+                headingEmphasis={headingEmphasisForHero}
+              />
+            </PreviewEditWrap>
           </RoomContentTransition>
         </div>
 
@@ -766,44 +836,50 @@ export function EventPreview({
           className={`${EVENT_BOOKING_SECTION_CLASSNAME} ${sectionAnchorClass}`}
         >
           <RoomContentTransition roomKey={roomContentKey}>
-            <DatesSection
-              dates={datesForSection}
-              eventSlug={eventSlug}
-              eventName={eventName}
-              eventImage={
-                s1?.event_banner_image || s1?.event_banner_video || undefined
-              }
-              headingEmphasis={headingEmphasisForHero}
-            />
+            <PreviewEditWrap label="Dates" onEdit={previewEdit?.onEditDates} skipButtons>
+              <DatesSection
+                dates={datesForSection}
+                eventSlug={eventSlug}
+                eventName={eventName}
+                eventImage={
+                  s1?.event_banner_image || s1?.event_banner_video || undefined
+                }
+                headingEmphasis={headingEmphasisForHero}
+              />
+            </PreviewEditWrap>
           </RoomContentTransition>
         </div>
 
         {showGallery ? (
           <div id={EVENT_SECTION_IDS.gallery} className={sectionAnchorClass}>
-            <EventGallery
-              gallery={galleryImages}
-              galleryTitle={siteEssentials?.event_gallery_title || undefined}
-              headingEmphasis={headingEmphasisForHero}
-            />
+            <PreviewEditWrap label="Gallery" onEdit={previewEdit?.onEditGallery}>
+              <EventGallery
+                gallery={galleryImages}
+                galleryTitle={siteEssentials?.event_gallery_title || undefined}
+                headingEmphasis={headingEmphasisForHero}
+              />
+            </PreviewEditWrap>
           </div>
         ) : null}
 
         {showMenu && (
           <div id={EVENT_SECTION_IDS.menu} className={sectionAnchorClass}>
             <RoomContentTransition roomKey={`${roomContentKey}:${menuOrderKey}`}>
-              <LazyMenuSection
-                key={menuOrderKey}
-                menu_title={activeMenu?.menu_title || ""}
-                menu_description={activeMenu?.menu_description || ""}
-                menus={menus}
-                catering_option={1}
-                menu_background_image={
-                  typeof activeMenu?.menu_background_image === "string"
-                    ? activeMenu.menu_background_image
-                    : (activeMenu?.menu_background_image ?? undefined)
-                }
-                headingEmphasis={headingEmphasisForHero}
-              />
+              <PreviewEditWrap label="Menu" onEdit={previewEdit?.onEditMenu}>
+                <LazyMenuSection
+                  key={menuOrderKey}
+                  menu_title={activeMenu?.menu_title || ""}
+                  menu_description={activeMenu?.menu_description || ""}
+                  menus={menus}
+                  catering_option={1}
+                  menu_background_image={
+                    typeof activeMenu?.menu_background_image === "string"
+                      ? activeMenu.menu_background_image
+                      : (activeMenu?.menu_background_image ?? undefined)
+                  }
+                  headingEmphasis={headingEmphasisForHero}
+                />
+              </PreviewEditWrap>
             </RoomContentTransition>
           </div>
         )}
@@ -811,36 +887,42 @@ export function EventPreview({
         {showDrinks && (
           <div id={EVENT_SECTION_IDS.drinks} className={sectionAnchorClass}>
             <RoomContentTransition roomKey={roomContentKey}>
-              <LazyDrinkSection
-                title={activeDrinks?.drink_title || ""}
-                description={activeDrinks?.drink_description || ""}
-                packages={drinkPackages}
-                eventSlug={eventSlug}
-                headingEmphasis={headingEmphasisForHero}
-              />
+              <PreviewEditWrap label="Drinks" onEdit={previewEdit?.onEditDrinks}>
+                <LazyDrinkSection
+                  title={activeDrinks?.drink_title || ""}
+                  description={activeDrinks?.drink_description || ""}
+                  packages={drinkPackages}
+                  eventSlug={eventSlug}
+                  headingEmphasis={headingEmphasisForHero}
+                />
+              </PreviewEditWrap>
             </RoomContentTransition>
           </div>
         )}
 
-        <LazyBrochureSection
-          showMapImmediately
-          headingEmphasis={headingEmphasisForHero}
-          location={{
-            title: "EVENT LOCATION",
-            description:
-              brochureAddress || "",
-            icon: "MapPin",
-            latitude: brochureLat,
-            longitude: brochureLng,
-          }}
-        />
+        <PreviewEditWrap label="Event location" onEdit={previewEdit?.onEditLocation} skipButtons>
+          <LazyBrochureSection
+            showMapImmediately
+            headingEmphasis={headingEmphasisForHero}
+            location={{
+              title: "EVENT LOCATION",
+              description:
+                brochureAddress || "",
+              icon: "MapPin",
+              latitude: brochureLat,
+              longitude: brochureLng,
+            }}
+          />
+        </PreviewEditWrap>
 
         {showFaqs && (
           <div id={EVENT_SECTION_IDS.faqs} className={sectionAnchorClass}>
-            <LazyFaqSection
-              faqs={faqs}
-              headingEmphasis={headingEmphasisForHero}
-            />
+            <PreviewEditWrap label="FAQs" onEdit={previewEdit?.onEditFaqs}>
+              <LazyFaqSection
+                faqs={faqs}
+                headingEmphasis={headingEmphasisForHero}
+              />
+            </PreviewEditWrap>
           </div>
         )}
 

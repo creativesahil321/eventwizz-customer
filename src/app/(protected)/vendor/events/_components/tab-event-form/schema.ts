@@ -15,6 +15,10 @@ import {
   PACKAGE_DETAIL_LINE_MAX_CHARS,
 } from "@/lib/event-form-limits";
 import {
+  EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+  isEventGalleryCountValid,
+} from "@/lib/event-gallery-count";
+import {
   plainTextCharCount,
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/plain-text-length";
@@ -24,9 +28,15 @@ import {
 } from "@/lib/word-count";
 import { isVendorDateCancelled } from "@/app/(protected)/vendor/events/_lib/vendor-date-cancelled";
 import {
+  EVENT_DATE_MIN_MESSAGE,
+  isEventDateBeforeMinimum,
+} from "@/lib/min-event-date";
+import {
   DUPLICATE_MENU_CATEGORY_MESSAGE,
   duplicateMenuCategoryIndexes,
 } from "@/lib/event-menu-categories";
+import { getContactNumberIssue } from "@/lib/contact-number";
+import { menuChoicesReminderDaysSchema } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 
 // Validation functions for event scheduler
 // Removed future time validation - only keeping sequence validation
@@ -89,7 +99,10 @@ const gallerySchema = z.preprocess((val) => {
       return false;
     }
   });
-}, z.array(galleryEntrySchema).optional());
+}, z.array(galleryEntrySchema).optional().refine(
+  (items) => isEventGalleryCountValid(items?.length ?? 0),
+  { message: EVENT_GALLERY_PARTIAL_COUNT_MESSAGE },
+));
 
 //=== Step 1 ===//
 export const stepOneSchema = z
@@ -829,21 +842,15 @@ export const stepThreeSchema = z
 
     for (const { dates, pathPrefix } of dateLists) {
       if (!dates || dates.length === 0) continue;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayTime = today.getTime();
       for (let i = 0; i < dates.length; i++) {
         if (isVendorDateCancelled(dates[i])) continue;
         const d = dates[i].event_date;
-        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-          const eventTime = new Date(d + "T00:00:00").getTime();
-          if (eventTime < todayTime) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: "Event date must be today or in the future.",
-              path: [...pathPrefix, i, "event_date"],
-            });
-          }
+        if (d && isEventDateBeforeMinimum(d)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: EVENT_DATE_MIN_MESSAGE,
+            path: [...pathPrefix, i, "event_date"],
+          });
         }
       }
       const eventDates = dates.map((d) => d.event_date).filter(Boolean);
@@ -1304,6 +1311,7 @@ export const stepEightSchema = z
     step: z.literal(8),
     event_id: z.number(),
     reminder_email_before_days: z.number().optional(),
+    reminder_menu_choices_before_days: menuChoicesReminderDaysSchema,
     submit_type: z.enum(["draft", "active"]),
     is_duplicate: z.boolean(),
     duplicate_target_type: z.enum(["existing", "new"]).optional(),
@@ -1342,18 +1350,22 @@ export const stepEightSchema = z
         message: "Address is required",
         path: ["address"],
       });
-    if (!data.contact_number?.trim())
+    const contactNumberIssue = getContactNumberIssue(data.contact_number);
+    if (contactNumberIssue) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Contact number is required",
+        message: contactNumberIssue,
         path: ["contact_number"],
       });
+    }
   });
 export type StepEightType = z.infer<typeof stepEightSchema>;
 
 //=== Final Event Schema ===//
 export const eventSchema = z.object({
   currentStep: z.number().min(1).max(8),
+  is_live: optionalBooleanFromApi,
+  has_bookings: optionalBooleanFromApi,
   stepOne: stepOneSchema,
   stepTwo: stepTwoSchema,
   stepThree: stepThreeSchema,

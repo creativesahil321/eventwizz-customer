@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { getDateInfo } from "@/lib/utils";
 import { DatesSectionType } from ".";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
 import {
@@ -26,7 +26,7 @@ export const DateCard = ({
   isFirstRow = false,
 }: DateCardProps) => {
   const currencySymbol = useCurrencySymbol();
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const dateInfo = getDateInfo(dateItem);
   const listPrice = Number.parseFloat(String(dateInfo.price));
   const soldOut = Boolean(dateItem.sold_out);

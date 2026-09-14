@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Clock, Loader2 } from "lucide-react";
+import { Calendar, Clock, Loader2, MapPin } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +20,7 @@ import { BookingTypeIcons } from "@/components/public/booking-type-icons";
 type LocationEventHeroCardProps = {
   event: LocationEventCardModel;
   locationSlug: string;
+  locationLabel?: string | null;
   isPending: boolean;
   onNavigateStart: () => void;
   imageFallback: string;
@@ -32,6 +33,7 @@ type LocationEventHeroCardProps = {
 export function LocationEventHeroCard({
   event,
   locationSlug,
+  locationLabel = null,
   isPending,
   onNavigateStart,
   imageFallback,
@@ -41,6 +43,8 @@ export function LocationEventHeroCard({
   const isInteractivePreview = isPreview && Boolean(onPreviewEventSelect);
   const href = `/${locationSlug}/events/${event.slug}`;
   const fromPrice = formatEventCardFromPrice(event.price);
+  const placeLabel =
+    event.eventAddress?.trim() || locationLabel?.trim() || "";
 
   // Visual hover is decoupled from click interactivity so the Site Essentials
   // preview matches the live site. Only the loading state blocks pointer events.
@@ -116,6 +120,18 @@ export function LocationEventHeroCard({
                 {event.timeLabel}
               </span>
             ) : null}
+            {placeLabel ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
+                <span className="truncate">{placeLabel}</span>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {!event.dateLabel && !event.timeLabel && placeLabel ? (
+          <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
+            <MapPin className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
+            <span className="truncate">{placeLabel}</span>
           </div>
         ) : null}
       </div>

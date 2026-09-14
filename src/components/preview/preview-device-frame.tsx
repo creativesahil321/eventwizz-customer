@@ -58,7 +58,7 @@ export const PreviewDeviceFrame = forwardRef(function PreviewDeviceFrame(
         ref={ref}
         className={cn(
           PREVIEW_CONTAINER_CLASS,
-          "min-h-0 min-w-0 max-w-full transition-[width,max-width,box-shadow,border-radius] duration-300 ease-out",
+          "relative min-h-0 min-w-0 max-w-full transition-[width,max-width,box-shadow,border-radius] duration-300 ease-out",
           scrollable &&
             "overflow-y-auto overflow-x-clip scroll-smooth no-scrollbar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           !scrollable && "overflow-x-clip",

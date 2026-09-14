@@ -8,7 +8,8 @@ import {
   pickRoomHighlights,
   type EventRoomChooserItem,
 } from "@/lib/event-room-chooser-item";
-import { resolveEventLocation } from "@/lib/event-location";
+import { resolvePublicEventMapLocation } from "@/lib/event-location";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 
 function mapPublicDates(
   dates: DatesSectionType | undefined,
@@ -98,7 +99,7 @@ function listRoomEntries(
 export function listPublicEventRooms(event: EventDetail): PublicEventRoomRef[] {
   return listRoomEntries(event).map((entry, index) => ({
     room_id: resolveRoomId(entry.payload, index),
-    name: entry.name || `Room ${index + 1}`,
+    name: entry.name || unnamedRoomLabel(),
     disabled: !roomHasBookableDates(entry.payload),
   }));
 }
@@ -145,7 +146,7 @@ export function listPublicEventRoomSummaries(
 
     return {
       room_id: resolveRoomId(payload, index),
-      name: name || `Room ${index + 1}`,
+      name: name || unnamedRoomLabel(),
       index,
       thumbnail: packageImage || galleryImage || bannerFallback,
       fromPrice: lowestBookableFromPrice({
@@ -202,7 +203,7 @@ function roomPayloadAtIndex(
 }
 
 function flatSlicesFromEvent(event: EventDetail): PublicEventActiveSlices {
-  const eventLocation = resolveEventLocation(event);
+  const eventLocation = resolvePublicEventMapLocation(event);
 
   return {
     roomMode: false,
@@ -243,7 +244,7 @@ function roomSlicesFromPayload(
   room: PublicEventRoomRef,
   payload: PublicRoomPayload,
 ): PublicEventActiveSlices {
-  const eventLocation = resolveEventLocation(payload, event);
+  const eventLocation = resolvePublicEventMapLocation(event);
 
   return {
     roomMode: true,

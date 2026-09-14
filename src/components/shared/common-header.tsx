@@ -16,6 +16,7 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import {
   useContext,
   useState,
@@ -62,6 +63,9 @@ import {
   previewDesktopIconAction,
   previewLogoSizeClass,
 } from "@/lib/preview-container-layout";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
+import { resolvePreviewMobileMenuHost } from "@/lib/preview-device";
+import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -255,6 +259,8 @@ interface CommonHeaderProps {
    * platform default (white), which wrongly forces a solid occupying bar.
    */
   headerColor?: string | null;
+  /** Onboarding preview: click the brand mark to open the logo upload form. */
+  onEditLogo?: () => void;
 }
 
 export default function CommonHeader({
@@ -274,6 +280,7 @@ export default function CommonHeader({
   solidBar = false,
   overlayHero = false,
   headerColor,
+  onEditLogo,
 }: CommonHeaderProps) {
   const { theme } = useContext(ServerContext);
   // Theme refetch after logo save updates this → busts browser cache for same URL path
@@ -291,6 +298,7 @@ export default function CommonHeader({
     (deviceFramesEnabled &&
       (variant === "preview" || isPreviewFromProvider || isPreviewPath));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [menuHost, setMenuHost] = useState<HTMLElement | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated";
@@ -415,8 +423,19 @@ export default function CommonHeader({
 
   const showGuestAccountMenu = compactGuestAuth && !isAuthenticated;
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+  const resolveMenuHost = () =>
+    resolvePreviewMobileMenuHost(
+      headerRootRef.current,
+      scrollContainerRef?.current,
+    );
+
+  const toggleMobileMenu = (event?: { stopPropagation(): void }) => {
+    event?.stopPropagation();
+    if (!mobileMenuOpen) {
+      const host = resolveMenuHost();
+      if (host) setMenuHost(host);
+    }
+    setMobileMenuOpen((open) => !open);
   };
 
   /** Light header themes (e.g. Clean White `#ffffff`) use on-header text — never glass-over-hero. */
@@ -618,8 +637,15 @@ export default function CommonHeader({
       : "opacity-90",
   );
 
-  /** Nested / framed previews scroll inside a panel — sticky, not viewport-fixed. */
-  const usesEmbeddedScrollPanel = Boolean(scrollContainerRef);
+  /**
+   * Nested / framed previews scroll inside a panel — sticky, not viewport-fixed.
+   * `deviceFramesEnabled` is the safety net when a framed page (e.g. Location
+   * on `/preview/onboarding`) forgets to pass `scrollContainerRef`; otherwise
+   * the bar goes `fixed` and covers Desktop / Tablet / Mobile.
+   */
+  const usesEmbeddedScrollPanel =
+    Boolean(scrollContainerRef) || deviceFramesEnabled;
+  const containMobileMenuInFrame = usesEmbeddedScrollPanel;
   /** Overlay the hero (live look) — do not occupy layout space above the cover. */
   const overlayHeroBar = overlayHero && !solidBar;
   const overlayInScrollPanel = overlayHeroBar && usesEmbeddedScrollPanel;
@@ -717,14 +743,36 @@ export default function CommonHeader({
     ? previewDesktopActionsRowClass
     : "relative z-0 flex min-w-0 w-1/3 flex-nowrap items-center justify-end gap-1 overflow-visible text-xs xl:gap-1.5 xl:text-sm";
 
-  return (
+  useEffect(() => {
+    if (!isPreviewNarrow) setMobileMenuOpen(false);
+  }, [isPreviewNarrow]);
+
+  useLayoutEffect(() => {
+    if (!mobileMenuOpen) return;
+    const host = resolveMenuHost();
+    if (host) setMenuHost(host);
+  }, [mobileMenuOpen, scrollContainerRef]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen || !menuHost) return;
+    const previousOverflowY = menuHost.style.overflowY;
+    menuHost.style.overflowY = "hidden";
+    return () => {
+      menuHost.style.overflowY = previousOverflowY;
+    };
+  }, [menuHost, mobileMenuOpen]);
+  
+    return (
     <section
       ref={headerRootRef}
       className={cn(
         overlayInScrollPanel
-          ? "sticky top-0 z-50 w-full pointer-events-none"
+          ? "relative sticky top-0 z-[80] w-full overflow-visible"
           : usesStickyHeader
-            ? "sticky top-0 z-50 w-full transition-all duration-300"
+            ? cn(
+                "sticky top-0 z-50 w-full transition-all duration-300",
+                containMobileMenuInFrame && "relative overflow-visible",
+              )
             : "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         // Banner owns its own fill; keep section transparent so strip colour isn't washed.
         overlayInScrollPanel || topBanner
@@ -745,14 +793,15 @@ export default function CommonHeader({
         ref={overlayBarInnerRef}
         className={cn(
           "w-full",
-          overlayInScrollPanel && "pointer-events-auto transition-all duration-300",
+          (overlayInScrollPanel || containMobileMenuInFrame) &&
+            "relative z-[80] overflow-visible transition-all duration-300",
           overlayInScrollPanel || topBanner ? styles.container : null,
           overlayInScrollPanel &&
             !overDarkHeroTransparent &&
             "dark:bg-[color:var(--color-header)]",
         )}
       >
-      <div className="container mx-auto min-w-0 px-2 sm:px-4">
+      <div className={PUBLIC_CHROME_CONTAINER_CLASS}>
         {/* Desktop Header — mirrors live site; container-aware when embedded */}
         <div
           className={cn(
@@ -804,8 +853,44 @@ export default function CommonHeader({
                 </Link>
               ))}
           </div>
-          <div className="relative z-0 w-1/3 min-w-0 overflow-hidden px-1 text-center sm:px-2">
+          <div
+            className={cn(
+              "relative z-10 w-1/3 min-w-0 px-1 text-center sm:px-2",
+              onEditLogo ? "overflow-visible" : "overflow-hidden",
+            )}
+          >
             {disableLogoHomeLink ? (
+              onEditLogo ? (
+                <PreviewEditRegion
+                  label="logo"
+                  onEdit={onEditLogo}
+                  className="inline-flex max-w-full"
+                  hoverFrameClassName="rounded-md"
+                  badgePositionClassName="-right-1 -top-1"
+                >
+                  <div className="flex h-14 max-w-full items-center justify-center">
+                    {logoPath ? (
+                      <BrandLogoImage
+                        src={addCacheBusting(
+                          logoPath as string,
+                          themeMediaVersion,
+                        )}
+                        width={200}
+                        height={116}
+                        className={logoSizeClass}
+                        alt={vendorTheme?.name || "EventWizz"}
+                      />
+                    ) : (
+                      <div
+                        className={`flex items-center gap-2 text-lg font-bold ${styles.textColor}`}
+                      >
+                        <ImageIcon size={24} />
+                        EventWizz
+                      </div>
+                    )}
+                  </div>
+                </PreviewEditRegion>
+              ) : (
               <div className="flex h-14 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
                   <BrandLogoImage
@@ -827,6 +912,7 @@ export default function CommonHeader({
                   </div>
                 )}
               </div>
+              )
             ) : (
               <Link
                 href="/"
@@ -1154,18 +1240,51 @@ export default function CommonHeader({
         >
           <button
             type="button"
+            data-preview-no-edit=""
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={toggleMobileMenu}
             className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
-              !useNonInteractiveChrome && styles.textColor,
+              "relative z-[90] flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
+              styles.textColor,
             )}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-            disabled={useNonInteractiveChrome}
+            aria-expanded={mobileMenuOpen}
           >
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex min-w-0 justify-center px-1">
             {disableLogoHomeLink ? (
+              onEditLogo ? (
+                <PreviewEditRegion
+                  label="logo"
+                  onEdit={onEditLogo}
+                  className="inline-flex max-w-full"
+                  hoverFrameClassName="rounded-md"
+                  badgePositionClassName="-right-1 -top-1"
+                >
+                  <div className="flex h-9 max-w-full items-center justify-center">
+                    {logoPath ? (
+                      <BrandLogoImage
+                        src={addCacheBusting(
+                          logoPath as string,
+                          themeMediaVersion,
+                        )}
+                        width={200}
+                        height={116}
+                        className="max-h-7 max-w-[min(100%,9.5rem)] w-auto object-contain"
+                        alt={vendorTheme?.name || "EventWizz"}
+                      />
+                    ) : (
+                      <div
+                        className={`flex items-center gap-2 text-base font-bold truncate ${styles.textColor}`}
+                      >
+                        <ImageIcon size={18} className="shrink-0" />
+                        <span className="truncate">EventWizz</span>
+                      </div>
+                    )}
+                  </div>
+                </PreviewEditRegion>
+              ) : (
               <div className="flex h-9 max-w-full items-center justify-center cursor-default">
                 {logoPath ? (
                   <BrandLogoImage
@@ -1187,6 +1306,7 @@ export default function CommonHeader({
                   </div>
                 )}
               </div>
+              )
             ) : (
               <Link
                 href="/"
@@ -1314,23 +1434,29 @@ export default function CommonHeader({
           </div>
         </div>
 
+        {(() => {
+          if (!mobileMenuOpen || !menuHost) return null;
+          const pinToFrame = menuHost !== document.body;
+          const mobileMenuLayer = (
+            <>
         {/* Mobile Menu Overlay */}
-        {mobileMenuOpen && (
           <div
-            className={cn(
-              "fixed inset-0 bg-black bg-opacity-50 z-40",
-              mobileHeaderVisibility,
-            )}
+            className={
+              pinToFrame
+                ? "absolute inset-0 z-[200] bg-black/50"
+                : "fixed inset-0 z-[200] bg-black/50"
+            }
             onClick={toggleMobileMenu}
           />
-        )}
 
         {/* Mobile Menu Panel */}
         <div
           className={cn(
-            "fixed top-0 left-0 z-50 flex h-screen w-[70%] max-w-xs transform flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] transition-transform duration-300 ease-in-out",
-            mobileHeaderVisibility,
-            mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+            "isolate flex w-[70%] max-w-xs flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] shadow-2xl transition-transform duration-300 ease-in-out",
+            pinToFrame
+              ? "absolute top-0 left-0 z-[210] h-full"
+              : "fixed top-0 left-0 z-[210] h-dvh",
+            "translate-x-0",
           )}
         >
           <div className="flex items-center justify-between border-b border-[var(--color-on-header)]/20 px-4 py-4">
@@ -1580,6 +1706,10 @@ export default function CommonHeader({
             )}
           </nav>
         </div>
+            </>
+          );
+          return createPortal(mobileMenuLayer, menuHost);
+        })()}
       </div>
       </div>
     </section>

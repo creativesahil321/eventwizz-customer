@@ -271,6 +271,10 @@ export const heroHomeHeadingTypeClass = cn(
 export const previewMobileHeroHeightClass =
   "!h-[32rem] !min-h-[30rem] !max-h-[36rem] @max-md/preview:!h-[32rem] @max-md/preview:!min-h-[30rem] @max-md/preview:!max-h-[36rem]";
 
+/** ~68dvh of a 1024px-tall tablet, not the laptop window. */
+export const previewTabletHeroHeightClass =
+  "@md/preview:@max-5xl/preview:!h-[42rem] @md/preview:@max-5xl/preview:!min-h-[36rem] @md/preview:@max-5xl/preview:!max-h-[45rem]";
+
 /**
  * Header clearance + reserved dock (contact + stacked search) on Mobile preview.
  * Viewport `sm:`/`md:` padding still wins inside a laptop window without `!`.
@@ -393,12 +397,13 @@ export function heroBandContentPadClass(
       "pt-16 pb-36 sm:pt-24 sm:pb-40 md:pt-28 md:pb-44",
     withBottomChrome &&
       v === "center" &&
-      "pt-16 pb-40 sm:pt-24 sm:pb-36 md:pb-40",
+      "pt-16 pb-40 sm:pt-24 sm:pb-36 md:pb-40 @max-md/preview:!pt-16 @max-md/preview:!pb-40",
     withBottomChrome &&
       v === "bottom" &&
-      "pt-16 pb-40 sm:pt-[4.5rem] sm:pb-44 md:pb-48",
+      "pt-16 pb-40 sm:pt-[4.5rem] sm:pb-44 md:pb-48 @max-md/preview:!pt-16 @max-md/preview:!pb-40",
     withBottomChrome &&
-    "@max-md/preview:!pt-[4.25rem] @max-md/preview:!pb-[11.5rem]",
+      v === "top" &&
+      "@max-md/preview:!pt-[4.25rem] @max-md/preview:!pb-[11.5rem]",
     !withBottomChrome && "@max-md/preview:!py-8",
   );
 }

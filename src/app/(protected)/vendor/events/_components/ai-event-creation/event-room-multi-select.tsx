@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { roomService } from "@/services/vendor/onboarding/room.service";
+import { roomNamePlaceholder } from "@/lib/room-name-examples";
 import {
   Popover,
   PopoverContent,
@@ -167,7 +168,7 @@ export function EventRoomMultiSelect({
               void handleCreateRoom();
             }
           }}
-          placeholder="New room name"
+          placeholder={roomNamePlaceholder(rooms.length)}
           maxLength={40}
           disabled={creating}
           className={cn(

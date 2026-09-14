@@ -10,6 +10,7 @@ import { VendorMainLandingView } from "./_components/LocationPage/vendor-main-la
 import type { LocationData } from "@/types/theme.types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 
 export default function VendorSiteHomePage() {
   const router = useRouter();
@@ -154,7 +155,7 @@ export default function VendorSiteHomePage() {
       <div className="flex min-h-screen flex-col bg-[var(--color-background)]">
         <Skeleton className="h-[60px] w-full rounded-none" />
         <Skeleton className="h-[min(55dvh,590px)] w-full rounded-none" />
-        <div className="mx-auto mt-8 w-full max-w-[1180px] px-4">
+        <div className={`${PUBLIC_CHROME_CONTAINER_CLASS} mt-8`}>
           <Skeleton className="mx-auto mb-6 h-10 w-56 rounded-full" />
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (

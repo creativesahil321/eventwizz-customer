@@ -11,7 +11,12 @@ const UI_ONLY_KEYS = new Set([
 const IGNORE_COMPARE_KEYS = new Set(["sort_order"]);
 
 /** Copied onto the preview overlay only — real values live on stepOne / stepTwo. */
-const ROOT_MERGE_META_KEYS = new Set(["is_rooms", "vendor_location_id"]);
+const ROOT_MERGE_META_KEYS = new Set([
+  "is_rooms",
+  "vendor_location_id",
+  "is_live",
+  "has_bookings",
+]);
 
 const NUMERIC_STRING = /^-?\d+(\.\d+)?$/;
 

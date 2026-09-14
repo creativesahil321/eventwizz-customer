@@ -7,6 +7,7 @@ import {
   readHasMultipleLocationsField,
 } from "./schema";
 import { toPositiveId, sortMenusForOnboardingDisplay } from "@/lib/event-menu-categories";
+import { roomNameExample } from "@/lib/room-name-examples";
 import { resolveDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 
 /**
@@ -546,7 +547,7 @@ function hydrateMultiSpaceFromApi(
             const name =
               typeof room.name === "string" && room.name.trim()
                 ? room.name.trim()
-                : `Room ${index + 1}`;
+                : roomNameExample(index);
             return [name, room];
           }),
       )
@@ -574,7 +575,7 @@ function hydrateMultiSpaceFromApi(
       name:
         typeof r.name === "string" && r.name.trim()
           ? r.name.trim()
-          : `Room ${i + 1}`,
+          : roomNameExample(i),
       isApprovedPackage: Boolean(r.isApprovedPackage ?? r.is_approved_package),
       isApprovedDates: Boolean(r.isApprovedDates ?? r.is_approved_dates),
       isApprovedCatering: Boolean(

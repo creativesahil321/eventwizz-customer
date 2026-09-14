@@ -8,6 +8,8 @@ import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { resolveCheckoutHeaderSurface } from "../_lib/checkout-header-surface";
 import { useLogoMarkTone } from "../_lib/use-logo-mark-tone";
 import { CheckoutHeaderProps } from "../_lib/types";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_LOGO = "/assets/images/logos/eventwizz-logo.png";
 
@@ -46,7 +48,12 @@ export default function CheckoutHeader({ settings }: CheckoutHeaderProps) {
         borderBottomColor: `color-mix(in srgb, ${foreground} 10%, transparent)`,
       }}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
+      <div
+        className={cn(
+          PUBLIC_CHROME_CONTAINER_CLASS,
+          "flex items-center justify-between gap-2 py-3 sm:gap-3 sm:py-4",
+        )}
+      >
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"

@@ -4,7 +4,6 @@ import React from "react";
 import {
   TransactionFilters,
   Transaction,
-  TransactionMeta,
   TransactionStats,
   TransactionStatus,
 } from "../_lib/types";
@@ -26,22 +25,24 @@ import { pageCardClassName } from "@/app/(protected)/_components/page-header-car
 
 interface TransactionsDataTableProps {
   transactions: Transaction[];
-  meta: TransactionMeta | undefined;
   filters: TransactionFilters;
   isLoading: boolean;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onLoadMore: () => void;
   onFilterChange: (filters: Partial<TransactionFilters>) => void;
-  onPageChange: (page: number) => void;
   onViewDetails: (transaction: Transaction) => void;
   stats?: TransactionStats;
 }
 
 export function TransactionsDataTable({
   transactions,
-  meta,
   filters,
   isLoading,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
   onFilterChange,
-  onPageChange,
   onViewDetails,
   stats,
 }: TransactionsDataTableProps) {
@@ -234,10 +235,11 @@ export function TransactionsDataTable({
           <div className="overflow-x-auto max-w-full">
             <TransactionListComponent
               transactions={safeTransactions}
-              meta={meta}
               onViewDetails={onViewDetails}
-              onPageChange={onPageChange}
               isLoading={isLoading}
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={onLoadMore}
             />
           </div>
         </div>

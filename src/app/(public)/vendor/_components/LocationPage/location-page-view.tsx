@@ -24,6 +24,7 @@ import { ServerContext } from "@/lib/server-context";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import CommonHeader from "@/components/shared/common-header";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
+import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
 import HeroBanner from "../EventListPage/hero-banner";
 import ExperienceSection from "../EventListPage/experience";
 import FooterSection, {
@@ -39,6 +40,17 @@ import {
   LocationPageHeroSearch,
   useLocationPageSearch,
 } from "./location-page-hero-search";
+
+export type LocationPagePreviewEdit = {
+  onEditCover?: () => void;
+  onEditBanner?: () => void;
+  onEditAbout?: () => void;
+  onEditFooter?: () => void;
+  /** Header / footer brand mark — logo upload on step 2. */
+  onEditLogo?: () => void;
+  /** Footer Enquiries (phone / email / address) — venue contact, not branding. */
+  onEditEnquiries?: () => void;
+};
 
 type LocationPageViewProps = {
   locationData: LocationData;
@@ -72,6 +84,8 @@ type LocationPageViewProps = {
   footerContactTheme?: Pick<ThemeSchema, "contactDetails" | "locations"> | null;
   footerSocialLinksOverride?: FooterSocialLinksOverride;
   footerBrandDescription?: string | null;
+  /** Onboarding / editor preview: click a region to jump to the matching form. */
+  previewEdit?: LocationPagePreviewEdit;
 };
 
 /**
@@ -95,6 +109,7 @@ export function LocationPageView({
   footerContactTheme,
   footerSocialLinksOverride,
   footerBrandDescription,
+  previewEdit,
 }: LocationPageViewProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
   const isPreviewMode = useIsPreviewMode();
@@ -181,6 +196,41 @@ export function LocationPageView({
       aboutDescription={locationData.about_description}
     />
   );
+  const aboutNode = previewEdit?.onEditAbout ? (
+    <PreviewEditRegion label="About" onEdit={previewEdit.onEditAbout}>
+      {experienceNode}
+    </PreviewEditRegion>
+  ) : (
+    experienceNode
+  );
+  const footerNode = (
+    <FooterSection
+      copyright={settings?.copyright}
+      logo={typeof headerLogo === "string" ? headerLogo : settings?.logo}
+      locationSlug={locationSlug}
+      contactOverride={
+        footerContactOverride ?? {
+          address: locationData.address,
+          phone: locationData.phone,
+          phone_number: locationData.phone_number,
+          email: locationData.email,
+        }
+      }
+      contactTheme={footerContactTheme}
+      socialLinksOverride={footerSocialLinksOverride}
+      brandDescription={
+        firstFooterBrandDescription(
+          footerBrandDescription,
+          settings?.footer_brand_description,
+          locationData.footer_brand_description,
+          isPreviewMode ? null : liveTheme?.footer_brand_description,
+        )
+      }
+      onEditFooter={previewEdit?.onEditFooter}
+      onEditLogo={previewEdit?.onEditLogo}
+      onEditEnquiries={previewEdit?.onEditEnquiries}
+    />
+  );
 
   return (
     <>
@@ -195,6 +245,7 @@ export function LocationPageView({
         }
         solidBar={isSearchMode}
         overlayHero={headerVariant === "preview" && !isSearchMode}
+        onEditLogo={previewEdit?.onEditLogo}
       />
 
       <div
@@ -228,6 +279,8 @@ export function LocationPageView({
             phone: heroContact.phone,
           }}
           heroFooter={searchBar}
+          onEditCover={previewEdit?.onEditCover}
+          onEditBanner={previewEdit?.onEditBanner}
         />
         {isSearchMode ? (
           <>
@@ -276,7 +329,7 @@ export function LocationPageView({
           <LocationMarketingBody
             className={marketingClassName}
             style={marketingStyle}
-            experience={experienceNode}
+            experience={aboutNode}
             latestEvents={filteredLatest}
             upcomingEvents={filteredUpcoming}
             popularSectionTitle={locationData.event_title_1 || "Popular Events"}
@@ -295,29 +348,7 @@ export function LocationPageView({
 
       <SubscribeSection emphasis={headingEmphasis} />
 
-      <FooterSection
-        copyright={settings?.copyright}
-        logo={typeof headerLogo === "string" ? headerLogo : settings?.logo}
-        locationSlug={locationSlug}
-        contactOverride={
-          footerContactOverride ?? {
-            address: locationData.address,
-            phone: locationData.phone,
-            phone_number: locationData.phone_number,
-            email: locationData.email,
-          }
-        }
-        contactTheme={footerContactTheme}
-        socialLinksOverride={footerSocialLinksOverride}
-        brandDescription={
-          firstFooterBrandDescription(
-            footerBrandDescription,
-            settings?.footer_brand_description,
-            locationData.footer_brand_description,
-            isPreviewMode ? null : liveTheme?.footer_brand_description,
-          )
-        }
-      />
+      {footerNode}
     </>
   );
 }

@@ -1,7 +1,17 @@
+import { isLondonDefaultPin } from "./london-default-coords";
+
 export type EventLocationSource = {
   event_address?: unknown;
   latitude?: unknown;
   longitude?: unknown;
+  lat?: unknown;
+  long?: unknown;
+};
+
+/** Public EventPayload pin — `event.event_address || event.address` and `event.lat` / `event.long` only. */
+export type PublicEventMapSource = {
+  event_address?: unknown;
+  address?: unknown;
   lat?: unknown;
   long?: unknown;
 };
@@ -15,10 +25,12 @@ export type ResolvedEventLocation = {
 
 const DEFAULT_EVENT_LOCATION_LABEL_LENGTH = 44;
 
+function readTrimmedString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function readAddress(source: EventLocationSource): string {
-  return typeof source.event_address === "string"
-    ? source.event_address.trim()
-    : "";
+  return readTrimmedString(source.event_address);
 }
 
 function readCoordinate(value: unknown): number | null {
@@ -51,6 +63,9 @@ export function formatEventLocationLabel(
  * Resolves only event-specific sources. Callers must not pass parent venue data.
  * Address and coordinates retain source priority independently so a legacy
  * event can still use its address when only its newer coordinate fields exist.
+ *
+ * Vendor form / step payloads only. Public EventPayload consumers must use
+ * `resolvePublicEventMapLocation` (never room `event_address` / lat / long).
  */
 export function resolveEventLocation(
   ...sources: Array<EventLocationSource | null | undefined>
@@ -67,6 +82,44 @@ export function resolveEventLocation(
     address,
     latitude: coordinates?.latitude ?? null,
     longitude: coordinates?.longitude ?? null,
+    label: formatEventLocationLabel(address),
+  };
+}
+
+/** True when the public event payload includes a usable map pin (not the London placeholder). */
+export function hasPublicEventMapCoordinates(
+  event: PublicEventMapSource | null | undefined,
+): boolean {
+  if (!event) return false;
+  const latitude = readCoordinate(event.lat);
+  const longitude = readCoordinate(event.long);
+  if (latitude == null || longitude == null) return false;
+  return !isLondonDefaultPin(latitude, longitude);
+}
+
+/**
+ * Shared map target for GET /domain/{domain}/events/{slug} `data` and
+ * site-essentials `data.event`. Never reads `rooms.*` or `locations[]`.
+ */
+export function resolvePublicEventMapLocation(
+  event: PublicEventMapSource | null | undefined,
+): ResolvedEventLocation {
+  const address =
+    readTrimmedString(event?.event_address) ||
+    readTrimmedString(event?.address);
+  if (!hasPublicEventMapCoordinates(event)) {
+    return {
+      address,
+      latitude: null,
+      longitude: null,
+      label: formatEventLocationLabel(address),
+    };
+  }
+
+  return {
+    address,
+    latitude: readCoordinate(event?.lat),
+    longitude: readCoordinate(event?.long),
     label: formatEventLocationLabel(address),
   };
 }

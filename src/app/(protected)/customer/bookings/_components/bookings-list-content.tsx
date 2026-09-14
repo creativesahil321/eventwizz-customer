@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo } from "react";
 import { parseAsString, parseAsInteger, useQueryState } from "nuqs";
-import { useBookings } from "@/services/customer/bookings";
+import { useInfiniteBookings } from "@/services/customer/bookings";
 import BookingsList from "./bookings-list";
-import BookingsPagination from "./bookings-pagination";
 import BookingsSkeleton from "./bookings-skeleton";
 import { SearchParams } from "@/types";
 import { getStringValue } from "../_lib/utils";
@@ -16,78 +15,65 @@ type BookingsListContentProps = {
 export default function BookingsListContent({
   search,
 }: BookingsListContentProps) {
-  // Query state for filters and pagination
-  const [page, setPage] = useQueryState(
-    "page",
-    parseAsInteger.withDefault(
-      search?.page ? Number(getStringValue(search.page)) : 1
-    )
-  );
-
   const [perPage] = useQueryState(
     "per_page",
     parseAsInteger.withDefault(
-      search?.per_page ? Number(getStringValue(search.per_page)) : 10
-    )
+      search?.per_page ? Number(getStringValue(search.per_page)) : 10,
+    ),
   );
 
   const [status, setStatus] = useQueryState(
     "status",
-    parseAsString.withDefault(getStringValue(search?.status) || "all")
+    parseAsString.withDefault(getStringValue(search?.status) || "all"),
   );
 
   const [searchQuery, setSearchQuery] = useQueryState(
     "search",
-    parseAsString.withDefault(getStringValue(search?.search) || "")
+    parseAsString.withDefault(getStringValue(search?.search) || ""),
   );
 
-  // Map display status values to API status values
   const mapStatusToAPI = (displayStatus: string): string | undefined => {
     if (displayStatus === "all") return undefined;
-    
+
     const statusMap: Record<string, string> = {
       confirmed: "confirmed",
       cancelled: "cancelled",
       partial_payment: "partial_payment",
     };
-    
+
     return statusMap[displayStatus] || displayStatus;
   };
 
-  // Format API query params
   const queryParams = useMemo(
     () => ({
-      page,
       per_page: perPage,
       status: mapStatusToAPI(status),
       search: searchQuery || undefined,
     }),
-    [page, perPage, status, searchQuery]
+    [perPage, status, searchQuery],
   );
 
-  // Reset page to 1 when filters change (but not on initial load)
-  useEffect(() => {
-    if (page !== 1) {
-      setPage(1);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, searchQuery]);
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    error,
+  } = useInfiniteBookings(queryParams);
 
-  // Fetch bookings with TanStack Query
-  const { data, isLoading, isFetching, error } = useBookings(queryParams);
-
-  // Extract items and meta from the response
   const bookings =
-    data?.data?.map((booking) => ({
-      ...booking,
-      id: booking.booking_id, // Add id alias for backward compatibility
-      total_amount: booking.total, // Add total_amount alias for backward compatibility
-    })) || [];
+    data?.pages.flatMap((page) =>
+      (page.data ?? []).map((booking) => ({
+        ...booking,
+        id: booking.booking_id,
+        total_amount: booking.total,
+      })),
+    ) ?? [];
 
-  const meta = data?.meta || { last_page: 1, total: 0, current_page: 1 };
-
-  // Show skeleton only on initial load (isLoading), not on refetch (isFetching)
   const showSkeleton = isLoading && !data;
+  const isFilterFetching = isFetching && !isFetchingNextPage;
 
   if (error) {
     return (
@@ -104,29 +90,21 @@ export default function BookingsListContent({
     );
   }
 
+  if (showSkeleton) {
+    return <BookingsSkeleton count={perPage} />;
+  }
+
   return (
-    <>
-      {showSkeleton ? (
-        <BookingsSkeleton count={perPage} />
-      ) : (
-        <BookingsList
-          bookings={bookings}
-          searchQuery={searchQuery || ""}
-          setSearchQuery={setSearchQuery}
-          statusFilter={status || "all"}
-          setStatusFilter={setStatus}
-          isFetching={isFetching}
-        />
-      )}
-      {!showSkeleton && (
-        <section className="w-full my-6">
-          <BookingsPagination
-            currentPage={meta.current_page || page}
-            setPage={setPage}
-            totalPages={meta.last_page || 1}
-          />
-        </section>
-      )}
-    </>
+    <BookingsList
+      bookings={bookings}
+      searchQuery={searchQuery || ""}
+      setSearchQuery={setSearchQuery}
+      statusFilter={status || "all"}
+      setStatusFilter={setStatus}
+      isFetching={isFilterFetching}
+      hasNextPage={Boolean(hasNextPage)}
+      isFetchingNextPage={isFetchingNextPage}
+      onLoadMore={fetchNextPage}
+    />
   );
 }

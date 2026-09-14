@@ -93,12 +93,12 @@ export const vendorMenus: MenuItemProps[] = [
   },
   {
     id: 10,
-    title: "Event Locations",
-    icon: "eventLocations",
+    title: "Locations",
+    icon: "locations",
     href: createVendorUrl("/vendor/venue-locations"),
     url: createVendorUrl("/vendor/venue-locations"),
     type: "title",
-    permissions: "read-event-location",
+    permissions: "read-location",
     menu: [],
   },
   {

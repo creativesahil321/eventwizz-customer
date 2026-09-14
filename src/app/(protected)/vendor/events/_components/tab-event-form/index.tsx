@@ -57,6 +57,10 @@ import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-e
 import { useEventData } from "../../_lib/hooks/useEventData";
 import { useEventPreviewNavigation } from "../../_lib/use-event-preview-navigation";
 import {
+  getVendorPublishCopy,
+  resolveVendorEventLifecycle,
+} from "../../_lib/vendor-event-lifecycle";
+import {
   clearVendorEventPreviewDraft,
   mergeVendorLivePreviewData,
   writeVendorEventPreviewDraft,
@@ -77,12 +81,17 @@ import {
   syncStepTwoRoomsFromCatalogSelection,
   type VendorStepTwoRoomForm,
 } from "@/lib/event-form-limits";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 import { isVendorRoomPackageStepComplete } from "../../_lib/normalize-step-two-fields";
 import {
-  hasMeaningfulVendorDates,
   normalizeVendorStepThreeRooms,
   type VendorStepThreeRoomEntry,
 } from "../../_lib/vendor-step-three-rooms";
+import {
+  getVendorDatesPublishIssue,
+  hasSchedulableVendorDates,
+} from "../../_lib/vendor-dates-publish";
+import { getVendorEventTabStatus } from "../../_lib/vendor-event-tab-status";
 import {
   findStepFourMenuForRoom,
   isVendorRoomMenuStepComplete,
@@ -231,6 +240,8 @@ type RoomRecord = {
 };
 
 type EventDataLike = {
+  is_live?: boolean | number | string;
+  has_bookings?: boolean | number | string;
   is_rooms?: boolean | number | string;
   stepTwo?: { rooms?: Record<string, unknown> };
   stepThree?: { rooms?: Record<string, unknown> };
@@ -261,7 +272,7 @@ const isRoomDatesFilled = (
   const entry = stepThreeRooms.find(
     (room) => Number(room.room_id) === Number(roomId),
   );
-  return hasMeaningfulVendorDates(entry?.dates);
+  return hasSchedulableVendorDates(entry?.dates);
 };
 
 const isRoomPackageFilled = (room: StepTwoRoom | undefined): boolean =>
@@ -290,19 +301,6 @@ const isMeaningfulValue = (value: unknown): boolean => {
   }
   return false;
 };
-
-type TabStatus = "complete" | "current" | "upcoming";
-
-function getTabStatus(
-  stepId: number,
-  stepValue: string,
-  activeTab: string,
-  currentStep: number,
-): TabStatus {
-  if (activeTab === stepValue) return "current";
-  if (stepId <= currentStep) return "complete";
-  return "upcoming";
-}
 
 const getStepRoomsForTab = (data: EventDataLike, tab: string) => {
   const sources: Record<string, Array<Record<string, unknown> | undefined>> = {
@@ -412,6 +410,14 @@ export default function TabEventForm() {
     control: formContext.control,
     name: "stepEight.submit_type",
   });
+  const watchedIsLive = useWatch({
+    control: formContext.control,
+    name: "is_live",
+  });
+  const watchedHasBookings = useWatch({
+    control: formContext.control,
+    name: "has_bookings",
+  });
   const watchedStepTwoRooms = useWatch({
     control: formContext.control,
     name: "stepTwo.rooms",
@@ -487,6 +493,11 @@ export default function TabEventForm() {
     control: formContext.control,
   }) as Partial<EventSchemaType>;
 
+  const datesTabComplete = useMemo(
+    () => getVendorDatesPublishIssue(liveFormValues) === null,
+    [liveFormValues],
+  );
+
   const livePreviewData = useMemo((): EventDetailData => {
     const saved =
       ((eventData as { data?: EventDetailData } | undefined)?.data as
@@ -547,13 +558,23 @@ export default function TabEventForm() {
 
   const isEventCancelled = (eventStatus || "").toLowerCase() === "cancelled";
   const isPublishTab = activeTab === "publish";
+  const isLiveEvent =
+    resolveVendorEventLifecycle({
+      is_live: watchedIsLive,
+      has_bookings: watchedHasBookings,
+    }).isLive ||
+    resolveVendorEventLifecycle(normalizedEventData).isLive ||
+    resolveVendorEventLifecycle(eventData).isLive;
+  const publishCopy = getVendorPublishCopy(isLiveEvent);
   const canFinalizeEvent =
     Boolean(currentStep && currentStep >= 8) &&
     !readOnly &&
     !isEventCancelled &&
     persistedHydrated;
   const publishActionLabel =
-    publishSubmitType === "active" ? "Publish event" : "Save as draft";
+    publishSubmitType === "active"
+      ? publishCopy.actionActive
+      : publishCopy.actionDraft;
 
   const resolvedStepTwoRooms = useMemo(
     () =>
@@ -599,9 +620,9 @@ export default function TabEventForm() {
 
   const roomRecords = useMemo<RoomRecord[]>(() => {
     if (localIsRooms === 1) {
-      return resolvedStepTwoRooms.slice(0, EVENT_ROOM_MAX_COUNT).map((room, index) => {
+      return resolvedStepTwoRooms.slice(0, EVENT_ROOM_MAX_COUNT).map((room) => {
         const resolvedName =
-          String(room?.name || "").trim() || `Room ${index + 1}`;
+          String(room?.name || "").trim() || unnamedRoomLabel();
         const isComplete =
           activeTab === "dates"
             ? isRoomDatesFilled(room?.room_id, stepThreeRoomsNormalized)
@@ -779,9 +800,9 @@ export default function TabEventForm() {
         if (cancelled) return;
         const data = Array.isArray(res?.data) ? res.data : [];
         const fromApi: VendorRoomOption[] = data
-          .map((room, index) => {
+          .map((room) => {
             const id = Number(room.id);
-            const name = String(room?.name ?? "").trim() || `Room ${index + 1}`;
+            const name = String(room?.name ?? "").trim() || unnamedRoomLabel();
             return { id, name };
           })
           .filter(
@@ -932,12 +953,13 @@ export default function TabEventForm() {
                         const isDisabled = currentStep
                           ? step.id > currentStep
                           : false;
-                        const tabStatus = getTabStatus(
-                          step.id,
-                          step.value,
+                        const tabStatus = getVendorEventTabStatus({
+                          stepId: step.id,
+                          stepValue: step.value,
                           activeTab,
-                          currentStep ?? 1,
-                        );
+                          unlockStep: currentStep ?? 1,
+                          contentComplete: { dates: datesTabComplete },
+                        });
                         const statusLabel =
                           tabStatus === "complete"
                             ? "Complete"
@@ -1210,7 +1232,7 @@ export default function TabEventForm() {
                   </div>
                 </TabsContent>
 
-                {/* Live Preview (read-only) — full-width desktop embed (device switcher is onboarding-only) */}
+                {/* Live Preview — click a section to jump to the matching form tab */}
                     <TabsContent value="preview" className="mt-0 w-full">
                   <div className="h-[min(70vh,720px)] max-h-[min(80vh,calc(100dvh-12rem))] overflow-hidden rounded-lg border border-slate-200/80 shadow-sm bg-white">
                     <PreviewProvider isPreviewMode>
@@ -1218,6 +1240,38 @@ export default function TabEventForm() {
                         data={livePreviewData}
                         siteEssentials={previewSiteEssentials}
                         embedInShell
+                        previewEdit={
+                          readOnly
+                            ? undefined
+                            : {
+                                onEditHero: () => void setActiveStep(1),
+                                onEditAbout: () => void setActiveStep(1),
+                                onEditLocation: () => void setActiveStep(1),
+                                onEditMeta: (key) => {
+                                  if (key === "date") void setActiveStep(3);
+                                  else if (key === "time") void setActiveStep(2);
+                                  else void setActiveStep(1);
+                                },
+                                onEditHighlight: (key) => {
+                                  if (key === "occasion") void setActiveStep(1);
+                                  else if (key === "dates" || key === "fromPrice") {
+                                    void setActiveStep(3);
+                                  } else if (key === "time") {
+                                    void setActiveStep(2);
+                                  } else {
+                                    void setActiveStep(1);
+                                  }
+                                },
+                                onEditRooms: () => void setActiveStep(2),
+                                onEditSchedule: () => void setActiveStep(2),
+                                onEditPackages: () => void setActiveStep(2),
+                                onEditGallery: () => void setActiveStep(2),
+                                onEditDates: () => void setActiveStep(3),
+                                onEditMenu: () => void setActiveStep(4),
+                                onEditDrinks: () => void setActiveStep(6),
+                                onEditFaqs: () => void setActiveStep(7),
+                              }
+                        }
                       />
                     </PreviewProvider>
                   </div>
@@ -1278,8 +1332,8 @@ export default function TabEventForm() {
                             <>
                               <Loader2 className="size-4 animate-spin" />
                               {publishSubmitType === "active"
-                                ? "Publishing…"
-                                : "Saving…"}
+                                ? publishCopy.busyActive
+                                : publishCopy.busyDraft}
                             </>
                           ) : (
                             publishActionLabel

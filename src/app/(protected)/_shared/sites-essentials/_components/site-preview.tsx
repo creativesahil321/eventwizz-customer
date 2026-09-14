@@ -1,7 +1,10 @@
 "use client";
 
 import type { RefObject } from "react";
-import { LocationPageView } from "@/app/(public)/vendor/_components/LocationPage/location-page-view";
+import {
+  LocationPageView,
+  type LocationPagePreviewEdit,
+} from "@/app/(public)/vendor/_components/LocationPage/location-page-view";
 import type { LocationData } from "@/services/common/events/type";
 import { SiteEssentialsGoogleFontsLoader } from "@/components/shared/site-essentials-google-fonts-loader";
 import { SiteEssentialsFormValues } from "../_lib/schema";
@@ -17,6 +20,7 @@ interface SitePreviewProps {
   formValues: SiteEssentialsFormValues;
   /** Onboarding preview scroll root for sticky header parity. */
   scrollContainerRef?: RefObject<HTMLElement | null>;
+  previewEdit?: LocationPagePreviewEdit;
 }
 
 function getPreviewUrl(value: string | File | null | undefined): string | null {
@@ -50,6 +54,7 @@ function resolvePreviewCity(
 export function SitePreview({
   formValues,
   scrollContainerRef,
+  previewEdit,
 }: Readonly<SitePreviewProps>) {
   const previewStyles = siteEssentialsToPreviewRootStyle(formValues);
 
@@ -162,6 +167,7 @@ export function SitePreview({
             formValues.seo?.description,
           )
         }
+        previewEdit={previewEdit}
       />
     </div>
   );

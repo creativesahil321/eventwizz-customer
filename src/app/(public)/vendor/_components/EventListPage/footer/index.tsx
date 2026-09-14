@@ -25,11 +25,13 @@ import { useThemeQuery } from "@/hooks/use-theme-query";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useIsPreviewMode } from "@/contexts/preview-context";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 import { hasPlainText, toPlainSnippet } from "@/lib/plain-text-length";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
+import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
 
 const FOOTER_SOCIAL_PLATFORMS = [
   "facebook",
@@ -87,6 +89,13 @@ interface FooterSectionProps {
    * Live pages may omit it; the footer then uses theme GET.
    */
   brandDescription?: string | null;
+  /**
+   * Onboarding preview: logo + footer blurb jump to branding (step 2).
+   * Enquiries (phone / email / address) jump to venue contact (step 1).
+   */
+  onEditFooter?: () => void;
+  onEditLogo?: () => void;
+  onEditEnquiries?: () => void;
 }
 
 const VISIT_LINKS: Array<{ href: string; label: string }> = [
@@ -185,34 +194,57 @@ function FooterPageLinks({
   );
 }
 
-function EnquiriesLines({ contact }: { contact: ResolvedVenueContact }) {
+const ENQUIRY_LINE_CLASS =
+  "text-sm leading-relaxed text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]";
+
+function EnquiriesLines({
+  contact,
+  asPlainText,
+}: {
+  contact: ResolvedVenueContact;
+  asPlainText: boolean;
+}) {
   return (
     <div className="flex flex-col items-start gap-1.5 text-left">
       {contact.phone ? (
-        <Link
-          href={`tel:${contact.phone}`}
-          className="text-sm leading-relaxed text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
-        >
-          {contact.phone}
-        </Link>
+        asPlainText ? (
+          <span className={ENQUIRY_LINE_CLASS}>{contact.phone}</span>
+        ) : (
+          <Link href={`tel:${contact.phone}`} className={ENQUIRY_LINE_CLASS}>
+            {contact.phone}
+          </Link>
+        )
       ) : null}
       {contact.email ? (
-        <Link
-          href={`mailto:${contact.email}`}
-          className="break-all text-sm leading-relaxed text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)]"
-        >
-          {contact.email}
-        </Link>
+        asPlainText ? (
+          <span className={cn(ENQUIRY_LINE_CLASS, "break-all")}>
+            {contact.email}
+          </span>
+        ) : (
+          <Link
+            href={`mailto:${contact.email}`}
+            className={cn(ENQUIRY_LINE_CLASS, "break-all")}
+          >
+            {contact.email}
+          </Link>
+        )
       ) : null}
       {contact.address ? (
-        <a
-          href={buildMapsDirectionsUrl(contact.address)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm leading-relaxed text-[var(--color-on-footer)]/80 transition-colors hover:text-[color:var(--color-primary)] hover:underline hover:underline-offset-2"
-        >
-          {contact.address}
-        </a>
+        asPlainText ? (
+          <span className={ENQUIRY_LINE_CLASS}>{contact.address}</span>
+        ) : (
+          <a
+            href={buildMapsDirectionsUrl(contact.address)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              ENQUIRY_LINE_CLASS,
+              "hover:underline hover:underline-offset-2",
+            )}
+          >
+            {contact.address}
+          </a>
+        )
       ) : null}
     </div>
   );
@@ -257,12 +289,15 @@ export default function FooterSection({
   contactTheme,
   socialLinksOverride,
   brandDescription,
+  onEditFooter,
+  onEditLogo,
+  onEditEnquiries,
 }: FooterSectionProps = {}) {
   const { theme: serverTheme } = useContext(ServerContext);
   const { domain } = useDomain();
   const { data: queryTheme } = useThemeQuery(domain, serverTheme);
   const vendorTheme = (queryTheme ?? serverTheme) as ThemeSchema;
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const pathname = usePathname();
   const isPreviewMode = useIsPreviewMode();
   /** Social icons on live site + site/event previews — not onboarding. */
@@ -350,6 +385,9 @@ export default function FooterSection({
     return list;
   }, [themeForContact?.locations]);
 
+  /** Multi-venue only — a single city in the footer looks like leftover nav. */
+  const showLocations = locationLinks.length > 1;
+
   const brandBlurb = toPlainSnippet(
     firstFooterBrandDescription(
       brandDescription,
@@ -365,6 +403,52 @@ export default function FooterSection({
     (hasPlainText(vendorTheme?.copyright) ? vendorTheme?.copyright : null) ||
     null;
 
+  const brandColumnClass = cn(
+    "col-span-2 flex min-w-0 flex-col items-center text-center",
+    !narrowPreview &&
+      "sm:col-span-1 sm:items-start sm:text-left lg:max-w-sm lg:flex-1 @max-5xl/preview:!max-w-none @max-5xl/preview:!flex-none",
+  );
+  const enquiriesColumnClass = cn(
+    "min-w-0",
+    !narrowPreview && "lg:w-56 lg:shrink-0 @max-5xl/preview:!w-auto",
+  );
+  const brandMark = (
+    <FooterBrand
+      logoPath={logoPath}
+      brandName={brandName}
+      isPreviewMode={isPreviewMode}
+    />
+  );
+  const brandColumn = (
+    <>
+      {onEditLogo ? (
+        <PreviewEditRegion
+          label="logo"
+          onEdit={onEditLogo}
+          className="inline-flex max-w-full"
+          hoverFrameClassName="rounded-md"
+        >
+          {brandMark}
+        </PreviewEditRegion>
+      ) : (
+        brandMark
+      )}
+      {brandBlurb ? (
+        <p className="mt-4 max-w-xs text-sm leading-relaxed text-[var(--color-on-footer)]/75">
+          {brandBlurb}
+        </p>
+      ) : null}
+      {socialLinks.length > 0 ? (
+        <div className="mt-5">
+          <SocialRow
+            links={socialLinks}
+            className={!narrowPreview ? "sm:justify-start" : "justify-center"}
+          />
+        </div>
+      ) : null}
+    </>
+  );
+
   return (
     <footer
       data-preview-footer=""
@@ -377,47 +461,33 @@ export default function FooterSection({
           : undefined
       }
     >
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-14">
+      <div className={cn(PUBLIC_CHROME_CONTAINER_CLASS, "py-8 sm:py-14")}>
         <div
           className={cn(
             "grid grid-cols-2 gap-x-6 gap-y-8 text-left",
-            !narrowPreview && "lg:grid-cols-4 lg:gap-8",
+            !narrowPreview &&
+              "lg:flex lg:flex-row lg:items-start lg:justify-between lg:gap-10 @max-5xl/preview:!grid @max-5xl/preview:!gap-x-6 @max-5xl/preview:!gap-y-8",
           )}
         >
-          <div
-            className={cn(
-              "col-span-2 flex min-w-0 flex-col items-center text-center",
-              !narrowPreview &&
-                "sm:col-span-1 sm:items-start sm:text-left",
-            )}
-          >
-            <FooterBrand
-              logoPath={logoPath}
-              brandName={brandName}
-              isPreviewMode={isPreviewMode}
-            />
-            {brandBlurb ? (
-              <p className="mt-4 max-w-xs text-sm leading-relaxed text-[var(--color-on-footer)]/75">
-                {brandBlurb}
-              </p>
-            ) : null}
-            {socialLinks.length > 0 ? (
-              <div className="mt-5">
-                <SocialRow
-                  links={socialLinks}
-                  className={
-                    !narrowPreview ? "sm:justify-start" : "justify-center"
-                  }
-                />
-              </div>
-            ) : null}
-          </div>
+          {onEditFooter ? (
+            <PreviewEditRegion
+              label="branding"
+              onEdit={onEditFooter}
+              className={brandColumnClass}
+              hoverFrameClassName="rounded-md"
+            >
+              {brandColumn}
+            </PreviewEditRegion>
+          ) : (
+            <div className={brandColumnClass}>{brandColumn}</div>
+          )}
 
-          {locationLinks.length > 0 ? (
+          {showLocations ? (
             <div
               className={cn(
                 "col-span-2 min-w-0",
-                !narrowPreview && "sm:col-span-1",
+                !narrowPreview &&
+                  "sm:col-span-1 lg:w-40 lg:shrink-0 @max-5xl/preview:!w-auto",
               )}
             >
               <FooterColumnHeading>Locations</FooterColumnHeading>
@@ -425,7 +495,8 @@ export default function FooterSection({
                 aria-label="Venue locations"
                 className={cn(
                   "grid grid-cols-2 gap-x-4 gap-y-2",
-                  !narrowPreview && "lg:flex lg:flex-col lg:gap-2",
+                  !narrowPreview &&
+                    "lg:flex lg:flex-col lg:gap-2 @max-5xl/preview:!grid @max-5xl/preview:!grid-cols-2 @max-5xl/preview:!gap-x-4 @max-5xl/preview:!gap-y-2",
                 )}
               >
                 {locationLinks.map((link) => (
@@ -441,7 +512,12 @@ export default function FooterSection({
             </div>
           ) : null}
 
-          <div className="min-w-0">
+          <div
+            className={cn(
+              "min-w-0",
+              !narrowPreview && "lg:w-40 lg:shrink-0 @max-5xl/preview:!w-auto",
+            )}
+          >
             <FooterColumnHeading>Visit</FooterColumnHeading>
             <nav aria-label="Visit" className="flex flex-col gap-2">
               {VISIT_LINKS.map((link) => (
@@ -456,11 +532,26 @@ export default function FooterSection({
             </nav>
           </div>
 
-          {hasEnquiries ? (
-            <div className="min-w-0">
-              <FooterColumnHeading>Enquiries</FooterColumnHeading>
-              <EnquiriesLines contact={enquiriesContact} />
-            </div>
+          {hasEnquiries && enquiriesContact ? (
+            onEditEnquiries ? (
+              <PreviewEditRegion
+                label="contact details"
+                onEdit={onEditEnquiries}
+                className={enquiriesColumnClass}
+                hoverFrameClassName="rounded-md"
+              >
+                <FooterColumnHeading>Enquiries</FooterColumnHeading>
+                <EnquiriesLines contact={enquiriesContact} asPlainText />
+              </PreviewEditRegion>
+            ) : (
+              <div className={enquiriesColumnClass}>
+                <FooterColumnHeading>Enquiries</FooterColumnHeading>
+                <EnquiriesLines
+                  contact={enquiriesContact}
+                  asPlainText={isPreviewMode}
+                />
+              </div>
+            )
           ) : null}
         </div>
       </div>
@@ -468,9 +559,9 @@ export default function FooterSection({
       <div className="border-t border-[color:color-mix(in_srgb,var(--color-on-footer)_10%,transparent)]">
         <div
           className={cn(
-            "mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-4 text-center",
-            !narrowPreview &&
-              "sm:flex-row sm:items-center sm:px-6 sm:text-left",
+            PUBLIC_CHROME_CONTAINER_CLASS,
+            "flex flex-col items-center justify-between gap-3 py-4 text-center",
+            !narrowPreview && "sm:flex-row sm:items-center sm:text-left",
           )}
         >
           {resolvedCopyright ? (

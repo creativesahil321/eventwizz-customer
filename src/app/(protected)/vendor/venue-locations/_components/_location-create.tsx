@@ -189,7 +189,7 @@ export default function CreateLocationDialog() {
   );
 
   return (
-    <PermissionGuard permissionKey="create-event-location" fallback={null}>
+    <PermissionGuard permissionKey="create-location" fallback={null}>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         {atLimit ? (
           <TooltipProvider>

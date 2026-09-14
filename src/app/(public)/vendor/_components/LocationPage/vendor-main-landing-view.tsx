@@ -40,10 +40,11 @@ import {
   heroHomeHeadingTypeClass,
 } from "@/lib/banner-heading-align";
 import { cn } from "@/lib/utils";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import type { LocationData } from "@/types/theme.types";
 import type { ThemeSchema } from "@/types/theme.types";
 import type { VenueContactOverride } from "@/lib/resolve-venue-contact";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { usePublicSearch } from "@/services/common/public-search";
@@ -75,6 +76,9 @@ export type VendorMainLandingViewProps = {
   className?: string;
   /** Optional slot above the header (e.g. preview font loader). */
   beforeHeader?: ReactNode;
+  onEditLogo?: () => void;
+  onEditFooter?: () => void;
+  onEditEnquiries?: () => void;
 };
 
 /**
@@ -105,10 +109,13 @@ export function VendorMainLandingView({
   style,
   className,
   beforeHeader,
+  onEditLogo,
+  onEditFooter,
+  onEditEnquiries,
 }: VendorMainLandingViewProps) {
   const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [isCompactViewport, setIsCompactViewport] = useState(false);
-  const isPreviewNarrow = usePreviewNarrowLayout();
+  const isPreviewNarrow = usePreviewMobileLayout();
   const isPreviewMode = useIsPreviewMode();
   const { domain } = useDomain();
   const useApi = !isPreviewMode;
@@ -290,7 +297,11 @@ export function VendorMainLandingView({
       )}
     >
       {beforeHeader}
-      <LocationSelectionHeader name={brandName} logo={logo || undefined} />
+      <LocationSelectionHeader
+        name={brandName}
+        logo={logo || undefined}
+        onEditLogo={onEditLogo}
+      />
 
       <section
         className={cn(
@@ -305,7 +316,12 @@ export function VendorMainLandingView({
           <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
         </div>
 
-        <div className="absolute inset-0 z-10 mx-auto flex min-w-0 w-full max-w-[1180px] flex-col items-center justify-center px-3 py-16 text-center sm:px-6 sm:py-20">
+        <div
+          className={cn(
+            PUBLIC_CHROME_CONTAINER_CLASS,
+            "absolute inset-0 z-10 flex flex-col items-center justify-center py-16 text-center sm:py-20",
+          )}
+        >
           <motion.div
             initial={{ y: 28, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -423,7 +439,7 @@ export function VendorMainLandingView({
         )}
       >
         <motion.div
-          className="mx-auto w-full max-w-[1180px] px-4 sm:px-6"
+          className={PUBLIC_CHROME_CONTAINER_CLASS}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.12 }}
@@ -619,6 +635,9 @@ export function VendorMainLandingView({
         contactTheme={contactTheme}
         socialLinksOverride={socialLinksOverride}
         brandDescription={brandDescription}
+        onEditFooter={onEditFooter}
+        onEditLogo={onEditLogo}
+        onEditEnquiries={onEditEnquiries}
       />
     </div>
   );

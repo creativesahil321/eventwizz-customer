@@ -11,7 +11,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { getRoomFloatingAccent } from "@/lib/room-accent-palette";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 
 export interface FloatingRoomBarItem {
   key: string;
@@ -79,7 +79,7 @@ export function FloatingRoomBar({
   addRoomHref,
   addRoomLabel = "Add room",
 }: FloatingRoomBarProps) {
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
   const sizeStyles = SIZE_STYLES[narrowPreview ? "sm" : size];
 
   const resolvedActiveIndex = Math.min(

@@ -12,11 +12,16 @@ import {
 } from "../_lib/preview-contact";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import type { LocationData } from "@/types/theme.types";
+import type { LocationPagePreviewEdit } from "@/app/(public)/vendor/_components/LocationPage/location-page-view";
 
 interface MainLandingSitePreviewProps {
   formValues: SiteEssentialsFormValues;
   /** Preview only: jump to that location in the review flow. */
   onLocationSelect?: (slug: string) => void | boolean;
+  previewEdit?: Pick<
+    LocationPagePreviewEdit,
+    "onEditLogo" | "onEditFooter" | "onEditEnquiries"
+  >;
 }
 
 function getPreviewUrl(
@@ -35,6 +40,7 @@ function getPreviewUrl(
 export function MainLandingSitePreview({
   formValues,
   onLocationSelect,
+  previewEdit,
 }: Readonly<MainLandingSitePreviewProps>) {
   const previewStyles = siteEssentialsToPreviewRootStyle(formValues);
   const { mediaVersion } = useTheme();
@@ -115,6 +121,9 @@ export function MainLandingSitePreview({
         )
       }
       exploreCitiesSectionId="explore-cities-preview"
+      onEditLogo={previewEdit?.onEditLogo}
+      onEditFooter={previewEdit?.onEditFooter}
+      onEditEnquiries={previewEdit?.onEditEnquiries}
     />
   );
 }

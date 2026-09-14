@@ -51,3 +51,20 @@ export const DEFAULT_PREVIEW_DEVICE: PreviewDeviceId = "desktop";
 
 /** Named CSS container — pair with `@5xl/preview:` (1024px) / `@7xl/preview:` (1280px). */
 export const PREVIEW_CONTAINER_CLASS = "@container/preview";
+
+/**
+ * Where the mobile nav drawer should mount.
+ * Device frame first (onboarding / admin / `/preview/onboarding`), then an
+ * embedded scroll panel (dashboard Preview tab), then `document.body` (live
+ * site and full-page `/preview/site`) so the drawer is always full-height
+ * and above page headings like “Menu”.
+ */
+export function resolvePreviewMobileMenuHost(
+  fromEl: HTMLElement | null,
+  embeddedScrollEl?: HTMLElement | null,
+): HTMLElement | null {
+  const frame = fromEl?.closest<HTMLElement>("[data-preview-device]");
+  if (frame) return frame;
+  if (embeddedScrollEl) return embeddedScrollEl;
+  return typeof document !== "undefined" ? document.body : null;
+}

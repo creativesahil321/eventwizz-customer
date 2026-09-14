@@ -1,7 +1,14 @@
 "use client";
 
+import type { MouseEvent, ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const PREVIEW_EDIT_SKIP = "a, input, textarea, select, [data-preview-no-edit]";
+
+export function shouldIgnorePreviewEditClick(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest(PREVIEW_EDIT_SKIP));
+}
 
 /** Hover ring + wash for a click-to-edit preview region. */
 export function PreviewEditHoverFrame({ className }: { className?: string }) {
@@ -39,5 +46,71 @@ export function PreviewEditHoverBadge({
       <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
       Edit {label}
     </span>
+  );
+}
+
+/** Hover highlight + “Edit …” chip. Used by onboarding event and location previews. */
+export function PreviewEditRegion({
+  label,
+  onEdit,
+  children,
+  className,
+  skipButtons = false,
+  hoverFrameClassName,
+  badgePositionClassName,
+}: {
+  label: string;
+  onEdit: () => void;
+  children: ReactNode;
+  className?: string;
+  skipButtons?: boolean;
+  hoverFrameClassName?: string;
+  badgePositionClassName?: string;
+}) {
+  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+    // Nested edit chips (glance facts, hero meta) own the click.
+    if (event.target instanceof Element) {
+      const nestedRegion = event.target.closest("[data-preview-edit-region]");
+      if (nestedRegion && nestedRegion !== event.currentTarget) return;
+    }
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-preview-edit-hit]")
+    ) {
+      onEdit();
+      return;
+    }
+    if (shouldIgnorePreviewEditClick(event.target)) return;
+    if (
+      skipButtons &&
+      event.target instanceof Element &&
+      event.target.closest("button")
+    ) {
+      return;
+    }
+    onEdit();
+  };
+
+  return (
+    <div
+      data-preview-edit-region=""
+      title={`Click to edit ${label}`}
+      onClick={handleClick}
+      className={cn(
+        "group/preview-edit relative isolate cursor-pointer rounded-sm",
+        className,
+      )}
+    >
+      <PreviewEditHoverFrame className={hoverFrameClassName} />
+      <div
+        className={cn(
+          "pointer-events-none absolute z-30",
+          badgePositionClassName ?? "right-3 top-3",
+        )}
+      >
+        <PreviewEditHoverBadge label={label} />
+      </div>
+      {children}
+    </div>
   );
 }

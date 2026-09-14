@@ -32,15 +32,23 @@ import { SavingState } from "../_components/saving-state";
 import { DuplicateLocationFields } from "../_components/duplicate-location-fields";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-
-const days = Array.from({ length: 31 }, (_, i) => i + 1);
-
-const extraOptions = [
-  { value: 60, label: "2 months before" },
-  { value: 90, label: "3 months before" },
-  { value: 120, label: "4 months before" },
-  { value: 180, label: "6 months before" },
-];
+import {
+  getVendorPublishCopy,
+  resolveVendorEventLifecycle,
+} from "../../../_lib/vendor-event-lifecycle";
+import { getVendorDatesPublishIssue } from "../../../_lib/vendor-dates-publish";
+import {
+  EVENT_REMINDER_DEFAULT_DAYS,
+  EVENT_REMINDER_WEEK_OPTIONS,
+  reminderDaysToSelectValue,
+} from "@/lib/event-reminder-weeks";
+import { Input } from "@/components/ui/input";
+import {
+  MENU_CHOICES_REMINDER_DEFAULT_DAYS,
+  MENU_CHOICES_REMINDER_MIN_DAYS,
+  hydrateMenuChoicesReminderDays,
+  serializeMenuChoicesReminderDays,
+} from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 
 function ChoiceOption({
   selected,
@@ -95,6 +103,7 @@ export default function PublishTab() {
     form: globalForm,
     advanceStep,
     setActiveField,
+    setActiveStep,
     setFinalizeBusy,
     readOnly,
   } = useEventFormContext();
@@ -116,7 +125,11 @@ export default function PublishTab() {
       step: 8,
       event_id: getEventId() || 0,
       reminder_email_before_days:
-        savedStepEight?.reminder_email_before_days || 10,
+        savedStepEight?.reminder_email_before_days ||
+        EVENT_REMINDER_DEFAULT_DAYS,
+      reminder_menu_choices_before_days: hydrateMenuChoicesReminderDays(
+        savedStepEight?.reminder_menu_choices_before_days,
+      ),
       submit_type: savedStepEight?.submit_type || "draft",
       is_duplicate: savedStepEight?.is_duplicate ?? false,
       duplicate_target_type: savedStepEight?.duplicate_target_type || "existing",
@@ -164,12 +177,40 @@ export default function PublishTab() {
     ? params?.eventID[0]
     : params?.eventID;
   const { invalidateCache, eventData } = useEventData(eventId, false);
+  const isLiveEvent =
+    resolveVendorEventLifecycle({
+      is_live: globalForm.watch("is_live"),
+      has_bookings: globalForm.watch("has_bookings"),
+    }).isLive || resolveVendorEventLifecycle(eventData).isLive;
+  const publishCopy = getVendorPublishCopy(isLiveEvent);
+
+  useEffect(() => {
+    const next = globalForm.getValues("stepEight.submit_type");
+    if (!next) return;
+    if (form.getValues("submit_type") !== next) {
+      form.setValue("submit_type", next);
+    }
+  }, [form, globalForm, isLiveEvent]);
 
   const handleSubmit = useCallback(
     async (data: StepEightType) => {
       setIsLoading(true);
 
       try {
+        const datesIssue = getVendorDatesPublishIssue(globalForm.getValues());
+        if (datesIssue) {
+          toast.error(datesIssue.message);
+          if (typeof datesIssue.roomIndex === "number") {
+            globalForm.setValue(
+              "stepTwo.active_room_index",
+              datesIssue.roomIndex,
+            );
+          }
+          await setActiveStep(3);
+          setIsLoading(false);
+          return;
+        }
+
         const isValid = await form.trigger();
 
         if (!isValid) {
@@ -199,6 +240,10 @@ export default function PublishTab() {
           step: data.step,
           event_id: data.event_id,
           reminder_email_before_days: data.reminder_email_before_days,
+          reminder_menu_choices_before_days:
+            serializeMenuChoicesReminderDays(
+              data.reminder_menu_choices_before_days,
+            ),
           submit_type: data.submit_type,
           is_duplicate: data.is_duplicate,
           ...(data.is_duplicate && {
@@ -231,8 +276,8 @@ export default function PublishTab() {
           }
           toast.success(
             data.submit_type === "active"
-              ? "Event published successfully."
-              : "Draft saved successfully.",
+              ? publishCopy.toastActive
+              : publishCopy.toastDraft,
           );
           router.push("/vendor/events");
         }
@@ -247,10 +292,13 @@ export default function PublishTab() {
       globalForm,
       advanceStep,
       setActiveField,
+      setActiveStep,
       invalidateCache,
       queryClient,
       updateSessionWithLocation,
       router,
+      publishCopy.toastActive,
+      publishCopy.toastDraft,
     ],
   );
 
@@ -263,7 +311,7 @@ export default function PublishTab() {
       : false;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {isEventCancelled && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950">
           <p className="font-medium">This event is cancelled</p>
@@ -274,43 +322,14 @@ export default function PublishTab() {
         </div>
       )}
 
-      {!isEventCancelled && !readOnly && (
-        <div
-          className={cn(
-            "rounded-lg border px-4 py-3 text-sm",
-            submitType === "active"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-              : "border-sky-200 bg-sky-50 text-sky-950",
-          )}
-        >
-          <p className="font-medium">
-            {submitType === "active"
-              ? "Ready to publish"
-              : "Saving as a draft"}
-          </p>
-          <p
-            className={cn(
-              "mt-0.5",
-              submitType === "active"
-                ? "text-emerald-900/90"
-                : "text-sky-900/90",
-            )}
-          >
-            {submitType === "active"
-              ? "Review your settings or preview the event before making it live."
-              : "Your event stays private so you can finish editing later."}
-          </p>
-        </div>
-      )}
-
       {isLoading && (
         <SavingState
           title={
             submitType === "active"
-              ? "Publishing your event..."
-              : "Saving your draft..."
+              ? publishCopy.savingActive
+              : publishCopy.savingDraft
           }
-          description="We are updating your publish settings. You will be redirected when this is complete."
+          description="We are updating your settings. You will be redirected when this is complete."
         />
       )}
 
@@ -318,73 +337,16 @@ export default function PublishTab() {
         <form
           id="vendor-event-publish-form"
           onSubmit={form.handleSubmit(handleSubmit)}
-          className={isLoading ? "hidden" : "space-y-10"}
+          className={isLoading ? "hidden" : "space-y-8"}
           aria-busy={isLoading}
         >
-          <section className="space-y-4 border-b border-gray-200 pb-8">
+          <section className="space-y-4">
             <div className="space-y-1">
               <h2 className="text-xl font-bold title-header">
-                Reminder email
+                {publishCopy.statusTitle}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Choose when attendees should receive a reminder before the
-                event.
-              </p>
-            </div>
-
-            <FormField
-              control={control}
-              name="reminder_email_before_days"
-              render={({ field }) => (
-                <FormItem className="max-w-md">
-                  <FormLabel className="text-sm font-medium">
-                    Send reminder
-                  </FormLabel>
-                  <FormControl>
-                    <Select
-                      value={field.value?.toString()}
-                      onValueChange={(value) => {
-                        field.onChange(Number(value));
-                      }}
-                      onOpenChange={() => field.onBlur()}
-                      disabled={isLoading || readOnly}
-                    >
-                      <SelectTrigger className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB]">
-                        <SelectValue placeholder="Select reminder timing" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {days.map((day) => (
-                          <SelectItem key={day} value={day.toString()}>
-                            {day} day{day !== 1 ? "s" : ""} before
-                          </SelectItem>
-                        ))}
-                        {extraOptions.map((option) => (
-                          <SelectItem
-                            key={option.value}
-                            value={option.value.toString()}
-                          >
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormDescription>
-                    Reminder emails go to customers who have booked this event.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </section>
-
-          <section className="space-y-6 border-b border-gray-200 pb-8">
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold title-header">
-                Publish options
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Decide whether to go live now or keep working on a draft.
+                {publishCopy.statusDescription}
               </p>
             </div>
 
@@ -393,9 +355,6 @@ export default function PublishTab() {
               name="submit_type"
               render={({ field }) => (
                 <FormItem className="space-y-3">
-                  <FormLabel className="text-sm font-medium">
-                    What should happen next?
-                  </FormLabel>
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
@@ -426,8 +385,8 @@ export default function PublishTab() {
                           <ChoiceOption
                             selected={field.value === "active"}
                             disabled={isEventCancelled || readOnly}
-                            title="Publish event"
-                            description="Make this event live so customers can book straight away."
+                            title={publishCopy.activeTitle}
+                            description={publishCopy.activeDescription}
                           />
                         </FormLabel>
                       </FormItem>
@@ -454,8 +413,8 @@ export default function PublishTab() {
                           <ChoiceOption
                             selected={field.value === "draft"}
                             disabled={isEventCancelled || readOnly}
-                            title="Save as draft"
-                            description="Keep the event private and come back to finish editing later."
+                            title={publishCopy.draftTitle}
+                            description={publishCopy.draftDescription}
                           />
                         </FormLabel>
                       </FormItem>
@@ -471,19 +430,23 @@ export default function PublishTab() {
                 </FormItem>
               )}
             />
+          </section>
+
+          <section className="space-y-4 border-t border-gray-200 pt-6">
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold title-header">
+                Duplicate location
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Optional. Copy this event to another venue after you save.
+              </p>
+            </div>
 
             <FormField
               control={control}
               name="is_duplicate"
               render={({ field }) => (
                 <FormItem className="space-y-3">
-                  <FormLabel className="text-sm font-medium">
-                    Duplicate for another location?
-                  </FormLabel>
-                  <FormDescription>
-                    Optional — creates a copy of this event at a different
-                    venue after you save.
-                  </FormDescription>
                   <FormControl>
                     <RadioGroup
                       onValueChange={(value) =>
@@ -513,8 +476,8 @@ export default function PublishTab() {
                           <ChoiceOption
                             selected={!field.value}
                             disabled={readOnly}
-                            title="No, keep this event only"
-                            description="Finish publishing or saving as a draft for the current location."
+                            title={publishCopy.duplicateKeepTitle}
+                            description={publishCopy.duplicateKeepDescription}
                           />
                         </FormLabel>
                       </FormItem>
@@ -538,8 +501,8 @@ export default function PublishTab() {
                           <ChoiceOption
                             selected={Boolean(field.value)}
                             disabled={readOnly}
-                            title="Yes, duplicate to another location"
-                            description="Create a copy of this event at an existing venue or a new location."
+                            title="Yes, copy to another location"
+                            description="Create a copy at an existing venue or a new location."
                           />
                         </FormLabel>
                       </FormItem>
@@ -552,15 +515,7 @@ export default function PublishTab() {
           </section>
 
           {isDuplicate && (
-            <section className="space-y-4 pb-2">
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold title-header">
-                  Duplicate location
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Choose where the copied event should be created.
-                </p>
-              </div>
+            <section className="space-y-4">
               <DuplicateLocationFields
                 form={form}
                 eventLocationId={eventLocationId}
@@ -569,6 +524,109 @@ export default function PublishTab() {
               />
             </section>
           )}
+
+          <section className="space-y-4 border-t border-gray-200 pt-6">
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold title-header">
+                Reminder email
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                When should booked customers get a reminder?
+              </p>
+            </div>
+
+            <FormField
+              control={control}
+              name="reminder_email_before_days"
+              render={({ field }) => (
+                <FormItem className="max-w-md">
+                  <FormLabel className="text-sm font-medium">
+                    Send reminder
+                  </FormLabel>
+                  <FormControl>
+                      <Select
+                      value={reminderDaysToSelectValue(field.value)}
+                      onValueChange={(value) => {
+                        field.onChange(Number(value));
+                      }}
+                      onOpenChange={() => field.onBlur()}
+                      disabled={isLoading || readOnly}
+                    >
+                      <SelectTrigger className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB]">
+                        <SelectValue placeholder="Select reminder timing" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EVENT_REMINDER_WEEK_OPTIONS.map((option) => (
+                          <SelectItem
+                            key={option.days}
+                            value={option.days.toString()}
+                          >
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormDescription>
+                    Reminder emails go to customers who have booked this event.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </section>
+
+          <section className="space-y-4 border-t border-gray-200 pt-6">
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold title-header">
+                Menu choices reminder
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                When should booked customers be reminded to submit menu choices?
+              </p>
+            </div>
+
+            <FormField
+              control={control}
+              name="reminder_menu_choices_before_days"
+              render={({ field }) => (
+                <FormItem className="max-w-md">
+                  <FormLabel className="text-sm font-medium">
+                    Send menu choices reminder X days before event
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={MENU_CHOICES_REMINDER_MIN_DAYS}
+                      step={1}
+                      placeholder={String(MENU_CHOICES_REMINDER_DEFAULT_DAYS)}
+                      disabled={isLoading || readOnly}
+                      className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                      name={field.name}
+                      value={field.value ?? ""}
+                      onBlur={field.onBlur}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (value === "") {
+                          field.onChange(null);
+                          return;
+                        }
+                        const parsed = Number.parseInt(value, 10);
+                        field.onChange(Number.isNaN(parsed) ? value : parsed);
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Default {MENU_CHOICES_REMINDER_DEFAULT_DAYS} days. Minimum{" "}
+                    {MENU_CHOICES_REMINDER_MIN_DAYS} days. Leave empty to use
+                    the default.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </section>
         </form>
       </Form>
     </div>

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar, Globe, Loader2, MapPin } from "lucide-react";
+import { RootQueryProvider } from "@/providers/query-provider";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
 import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
@@ -77,9 +78,11 @@ const TAB_META: Record<
 /* ──────────────────────────── entry ──────────────────────────── */
 export default function OnboardingPreviewPage() {
   return (
-    <Suspense fallback={<OnboardingPreviewLoadingShell />}>
-      <OnboardingPreviewContent />
-    </Suspense>
+    <RootQueryProvider>
+      <Suspense fallback={<OnboardingPreviewLoadingShell />}>
+        <OnboardingPreviewContent />
+      </Suspense>
+    </RootQueryProvider>
   );
 }
 
@@ -491,7 +494,10 @@ function OnboardingPreviewContent() {
                   <Loader2 className="h-8 w-8 text-gray-300 animate-spin" />
                 </div>
               ) : locationSiteEssentials ? (
-                <SitePreview formValues={locationSiteEssentials} />
+                <SitePreview
+                  formValues={locationSiteEssentials}
+                  scrollContainerRef={deviceFrameRef}
+                />
               ) : null}
             </>
           )}

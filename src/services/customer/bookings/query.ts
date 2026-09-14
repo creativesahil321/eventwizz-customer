@@ -4,7 +4,7 @@
  * TanStack Query hooks for customer bookings.
  */
 
-import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { bookingsService } from "./bookings.service";
 import { resolveBookingPaymentAction } from "./booking-payment";
 import { resolveReschedulePaymentAction } from "./reschedule-payment";
@@ -83,6 +83,28 @@ export const useBookings = (params?: BookingsQueryParams) => {
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
     refetchOnMount: "always",
     placeholderData: (previousData) => previousData, // Keep previous data while fetching new data
+  });
+};
+
+export const useInfiniteBookings = (params?: BookingsQueryParams) => {
+  const { page: _ignoredPage, ...listKey } = params ?? {};
+
+  return useInfiniteQuery<BookingsResponse>({
+    queryKey: bookingsKeys.list(listKey),
+    queryFn: ({ pageParam = 1 }) =>
+      bookingsService.getBookings({
+        ...params,
+        page: pageParam as number,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage.meta;
+      if (!meta || meta.current_page >= meta.last_page) return undefined;
+      return meta.current_page + 1;
+    },
+    staleTime: 0,
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: "always",
   });
 };
 

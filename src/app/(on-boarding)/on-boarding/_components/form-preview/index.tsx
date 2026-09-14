@@ -42,7 +42,10 @@ import {
   formatEventLocationLabel,
   resolveEventLocation,
 } from "@/lib/event-location";
-import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
+import {
+  buildEventAboutHighlights,
+  type EventAboutHighlightKey,
+} from "@/lib/event-about-highlights";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import { Image as ImageIcon } from "lucide-react";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
@@ -65,6 +68,7 @@ import {
   PREVIEW_SECTION_EDITOR,
   type PreviewEditorTarget,
   ONBOARDING_PREVIEW_EDITOR_TARGETS,
+  editorTargetForAboutHighlight,
 } from "./preview-edit-hit";
 
 const HEADER_OFFSET_PX = 72;
@@ -861,7 +865,8 @@ export default function FormPreview() {
 
     const heroHighlight =
       activeField &&
-      (activeField.includes("cover_image") ||
+      (activeField.includes("logo") ||
+        activeField.includes("cover_image") ||
         activeField.includes("banner_heading") ||
         activeField.includes("banner_sub_heading"));
     const aboutHighlight =
@@ -879,7 +884,24 @@ export default function FormPreview() {
       >
         <div ref={heroRef} className="contents" />
         <div ref={aboutRef} className="contents" />
-        <SitePreview formValues={tv} scrollContainerRef={previewContainerRef} />
+        <SitePreview
+          formValues={tv}
+          scrollContainerRef={previewContainerRef}
+          previewEdit={{
+            onEditCover: () =>
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteCover),
+            onEditBanner: () =>
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteBanner),
+            onEditAbout: () =>
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteAbout),
+            onEditFooter: () =>
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteFooter),
+            onEditLogo: () =>
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteLogo),
+            onEditEnquiries: () =>
+              jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteEnquiries),
+          }}
+        />
       </div>
     );
   };
@@ -1023,6 +1045,9 @@ export default function FormPreview() {
           roomSelectorVisible={showRoomChooser && roomSelectorScrollVisible}
           onRoomChange={handleRoomChange}
           roomSelectorStickyTop={roomSelectorStickyTop}
+          onEditLogo={() =>
+            jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteLogo)
+          }
         />
 
         <div
@@ -1062,8 +1087,12 @@ export default function FormPreview() {
               jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.eventBanner)
             }
             onEditMeta={(key) => {
-              if (key === "date" || key === "time") {
+              if (key === "date") {
                 jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.dates);
+                return;
+              }
+              if (key === "time") {
+                jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.schedule);
                 return;
               }
               jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.eventLocation);
@@ -1131,6 +1160,9 @@ export default function FormPreview() {
                   heroEventLabel ? `${heroEventLabel} event` : "Event image"
                 }
                 highlights={aboutHighlights}
+                onEditHighlight={(key: EventAboutHighlightKey) => {
+                  jumpToEditor(editorTargetForAboutHighlight(key));
+                }}
                 headingEmphasis={
                   tryHeroPreviewProps?.headingEmphasis ?? undefined
                 }
@@ -1392,10 +1424,19 @@ export default function FormPreview() {
                 : ""
           }`}
         >
-          <BrochureSection
-            location={activePreviewBrochureLocation}
-            onEditLocation={jumpToEditor}
-          />
+          <PreviewEditHit
+            {...ONBOARDING_PREVIEW_EDITOR_TARGETS.eventLocation}
+            label="Event location"
+            onEdit={jumpToEditor}
+            skipButtons
+          >
+            <BrochureSection
+              location={activePreviewBrochureLocation}
+              headingEmphasis={
+                tryHeroPreviewProps?.headingEmphasis ?? undefined
+              }
+            />
+          </PreviewEditHit>
         </div>
 
         {/* FAQs — same visibility rule as live event page */}
@@ -1418,6 +1459,9 @@ export default function FormPreview() {
                 <FaqSection
                   faqs={formState.stepNine?.faqs || []}
                   defaultExpanded
+                  headingEmphasis={
+                    tryHeroPreviewProps?.headingEmphasis ?? undefined
+                  }
                 />
               </Suspense>
             </PreviewEditHit>
@@ -1434,6 +1478,15 @@ export default function FormPreview() {
             formState.stepTwo?.about_description,
             formState.stepOne?.description,
           )}
+          onEditFooter={() =>
+            jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteFooter)
+          }
+          onEditLogo={() =>
+            jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteLogo)
+          }
+          onEditEnquiries={() =>
+            jumpToEditor(ONBOARDING_PREVIEW_EDITOR_TARGETS.siteEnquiries)
+          }
         />
       </div>
     );

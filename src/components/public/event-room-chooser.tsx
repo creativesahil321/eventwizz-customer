@@ -4,11 +4,10 @@ import { Check, ImageIcon } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import { getRoomFloatingAccent } from "@/lib/room-accent-palette";
-import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import type { EventRoomChooserItem } from "@/lib/event-room-chooser-item";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { previewGridCols1UntilMd } from "@/lib/preview-container-layout";
 import { PUBLIC_MOTION_DURATION_MEDIUM, PUBLIC_MOTION_EASE } from "@/lib/public-rhythm";
 
 type EventRoomChooserProps = {
@@ -37,9 +36,6 @@ export function EventRoomChooser({
   headingAccentHint,
   className,
 }: EventRoomChooserProps) {
-  const { formatCompact } = useCurrencyFormat();
-  const narrowPreview = usePreviewNarrowLayout();
-
   if (rooms.length < 2) return null;
 
   const clampedIndex = Math.min(
@@ -82,9 +78,9 @@ export function EventRoomChooser({
 
         <div
           className={cn(
-            "grid grid-cols-1 gap-4",
-            !narrowPreview && "sm:grid-cols-2 sm:gap-5",
-            !narrowPreview && rooms.length >= 3 && "lg:grid-cols-3",
+            "grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5",
+            previewGridCols1UntilMd,
+            rooms.length >= 3 && "lg:grid-cols-3",
           )}
         >
           {rooms.map((room) => {
@@ -179,26 +175,6 @@ export function EventRoomChooser({
                     <p className="line-clamp-2 text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm">
                       {room.highlights.join(" • ")}
                     </p>
-                  ) : null}
-
-                  {!isDisabled ? (
-                    <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs font-medium text-[var(--color-text-dimmed)] sm:text-sm">
-                      {room.fromPrice != null ? (
-                        <span className="text-[var(--color-text)]">
-                          From{" "}
-                          <span className="font-bold text-[color:var(--color-primary)]">
-                            {formatCompact(room.fromPrice)}
-                          </span>{" "}
-                          pp
-                        </span>
-                      ) : null}
-                      {room.packageCount > 0 ? (
-                        <span>
-                          {room.packageCount}{" "}
-                          {room.packageCount === 1 ? "package" : "packages"}
-                        </span>
-                      ) : null}
-                    </div>
                   ) : null}
                 </div>
               </button>

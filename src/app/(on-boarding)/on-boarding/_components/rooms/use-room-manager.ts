@@ -11,6 +11,7 @@ import {
 import { roomService } from "@/services/vendor/onboarding/room.service";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { writeVendorEventIsRoomsFlag } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
+import { roomNameExample } from "@/lib/room-name-examples";
 import { isOnboardingCateringRoomReady } from "../../_lib/onboarding-catering-ready";
 import {
   isVendorRoomDrinksStepComplete,
@@ -173,7 +174,7 @@ const blankRoom = (name: string): RoomType => ({
  *
  * Invariants this hook enforces:
  *  - At most {@link MAX_ROOMS} rooms.
- *  - When the toggle is flipped to `true`, at least one room exists (auto-seeded "Room 1").
+ *  - When the toggle is flipped to `true`, at least one room exists.
  *  - `currentRoomIndex` is always within `[0, rooms.length - 1]` (clamped on remove).
  */
 export function useRoomManager() {
@@ -246,7 +247,7 @@ export function useRoomManager() {
           .slice(0, MAX_ROOMS)
           .map((r, index) => {
             const id = Number(r.id);
-            const name = String(r?.name ?? "").trim() || `Room ${index + 1}`;
+            const name = String(r?.name ?? "").trim() || roomNameExample(index);
             const existing = findExistingRoom(id, name);
 
             return {
@@ -348,8 +349,8 @@ export function useRoomManager() {
         { enabled: true, currentRoomIndex: 0, rooms: [] }) as MultiSpaceType;
       if (current.rooms.length >= MAX_ROOMS) return null;
 
-      const fallbackName = `Room ${current.rooms.length + 1}`;
-      const name = (proposedName ?? "").trim() || fallbackName;
+      const name = (proposedName ?? "").trim();
+      if (!name) return null;
 
       const nextRooms = [...current.rooms, blankRoom(name)];
       const nextIndex = nextRooms.length - 1;

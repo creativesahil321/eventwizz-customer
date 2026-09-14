@@ -28,6 +28,10 @@ import {
 import { VenueLocation } from "@/types/api.types";
 import { StepEightType } from "../schema";
 import { formatLiveEventsLabel } from "@/components/location-selector/active-events-count";
+import {
+  CONTACT_NUMBER_MAX_CHARS,
+  sanitizeContactNumberInput,
+} from "@/lib/contact-number";
 
 type DuplicateLocationFieldsProps = {
   form: UseFormReturn<StepEightType>;
@@ -323,9 +327,18 @@ export function DuplicateLocationFields({
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="Enter contact number"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      maxLength={CONTACT_NUMBER_MAX_CHARS}
+                      placeholder="e.g. +44 7700 900123"
                       className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                       onFocus={() => onFieldFocus?.("contact_number")}
+                      onChange={(event) =>
+                        field.onChange(
+                          sanitizeContactNumberInput(event.target.value),
+                        )
+                      }
                       disabled={readOnly}
                     />
                   </FormControl>

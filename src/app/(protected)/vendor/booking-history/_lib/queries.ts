@@ -12,6 +12,7 @@ import {
   VendorBookingRoomFilterOption,
   type VendorBookingEventDateEntry,
 } from "@/services/vendor/bookings/bookings.service";
+import { unnamedRoomLabel } from "@/lib/room-name-examples";
 import {
   parseCouponCode,
   parseSavedAmount,
@@ -158,7 +159,7 @@ function normalizeAvailableRooms(
       const roomName =
         raw.room_name?.trim() ||
         raw.name?.trim() ||
-        `Room ${roomId}`;
+        unnamedRoomLabel();
       return {
         room_id: Number(roomId),
         room_name: roomName,

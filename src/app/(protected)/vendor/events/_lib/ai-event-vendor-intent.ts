@@ -190,7 +190,7 @@ CRITICAL RULES:
    - booking_type "tickets": payment_type "full", no deposit fields
    - booking_type "tables" or "both": payment_type required ("full" or "deposit")
    - deposit: is_deposit_enabled true, deposit_type amount|percentage, deposit_value (percentage 20-80), deposit_due_date BEFORE event_date
-9. stepThree.dates: YYYY-MM-DD, ascending, no duplicates, today or future
+9. stepThree.dates: YYYY-MM-DD, ascending, no duplicates, tomorrow or later (not today)
 10. stepFour/stepFive optional when vendor says no food/drinks — if they say no catering/menus, set catering_option 0 and menus []. If they say no drinks, set drinks_option 0, empty titles, and packages []. If they want drinks, set drinks_option 1 with real packages (price > 0, quantity ≥ 1).
 11. stepSeven.faqs: max ${maxFaqs}; when vendor asks for 10+ FAQs, provide ${maxFaqs} strong relevant FAQs. If they say no FAQs, return faqs [].
 12. ROOM SYSTEM (when YES):
@@ -551,7 +551,7 @@ export function inferAiEventRemovedSections(
 }
 
 export const AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER =
-  "e.g. 15 tables at £20 per person, tickets £10 per person, 20% deposit, dates 26, 27 and 28 Dec. Add room names if setups differ, plus menu or drinks notes.";
+  "e.g. 15 tables at £20 per person, tickets £10 per person, 20% deposit, dates 26, 27 and 28 Dec. If setups differ, name the spaces (e.g. Dining Hall vs Snowball), plus menu or drinks notes.";
 
 export const AI_EVENT_ADDITIONAL_DETAILS_HINT =
   "Be specific with numbers: dates, table count, ticket/table prices, and deposit %. We use those facts instead of inventing placeholders.";

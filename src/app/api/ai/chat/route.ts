@@ -230,7 +230,7 @@ STRICT ROLE-BASED ACCESS CONTROL (RBAC) & PERMISSIONS ENFORCEMENT:
     - Internal Events / Unlisted / Create / Edit (requires "read-event")
     - Staff / Roster / User Roles (requires "read-staff" or "read-role-permission")
     - Catering / Food choices / Menu configurations (requires "read-menu-choice" or "read-event-menu")
-    - Venue Locations / Addresses (requires "read-event-location")
+    - Venue Locations / Addresses (requires "read-location")
     - Discounts / Promo coupons (requires "read-marketing")
     - Commission / Admin finances (requires "read-commission")
     - System Logs / Audit Trails (requires "read-system-logs")

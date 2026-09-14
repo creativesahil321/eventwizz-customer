@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { transactionService } from "@/services/customer/transactions/transaction.service";
 import {
   TransactionFilters,
@@ -54,6 +54,28 @@ export const useTransactions = (filters: TransactionFilters = {}) => {
     queryFn: () => transactionService.getTransactions(normalized),
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
+  });
+};
+
+export const useInfiniteTransactions = (filters: TransactionFilters = {}) => {
+  const normalized = normalizeTransactionFilters({ ...filters, page: 1 });
+  const { page: _ignoredPage, ...listKey } = normalized;
+
+  return useInfiniteQuery<TransactionsResponse>({
+    queryKey: transactionKeys.list(listKey),
+    queryFn: ({ pageParam = 1 }) =>
+      transactionService.getTransactions({
+        ...normalized,
+        page: pageParam as number,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage.meta;
+      if (!meta || meta.current_page >= meta.last_page) return undefined;
+      return meta.current_page + 1;
+    },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
   });
 };
 

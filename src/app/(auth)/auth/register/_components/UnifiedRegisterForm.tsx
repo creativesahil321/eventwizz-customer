@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
-import { setCookie } from "cookies-next";
+import { setCookie, deleteCookie } from "cookies-next";
+import { restartRegisterEmailVerification } from "@/lib/register-otp-gate";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link";
 import { AuthLegalNotice } from "@/app/(auth)/_components/auth-legal-notice";
@@ -46,7 +47,10 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
     },
   });
 
-  // Set form values from domain context
+  // Starting (or restarting) this form means a new OTP is required.
+  useEffect(() => {
+    restartRegisterEmailVerification(deleteCookie);
+  }, []);
   useEffect(() => {
     if (isDomainRequest) {
       if (domain) setValue("domain", domain);
@@ -68,6 +72,9 @@ export function UnifiedRegisterForm({ accountType }: UnifiedRegisterFormProps) {
   const handleEmailVerification = async (data: RegisterFormValues) => {
     setLoading(true);
     try {
+      // A previous OTP success must not skip the new code screen.
+      restartRegisterEmailVerification(deleteCookie);
+
       // Get domain from domain store or current hostname
       const domainValue =
         domain ||

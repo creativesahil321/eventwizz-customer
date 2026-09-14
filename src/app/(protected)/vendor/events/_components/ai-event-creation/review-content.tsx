@@ -38,6 +38,7 @@ import {
   inferAiEventRemovedSections,
   parseAiEventVendorIntent,
 } from "../../_lib/ai-event-vendor-intent";
+import { getMinEventDateString } from "@/lib/min-event-date";
 import { AIEventApplyOverlay } from "./ai-event-apply-overlay";
 import { toast } from "sonner";
 import type {
@@ -882,6 +883,7 @@ function StepThreeEditor({
             <input
               type="date"
               value={date.event_date}
+              min={getMinEventDateString()}
               onChange={(e) => updateDateField(dateIdx, "event_date", e.target.value)}
               className="bg-slate-900 border border-white/10 text-white text-xs rounded-md px-2 h-7 flex-1 min-w-0 outline-none focus:border-white/20"
             />

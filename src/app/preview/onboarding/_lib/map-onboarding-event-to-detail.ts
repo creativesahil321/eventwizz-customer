@@ -1,48 +1,25 @@
+import type { EventDetailRoom } from "@/services/common/events/type";
 import type {
   EventDetailData,
   EventDetailStepThree,
 } from "@/services/vendor/events/type";
-import type { OnboardingPreviewEventData } from "./use-onboarding-preview-queries";
+import { resolvePublicEventMapLocation } from "@/lib/event-location";
+import type { OnboardingPreviewEventData } from "./onboarding-preview-types";
 
-/** Shared slice shape — either a room entry or flat single-event fields on `event`. */
-type EventContentSlice = {
-  room_id?: number;
-  event_schedular_title?: string;
-  event_schedule_subtitle?: string;
-  event_schedular_background_image?: string | null;
-  event_schedular?: Array<{ time: string; title: string }>;
-  package_title?: string;
-  package_description?: string;
-  package_image?: string | null;
-  package_details?: Array<{ title: string }>;
-  dates?: Array<{
-    event_date: string;
-    price: number;
-    sold_out: boolean;
-  }>;
-  event_galley?: Array<{ url: string }>;
-  menu_title?: string;
-  menu_background_image?: string | null;
-  menu_description?: string;
-  menus?: Array<{
-    name: string;
-    items: Array<{ title: string; description: string }>;
-  }>;
-  drink_title?: string;
-  drink_description?: string;
-  packages?: Array<{
-    id: number;
-    title: string;
-    description: string;
-    price: string;
-    available_quantity: number;
-  }>;
-  event_address?: string;
-  lat?: string;
-  long?: string;
-  brochure_pdf?: string | null;
-  brochure_pdf_2?: string | null;
-};
+/** Room entry or flat `is_rooms: false` fields — matches EventPayload rooms. */
+type EventContentSlice = Partial<EventDetailRoom>;
+
+function mappedEventPin(
+  event: NonNullable<OnboardingPreviewEventData["event"]>,
+) {
+  const pin = resolvePublicEventMapLocation(event);
+  return {
+    event_address: pin.address || undefined,
+    lat: pin.latitude,
+    long: pin.longitude,
+  };
+
+}
 
 function mapDatesToStepThree(
   dates: EventContentSlice["dates"],
@@ -58,7 +35,7 @@ function mapDatesToStepThree(
         event_date_id: 0,
         title: "General Admission",
         description: "Standard entry",
-        price: d.price,
+        price: d.price ?? 0,
         total_capacity: 100,
         sold_tickets: 0,
       },
@@ -104,8 +81,8 @@ export function mapOnboardingEventToDetailData(
 
   const eventId =
     typeof event.event_id === "number" &&
-    Number.isFinite(event.event_id) &&
-    event.event_id > 0
+      Number.isFinite(event.event_id) &&
+      event.event_id > 0
       ? event.event_id
       : 0;
 
@@ -154,7 +131,6 @@ export function mapOnboardingEventToDetailData(
       room_id: roomData.room_id,
       brochure_pdf: roomData.brochure_pdf,
       brochure_pdf_2: roomData.brochure_pdf_2,
-      event_address: roomData.event_address,
     };
 
     if (roomData.packages?.length) {
@@ -166,6 +142,8 @@ export function mapOnboardingEventToDetailData(
       };
     }
   }
+
+  const eventPin = mappedEventPin(event);
 
   const stepOne = {
     event_id: eventId,
@@ -179,6 +157,9 @@ export function mapOnboardingEventToDetailData(
     about_event_heading: event.about_event_heading,
     about_event_sub_heading: event.about_event_sub_heading,
     about_event_description: event.about_event_description,
+    event_address: eventPin.event_address,
+    lat: eventPin.lat,
+    long: eventPin.long,
     event_schedular_title: primary?.event_schedular_title,
     event_schedule_subtitle: primary?.event_schedule_subtitle,
     event_schedular: primary?.event_schedular,
@@ -191,7 +172,7 @@ export function mapOnboardingEventToDetailData(
     step: 2,
     is_rooms: hasRoomSystem,
     package_title: primary?.package_title,
-    package_description: primary?.package_description,
+    package_description: primary?.package_description ?? undefined,
     package_image: primary?.package_image,
     package_details: primary?.package_details,
     gallery: primary?.event_galley?.map((g) => ({ id: 0, url: g.url })),
@@ -206,11 +187,11 @@ export function mapOnboardingEventToDetailData(
   const stepThreeDates = mapDatesToStepThree(primary?.dates);
   const stepThree = stepThreeDates?.length
     ? {
-        event_id: eventId,
-        step: 3,
-        dates: stepThreeDates,
-        ...(hasRoomSystem ? { rooms: stepThreeRooms } : {}),
-      }
+      event_id: eventId,
+      step: 3,
+      dates: stepThreeDates,
+      ...(hasRoomSystem ? { rooms: stepThreeRooms } : {}),
+    }
     : hasRoomSystem
       ? { event_id: eventId, step: 3, rooms: stepThreeRooms }
       : undefined;
@@ -218,44 +199,47 @@ export function mapOnboardingEventToDetailData(
   const stepFour =
     primary?.menus?.length || Object.keys(stepFourRooms).length > 0
       ? {
-          event_id: eventId,
-          step: 4,
-          catering_option: primary?.menus?.length ? 1 : 0,
-          menu_title: primary?.menu_title,
-          menu_description: primary?.menu_description,
-          menu_background_image: primary?.menu_background_image,
-          menus: primary?.menus,
-          ...(hasRoomSystem ? { rooms: stepFourRooms } : {}),
-        }
+        event_id: eventId,
+        step: 4,
+        catering_option: primary?.menus?.length ? 1 : 0,
+        menu_title: primary?.menu_title,
+        menu_description: primary?.menu_description,
+        menu_background_image: primary?.menu_background_image,
+        menus: primary?.menus,
+        ...(hasRoomSystem ? { rooms: stepFourRooms } : {}),
+      }
       : undefined;
 
-  const stepFive =
-    primary?.packages?.length || Object.keys(stepSixDrinksRooms).length > 0
-      ? {
-          event_id: eventId,
-          step: 5,
-          drink_title: primary?.drink_title,
-          drink_description: primary?.drink_description,
-          packages:
-            primary?.packages?.map((p) => ({
-              id: p.id,
-              title: p.title,
-              description: p.description,
-              price: p.price,
-              available_quantity: p.available_quantity,
-            })) ?? [],
-          ...(hasRoomSystem ? { rooms: stepSixDrinksRooms } : {}),
-        }
-      : undefined;
-
-  const stepSix = {
+  const stepFive = {
     event_id: eventId,
-    step: 6,
+    step: 5,
     brochure_pdf: primary?.brochure_pdf,
     brochure_pdf_2: primary?.brochure_pdf_2,
-    event_address: primary?.event_address ?? event.event_address,
+    event_address: eventPin.event_address,
+    lat: eventPin.lat,
+    long: eventPin.long,
     ...(hasRoomSystem ? { rooms: stepFiveBrochureRooms } : {}),
   };
+
+  const stepSix =
+    primary?.packages?.length || Object.keys(stepSixDrinksRooms).length > 0
+      ? {
+        event_id: eventId,
+        step: 6,
+        drinks_option: 1,
+        drink_title: primary?.drink_title,
+        drink_description: primary?.drink_description,
+        packages:
+          primary?.packages?.map((p) => ({
+            id: p.id,
+            title: p.title,
+            description: p.description,
+            price: p.price,
+            available_quantity: p.available_quantity,
+          })) ?? [],
+        ...(hasRoomSystem ? { rooms: stepSixDrinksRooms } : {}),
+      }
+      : undefined;
 
   const stepSeven = event.faqs?.length
     ? { event_id: eventId, step: 7, faqs: event.faqs }
@@ -264,10 +248,10 @@ export function mapOnboardingEventToDetailData(
   const stepEight = {
     event_id: eventId,
     step: 8,
-    address: event.address ?? event.event_address,
+    address: eventPin.event_address,
     contact_number: event.phone,
-    latitude: primary?.lat ?? event.lat,
-    longitude: primary?.long ?? event.long,
+    latitude: eventPin.lat,
+    longitude: eventPin.long,
   };
 
   return {
@@ -277,11 +261,11 @@ export function mapOnboardingEventToDetailData(
       event.banner_heading_align ?? apiData.banner_heading_align ?? null,
     banner_heading_valign:
       event.banner_heading_valign ?? apiData.banner_heading_valign ?? null,
-    logo: event.logo,
+    logo: typeof event.logo === "string" ? event.logo : null,
     email: event.email ?? undefined,
     contact_number: event.phone,
-    lat: primary?.lat ?? event.lat,
-    long: primary?.long ?? event.long,
+    lat: eventPin.lat,
+    long: eventPin.long,
     stepOne,
     stepTwo,
     stepThree,

@@ -1,17 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Transaction,
-  TransactionFilters,
-} from "./types";
-import { useTransactions } from "./queries";
+import { Transaction, TransactionFilters } from "./types";
+import { useInfiniteTransactions } from "./queries";
 import { transactionService } from "@/services/customer/transactions/transaction.service";
 
 export const useTransactionSystem = () => {
   const [filters, setFilters] = useState<TransactionFilters>({
     status: "all",
-    page: 1,
     limit: 10,
   });
 
@@ -19,33 +15,32 @@ export const useTransactionSystem = () => {
     useState<Transaction | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  // Queries
   const {
     data: transactionsResponse,
     isLoading: isLoadingTransactions,
-    refetch: refetchTransactions,
-  } = useTransactions(filters);
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteTransactions(filters);
 
   const stats = useMemo(() => {
-    if (!transactionsResponse?.summary) return undefined;
-    return transactionService.mapSummaryToStats(transactionsResponse.summary);
-  }, [transactionsResponse?.summary]);
+    const summary = transactionsResponse?.pages[0]?.summary;
+    if (!summary) return undefined;
+    return transactionService.mapSummaryToStats(summary);
+  }, [transactionsResponse?.pages]);
 
-  // Derived state
-  const transactions = Array.isArray(transactionsResponse?.data)
-    ? transactionsResponse.data
-    : [];
+  const transactions = useMemo(
+    () =>
+      transactionsResponse?.pages.flatMap((page) =>
+        Array.isArray(page.data) ? page.data : [],
+      ) ?? [],
+    [transactionsResponse?.pages],
+  );
 
-  const meta = transactionsResponse?.meta as any;
   const isLoading = isLoadingTransactions;
 
-  // Actions
   const handleFilterChange = (newFilters: Partial<TransactionFilters>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters, page: 1 }));
-  };
-
-  const handlePageChange = (page: number) => {
-    setFilters((prev) => ({ ...prev, page }));
+    setFilters((prev) => ({ ...prev, ...newFilters }));
   };
 
   const handleViewDetails = (transaction: Transaction) => {
@@ -59,21 +54,17 @@ export const useTransactionSystem = () => {
   };
 
   return {
-    // State
     filters,
     transactions,
-    meta,
     stats,
     selectedTransaction,
     isDetailsOpen,
     isLoading,
-
-    // Actions
+    hasNextPage: Boolean(hasNextPage),
+    isFetchingNextPage,
+    fetchNextPage,
     handleFilterChange,
-    handlePageChange,
     handleViewDetails,
     handleCloseDetails,
-    refetchTransactions,
   };
 };
-

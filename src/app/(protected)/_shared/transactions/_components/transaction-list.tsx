@@ -16,46 +16,38 @@ import {
   flexRender,
   SortingState,
 } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getTransactionColumns } from "./columns";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import { Receipt } from "lucide-react";
-import { TransactionsListSkeleton } from "./skeleton-loader";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  TransactionLoadMoreCardSkeleton,
+  TransactionsListSkeleton,
+} from "./skeleton-loader";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { TransactionItemComponent } from "./transaction-item";
 
-interface TransactionMeta {
-  total: number;
-  current_page: number;
-  per_page: number;
-  last_page: number;
-}
-
 interface TransactionListProps {
   transactions: Transaction[];
-  meta: TransactionMeta | undefined;
   onViewDetails: (transaction: Transaction) => void;
-  onPageChange: (page: number) => void;
   isLoading?: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
 }
 
 export function TransactionListComponent({
   transactions,
-  meta,
   onViewDetails,
-  onPageChange,
   isLoading,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
 }: TransactionListProps) {
   const { formatLocale: formatMoneyLocale } = useCurrencyFormat();
   const [sorting, setSorting] = useState<SortingState>([]);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const columns = useMemo(
     () =>
@@ -77,12 +69,35 @@ export function TransactionListComponent({
     },
   });
 
-  // If loading, show a skeleton
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          onLoadMore?.();
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: "100px",
+      },
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasNextPage, isFetchingNextPage, onLoadMore]);
+
   if (isLoading) {
     return <TransactionsListSkeleton />;
   }
 
-  // If no transactions or invalid data, show empty state
   if (
     !transactions ||
     !Array.isArray(transactions) ||
@@ -99,18 +114,16 @@ export function TransactionListComponent({
 
   return (
     <div className="space-y-4">
-      {/* Mobile: stacked cards (avoids horizontal scrolling a wide table) */}
       <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-white md:hidden">
         {table.getRowModel().rows.map((row) => (
           <TransactionItemComponent
-            key={row.id}
+            key={row.original.id}
             transaction={row.original}
             onViewDetails={onViewDetails}
           />
         ))}
       </div>
 
-      {/* Desktop: full table */}
       <section className="hidden overflow-x-auto overflow-y-visible rounded-lg border border-[var(--color-border)] bg-white md:block">
         <Table className="min-w-[900px]">
           <TableHeader>
@@ -125,7 +138,7 @@ export function TransactionListComponent({
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                   </TableHead>
                 ))}
@@ -135,7 +148,7 @@ export function TransactionListComponent({
           <TableBody className="bg-background">
             {table.getRowModel().rows.map((row) => (
               <TableRow
-                key={row.id}
+                key={row.original.id}
                 className="border-b transition-colors hover:bg-slate-100"
               >
                 {row.getVisibleCells().map((cell) => (
@@ -143,97 +156,32 @@ export function TransactionListComponent({
                     key={cell.id}
                     className="whitespace-nowrap px-3 py-4 text-xs first:pl-4 last:pr-4 sm:px-4 sm:text-sm"
                   >
-                    {flexRender(
-                      cell.column.columnDef.cell,
-                      cell.getContext()
-                    )}
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
               </TableRow>
             ))}
+            {isFetchingNextPage
+              ? Array.from({ length: 3 }).map((_, rowIndex) => (
+                  <TableRow key={`load-more-${rowIndex}`}>
+                    {columns.map((column, cellIndex) => (
+                      <TableCell
+                        key={`${String(column.id ?? cellIndex)}-${rowIndex}`}
+                        className="px-3 py-4 first:pl-4 last:pr-4 sm:px-4"
+                      >
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : null}
           </TableBody>
         </Table>
       </section>
 
-      {/* Pagination */}
-      {meta && meta.last_page > 1 && (
-        <Pagination className="mt-4">
-          <PaginationContent className="flex-wrap gap-2 justify-center">
-            {meta.current_page > 1 && (
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => onPageChange(meta.current_page - 1)}
-                  aria-label="Go to previous page"
-                />
-              </PaginationItem>
-            )}
+      {isFetchingNextPage ? <TransactionLoadMoreCardSkeleton /> : null}
 
-            {/* First page */}
-            <PaginationItem>
-              <PaginationLink
-                onClick={() => onPageChange(1)}
-                isActive={meta.current_page === 1}
-              >
-                1
-              </PaginationLink>
-            </PaginationItem>
-
-            {/* Ellipsis if needed */}
-            {meta.current_page > 3 && (
-              <PaginationItem>
-                <span className="px-4">...</span>
-              </PaginationItem>
-            )}
-
-            {/* Current page and neighbors */}
-            {Array.from({ length: meta.last_page }, (_, i) => i + 1)
-              .filter(
-                (page) =>
-                  page > 1 &&
-                  page < meta.last_page &&
-                  Math.abs(page - meta.current_page) <= 1
-              )
-              .map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => onPageChange(page)}
-                    isActive={page === meta.current_page}
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-
-            {/* Ellipsis if needed */}
-            {meta.current_page < meta.last_page - 2 && (
-              <PaginationItem>
-                <span className="px-4">...</span>
-              </PaginationItem>
-            )}
-
-            {/* Last page */}
-            {meta.last_page > 1 && (
-              <PaginationItem>
-                <PaginationLink
-                  onClick={() => onPageChange(meta.last_page)}
-                  isActive={meta.current_page === meta.last_page}
-                >
-                  {meta.last_page}
-                </PaginationLink>
-              </PaginationItem>
-            )}
-
-            {meta.current_page < meta.last_page && (
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => onPageChange(meta.current_page + 1)}
-                  aria-label="Go to next page"
-                />
-              </PaginationItem>
-            )}
-          </PaginationContent>
-        </Pagination>
-      )}
+      <div ref={loadMoreRef} className="h-4" aria-hidden />
     </div>
   );
 }

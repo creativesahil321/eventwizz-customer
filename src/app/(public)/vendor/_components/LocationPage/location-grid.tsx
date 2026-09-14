@@ -10,7 +10,7 @@ import Image from "next/image";
 import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
-import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
+import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import {
   PUBLIC_CARD_HOVER_LIFT_CLASS,
   PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
@@ -37,14 +37,15 @@ export default function LocationGrid({
   onSelect,
 }: LocationGridProps) {
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
-  const narrowPreview = usePreviewNarrowLayout();
+  const narrowPreview = usePreviewMobileLayout();
 
   if (isLoading) {
     return (
       <div
         className={cn(
           "mx-auto grid max-w-[920px] grid-cols-1 gap-4",
-          !narrowPreview && "sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6",
+          !narrowPreview &&
+            "sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6 @max-5xl/preview:!grid-cols-2 @max-5xl/preview:!gap-5",
         )}
       >
         {Array(6)
@@ -82,7 +83,7 @@ export default function LocationGrid({
             className="mb-2 !text-2xl !font-semibold tracking-tight"
           />
           <p className="text-[var(--color-text-dimmed)]">
-            There are no event locations available at the moment. Check back
+            There are no locations available at the moment. Check back
             soon!
           </p>
         </div>
@@ -101,7 +102,11 @@ export default function LocationGrid({
             !narrowPreview && "md:grid-cols-2",
           ),
         locations.length >= 3 &&
-          cn("grid-cols-1", !narrowPreview && "sm:grid-cols-2 lg:grid-cols-3"),
+          cn(
+            "grid-cols-1",
+            !narrowPreview &&
+              "sm:grid-cols-2 lg:grid-cols-3 @max-5xl/preview:!grid-cols-2",
+          ),
       )}
     >
       <AnimatePresence>

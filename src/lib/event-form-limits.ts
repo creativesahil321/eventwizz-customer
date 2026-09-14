@@ -6,6 +6,7 @@ import {
   booleanFlagToFormDataValue,
   coerceApiFlag,
 } from "@/lib/coerce-api-boolean";
+import { roomNameExample } from "@/lib/room-name-examples";
 
 export { RICH_DESCRIPTION_MAX_CHARS } from "./plain-text-length";
 
@@ -150,7 +151,7 @@ export function normalizeVendorStepTwoRooms(
   if (Array.isArray(raw)) {
     return raw.map((room, index) => {
       const source = (room || {}) as Record<string, unknown>;
-      const fallbackName = `Room ${index + 1}`;
+      const fallbackName = roomNameExample(index);
       const resolvedName =
         String(source.name || "").trim() ||
         (typeof room === "object" && room !== null ? fallbackName : fallbackName);
@@ -305,7 +306,7 @@ export function enrichStepTwoRoomsFromVenueCatalog(
     return {
       ...room,
       room_id: roomId > 0 ? roomId : room.room_id,
-      name: name || `Room ${index + 1}`,
+      name: name || roomNameExample(index),
     };
   });
 }
@@ -365,13 +366,13 @@ export function syncStepTwoRoomsFromCatalogSelection(
       return {
         ...existing,
         room_id: id,
-        name: name || catalogName || `Room ${index + 1}`,
+        name: name || catalogName || roomNameExample(index),
       };
     }
 
     return {
       room_id: id,
-      name: name || catalogName || `Room ${index + 1}`,
+      name: name || catalogName || roomNameExample(index),
       package_title: "",
       package_description: "",
       package_button_link: "",

@@ -53,16 +53,19 @@ export function OTPVerificationForm() {
     }
   }, [router]);
 
+  const blockClipboardInsert = () => {
+    toast.error("Please type the code — pasting is not allowed");
+  };
+
   const handleChangeOtp = (value: string, index: number) => {
-    // Only allow numbers
+    // Ignore paste / autofill dumps; only a single typed digit (or clear) is allowed
+    if (value.length > 1) return;
     if (!/^\d*$/.test(value)) return;
 
-    // Update the OTP array
     const newOtp = [...otp];
-    newOtp[index] = value.slice(0, 1); // Only take the first digit
+    newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input when a digit is entered
     if (value && index < 3) {
       inputRefs[index + 1][0]?.focus();
     }
@@ -72,7 +75,12 @@ export function OTPVerificationForm() {
     e: React.KeyboardEvent<HTMLInputElement>,
     index: number
   ) => {
-    // Move to previous input on backspace if current input is empty
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+      e.preventDefault();
+      blockClipboardInsert();
+      return;
+    }
+
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs[index - 1][0]?.focus();
     }
@@ -80,28 +88,23 @@ export function OTPVerificationForm() {
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData("text/plain").trim();
+    blockClipboardInsert();
+  };
 
-    // Only proceed if the pasted data contains only digits
-    if (!/^\d+$/.test(pastedData)) return;
+  const handleDrop = (e: React.DragEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    blockClipboardInsert();
+  };
 
-    const digits = pastedData.slice(0, 4).split("");
-    const newOtp = [...otp];
-
-    digits.forEach((digit, index) => {
-      if (index < 4) {
-        newOtp[index] = digit;
-      }
-    });
-
-    setOtp(newOtp);
-
-    // Focus the appropriate input based on paste length
-    if (digits.length < 4) {
-      inputRefs[digits.length][0]?.focus();
-    } else {
-      // Focus the last input if all digits are filled
-      inputRefs[3][0]?.focus();
+  const handleBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const native = e.nativeEvent as InputEvent;
+    if (
+      native.inputType === "insertFromPaste" ||
+      native.inputType === "insertFromDrop" ||
+      native.inputType === "insertFromYank"
+    ) {
+      e.preventDefault();
+      blockClipboardInsert();
     }
   };
 
@@ -206,10 +209,18 @@ export function OTPVerificationForm() {
               type="text"
               inputMode="numeric"
               maxLength={1}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore="true"
               value={digit}
               onChange={(e) => handleChangeOtp(e.target.value, index)}
               onKeyDown={(e) => handleKeyDown(e, index)}
               onPaste={handlePaste}
+              onDrop={handleDrop}
+              onBeforeInput={handleBeforeInput}
               autoFocus={index === 0}
               className={cn(
                 "w-14 h-14 text-center text-xl border rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none",

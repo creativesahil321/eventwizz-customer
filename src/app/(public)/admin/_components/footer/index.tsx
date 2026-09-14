@@ -20,6 +20,8 @@ import {
 } from "@/lib/admin-cms-content";
 import { ThemeSchema } from "@/types/theme.types";
 import FAQSection from "../faq-section";
+import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
+import { cn } from "@/lib/utils";
 
 function SocialRow({
   links,
@@ -89,7 +91,7 @@ export default function AdminFooter() {
       {/* Shown on every admin page just above the footer */}
       <FAQSection />
       <footer className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]">
-      <div className="container mx-auto px-4 py-12 md:py-14">
+      <div className={cn(PUBLIC_CHROME_CONTAINER_CLASS, "py-12 md:py-14")}>
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-12 lg:gap-8">
           {/* Brand */}
           <div className="lg:col-span-4">
