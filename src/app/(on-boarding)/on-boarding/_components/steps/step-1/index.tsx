@@ -30,6 +30,7 @@ import {
   LOCATION_COORDINATES_REQUIRED_MESSAGE,
   parseOptionalCoordinate,
 } from "@/lib/to-location-coords-payload";
+import { isCoarseUkFallbackPin } from "@/lib/sync-event-location-map";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Settings2 } from "lucide-react";
@@ -727,7 +728,8 @@ export default function StepOne() {
                                       latitude != null &&
                                       longitude != null &&
                                       Number.isFinite(latitude) &&
-                                      Number.isFinite(longitude)
+                                      Number.isFinite(longitude) &&
+                                      !isCoarseUkFallbackPin(latitude, longitude)
                                     ) {
                                       form.setValue("latitude", latitude, {
                                         shouldDirty: true,
@@ -830,6 +832,12 @@ export default function StepOne() {
                             latitude,
                             longitude,
                           }) => {
+                            if (
+                              isCoarseUkFallbackPin(latitude, longitude) ||
+                              address.trim().toLowerCase() === "united kingdom"
+                            ) {
+                              return;
+                            }
                             form.setValue("address", address, {
                               shouldDirty: true,
                               shouldValidate: true,

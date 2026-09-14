@@ -33,6 +33,12 @@ interface AddressAutocompleteProps {
   /** Optional parent venue coords — preferred over geocoding biasCity. */
   biasLatitude?: number | string | null;
   biasLongitude?: number | string | null;
+  onResolved?: (details: {
+    placeId: string;
+    address: string;
+    latitude: number | null;
+    longitude: number | null;
+  }) => void;
 }
 
 export default function AddressAutocomplete({
@@ -48,6 +54,7 @@ export default function AddressAutocomplete({
   biasCity = null,
   biasLatitude = null,
   biasLongitude = null,
+  onResolved,
 }: AddressAutocompleteProps) {
   const isDark = variant === "dark";
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -97,7 +104,10 @@ export default function AddressAutocomplete({
       script.async = true;
       script.defer = true;
       script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      script.onload = () => resolve();
+      script.onload = () => {
+        script.setAttribute("data-loaded", "true");
+        resolve();
+      };
       script.onerror = () =>
         reject(new Error("Google Maps script failed to load"));
       document.head.appendChild(script);
@@ -292,12 +302,22 @@ export default function AddressAutocomplete({
   const handleSuggestionSelect = async (suggestion: Suggestion) => {
     setAreaError(null);
 
-    const finishSelect = (address: string) => {
+    const finishSelect = (
+      address: string,
+      latitude: number | null = null,
+      longitude: number | null = null,
+    ) => {
       onChange(address);
       setSuggestions([]);
       setSearchQuery("");
       setIsSelected(true);
       onSelect?.(suggestion.place_id, address);
+      onResolved?.({
+        placeId: suggestion.place_id,
+        address,
+        latitude,
+        longitude,
+      });
     };
 
     const rejectOutside = () => {
@@ -327,6 +347,8 @@ export default function AddressAutocomplete({
             }
             finishSelect(
               place.formatted_address || suggestion.description,
+              loc ? loc.lat() : null,
+              loc ? loc.lng() : null,
             );
           } else {
             finishSelect(suggestion.description);

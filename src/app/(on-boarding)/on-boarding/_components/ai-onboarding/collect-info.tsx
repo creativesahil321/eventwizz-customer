@@ -42,6 +42,7 @@ import {
   hasValidLocationCoordinates,
   parseOptionalCoordinate,
 } from "@/lib/to-location-coords-payload";
+import { isCoarseUkFallbackPin } from "@/lib/sync-event-location-map";
 
 const EventLocationMap = dynamic(
   () => import("../steps/step-7/event-location-map"),
@@ -533,12 +534,20 @@ export default function AICollectInfo({
           }
 
           const loc = place.geometry?.location;
-          if (loc) {
-            form.setValue("latitude", loc.lat(), {
+          const nextLat = loc ? loc.lat() : null;
+          const nextLng = loc ? loc.lng() : null;
+          if (
+            nextLat != null &&
+            nextLng != null &&
+            Number.isFinite(nextLat) &&
+            Number.isFinite(nextLng) &&
+            !isCoarseUkFallbackPin(nextLat, nextLng)
+          ) {
+            form.setValue("latitude", nextLat, {
               shouldValidate: true,
               shouldDirty: true,
             });
-            form.setValue("longitude", loc.lng(), {
+            form.setValue("longitude", nextLng, {
               shouldValidate: true,
               shouldDirty: true,
             });
@@ -640,7 +649,6 @@ export default function AICollectInfo({
   const cityValue = form.watch("city");
   const latitudeValue = form.watch("latitude");
   const longitudeValue = form.watch("longitude");
-  const showLocationMap = Boolean(addressValue?.trim());
   const showConfirmedAddress =
     !isBrandMode &&
     isPlaceSelected &&
@@ -1232,13 +1240,23 @@ export default function AICollectInfo({
                             latitude != null &&
                             longitude != null &&
                             Number.isFinite(latitude) &&
-                            Number.isFinite(longitude)
+                            Number.isFinite(longitude) &&
+                            !isCoarseUkFallbackPin(latitude, longitude)
                           ) {
                             form.setValue("latitude", latitude, {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
                             form.setValue("longitude", longitude, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          } else {
+                            form.setValue("latitude", undefined, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                            form.setValue("longitude", undefined, {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
@@ -1281,49 +1299,53 @@ export default function AICollectInfo({
                   )}
                 </div>
 
-                {showLocationMap ? (
-                  <div className="sm:col-span-2">
-                    <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                      <MapPin className="w-4 h-4" style={themeAccent.text} />
-                      Confirm on map <span className="text-red-400">*</span>
-                    </label>
-                    <p className="text-xs text-slate-500 mb-3">
-                      Drag the pin if the address search did not land on your
-                      entrance — same as event location setup.
+                <div className="sm:col-span-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                    <MapPin className="w-4 h-4" style={themeAccent.text} />
+                    Confirm on map <span className="text-red-400">*</span>
+                  </label>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Drag the pin if the address search did not land on your
+                    entrance — same as event location setup.
+                  </p>
+                  <EventLocationMap
+                    initialAddress={addressValue}
+                    initialLatitude={latitudeValue}
+                    initialLongitude={longitudeValue}
+                    onLocationChange={({ address, latitude, longitude }) => {
+                      if (
+                        isCoarseUkFallbackPin(latitude, longitude) ||
+                        address.trim().toLowerCase() === "united kingdom"
+                      ) {
+                        return;
+                      }
+                      form.setValue("address", address, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                      form.setValue("latitude", latitude, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                      form.setValue("longitude", longitude, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                      const parsedCity = cityFromFormattedAddress(address);
+                      if (parsedCity) {
+                        form.setValue("city", parsedCity, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }
+                    }}
+                  />
+                  {form.formState.errors.latitude && (
+                    <p className="text-red-400 text-xs mt-1.5">
+                      {form.formState.errors.latitude.message}
                     </p>
-                    <EventLocationMap
-                      initialAddress={addressValue}
-                      initialLatitude={latitudeValue}
-                      initialLongitude={longitudeValue}
-                      onLocationChange={({ address, latitude, longitude }) => {
-                        form.setValue("address", address, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                        form.setValue("latitude", latitude, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                        form.setValue("longitude", longitude, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                        const parsedCity = cityFromFormattedAddress(address);
-                        if (parsedCity) {
-                          form.setValue("city", parsedCity, {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          });
-                        }
-                      }}
-                    />
-                    {form.formState.errors.latitude && (
-                      <p className="text-red-400 text-xs mt-1.5">
-                        {form.formState.errors.latitude.message}
-                      </p>
-                    )}
-                  </div>
-                ) : null}
+                  )}
+                </div>
 
                 <div className="sm:col-span-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">

@@ -66,6 +66,7 @@ import {
 import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import { resolvePreviewMobileMenuHost } from "@/lib/preview-device";
 import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
+import { GuestAccountMenu } from "@/components/shared/guest-account-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -273,7 +274,7 @@ export default function CommonHeader({
   headerDownloads,
   hideBrowseEvents = false,
   hideHeaderPhone = false,
-  compactGuestAuth = false,
+  compactGuestAuth = true,
   scrollContainerRef,
   locationSlug,
   topBanner,
@@ -413,7 +414,7 @@ export default function CommonHeader({
     if (l.icon === "phone" && hideHeaderPhone) return false;
     if (
       compactGuestAuth &&
-      !isAuthenticated &&
+      showGuestAuthLinks &&
       (l.linkText === "Log In" || l.linkText === "Register")
     ) {
       return false;
@@ -421,7 +422,7 @@ export default function CommonHeader({
     return true;
   });
 
-  const showGuestAccountMenu = compactGuestAuth && !isAuthenticated;
+  const showGuestAccountMenu = compactGuestAuth && showGuestAuthLinks;
 
   const resolveMenuHost = () =>
     resolvePreviewMobileMenuHost(
@@ -1162,72 +1163,24 @@ export default function CommonHeader({
               );
             })}
 
-            {showGuestAccountMenu &&
-              (useNonInteractiveChrome ? (
-                <div
-                  className={cn(
-                    "flex items-center gap-1.5",
-                    topBarPillDisabledClass,
-                    styles.textColor,
-                    desktopIconActionClass,
-                  )}
-                  aria-label="Account"
-                  aria-hidden
-                >
-                  <UserCircle size={16} className="shrink-0" />
-                  <span className={desktopActionLabelClass}>Account</span>
-                </div>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        "flex items-center gap-1.5",
-                        topBarPillClass,
-                        styles.textColor,
-                        styles.hoverColor,
-                        desktopIconActionClass,
-                      )}
-                      aria-label="Account menu"
-                      aria-haspopup="menu"
-                    >
-                      <UserCircle size={16} className="shrink-0" />
-                      <span className={desktopActionLabelClass}>Account</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    sideOffset={8}
-                    className={downloadsDropdownContentClass}
-                  >
-                    <DropdownMenuItem
-                      asChild
-                      className={downloadsDropdownItemClass}
-                    >
-                      <Link
-                        href="/auth/login"
-                        className="flex cursor-pointer items-center gap-2.5"
-                      >
-                        <LogIn className={downloadsFileIconClass} />
-                        Log in
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      asChild
-                      className={downloadsDropdownItemClass}
-                    >
-                      <Link
-                        href="/auth/register"
-                        className="flex cursor-pointer items-center gap-2.5"
-                      >
-                        <UserPlus className={downloadsFileIconClass} />
-                        Register
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ))}
+            {showGuestAccountMenu ? (
+              <GuestAccountMenu
+                disabled={useNonInteractiveChrome}
+                triggerClassName={cn(
+                  "flex items-center gap-1.5",
+                  useNonInteractiveChrome
+                    ? topBarPillDisabledClass
+                    : topBarPillClass,
+                  styles.textColor,
+                  !useNonInteractiveChrome && styles.hoverColor,
+                  desktopIconActionClass,
+                )}
+                labelClassName={desktopActionLabelClass}
+                contentClassName={downloadsDropdownContentClass}
+                itemClassName={downloadsDropdownItemClass}
+                iconClassName={downloadsFileIconClass}
+              />
+            ) : null}
           </div>
         </div>
 

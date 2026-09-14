@@ -3,6 +3,17 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { env } from "@/env";
 import {
+  isCoarseUkFallbackPin,
+  isUnusableMapPin,
+  shouldApplyMapCoords,
+  shouldRefreshMapForAddress,
+  type MapLatLng,
+} from "@/lib/sync-event-location-map";
+import {
+  isGoogleMapsApiReady,
+  resolveGoogleMapsLoadAction,
+} from "@/lib/google-maps-ready";
+import {
   isWithinVenueArea,
   venueAreaBoundsLiteral,
   VENUE_LOCATION_RADIUS_M,
@@ -26,6 +37,7 @@ interface EventLocationMapProps {
   }) => void;
   onAddressSearch?: (searchFunction: (address: string) => void) => void;
   className?: string;
+  variant?: "default" | "dark";
 }
 
 interface MapLocation {
@@ -55,19 +67,38 @@ export default function EventLocationMap({
   onLocationChange,
   onAddressSearch,
   className = "",
+  variant = "default",
 }: EventLocationMapProps) {
+  const isDark = variant === "dark";
   const mapRef = useRef<HTMLDivElement>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const lastValidPositionRef = useRef<LatLngLiteral | null>(null);
   const restrictCenterRef = useRef<LatLngLiteral | null>(null);
+  const lastAppliedAddressRef = useRef("");
+  const lastAppliedCoordsRef = useRef<MapLatLng | null>(null);
+  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<MapLocation | null>(
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [areaWarning, setAreaWarning] = useState<string | null>(null);
+
+  const rememberApplied = (center: MapLatLng, address: string) => {
+    lastAppliedCoordsRef.current = center;
+    lastAppliedAddressRef.current = address.trim();
+  };
+
+  const refreshMapViewport = (center: MapLatLng) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    google.maps.event.trigger(map, "resize");
+    map.setCenter(center);
+    map.setZoom(15);
+  };
 
   const areaLabel = restrictLabel?.trim() || "your selected location";
 
@@ -112,22 +143,24 @@ export default function EventLocationMap({
         { location: point },
         (results, status) => {
           if (status === "OK" && results?.[0]) {
-            const newLocation: MapLocation = {
-              address: results[0].formatted_address,
-              latitude: point.lat,
-              longitude: point.lng,
-            };
-            setCurrentLocation(newLocation);
-            onLocationChange(newLocation);
-          } else {
-            const newLocation: MapLocation = {
-              address: `Location (${point.lat.toFixed(6)}, ${point.lng.toFixed(6)})`,
-              latitude: point.lat,
-              longitude: point.lng,
-            };
-            setCurrentLocation(newLocation);
-            onLocationChange(newLocation);
-          }
+          const newLocation: MapLocation = {
+            address: results[0].formatted_address,
+            latitude: point.lat,
+            longitude: point.lng,
+          };
+          rememberApplied(point, newLocation.address);
+          setCurrentLocation(newLocation);
+          onLocationChange(newLocation);
+        } else {
+          const newLocation: MapLocation = {
+            address: `Location (${point.lat.toFixed(6)}, ${point.lng.toFixed(6)})`,
+            latitude: point.lat,
+            longitude: point.lng,
+          };
+          rememberApplied(point, newLocation.address);
+          setCurrentLocation(newLocation);
+          onLocationChange(newLocation);
+        }
         },
       );
     },
@@ -149,6 +182,13 @@ export default function EventLocationMap({
         if (status === "OK" && results?.[0]) {
           const location = results[0].geometry.location;
           const newCenter = { lat: location.lat(), lng: location.lng() };
+          const types = Array.isArray(results[0].types) ? results[0].types : [];
+          if (isUnusableMapPin(newCenter.lat, newCenter.lng, types)) {
+            setError(
+              "Couldn’t place that address on the map. Search again or drag the pin.",
+            );
+            return;
+          }
 
           if (!acceptPoint(newCenter)) {
             const fallback = lastValidPositionRef.current || restrictCenterRef.current;
@@ -159,8 +199,7 @@ export default function EventLocationMap({
             return;
           }
 
-          mapInstanceRef.current?.setCenter(newCenter);
-          mapInstanceRef.current?.setZoom(15);
+          refreshMapViewport(newCenter);
           markerRef.current?.setPosition(newCenter);
 
           const newLocation: MapLocation = {
@@ -168,6 +207,7 @@ export default function EventLocationMap({
             latitude: newCenter.lat,
             longitude: newCenter.lng,
           };
+          rememberApplied(newCenter, newLocation.address);
           setCurrentLocation(newLocation);
           onLocationChange(newLocation);
         } else {
@@ -204,6 +244,29 @@ export default function EventLocationMap({
       const mapBounds = restrictCenter
         ? venueAreaBoundsLiteral(restrictCenter)
         : UK_BOUNDS;
+
+      const startPoint = acceptPoint(center)
+        ? center
+        : restrictCenter || center;
+
+      if (mapInstanceRef.current && markerRef.current) {
+        lastValidPositionRef.current = startPoint;
+        refreshMapViewport(startPoint);
+        markerRef.current.setPosition(startPoint);
+        setMapReady(true);
+        setIsLoading(false);
+        if (shouldCommit && acceptPoint(startPoint) && !isUnusableMapPin(startPoint.lat, startPoint.lng)) {
+          const next = {
+            address: address || "Selected location",
+            latitude: startPoint.lat,
+            longitude: startPoint.lng,
+          };
+          rememberApplied(startPoint, address);
+          setCurrentLocation(next);
+          onLocationChange(next);
+        }
+        return;
+      }
 
       try {
         const geocoderInstance = new google.maps.Geocoder();
@@ -269,9 +332,6 @@ export default function EventLocationMap({
           }
         });
 
-        const startPoint = acceptPoint(center)
-          ? center
-          : restrictCenter || center;
         lastValidPositionRef.current = startPoint;
 
         const markerInstance = new google.maps.Marker({
@@ -295,9 +355,18 @@ export default function EventLocationMap({
           latitude: startPoint.lat,
           longitude: startPoint.lng,
         };
-        setCurrentLocation(shouldCommit ? initialLocation : null);
-        if (shouldCommit && acceptPoint(startPoint)) {
+        setMapReady(true);
+        if (
+          shouldCommit &&
+          acceptPoint(startPoint) &&
+          !isUnusableMapPin(startPoint.lat, startPoint.lng)
+        ) {
+          rememberApplied(startPoint, address);
+          setCurrentLocation(initialLocation);
           onLocationChange(initialLocation);
+        } else {
+          lastAppliedCoordsRef.current = startPoint;
+          setCurrentLocation(null);
         }
 
         markerInstance.addListener("dragend", () => {
@@ -354,7 +423,9 @@ export default function EventLocationMap({
     try {
       const ukOverviewCenter = { lat: 54.7024, lng: -3.2766 };
       const hasStoredCoords =
-        isFiniteCoord(initialLatitude) && isFiniteCoord(initialLongitude);
+        isFiniteCoord(initialLatitude) &&
+        isFiniteCoord(initialLongitude) &&
+        !isCoarseUkFallbackPin(initialLatitude, initialLongitude);
       const address = initialAddress.trim();
       const restrictCenter =
         isFiniteCoord(restrictLatitude) && isFiniteCoord(restrictLongitude)
@@ -473,23 +544,33 @@ export default function EventLocationMap({
       tryInitialize();
     };
 
-    if (window.google?.maps?.places) {
+    const loadAction = resolveGoogleMapsLoadAction({
+      hasMapsApi: isGoogleMapsApiReady(),
+      scriptExists: Boolean(existingScript),
+      scriptMarkedLoaded:
+        existingScript?.getAttribute("data-loaded") === "true",
+    });
+
+    if (loadAction === "init") {
       initializeMapCallback();
-    } else if (existingScript) {
+    } else if (loadAction === "wait-script" && existingScript) {
       const handleLoad = () => {
+        existingScript.setAttribute("data-loaded", "true");
         if (isMounted) initializeMapCallback();
       };
-
-      if (existingScript.getAttribute("data-loaded") === "true") {
-        initializeMapCallback();
-      } else {
-        existingScript.addEventListener("load", handleLoad);
-        return () => {
-          isMounted = false;
-          if (timeoutId) clearTimeout(timeoutId);
-          existingScript.removeEventListener("load", handleLoad);
-        };
-      }
+      existingScript.addEventListener("load", handleLoad);
+      const pollId = window.setInterval(() => {
+        if (!isGoogleMapsApiReady()) return;
+        window.clearInterval(pollId);
+        existingScript.setAttribute("data-loaded", "true");
+        if (isMounted) initializeMapCallback();
+      }, 150);
+      return () => {
+        isMounted = false;
+        if (timeoutId) clearTimeout(timeoutId);
+        window.clearInterval(pollId);
+        existingScript.removeEventListener("load", handleLoad);
+      };
     } else {
       const script = document.createElement("script");
       script.src = `https://maps.googleapis.com/maps/api/js?key=${env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
@@ -515,6 +596,75 @@ export default function EventLocationMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleAddressSearchRef = useRef(handleAddressSearch);
+  const acceptPointRef = useRef(acceptPoint);
+  const onLocationChangeRef = useRef(onLocationChange);
+  handleAddressSearchRef.current = handleAddressSearch;
+  acceptPointRef.current = acceptPoint;
+  onLocationChangeRef.current = onLocationChange;
+
+  useEffect(() => {
+    if (!mapReady) return;
+
+    const address = initialAddress.trim();
+    const nextCoords = shouldApplyMapCoords(
+      initialLatitude,
+      initialLongitude,
+      lastAppliedCoordsRef.current,
+    );
+
+    if (nextCoords) {
+      if (geocodeTimerRef.current) {
+        clearTimeout(geocodeTimerRef.current);
+        geocodeTimerRef.current = null;
+      }
+      if (acceptPointRef.current(nextCoords)) {
+        refreshMapViewport(nextCoords);
+        markerRef.current?.setPosition(nextCoords);
+        const next = {
+          address: address || "Selected location",
+          latitude: nextCoords.lat,
+          longitude: nextCoords.lng,
+        };
+        rememberApplied(nextCoords, address);
+        setCurrentLocation(next);
+        setError(null);
+        onLocationChangeRef.current(next);
+      }
+      return;
+    }
+
+    const pinLat =
+      lastAppliedCoordsRef.current?.lat ??
+      (isFiniteCoord(initialLatitude) ? initialLatitude : null);
+    const pinLng =
+      lastAppliedCoordsRef.current?.lng ??
+      (isFiniteCoord(initialLongitude) ? initialLongitude : null);
+
+    if (
+      !shouldRefreshMapForAddress({
+        address,
+        lastAppliedAddress: lastAppliedAddressRef.current,
+        pinLat,
+        pinLng,
+      })
+    ) {
+      return;
+    }
+
+    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
+    geocodeTimerRef.current = setTimeout(() => {
+      handleAddressSearchRef.current(address);
+    }, 50);
+
+    return () => {
+      if (geocodeTimerRef.current) {
+        clearTimeout(geocodeTimerRef.current);
+        geocodeTimerRef.current = null;
+      }
+    };
+  }, [initialAddress, initialLatitude, initialLongitude, mapReady]);
+
   useEffect(() => {
     return () => {
       if (markerRef.current) {
@@ -531,7 +681,11 @@ export default function EventLocationMap({
       <div className="relative">
         <div
           ref={mapRef}
-          className="w-full h-64 rounded-lg border border-gray-300 overflow-hidden"
+          className={
+            isDark
+              ? "h-64 w-full overflow-hidden rounded-lg border border-white/20"
+              : "h-64 w-full overflow-hidden rounded-lg border border-gray-300"
+          }
           style={{ minHeight: "256px" }}
         />
 
@@ -553,52 +707,102 @@ export default function EventLocationMap({
           </button>
         )}
 
-        {isLoading && (
-          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg">
+        {isLoading && !mapReady && (
+          <div
+            className={
+              isDark
+                ? "absolute inset-0 flex items-center justify-center rounded-lg bg-slate-950/80 backdrop-blur-sm"
+                : "absolute inset-0 flex items-center justify-center rounded-lg bg-white/75"
+            }
+          >
             <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className="text-sm text-gray-600">Loading map...</span>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="absolute inset-0 bg-red-50 bg-opacity-90 flex items-center justify-center rounded-lg">
-            <div className="text-center p-4">
-              <p className="text-sm text-red-600 mb-2">{error}</p>
-              <button
-                type="button"
-                onClick={initializeMap}
-                className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded"
+              <div
+                className={
+                  isDark
+                    ? "h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[var(--color-primary,#38bdf8)]"
+                    : "h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"
+                }
+              />
+              <span
+                className={
+                  isDark ? "text-sm text-slate-400" : "text-sm text-gray-600"
+                }
               >
-                Retry
-              </button>
+                Loading map...
+              </span>
             </div>
           </div>
         )}
       </div>
 
+      {error && (
+        <div
+          className={
+            isDark
+              ? "flex items-center justify-between gap-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+              : "flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+          }
+        >
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={initializeMap}
+            className={
+              isDark
+                ? "shrink-0 rounded bg-red-500/20 px-2 py-1 text-red-200 hover:bg-red-500/30"
+                : "shrink-0 rounded bg-red-100 px-2 py-1 text-red-700 hover:bg-red-200"
+            }
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {areaWarning && !error && (
-        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+        <p
+          className={
+            isDark
+              ? "rounded-md border border-amber-500/25 bg-amber-950/60 px-3 py-2 text-xs text-amber-100/90"
+              : "rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+          }
+        >
           {areaWarning}
         </p>
       )}
 
-      {currentLocation && !isLoading && (
-        <div className="bg-gray-50 rounded-lg p-3 text-xs">
+      {currentLocation && (
+        <div
+          className={
+            isDark
+              ? "rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs"
+              : "rounded-lg bg-gray-50 p-3 text-xs"
+          }
+        >
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <p className="font-medium text-gray-700 mb-1">
+              <p
+                className={
+                  isDark
+                    ? "mb-1 font-medium text-slate-200"
+                    : "mb-1 font-medium text-gray-700"
+                }
+              >
                 Selected location:
               </p>
-              <p className="text-gray-600 mb-1">{currentLocation.address}</p>
-              <p className="text-gray-500">
+              <p
+                className={
+                  isDark ? "mb-1 text-slate-400" : "mb-1 text-gray-600"
+                }
+              >
+                {currentLocation.address}
+              </p>
+              <p className={isDark ? "text-slate-500" : "text-gray-500"}>
                 Coordinates: {currentLocation.latitude.toFixed(6)},{" "}
                 {currentLocation.longitude.toFixed(6)}
               </p>
             </div>
             <div className="ml-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="h-3 w-3 animate-pulse rounded-full bg-green-500"></div>
             </div>
           </div>
         </div>

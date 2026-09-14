@@ -2,6 +2,18 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { env } from "@/env";
+import {
+  isGoogleMapsApiReady,
+  resolveGoogleMapsLoadAction,
+} from "@/lib/google-maps-ready";
+import {
+  isCoarseUkFallbackPin,
+  isCountryOnlyAddress,
+  isUnusableMapPin,
+  shouldApplyMapCoords,
+  shouldRefreshMapForAddress,
+  type MapLatLng,
+} from "@/lib/sync-event-location-map";
 
 interface EventLocationMapProps {
   initialAddress?: string;
@@ -38,50 +50,113 @@ export default function EventLocationMap({
   const markerRef = useRef<any | null>(null);
   const mapInstanceRef = useRef<any | null>(null);
   const geocoderRef = useRef<any | null>(null);
+  const lastAppliedAddressRef = useRef("");
+  const lastAppliedCoordsRef = useRef<MapLatLng | null>(null);
+  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geocodeGenerationRef = useRef(0);
+  const [mapReady, setMapReady] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<MapLocation | null>(
     null
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAddressSearch = useCallback(
-    (address: string) => {
-      if (!geocoderRef.current || !mapInstanceRef.current || !markerRef.current)
-        return;
+  const rememberApplied = (center: MapLatLng, address: string) => {
+    lastAppliedCoordsRef.current = center;
+    lastAppliedAddressRef.current = address.trim();
+  };
 
+  const refreshMapViewport = (center: MapLatLng) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const maps = window.google?.maps as
+      | { event?: { trigger?: (instance: unknown, name: string) => void } }
+      | undefined;
+    maps?.event?.trigger?.(map, "resize");
+    map.setCenter(center);
+    map.setZoom(15);
+  };
+
+  const applyExistingMapPin = useCallback(
+    (
+      center: MapLatLng,
+      address: string,
+      options?: { commit?: boolean },
+    ) => {
+      const map = mapInstanceRef.current;
+      const marker = markerRef.current;
+      if (!map || !marker) return false;
+      if (isUnusableMapPin(center.lat, center.lng, null, address)) return false;
+      const shouldCommit = options?.commit !== false;
+      refreshMapViewport(center);
+      marker.setPosition(center);
+      const next: MapLocation = {
+        address: address || "Selected Location",
+        latitude: center.lat,
+        longitude: center.lng,
+      };
+      setError(null);
+      setIsLoading(false);
+      if (shouldCommit) {
+        rememberApplied(center, address);
+        setCurrentLocation(next);
+        onLocationChange(next);
+      } else {
+        lastAppliedCoordsRef.current = center;
+      }
+      return true;
+    },
+    [onLocationChange],
+  );
+
+  const geocodeAddressOntoMap = useCallback(
+    (address: string) => {
+      const geocoder =
+        geocoderRef.current ||
+        (window.google?.maps
+          ? new (window.google.maps as any).Geocoder()
+          : null);
+      if (!geocoder || !address.trim()) return;
+      geocoderRef.current = geocoder;
+      const generation = ++geocodeGenerationRef.current;
       setIsLoading(true);
       setError(null);
-
-      geocoderRef.current.geocode({ address }, (results: any, status: any ) => {
-        setIsLoading(false);
-
-        if (status === "OK" && results && results[0]) {
-          const location = results[0].geometry.location;
-          const newCenter = { lat: location.lat(), lng: location.lng() };
-
-          // Update map center
-          mapInstanceRef.current?.setCenter(newCenter);
-          mapInstanceRef.current?.setZoom(15);
-
-          // Update marker position
-          markerRef.current?.setPosition(newCenter);
-
-          // Update location data
-          const newLocation: MapLocation = {
-            address: results[0].formatted_address,
-            latitude: location.lat(),
-            longitude: location.lng(),
-          };
-          setCurrentLocation(newLocation);
-          onLocationChange(newLocation);
-        } else {
-          setError(
-            "Address not found. Please try a different address or manually select the location on the map."
-          );
-        }
-      });
+      geocoder.geocode(
+        { address, componentRestrictions: { country: "GB" } },
+        (results: any, status: any) => {
+          if (generation !== geocodeGenerationRef.current) return;
+          if (status === "OK" && results?.[0]) {
+            const location = results[0].geometry.location;
+            const center = { lat: location.lat(), lng: location.lng() };
+            const types = Array.isArray(results[0].types)
+              ? results[0].types
+              : [];
+            const formatted = results[0].formatted_address || address;
+            if (isUnusableMapPin(center.lat, center.lng, types, formatted)) {
+              setIsLoading(false);
+              setError(
+                "Couldn’t place that address on the map. Search again or drag the pin.",
+              );
+              return;
+            }
+            applyExistingMapPin(center, formatted, { commit: true });
+          } else {
+            setIsLoading(false);
+            setError(
+              "Address not found. Please try a different address or drag the pin.",
+            );
+          }
+        },
+      );
     },
-    [onLocationChange]
+    [applyExistingMapPin],
+  );
+
+  const handleAddressSearch = useCallback(
+    (address: string) => {
+      geocodeAddressOntoMap(address);
+    },
+    [geocodeAddressOntoMap],
   );
 
   // Expose handleAddressSearch to parent component
@@ -99,6 +174,11 @@ export default function EventLocationMap({
     ) => {
       if (!mapRef.current || !window.google) return;
       const shouldCommit = options?.commit !== false;
+
+      if (mapInstanceRef.current && markerRef.current) {
+        applyExistingMapPin(center, address, options);
+        return;
+      }
 
       try {
         // Initialize geocoder
@@ -190,9 +270,17 @@ export default function EventLocationMap({
           latitude: center.lat,
           longitude: center.lng,
         };
-        setCurrentLocation(shouldCommit ? initialLocation : null);
-        if (shouldCommit) {
+        setMapReady(true);
+        requestAnimationFrame(() => {
+          refreshMapViewport(center);
+        });
+        if (shouldCommit && !isUnusableMapPin(center.lat, center.lng)) {
+          rememberApplied(center, address);
+          setCurrentLocation(initialLocation);
           onLocationChange(initialLocation);
+        } else {
+          lastAppliedCoordsRef.current = center;
+          setCurrentLocation(null);
         }
 
         // Handle marker drag events
@@ -224,8 +312,21 @@ export default function EventLocationMap({
                       latitude: position.lat(),
                       longitude: position.lng(),
                     };
-                    setCurrentLocation(newLocation);
-                    onLocationChange(newLocation);
+                    if (
+                      !isUnusableMapPin(
+                        newLocation.latitude,
+                        newLocation.longitude,
+                        results[0].types,
+                        newLocation.address,
+                      )
+                    ) {
+                      rememberApplied(
+                        { lat: newLocation.latitude, lng: newLocation.longitude },
+                        newLocation.address,
+                      );
+                      setCurrentLocation(newLocation);
+                      onLocationChange(newLocation);
+                    }
                   } else {
                     // If reverse geocoding fails, still update coordinates
                     const newLocation: MapLocation = {
@@ -235,8 +336,21 @@ export default function EventLocationMap({
                       latitude: position.lat(),
                       longitude: position.lng(),
                     };
-                    setCurrentLocation(newLocation);
-                    onLocationChange(newLocation);
+                    if (
+                      !isUnusableMapPin(
+                        newLocation.latitude,
+                        newLocation.longitude,
+                        null,
+                        newLocation.address,
+                      )
+                    ) {
+                      rememberApplied(
+                        { lat: newLocation.latitude, lng: newLocation.longitude },
+                        newLocation.address,
+                      );
+                      setCurrentLocation(newLocation);
+                      onLocationChange(newLocation);
+                    }
                   }
                 }
               );
@@ -269,6 +383,20 @@ export default function EventLocationMap({
                       latitude: latLng.lat(),
                       longitude: latLng.lng(),
                     };
+                    if (
+                      isUnusableMapPin(
+                        newLocation.latitude,
+                        newLocation.longitude,
+                        results[0].types,
+                        newLocation.address,
+                      )
+                    ) {
+                      return;
+                    }
+                    rememberApplied(
+                      { lat: newLocation.latitude, lng: newLocation.longitude },
+                      newLocation.address,
+                    );
                     setCurrentLocation(newLocation);
                     onLocationChange(newLocation);
                   } else {
@@ -279,6 +407,20 @@ export default function EventLocationMap({
                       latitude: latLng.lat(),
                       longitude: latLng.lng(),
                     };
+                    if (
+                      isUnusableMapPin(
+                        newLocation.latitude,
+                        newLocation.longitude,
+                        null,
+                        newLocation.address,
+                      )
+                    ) {
+                      return;
+                    }
+                    rememberApplied(
+                      { lat: newLocation.latitude, lng: newLocation.longitude },
+                      newLocation.address,
+                    );
                     setCurrentLocation(newLocation);
                     onLocationChange(newLocation);
                   }
@@ -295,7 +437,7 @@ export default function EventLocationMap({
         setIsLoading(false);
       }
     },
-    [onLocationChange]
+    [applyExistingMapPin, onLocationChange]
   );
 
   const initializeMap = useCallback(() => {
@@ -306,9 +448,11 @@ export default function EventLocationMap({
 
     try {
       const ukOverviewCenter = { lat: 54.7024, lng: -3.2766 };
-      const hasStoredCoords =
-        isFiniteCoord(initialLatitude) && isFiniteCoord(initialLongitude);
       const address = initialAddress.trim();
+      const hasStoredCoords =
+        isFiniteCoord(initialLatitude) &&
+        isFiniteCoord(initialLongitude) &&
+        !isCoarseUkFallbackPin(initialLatitude, initialLongitude);
 
       if (hasStoredCoords) {
         initializeMapWithCenter(
@@ -326,11 +470,22 @@ export default function EventLocationMap({
           (results: any, status: any) => {
             if (status === "OK" && results && results[0]) {
               const location = results[0].geometry.location;
-              initializeMapWithCenter(
-                { lat: location.lat(), lng: location.lng() },
-                results[0].formatted_address,
-                { commit: true },
-              );
+              const center = { lat: location.lat(), lng: location.lng() };
+              const formatted = results[0].formatted_address || address;
+              if (
+                isUnusableMapPin(
+                  center.lat,
+                  center.lng,
+                  results[0].types,
+                  formatted,
+                )
+              ) {
+                initializeMapWithCenter(ukOverviewCenter, address, {
+                  commit: false,
+                });
+                return;
+              }
+              initializeMapWithCenter(center, formatted, { commit: true });
             } else {
               initializeMapWithCenter(ukOverviewCenter, address, {
                 commit: false,
@@ -390,28 +545,33 @@ export default function EventLocationMap({
       tryInitialize();
     };
 
-    // If Google Maps API is already loaded, initialize immediately
-    if (window.google && window.google.maps && window.google.maps.places) {
-      initializeMapCallback();
-    } else if (existingScript) {
-      // Script is already being loaded, wait for it
-      const handleLoad = () => {
-        if (isMounted) {
-          initializeMapCallback();
-        }
-      };
+    const loadAction = resolveGoogleMapsLoadAction({
+      hasMapsApi: isGoogleMapsApiReady(),
+      scriptExists: Boolean(existingScript),
+      scriptMarkedLoaded:
+        existingScript?.getAttribute("data-loaded") === "true",
+    });
 
-      if (existingScript.getAttribute("data-loaded") === "true") {
-        // Script already loaded
-        initializeMapCallback();
-      } else {
-        existingScript.addEventListener("load", handleLoad);
-        return () => {
-          isMounted = false;
-          if (timeoutId) clearTimeout(timeoutId);
-          existingScript.removeEventListener("load", handleLoad);
-        };
-      }
+    if (loadAction === "init") {
+      initializeMapCallback();
+    } else if (loadAction === "wait-script" && existingScript) {
+      const handleLoad = () => {
+        existingScript.setAttribute("data-loaded", "true");
+        if (isMounted) initializeMapCallback();
+      };
+      existingScript.addEventListener("load", handleLoad);
+      const pollId = window.setInterval(() => {
+        if (!isGoogleMapsApiReady()) return;
+        window.clearInterval(pollId);
+        existingScript.setAttribute("data-loaded", "true");
+        if (isMounted) initializeMapCallback();
+      }, 150);
+      return () => {
+        isMounted = false;
+        if (timeoutId) clearTimeout(timeoutId);
+        window.clearInterval(pollId);
+        existingScript.removeEventListener("load", handleLoad);
+      };
     } else {
       // Load Google Maps API script
       const script = document.createElement("script");
@@ -437,7 +597,67 @@ export default function EventLocationMap({
       isMounted = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, []); // Create the map once — address/coord updates sync onto this instance.
+
+  const applyPinRef = useRef(applyExistingMapPin);
+  const geocodeAddressRef = useRef(geocodeAddressOntoMap);
+  applyPinRef.current = applyExistingMapPin;
+  geocodeAddressRef.current = geocodeAddressOntoMap;
+
+  useEffect(() => {
+    if (!mapReady) return;
+
+    const address = initialAddress.trim();
+    if (isCountryOnlyAddress(address)) return;
+
+    const nextCoords = shouldApplyMapCoords(
+      initialLatitude,
+      initialLongitude,
+      lastAppliedCoordsRef.current,
+    );
+
+    if (nextCoords) {
+      if (geocodeTimerRef.current) {
+        clearTimeout(geocodeTimerRef.current);
+        geocodeTimerRef.current = null;
+      }
+      geocodeGenerationRef.current += 1;
+      applyPinRef.current(nextCoords, address || "Selected Location", {
+        commit: true,
+      });
+      return;
+    }
+
+    const pinLat =
+      lastAppliedCoordsRef.current?.lat ??
+      (isFiniteCoord(initialLatitude) ? initialLatitude : null);
+    const pinLng =
+      lastAppliedCoordsRef.current?.lng ??
+      (isFiniteCoord(initialLongitude) ? initialLongitude : null);
+
+    if (
+      !shouldRefreshMapForAddress({
+        address,
+        lastAppliedAddress: lastAppliedAddressRef.current,
+        pinLat,
+        pinLng,
+      })
+    ) {
+      return;
+    }
+
+    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
+    geocodeTimerRef.current = setTimeout(() => {
+      geocodeAddressRef.current(address);
+    }, 50);
+
+    return () => {
+      if (geocodeTimerRef.current) {
+        clearTimeout(geocodeTimerRef.current);
+        geocodeTimerRef.current = null;
+      }
+    };
+  }, [initialAddress, initialLatitude, initialLongitude, mapReady]);
 
   // Cleanup marker only on component unmount
   useEffect(() => {
@@ -486,8 +706,7 @@ export default function EventLocationMap({
           </button>
         )}
 
-        {/* Loading Overlay */}
-        {isLoading && (
+        {isLoading && !mapReady && (
           <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-950/80 backdrop-blur-sm">
             <div className="flex items-center space-x-2">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[var(--color-primary,#38bdf8)]" />
@@ -495,22 +714,20 @@ export default function EventLocationMap({
             </div>
           </div>
         )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="absolute inset-0 bg-red-50 bg-opacity-90 flex items-center justify-center rounded-lg">
-            <div className="text-center p-4">
-              <p className="text-sm text-red-600 mb-2">{error}</p>
-              <button
-                onClick={initializeMap}
-                className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={initializeMap}
+            className="shrink-0 rounded bg-red-500/20 px-2 py-1 text-red-200 hover:bg-red-500/30"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Location Info */}
       {currentLocation && !isLoading && (

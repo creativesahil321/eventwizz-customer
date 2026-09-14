@@ -1268,6 +1268,12 @@ export default function EventNameTab() {
                               description: address,
                               icon: "MapPin",
                             });
+                            form.setValue("latitude", undefined, {
+                              shouldDirty: true,
+                            });
+                            form.setValue("longitude", undefined, {
+                              shouldDirty: true,
+                            });
                           }}
                           onSelect={(_placeId, address) => {
                             field.onChange(address);
@@ -1278,6 +1284,32 @@ export default function EventNameTab() {
                               icon: "MapPin",
                             });
                             addressSearchFunctionRef.current?.(address);
+                          }}
+                          onResolved={({ address, latitude, longitude }) => {
+                            field.onChange(address);
+                            globalForm.setValue("stepOne.event_address", address);
+                            globalForm.setValue("stepOne.location", {
+                              title: "LOCATION",
+                              description: address,
+                              icon: "MapPin",
+                            });
+                            if (
+                              latitude != null &&
+                              longitude != null &&
+                              Number.isFinite(latitude) &&
+                              Number.isFinite(longitude)
+                            ) {
+                              form.setValue("latitude", latitude, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                              form.setValue("longitude", longitude, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                            } else {
+                              addressSearchFunctionRef.current?.(address);
+                            }
                           }}
                           onFocus={() => handleFieldFocus("event_address")}
                           placeholder="Type to search for a UK address or location..."

@@ -1041,7 +1041,6 @@ export default function StepEleven() {
                                       </p>
                                     </div>
                                     <EventLocationMap
-                                      key={`duplicate-venue-${duplicateVenueLatitude ?? "na"}-${duplicateVenueLongitude ?? "na"}-${duplicateVenueAddress ?? ""}`}
                                       initialAddress={duplicateVenueAddress || ""}
                                       initialLatitude={duplicateVenueLatitude}
                                       initialLongitude={duplicateVenueLongitude}

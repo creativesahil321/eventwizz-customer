@@ -24,6 +24,7 @@ import {
 import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
 import { resolvePreviewMobileMenuHost } from "@/lib/preview-device";
+import { GuestAccountMenu } from "@/components/shared/guest-account-menu";
 
 interface LocationSelectionHeaderProps {
   logo?: string;
@@ -157,29 +158,35 @@ export default function LocationSelectionHeader({
     if (sessionStatus === "loading") return null;
 
     if (forceGuest) {
+      if (fullWidth) {
+        return (
+          <>
+            <div
+              className={cn(
+                surfaceClass,
+                "w-full cursor-not-allowed justify-center opacity-60",
+              )}
+              aria-hidden
+            >
+              Log In
+            </div>
+            <div
+              className={cn(
+                surfaceClass,
+                "w-full cursor-not-allowed justify-center opacity-60",
+              )}
+              aria-hidden
+            >
+              Register
+            </div>
+          </>
+        );
+      }
       return (
-        <>
-          <div
-            className={cn(
-              surfaceClass,
-              "cursor-not-allowed opacity-60",
-              fullWidth && "w-full justify-center",
-            )}
-            aria-hidden
-          >
-            Log In
-          </div>
-          <div
-            className={cn(
-              surfaceClass,
-              "cursor-not-allowed opacity-60",
-              fullWidth && "w-full justify-center",
-            )}
-            aria-hidden
-          >
-            Register
-          </div>
-        </>
+        <GuestAccountMenu
+          disabled
+          triggerClassName={cn(surfaceClass, "cursor-not-allowed gap-1.5 opacity-60")}
+        />
       );
     }
 
@@ -241,29 +248,33 @@ export default function LocationSelectionHeader({
       );
     }
 
+    if (fullWidth) {
+      return (
+        <>
+          <Link
+            href="/auth/login"
+            className={cn(surfaceClass, "inline-flex w-full justify-center")}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Log In
+          </Link>
+          <Link
+            href="/auth/register"
+            className={cn(surfaceClass, "inline-flex w-full justify-center")}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Register
+          </Link>
+        </>
+      );
+    }
+
     return (
-      <>
-        <Link
-          href="/auth/login"
-          className={cn(
-            surfaceClass,
-            fullWidth && "inline-flex w-full justify-center",
-          )}
-          onClick={() => setMobileMenuOpen(false)}
-        >
-          Log In
-        </Link>
-        <Link
-          href="/auth/register"
-          className={cn(
-            surfaceClass,
-            fullWidth && "inline-flex w-full justify-center",
-          )}
-          onClick={() => setMobileMenuOpen(false)}
-        >
-          Register
-        </Link>
-      </>
+      <GuestAccountMenu
+        triggerClassName={cn(surfaceClass, "gap-1.5")}
+        contentClassName="z-[60] min-w-[12rem] overflow-hidden rounded-xl border border-[color:color-mix(in_srgb,var(--color-on-header)_12%,transparent)] bg-[var(--color-header)] p-0 py-1 text-[var(--color-on-header)] shadow-xl"
+        itemClassName="mx-1 cursor-pointer rounded-lg px-2.5 py-2 text-sm font-medium"
+      />
     );
   };
 

@@ -34,7 +34,14 @@ import type { EventCategory } from "@/services/vendor/events/type";
 import { ApiResponse } from "@/services/core/api-client";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { useEventNameAvailability } from "@/hooks/use-event-name-availability";
+import dynamic from "next/dynamic";
 import AddressAutocomplete from "@/app/(protected)/vendor/events/_components/tab-event-form/tabs/_components/address-autocomplete";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  hasValidLocationCoordinates,
+  parseOptionalCoordinate,
+} from "@/lib/to-location-coords-payload";
+import { isCoarseUkFallbackPin } from "@/lib/sync-event-location-map";
 import {
   EventRoomMultiSelect,
   type VendorRoomOption,
@@ -48,6 +55,19 @@ import {
   roomNamePlaceholder,
   unnamedRoomLabel,
 } from "@/lib/room-name-examples";
+
+const EventLocationMap = dynamic(
+  () =>
+    import(
+      "@/app/(protected)/vendor/events/_components/tab-event-form/tabs/_components/event-location-map"
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <Skeleton className="h-64 w-full rounded-lg border border-white/10" />
+    ),
+  },
+);
 
 const AI_EVENT_MIN_ROOMS = 2;
 const AI_EVENT_MAX_ROOMS = 3;
@@ -67,6 +87,8 @@ const collectInfoSchema = z
         5,
         "Enter the full address or location where this event takes place",
       ),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
     eventDescription: z
       .string()
       .max(2000, "Description must be 2000 characters or fewer")
@@ -197,6 +219,12 @@ export default function AIEventCollectInfo({
       eventCategoryId: "",
       venueAddress:
         initialData?.venueAddress?.trim() || venueInfo?.address?.trim() || "",
+      latitude:
+        parseOptionalCoordinate(initialData?.venueLatitude) ??
+        parseOptionalCoordinate(venueInfo?.latitude),
+      longitude:
+        parseOptionalCoordinate(initialData?.venueLongitude) ??
+        parseOptionalCoordinate(venueInfo?.longitude),
       eventDescription: initialData?.eventDescription || "",
       guestCount: initialData?.guestCount || "",
       priceRange: initialData?.priceRange || "",
@@ -264,6 +292,9 @@ export default function AIEventCollectInfo({
     fetchCategories();
   }, []);
 
+  const venueRestrictLat = parseOptionalCoordinate(venueInfo?.latitude);
+  const venueRestrictLng = parseOptionalCoordinate(venueInfo?.longitude);
+
   useEffect(() => {
     const fromVenue = venueInfo?.address?.trim();
     if (!fromVenue) return;
@@ -274,7 +305,19 @@ export default function AIEventCollectInfo({
         shouldDirty: false,
       });
     }
-  }, [venueInfo?.address, form]);
+    if (
+      !hasValidLocationCoordinates(
+        form.getValues("latitude"),
+        form.getValues("longitude"),
+      ) &&
+      venueRestrictLat != null &&
+      venueRestrictLng != null &&
+      !isCoarseUkFallbackPin(venueRestrictLat, venueRestrictLng)
+    ) {
+      form.setValue("latitude", venueRestrictLat, { shouldDirty: false });
+      form.setValue("longitude", venueRestrictLng, { shouldDirty: false });
+    }
+  }, [form, venueInfo?.address, venueRestrictLat, venueRestrictLng]);
 
   const syncSelectedRoomsToForm = (
     ids: number[],
@@ -370,6 +413,13 @@ export default function AIEventCollectInfo({
     if (eventNameTaken || eventNameChecking) return;
 
     const addr = data.venueAddress.trim();
+    if (!hasValidLocationCoordinates(data.latitude, data.longitude)) {
+      form.setError("latitude", {
+        message:
+          "Confirm the pin on the map. Search must stay within about 50km of your venue.",
+      });
+      return;
+    }
     const desc = data.eventDescription?.trim();
     const roomNames =
       data.hasRoomSystem === "yes"
@@ -388,8 +438,8 @@ export default function AIEventCollectInfo({
       venueName: venueInfo?.name,
       venueCity: venueInfo?.city,
       venueAddress: addr,
-      venueLatitude: venueInfo?.latitude,
-      venueLongitude: venueInfo?.longitude,
+      venueLatitude: data.latitude,
+      venueLongitude: data.longitude,
       has_room_system: data.hasRoomSystem === "yes",
       room_names: roomNames,
       selected_room_ids:
@@ -574,15 +624,52 @@ export default function AIEventCollectInfo({
                     <FormControl>
                       <AddressAutocomplete
                         value={field.value ?? ""}
-                        onChange={(v) => field.onChange(v)}
+                        onChange={(v) => {
+                          field.onChange(v);
+                          form.setValue("latitude", undefined, {
+                            shouldDirty: true,
+                          });
+                          form.setValue("longitude", undefined, {
+                            shouldDirty: true,
+                          });
+                          form.clearErrors("latitude");
+                        }}
                         onSelect={(_placeId, formatted) => {
                           field.onChange(formatted);
                           void form.trigger("venueAddress");
                         }}
+                        onResolved={({ address, latitude, longitude }) => {
+                          field.onChange(address);
+                          if (
+                            latitude != null &&
+                            longitude != null &&
+                            Number.isFinite(latitude) &&
+                            Number.isFinite(longitude) &&
+                            !isCoarseUkFallbackPin(latitude, longitude)
+                          ) {
+                            form.setValue("latitude", latitude, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                            form.setValue("longitude", longitude, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                            form.clearErrors("latitude");
+                          } else {
+                            form.setValue("latitude", undefined, {
+                              shouldDirty: true,
+                            });
+                            form.setValue("longitude", undefined, {
+                              shouldDirty: true,
+                            });
+                          }
+                          void form.trigger("venueAddress");
+                        }}
                         onBlur={field.onBlur}
                         biasCity={venueInfo?.city ?? venueInfo?.name ?? null}
-                        biasLatitude={venueInfo?.latitude ?? null}
-                        biasLongitude={venueInfo?.longitude ?? null}
+                        biasLatitude={venueRestrictLat}
+                        biasLongitude={venueRestrictLng}
                         placeholder="Start typing — search nearby UK addresses"
                         variant="dark"
                       />
@@ -590,11 +677,48 @@ export default function AIEventCollectInfo({
                     <p className="text-xs text-slate-500 leading-relaxed">
                       Restricted to{" "}
                       {venueInfo?.city || venueInfo?.name || "your selected location"}{" "}
-                      (~50km). Choose a suggestion so we can save a full
-                      formatted address. You can adjust the pin on the map in
-                      the event editor.
+                      (~50km). Pick a suggestion, then confirm the pin on the
+                      map. A city or region outside that area will not save.
                     </p>
                     <FormMessage />
+                    <div className="pt-2">
+                      <p className={labelClass}>
+                        Confirm on map <span className="text-red-400">*</span>
+                      </p>
+                      <p className="mb-3 mt-1 text-xs leading-relaxed text-slate-500">
+                        Drag the pin if search did not land on the entrance.
+                        Latitude and longitude update every time the address
+                        changes.
+                      </p>
+                      <EventLocationMap
+                        variant="dark"
+                        initialAddress={field.value ?? ""}
+                        initialLatitude={form.watch("latitude")}
+                        initialLongitude={form.watch("longitude")}
+                        restrictLatitude={venueRestrictLat ?? null}
+                        restrictLongitude={venueRestrictLng ?? null}
+                        restrictLabel={
+                          venueInfo?.city ?? venueInfo?.name ?? null
+                        }
+                        onLocationChange={({ address, latitude, longitude }) => {
+                          field.onChange(address);
+                          form.setValue("latitude", latitude, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.setValue("longitude", longitude, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.clearErrors("latitude");
+                        }}
+                      />
+                      {form.formState.errors.latitude && (
+                        <p className="mt-1.5 text-xs text-red-400">
+                          {form.formState.errors.latitude.message}
+                        </p>
+                      )}
+                    </div>
                   </FormItem>
                 )}
               />
