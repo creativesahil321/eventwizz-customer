@@ -12,7 +12,9 @@ import {
   RotateCcw,
   Wallet,
   Building2,
+  QrCode,
 } from "lucide-react";
+import Link from "next/link";
 import HistoryDataTable from "./_components/history-data-table";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
@@ -224,6 +226,12 @@ export default function BookingHistoryPage() {
                   </div>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center w-full sm:w-auto min-w-0">
                     <div className="flex flex-wrap gap-3 items-center w-full sm:min-w-0 sm:max-w-full min-w-0">
+                      <Button asChild variant="outline" className="shrink-0">
+                        <Link href="/vendor/door-scan">
+                          <QrCode className="h-4 w-4" />
+                          Door scan
+                        </Link>
+                      </Button>
                       {/* Date range filter - same as Email Logs */}
                       <div className="w-full min-w-0 sm:w-auto sm:min-w-[280px]">
                         <DateRangePicker

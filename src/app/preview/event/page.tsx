@@ -29,6 +29,7 @@ import { eventsService } from "@/services/vendor/events/events.service";
 import { stepEightSchema } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import { hydrateMenuChoicesReminderDays } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 import { PreviewProvider } from "@/contexts/preview-context";
+import { EVENT_PREVIEW_REVIEW_CHROME_CLASSNAME } from "@/app/preview/event/event-preview-review-chrome";
 import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { useToast } from "@/components/ui/use-toast";
@@ -449,17 +450,22 @@ function EventPreviewPageContent() {
         the scroll container — without a fixed height they stretch over the full page.
       */}
       <div className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--color-background)]">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-6">
+        <div
+          data-event-preview-chrome=""
+          className={EVENT_PREVIEW_REVIEW_CHROME_CLASSNAME}
+        >
           <Button
+            type="button"
             variant="event-primary"
             onClick={handleGoBack}
             size="sm"
-            className="pointer-events-auto shrink-0 shadow-md ring-1 ring-black/10"
+            className="pointer-events-auto relative z-[1] shrink-0 shadow-md ring-1 ring-black/10"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Editor
+            <span className="sm:hidden">Back</span>
+            <span className="hidden sm:inline">Back to Editor</span>
           </Button>
-          <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-2">
+          <div className="pointer-events-auto relative z-[1] flex min-w-0 shrink-0 items-center justify-end gap-2">
             {hasUnsavedPreviewDraft ? (
               <Button
                 type="button"
@@ -470,7 +476,8 @@ function EventPreviewPageContent() {
                 className="bg-white shadow-md ring-1 ring-black/10"
               >
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Discard changes
+                <span className="sm:hidden">Discard</span>
+                <span className="hidden sm:inline">Discard changes</span>
               </Button>
             ) : null}
             <Button
@@ -482,7 +489,8 @@ function EventPreviewPageContent() {
               className="shadow-md ring-1 ring-black/10"
             >
               <Rocket className="mr-2 h-4 w-4" />
-              Publish event
+              <span className="sm:hidden">Publish</span>
+              <span className="hidden sm:inline">Publish event</span>
             </Button>
           </div>
         </div>

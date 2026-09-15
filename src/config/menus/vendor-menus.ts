@@ -42,6 +42,16 @@ export const vendorMenus: MenuItemProps[] = [
     permissions: "read-booking",
   },
   {
+    id: "door-scan",
+    title: "Door Scan",
+    icon: "doorScan",
+    href: createVendorUrl("/vendor/door-scan"),
+    url: createVendorUrl("/vendor/door-scan"),
+    type: "title",
+    permissions: "read-booking",
+    menu: [],
+  },
+  {
     id: 5,
     title: "Table Assignment",
     icon: "tableAssignment",

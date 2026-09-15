@@ -225,6 +225,7 @@ export interface EventDetailStepEight {
   step: number;
   reminder_email_before_days?: number;
   reminder_menu_choices_before_days?: number | null;
+  generate_qr_code?: boolean | number | string;
   city?: string;
   address?: string;
   contact_number?: string;
@@ -246,6 +247,8 @@ export interface EventDetailData {
   is_live?: boolean | number | string;
   /** True when any booking exists on this event. */
   has_bookings?: boolean | number | string;
+  /** Door-entry QR on booking invoices when returned at event root. */
+  generate_qr_code?: boolean | number | string;
   /** Persisted when step 1 is saved with room system enabled (AI + manual). */
   is_rooms?: boolean | number | string;
   approval_status?: string;

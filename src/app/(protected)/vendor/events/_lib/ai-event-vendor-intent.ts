@@ -8,13 +8,15 @@ import {
   ensureStepFiveRooms,
   ensureStepSevenRooms,
   formatVendorFactsForPrompt,
+  AI_VENDOR_DESCRIPTION_MAX,
   normalizeAiRoomNames,
   parseVendorDescriptionHints,
   sanitizeVendorDescription,
   type VendorDescriptionHints,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
+import { buildMessyVendorEnglishRules } from "@/app/(on-boarding)/on-boarding/_lib/vendor-messy-facts";
 
-export const AI_EVENT_VENDOR_DESCRIPTION_MAX = 2000;
+export const AI_EVENT_VENDOR_DESCRIPTION_MAX = AI_VENDOR_DESCRIPTION_MAX;
 export const AI_EVENT_MIN_ROOMS = 2;
 export const AI_EVENT_MAX_ROOMS = 3;
 
@@ -61,11 +63,11 @@ export interface AIEventRoomBrochure {
 const INTENT_PATTERNS: Array<{ id: string; pattern: RegExp }> = [
   { id: "ROOM_CREATION", pattern: /\b(create|add|set up)\s+\d+\s+rooms?\b/i },
   { id: "ROOM_UPDATE", pattern: /\b(room\s+\d+|rename room|vip seating|adults only|standing only)\b/i },
-  { id: "DATE_MANAGEMENT", pattern: /\b(\d{1,2}\s+\w+\s+\d{4}|august|september|weekend|every friday|date range|same dates?)\b/i },
-  { id: "CATERING_SETUP", pattern: /\b(starter|main course|dessert|vegan|breakfast|lunch|italian food|menu choice)\b/i },
-  { id: "DRINK_CONFIGURATION", pattern: /\b(soft drink|beverage|whisky|whiskey|cocktail|alcohol|non[- ]?alcohol)\b/i },
-  { id: "PRICING_SETUP", pattern: /\b(£|\$|eur|price|cost|catering cost|food cost|usd|gbp)\b/i },
-  { id: "TICKET_SETUP", pattern: /\b(ticket|vip ticket|early bird|general admission|capacity|free entry)\b/i },
+  { id: "DATE_MANAGEMENT", pattern: /\b(\d{1,2}\s+\w+\s+\d{4}|august|september|weekend|every friday|date range|same dates?|christmas|xmas|25\/12)\b/i },
+  { id: "CATERING_SETUP", pattern: /\b(starter|main course|dessert|sweet|vegan|breakfast|lunch|italian food|menu choice|menu included)\b/i },
+  { id: "DRINK_CONFIGURATION", pattern: /\b(soft drink|beverage|whisky|whiskey|cocktail|alcohol|non[- ]?alcohol|vodka|beer pint|oj)\b/i },
+  { id: "PRICING_SETUP", pattern: /\b(£|\$|eur|price|cost|catering cost|food cost|usd|gbp|pound|quid|per head|pp)\b/i },
+  { id: "TICKET_SETUP", pattern: /\b((?<!no )ticket|vip ticket|early bird|general admission|capacity|free entry)\b/i },
   { id: "TABLE_SETUP", pattern: /\b(table|seating|seats per table|reserved seating)\b/i },
   { id: "TIMELINE_SETUP", pattern: /\b(starts?\s+\d|doors open|ends?\s+|schedule|timeline|break at)\b/i },
   { id: "BROCHURE_SETUP", pattern: /\b(brochure|pdf|download)\b/i },
@@ -121,6 +123,7 @@ export function parseAiEventVendorIntent(
 
   const wantsBothTicketsAndTables =
     !base.prefersTicketsOnly &&
+    !base.bookingFacts.tablesOnly &&
     ((base.bookingFacts.ticketPrice != null &&
       (base.bookingFacts.tableCount != null ||
         base.bookingFacts.tablePrice != null ||
@@ -163,6 +166,8 @@ export function parseAiEventVendorIntent(
 export function buildAiEventSystemPrompt(maxFaqs: number): string {
   return `You are an expert EventWizz AI Event Creation Assistant for vendors. Vendors write messy natural-language instructions in "Additional Details" — your job is to extract structured event configuration and marketing copy.
 
+${buildMessyVendorEnglishRules()}
+
 VENDOR INTENT CATEGORIES (handle all that apply):
 - ROOM: create/update rooms, VIP seating, adults-only, copy settings between rooms
 - DATES: single/multiple dates, ranges, recurring (weekends/Fridays), shared dates across rooms, per-room dates
@@ -184,7 +189,7 @@ CRITICAL RULES:
 3. Times: HH:mm 24-hour, chronological within a day
 4. Prices: positive integers (strings in dates; numbers in drink packages)
 5. No HTML in text fields
-6. Honor vendor specs EXACTLY when stated (dates, prices, room names, deposit %, booking types). If they list dates like 26, 27, 28 Dec or "15 tables" or "tickets £10 per person", use those numbers — do not invent different dates or prices.
+6. Honor vendor specs EXACTLY when stated (dates, prices, room names, deposit %, booking types). If they list dates like 26, 27, 28 Dec or "15 tables" or "tickets £10 per person", use those numbers — do not invent different dates or prices. If they correct themselves later in the same notes, the last instruction wins.
 7. Ignore jokes, insults, unrelated noise — use only event facts
 8. PAYMENT (backend rejects invalid combos):
    - booking_type "tickets": payment_type "full", no deposit fields
@@ -380,7 +385,9 @@ export function buildAiEventUserPrompt(params: {
 
   const drinksHint = hints.omitDrinks
     ? "Vendor does NOT want drink/bar packages — set stepFive.drinks_option 0, empty titles, packages [], and the same per-room. Do not invent drinks."
-    : hints.wantsPerRoomDrinks
+    : hints.drinkRoomKeys.length > 0
+      ? `Drinks ONLY on rooms matching ${hints.drinkRoomKeys.join(", ")} — other rooms drinks_option 0 and packages []. Use the extracted drink package titles and prices.`
+      : hints.wantsPerRoomDrinks
       ? "DIFFERENT drink packages per room — use stepFive.rooms with drinks_option 1 and room-specific packages (e.g. whisky/beverages in one room, soft drinks only in another). A room with no bar uses drinks_option 0 and packages []."
       : hints.wantsSecondRoomNonAlcoholDrinks
         ? "Second room: drinks_option 1 with non-alcoholic packages only in stepFive.rooms."
@@ -400,11 +407,11 @@ export function buildAiEventUserPrompt(params: {
 
   const factsBlock = formatVendorFactsForPrompt(hints.bookingFacts);
   const descriptionBlock = hints.sanitizedDescription
-    ? `\nVENDOR REQUIREMENTS (natural language — extract ALL facts, ignore noise):\n"""${hints.sanitizedDescription}"""\n`
+    ? `\nVENDOR REQUIREMENTS (messy natural language — extract ALL dates, prices, rooms, menus, drinks, deposits; ignore noise):\n"""${hints.sanitizedDescription}"""\n`
     : "";
 
   const exampleBlock = hasRoomSystem
-    ? `\nEXAMPLE (multi-room): "Room Snow Ball dates 25-27 Aug 2026 with tickets+tables+deposit%; Room Office dates 2,6,8 Sep 2026 with tickets+tables; different menus and drink packages per room; Italian menu; whisky in Snow Ball, soft drinks in Office; packages price £55; 10 FAQs" → map each fact to the correct step and room_name.\n`
+    ? `\nEXAMPLE (messy vendor English): "xmas 25th Dec and 27th Dec three rooms everything same. Price for 25th Pound 50. 26th Pound 90. menu included. drinks on 2 room ballroom and openterrace inclusions Vodka 23, Beeer pint 40. starters tea, main shahi pabeer, dessert gulabjamun. discount whoever books deposit 20% 30days before" → dates 25 and 27 Dec only (90 on the 27th), same details all rooms, tables+20% deposit due 30 days before, menu dishes on every room, drinks only Ballroom + Open Terrace.\n`
     : "";
 
   return `Generate complete event content for:
@@ -551,7 +558,7 @@ export function inferAiEventRemovedSections(
 }
 
 export const AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER =
-  "e.g. 15 tables at £20 per person, tickets £10 per person, 20% deposit, dates 26, 27 and 28 Dec. If setups differ, name the spaces (e.g. Dining Hall vs Snowball), plus menu or drinks notes.";
+  "UK venue notes are fine as-is — typos, pp, quid, 25/12. e.g. xmas 25th + 27th, tables only, 50pp / 90pp, menu included, drinks only ballroom and terrace, 20% deposit 30 days before, no codes.";
 
 export const AI_EVENT_ADDITIONAL_DETAILS_HINT =
-  "Be specific with numbers: dates, table count, ticket/table prices, and deposit %. We use those facts instead of inventing placeholders.";
+  "Write it how you'd text a colleague. We extract dates, rooms, tables/tickets, per-head prices, menus, drinks, deposit, and no-discount rules. Later 'actually…' lines override earlier ones.";

@@ -9,6 +9,8 @@ export interface ApiError {
   status: boolean;
   message: string;
   errors: string[];
+  /** Business error key, e.g. door-entry `invalid_token` / `already_admitted`. */
+  code?: string;
 }
 
 export interface EmailVerificationRequest {

@@ -245,6 +245,10 @@ export const API_ENDPOINTS = {
       NOTES: {
         CREATE: "/vendor/bookings/show/{id}/comments",
       },
+      DOOR_ENTRY: {
+        SCAN: "/vendor/bookings/door-entry/scan",
+        CHECK_IN: "/vendor/bookings/door-entry/check-in",
+      },
       MULTIPLE_ACTIONS: {
         BULK_EMAIL_SEND: "/vendor/bookings/bulk-email",
         BULK_EXPORT: "/vendor/bookings/bulk-export",

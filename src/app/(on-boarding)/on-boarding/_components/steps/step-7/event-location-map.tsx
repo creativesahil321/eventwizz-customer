@@ -26,6 +26,12 @@ interface EventLocationMapProps {
   }) => void;
   onAddressSearch?: (searchFunction: (address: string) => void) => void;
   className?: string;
+  /** Tailwind height for the map canvas. Step 1 uses a compact size. */
+  heightClass?: string;
+  /** Pixel min-height so Google Maps has a real layout box. */
+  minHeightPx?: number;
+  /** Tighter canvas + one-line selected-address row (AI collect / step 1). */
+  compact?: boolean;
 }
 
 interface MapLocation {
@@ -45,6 +51,9 @@ export default function EventLocationMap({
   onLocationChange,
   onAddressSearch,
   className = "",
+  heightClass = "h-64",
+  minHeightPx = 256,
+  compact = false,
 }: EventLocationMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const markerRef = useRef<any | null>(null);
@@ -676,13 +685,13 @@ export default function EventLocationMap({
   }, []); // Empty dependency array - only run on unmount
 
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`${compact ? "space-y-1.5" : "space-y-3"} ${className}`}>
       {/* Map Container */}
       <div className="relative">
         <div
           ref={mapRef}
-          className="h-64 w-full overflow-hidden rounded-lg border border-white/20"
-          style={{ minHeight: "256px" }}
+          className={`${heightClass} w-full overflow-hidden rounded-lg border border-white/20`}
+          style={{ minHeight: minHeightPx }}
         />
 
         {/* Street View Button - Only show when location is selected */}
@@ -730,7 +739,7 @@ export default function EventLocationMap({
       )}
 
       {/* Location Info */}
-      {currentLocation && !isLoading && (
+      {currentLocation && !isLoading && !compact && (
         <div className="rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs">
           <div className="flex items-center justify-between">
             <div className="flex-1">

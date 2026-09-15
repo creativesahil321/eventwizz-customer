@@ -135,6 +135,7 @@ export const initialData: EventSchemaType = {
     city: "",
     reminder_email_before_days: 0,
     reminder_menu_choices_before_days: MENU_CHOICES_REMINDER_DEFAULT_DAYS,
+    generate_qr_code: false,
     is_duplicate: false,
     duplicate_target_type: "existing" as "existing" | "new",
     vendor_location_id: undefined,

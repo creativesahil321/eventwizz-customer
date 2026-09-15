@@ -11,6 +11,7 @@ import {
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import {
   AI_EVENT_MIN_ROOMS,
+  ensureStepFiveEventDrinkRooms,
   parseAiEventVendorIntent,
   resolveRoomMenuFields,
 } from "./ai-event-vendor-intent";
@@ -162,11 +163,16 @@ export function fillAiEventGeneratedDefaults(
       : [],
   };
 
+  const catalogMenus = vendorHints.bookingFacts.menuCourses ?? [];
   const sharedMenus = menusHaveItems(src.stepFour?.menus)
     ? normalizeVendorStepFourMenus(src.stepFour?.menus)
     : firstMenusFromStepFour(src.stepFour);
   const resolvedSharedMenus =
-    sharedMenus.length > 0 ? sharedMenus : FALLBACK_AI_EVENT_MENUS;
+    sharedMenus.length > 0
+      ? sharedMenus
+      : catalogMenus.length > 0
+        ? catalogMenus
+        : FALLBACK_AI_EVENT_MENUS;
   const sharedMenuTitle =
     str(src.stepFour?.menu_title) || "Dining menu";
   const sharedMenuDescription =
@@ -227,11 +233,24 @@ export function fillAiEventGeneratedDefaults(
               ),
             })),
       };
+  const catalogDrinkPackages = (vendorHints.bookingFacts.drinkPackages ?? []).map(
+    (item) => ({
+      title: item.title,
+      description: item.title,
+      price: item.price,
+      available_quantity: 100,
+    }),
+  );
   const hasDrinkPackages =
     (src.stepFive?.packages ?? []).some((p) => str(p.title)) ||
     (src.stepFive?.rooms ?? []).some((room) =>
       (room.packages ?? []).some((p) => str(p.title)),
-    );
+    ) ||
+    catalogDrinkPackages.length > 0;
+  const resolvedDrinkPackages =
+    (src.stepFive?.packages ?? []).some((p) => str(p.title))
+      ? (src.stepFive?.packages ?? [])
+      : catalogDrinkPackages;
   const stepFive =
     vendorHints.omitDrinks || !hasDrinkPackages
       ? {
@@ -239,13 +258,21 @@ export function fillAiEventGeneratedDefaults(
           drink_title: "",
           drink_description: "",
           packages: [],
-          rooms: (src.stepFive?.rooms ?? []).map((room) => ({
-            ...room,
-            drinks_option: 0 as const,
-            drink_title: "",
-            drink_description: "",
-            packages: [],
-          })),
+          rooms: useRooms
+            ? roomNames.map((room_name) => ({
+                room_name,
+                drinks_option: 0 as const,
+                drink_title: "",
+                drink_description: "",
+                packages: [],
+              }))
+            : (src.stepFive?.rooms ?? []).map((room) => ({
+                ...room,
+                drinks_option: 0 as const,
+                drink_title: "",
+                drink_description: "",
+                packages: [],
+              })),
         }
       : {
           drinks_option: 1 as const,
@@ -253,27 +280,41 @@ export function fillAiEventGeneratedDefaults(
           drink_description:
             str(src.stepFive?.drink_description) ||
             "Drink packages available with this event.",
-          packages: src.stepFive?.packages ?? [],
-          rooms: src.stepFive?.rooms?.map((room) => {
-            const roomEnabled = resolveAiDrinksEnabled(room) === 1;
-            if (!roomEnabled) {
-              return {
-                ...room,
-                drinks_option: 0 as const,
-                drink_title: "",
-                drink_description: "",
-                packages: [],
-              };
-            }
-            return {
-              ...room,
-              drinks_option: 1 as const,
-              drink_title: str(room.drink_title) || "Drinks & Packages",
-              drink_description:
-                str(room.drink_description) ||
-                "Drink packages available with this event.",
-            };
-          }),
+          packages: resolvedDrinkPackages,
+          rooms: useRooms
+            ? ensureStepFiveEventDrinkRooms(
+                src.stepFive?.rooms,
+                roomNames,
+                {
+                  drinks_option: 1,
+                  drink_title: str(src.stepFive?.drink_title) || "Drinks & Packages",
+                  drink_description:
+                    str(src.stepFive?.drink_description) ||
+                    "Drink packages available with this event.",
+                  packages: resolvedDrinkPackages,
+                },
+                vendorHints,
+              )
+            : src.stepFive?.rooms?.map((room) => {
+                const roomEnabled = resolveAiDrinksEnabled(room) === 1;
+                if (!roomEnabled) {
+                  return {
+                    ...room,
+                    drinks_option: 0 as const,
+                    drink_title: "",
+                    drink_description: "",
+                    packages: [],
+                  };
+                }
+                return {
+                  ...room,
+                  drinks_option: 1 as const,
+                  drink_title: str(room.drink_title) || "Drinks & Packages",
+                  drink_description:
+                    str(room.drink_description) ||
+                    "Drink packages available with this event.",
+                };
+              }),
         };
 
   const stepSix = {

@@ -213,7 +213,7 @@ export function GuidedMultiSectionBottomActions({
   return (
     <div
       className={cn(
-        "mt-6 flex w-full min-w-0 flex-col items-center justify-center gap-3 border-t border-white/[0.08] pt-5",
+        "sticky bottom-0 z-30 mt-6 flex w-full min-w-0 flex-col items-center justify-center gap-3 border-t border-white/[0.08] bg-slate-950 pt-5 pb-4",
         className,
       )}
     >

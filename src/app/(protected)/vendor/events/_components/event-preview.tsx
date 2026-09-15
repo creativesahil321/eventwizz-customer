@@ -129,8 +129,8 @@ interface EventPreviewProps {
    */
   embedInShell?: boolean;
   /**
-   * Shift desktop "Browse Events" right of a floating Back button.
-   * Defaults to off inside embeds (no floating chrome).
+   * Shift desktop header pills away from floating `/preview/event` chrome
+   * (Back / Publish) at `2xl+`. Defaults to off inside embeds.
    */
   previewBackButtonOffset?: boolean;
   /** Vendor dashboard preview tab — click a region to open the matching form tab. */

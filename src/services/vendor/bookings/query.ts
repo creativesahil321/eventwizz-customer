@@ -20,6 +20,9 @@ import type {
   VendorRescheduleBookingPayload,
   VendorUpdateBookingStatusPayload,
   VendorUpdateBookingStatusResponse,
+  DoorEntryScanData,
+  DoorEntryCheckInPayload,
+  DoorEntryCheckInResponse,
 } from "./type";
 
 /**
@@ -236,6 +239,38 @@ export const useUpdateVendorBookingStatus = () => {
     },
     onError: () => {
       // Error toast notifications handled at root level by API client interceptor
+    },
+  });
+};
+
+/**
+ * Scan a door-entry QR token. Errors are mapped in the door-scan UI (`code`).
+ */
+export const useScanDoorEntry = () => {
+  return useMutation<DoorEntryScanData, Error, string>({
+    mutationFn: (token) => vendorBookingsService.scanDoorEntry(token),
+  });
+};
+
+/**
+ * Confirm check-in for one booking date. Requires `update-booking`.
+ */
+export const useCheckInDoorEntry = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    DoorEntryCheckInResponse,
+    Error,
+    DoorEntryCheckInPayload
+  >({
+    mutationFn: (payload) => vendorBookingsService.checkInDoorEntry(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vendor-booking-history"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: vendorBookingsKeys.all,
+      });
     },
   });
 };

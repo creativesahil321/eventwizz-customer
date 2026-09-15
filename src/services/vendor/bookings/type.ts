@@ -170,3 +170,52 @@ export interface VendorUpdateBookingStatusResponse {
   };
   errors: string[];
 }
+
+export type DoorEntryErrorCode =
+  | "already_admitted"
+  | "not_paid"
+  | "cancelled"
+  | "refunded"
+  | "invalid_token"
+  | "wrong_venue"
+  | "permission_denied";
+
+export interface DoorEntryDateRow {
+  booking_date_id: number;
+  booking_date: string;
+  room_name?: string | null;
+  entry_status?: string | null;
+  entry_label: string;
+  can_check_in: boolean;
+  checked_in_at?: string | null;
+}
+
+export interface DoorEntryScanData {
+  booking_id: number;
+  booking_number: string;
+  guest_name: string;
+  event_name: string;
+  suggested_booking_date_id: number | null;
+  dates: DoorEntryDateRow[];
+}
+
+export interface DoorEntryScanResponse {
+  status: boolean;
+  message: string;
+  data: DoorEntryScanData;
+  errors?: string[];
+  code?: string;
+}
+
+export interface DoorEntryCheckInPayload {
+  token: string;
+  booking_date_id: number;
+}
+
+export interface DoorEntryCheckInResponse {
+  status: boolean;
+  message: string;
+  data?: unknown;
+  errors?: string[];
+  code?: string;
+}

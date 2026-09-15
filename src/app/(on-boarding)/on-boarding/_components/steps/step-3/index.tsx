@@ -1690,7 +1690,7 @@ export default function StepThree() {
               <GuidedMultiSectionBottomActions
                 onApproveAll={guided.handleApproveAllSections}
                 allSectionsApproved={guided.allSectionsApproved}
-                hasInput={guided.currentSectionHasInput}
+                hasInput={guided.stepHasGuidedInput}
                 loading={loading}
                 onEditAll={() => guided.handleUnlockSection(0)}
                 onContinue={() => void handleContinue()}

@@ -168,7 +168,7 @@ const SplitLayout = React.memo(
                 : "shrink-0 w-[42%] min-w-[280px] max-w-[36rem] ml-2 opacity-100 pr-2"
             }`}
           >
-            <ScrollArea className="h-[calc(100vh-40px)] w-full min-w-0">
+            <ScrollArea className="h-[calc(100vh-40px)] w-full min-w-0 [&_[data-slot=scroll-area-viewport]]:block [&_[data-slot=scroll-area-viewport]]:h-full">
               <Suspense fallback={<StepLoader />}>
                 <StepTransition stepKey={activeStep}>
                   <Step />

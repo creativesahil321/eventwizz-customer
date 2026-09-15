@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { useForm, useFieldArray, type Resolver } from "react-hook-form";
+import { useForm, useFieldArray, type Resolver, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader } from "@googlemaps/js-api-loader";
@@ -28,7 +28,6 @@ import { useSession } from "next-auth/react";
 import { env } from "@/env";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 import { useEventCategories } from "@/services/vendor/events/query";
-import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { useBrandNameAvailability } from "@/hooks/use-brand-name-availability";
 import AddressAutocomplete, {
   cityFromFormattedAddress,
@@ -49,11 +48,15 @@ const EventLocationMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <Skeleton className="h-64 w-full rounded-lg border border-white/10" />
+      <Skeleton className="h-32 w-full rounded-lg border border-white/10" />
     ),
   },
 );
 import { AIChoicePair, AIFlowProgress } from "./ai-choice-pair";
+import {
+  useAiCollectDraft,
+  type AiCollectFormValues,
+} from "../../_lib/hooks/use-ai-collect-draft";
 
 const themeAccent = {
   badge: {
@@ -71,7 +74,7 @@ const themeAccent = {
 };
 
 const INPUT_CLASS =
-  "w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-colors";
+  "w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-colors";
 
 const collectInfoSchema = z
   .object({
@@ -93,7 +96,7 @@ const collectInfoSchema = z
     eventType: z.string().optional(),
     guestCount: z.string().optional(),
     priceRange: z.string().optional(),
-    description: z.string().max(800, "Max 800 characters").optional(),
+    description: z.string().max(2000, "Max 2000 characters").optional(),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
   })
@@ -171,6 +174,29 @@ const collectInfoSchema = z
   });
 
 type CollectInfoForm = z.infer<typeof collectInfoSchema>;
+
+function CollectInfoDraftSkeleton() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8 space-y-5">
+      <Skeleton className="h-2 w-full rounded-full bg-white/10" />
+      <Skeleton className="h-4 w-28 bg-white/10" />
+      <Skeleton className="h-12 w-full rounded-xl bg-white/10" />
+      <Skeleton className="h-4 w-40 bg-white/10" />
+      <div className="grid grid-cols-2 gap-3">
+        <Skeleton className="h-12 rounded-xl bg-white/10" />
+        <Skeleton className="h-12 rounded-xl bg-white/10" />
+      </div>
+      <Skeleton className="h-12 w-full rounded-xl bg-white/10" />
+      <Skeleton className="h-12 w-full rounded-xl bg-white/10" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {Array.from({ length: 8 }, (_, i) => (
+          <Skeleton key={i} className="h-12 rounded-lg bg-white/10" />
+        ))}
+      </div>
+      <Skeleton className="h-12 w-full rounded-xl bg-white/10" />
+    </div>
+  );
+}
 
 const INITIAL_CATEGORY_VISIBLE = 8; // 2 rows × 4 columns
 
@@ -266,8 +292,7 @@ export default function AICollectInfo({
   persistedHasRoomSystem,
   persistedRoomNames,
 }: AICollectInfoProps) {
-  const { data: session } = useSession();
-  const currencySymbol = useCurrencySymbol();
+  const { data: session, status: sessionStatus } = useSession();
   const [editingAddress, setEditingAddress] = useState(false);
   const knownMultiOnMount = resolveKnownHasMultipleLocations(
     initialData,
@@ -351,6 +376,8 @@ export default function AICollectInfo({
       if (seeded.length > 0) {
         form.setValue("room_names", seeded, { shouldValidate: true });
       }
+    } else {
+      form.setValue("room_names", [], { shouldValidate: true });
     }
   }, [initialData, persistedHasRoomSystem, persistedRoomNames, form]);
 
@@ -400,6 +427,36 @@ export default function AICollectInfo({
     !!initialData?.venueName &&
       initialData?.has_multiple_locations !== true,
   );
+  const { draftReady, applyRoomToggle, persistDraft } = useAiCollectDraft({
+    form: form as unknown as UseFormReturn<AiCollectFormValues>,
+    userKey: session?.user?.email?.trim() ?? "",
+    sessionStatus,
+    initialData,
+    persistedHasMultipleLocations,
+    persistedHasRoomSystem,
+    persistedRoomNames,
+    locationGateDone,
+    setLocationGateDone,
+    isPlaceSelected,
+    setIsPlaceSelected,
+  });
+
+  useEffect(() => {
+    if (!draftReady) return;
+    const enabled = form.getValues("has_room_system") === true;
+    const rooms = form.getValues("room_names") ?? [];
+    if (!enabled) {
+      if (roomNames.fields.length > 0) roomNames.replace([]);
+      return;
+    }
+    const next =
+      rooms.length >= 2
+        ? rooms.slice(0, 3)
+        : [...rooms, { name: "" }, { name: "" }].slice(0, 2);
+    roomNames.replace(next);
+    // Sync field array once after sessionStorage restore.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draftReady is the hydrate gate
+  }, [draftReady]);
   const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(
     null,
   );
@@ -640,6 +697,7 @@ export default function AICollectInfo({
       has_room_system: hasValidRoomSystem,
       room_names: hasValidRoomSystem ? normalizedRoomNames : [],
     };
+    persistDraft(true);
     onSubmit(payload);
   };
 
@@ -665,7 +723,7 @@ export default function AICollectInfo({
 
   const descriptionPlaceholder = useMemo(() => {
     if (hasRoomSystem !== true) {
-      return `e.g. "15 tables, each table ${currencySymbol}20 per person, tickets ${currencySymbol}10 per person, 20% deposit, dates 26, 27 and 28 Dec"`;
+      return `Type it like a WhatsApp note — typos are fine. e.g. "xmas 25th + 27th Dec, 25th pound 50, 27th 90, menu included, deposit 20% 30 days before"`;
     }
 
     const namedRooms = (roomNameFields ?? [])
@@ -674,32 +732,27 @@ export default function AICollectInfo({
 
     if (namedRooms.length >= 2) {
       const [first, second] = namedRooms;
-      return `e.g. "${first} and ${second}: 15 tables at ${currencySymbol}20 per person, tickets ${currencySymbol}10, 20% deposit, dates 26, 27 and 28 Dec for both spaces"`;
+      return `e.g. "${first} and ${second} same details, xmas 25th + 27th Dec, 25th pound 50, drinks on ${first} vodka 23, deposit 20% 30 days before"`;
     }
 
     if (namedRooms.length === 1) {
       const first = namedRooms[0];
-      return `e.g. "${first}: 15 tables at ${currencySymbol}20 per person, tickets ${currencySymbol}10, 20% deposit, dates 26, 27 and 28 Dec"`;
+      return `e.g. "${first}: xmas 25th + 27th Dec, 25th pound 50, menu included, deposit 20% 30 days before"`;
     }
 
-    return `e.g. "15 tables at ${currencySymbol}20 per person, tickets ${currencySymbol}10, 20% deposit, dates 26, 27 and 28 Dec for every space"`;
-  }, [currencySymbol, hasRoomSystem, roomNameFields]);
+    return `e.g. "three rooms same details, xmas 25th + 27th Dec, 25th pound 50, drinks on 2 rooms, deposit 20% 30 days before"`;
+  }, [hasRoomSystem, roomNameFields]);
 
-  const setRoomSystem = (value: boolean) => {
-    form.setValue("has_room_system", value, { shouldValidate: true });
-    const current = form.getValues("room_names");
-    if (value) {
-      if (current.length < 2) {
-        const seeded = [...current];
-        while (seeded.length < 2) seeded.push({ name: "" });
-        form.setValue("room_names", seeded, { shouldValidate: true });
-      }
-    } else {
-      form.setValue("room_names", [], { shouldValidate: true });
-    }
-  };
+  const setRoomSystem = applyRoomToggle;
 
   const pickMultipleLocations = (value: boolean) => {
+    const current = form.getValues("has_multiple_locations");
+    const hasVenue = Boolean(form.getValues("venueName")?.trim());
+    if (hasVenue && current === value) {
+      setLocationGateDone(true);
+      persistDraft(true);
+      return;
+    }
     form.clearErrors("venueName");
     form.setValue("has_multiple_locations", value, { shouldValidate: false });
     form.setValue("venueName", "", { shouldValidate: false });
@@ -714,6 +767,7 @@ export default function AICollectInfo({
     setSuggestions([]);
     setEditingAddress(false);
     setLocationGateDone(true);
+    persistDraft(true);
   };
 
   const locationChoiceLocked =
@@ -725,15 +779,16 @@ export default function AICollectInfo({
       return;
     }
     setLocationGateDone(false);
+    persistDraft(true);
   };
 
   return (
-    <div className="relative z-10 flex items-center justify-center min-h-screen py-10 px-4">
+    <div className="relative z-10 flex items-center justify-center min-h-screen py-6 px-4">
       <div className="w-full max-w-2xl">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-5">
           <div
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border backdrop-blur-sm mb-5"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border backdrop-blur-sm mb-3"
             style={themeAccent.badge}
           >
             <Sparkles className="w-3.5 h-3.5" style={themeAccent.text} />
@@ -744,19 +799,23 @@ export default function AICollectInfo({
               AI-Powered Setup
             </span>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-3">
+          <h1 className="text-2xl font-bold text-white mb-1.5">
             Tell us about your business
           </h1>
-          <p className="text-slate-400 text-sm max-w-md mx-auto">
-            {locationGateDone
+          <div className="text-slate-400 text-sm max-w-md mx-auto">
+            {!draftReady ? (
+              <Skeleton className="mx-auto h-4 w-64 max-w-full bg-white/10" />
+            ) : locationGateDone
               ? isBrandMode
                 ? "Enter your brand and contact details. We’ll draft your site, then you review every section before publishing."
                 : "Pick your UK venue from Google so we can fill the basics. We’ll draft your site, then you review every section before publishing."
               : "First, tell us if you run more than one venue under the same brand."}
-          </p>
+          </div>
         </div>
 
-        {!locationGateDone ? (
+        {!draftReady ? (
+          <CollectInfoDraftSkeleton />
+        ) : !locationGateDone ? (
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8 space-y-6">
             <AIFlowProgress
               current={1}
@@ -791,15 +850,15 @@ export default function AICollectInfo({
             </div>
           </div>
         ) : (
-        <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-8">
+        <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-5 sm:p-6">
           <form
             onSubmit={form.handleSubmit(handleFormSubmit)}
-            className="space-y-6"
+            className="space-y-4"
           >
             <AIFlowProgress
               current={2}
               total={3}
-              label="Venue details"
+              label="Venue & first event"
             />
             <button
               type="button"
@@ -833,8 +892,7 @@ export default function AICollectInfo({
                     className={INPUT_CLASS}
                   />
                   <p className="text-xs text-slate-500 mt-1.5">
-                    Type your trading or brand name — it does not need to match
-                    a Google listing.
+                    Trading name — no Google listing needed.
                   </p>
                 </>
               ) : (
@@ -915,8 +973,7 @@ export default function AICollectInfo({
                       )}
                   </div>
                   <p className="text-xs text-slate-500 mt-1.5">
-                    Select your venue from the list so we can fill address and
-                    phone for you.
+                    Pick a Google listing so address and phone can fill.
                   </p>
                 </>
               )}
@@ -947,17 +1004,14 @@ export default function AICollectInfo({
               )}
             </div>
 
-            {/* Event Category: 2×4 initially, "More" to expand (same list as manual step 3) */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
                 <Building2 className="w-4 h-4" style={themeAccent.text} />
                 Does your venue use multiple rooms or areas?{" "}
                 <span className="text-red-400">*</span>
               </label>
-              <p className="mb-3 text-xs leading-relaxed text-slate-500">
-                Choose Yes when rooms need different packages, dates, menus,
-                drinks, or brochures. Choose No for one shared setup across
-                the venue.
+              <p className="mb-2 text-xs text-slate-500">
+                Yes if packages, dates, menus or drinks differ by room.
               </p>
               {roomSystemLocked ? (
                 <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300">
@@ -996,8 +1050,7 @@ export default function AICollectInfo({
                   Room names <span className="text-red-400">*</span>
                 </label>
                 <p className="text-xs text-slate-500 mb-2">
-                  Name each space as guests know it (2–3), e.g. Dining Hall or
-                  Snowball. We’ll draft content per room.
+                  2–3 names as guests know them.
                 </p>
                 <div className="space-y-2">
                   {roomNames.fields.map((field, index) => (
@@ -1059,126 +1112,21 @@ export default function AICollectInfo({
               </div>
             )}
 
-            {/* Event Category: 2×4 initially, "More" to expand (same list as manual step 3) */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-                <Globe className="w-4 h-4" style={themeAccent.text} />
-                Event Category <span className="text-red-400">*</span>
-              </label>
-              {isCategoriesLoading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {Array.from({ length: 8 }, (_, i) => (
-                    <div
-                      key={i}
-                      className="h-12 rounded-lg bg-white/5 border border-white/10 animate-pulse"
-                    />
-                  ))}
-                </div>
-              ) : eventCategories.length > 0 ? (
-                <div className="space-y-2">
-                  {/* First 2 rows × 4 columns (2 cols on mobile) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {firstPageCategories.map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() =>
-                          form.setValue("venueType", String(cat.id), {
-                            shouldValidate: true,
-                          })
-                        }
-                        className={`flex flex-col items-center justify-center gap-1 px-2 py-2.5 rounded-lg border text-[11px] font-medium transition-all duration-200 min-h-[52px] ${
-                          selectedVenueType === String(cat.id)
-                            ? ""
-                            : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
-                        }`}
-                        style={
-                          selectedVenueType === String(cat.id)
-                            ? {
-                                ...themeAccent.selectedCard,
-                                color: `var(--color-primary, #93c5fd)`,
-                              }
-                            : undefined
-                        }
-                      >
-                        <span className="text-base leading-none">
-                          {getCategoryIcon(cat.name)}
-                        </span>
-                        <span className="text-center leading-tight line-clamp-2">
-                          {cat.name}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  {hasMoreCategories && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllCategories((v) => !v)}
-                      className="w-full py-2 rounded-lg border border-white/10 bg-white/5 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-                    >
-                      {showAllCategories
-                        ? "Show less"
-                        : `Show more categories (${restCategories.length})`}
-                    </button>
-                  )}
-                  {showAllCategories && hasMoreCategories && (
-                    <div className="max-h-44 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02] p-2">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {restCategories.map((cat) => (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() =>
-                              form.setValue("venueType", String(cat.id), {
-                                shouldValidate: true,
-                              })
-                            }
-                            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg border text-[11px] font-medium transition-all duration-200 min-h-[48px] ${
-                              selectedVenueType === String(cat.id)
-                                ? ""
-                                : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
-                            }`}
-                            style={
-                              selectedVenueType === String(cat.id)
-                                ? {
-                                    ...themeAccent.selectedCard,
-                                    color: `var(--color-primary, #93c5fd)`,
-                                  }
-                                : undefined
-                            }
-                          >
-                            <span className="text-base leading-none">
-                              {getCategoryIcon(cat.name)}
-                            </span>
-                            <span className="text-center leading-tight line-clamp-2">
-                              {cat.name}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">
-                  No categories available. Please try again or switch to Manual
-                  setup.
-                </p>
-              )}
-              {form.formState.errors.venueType && (
-                <p className="text-red-400 text-xs mt-1.5">
-                  {form.formState.errors.venueType.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                    <MapPin className="w-4 h-4" style={themeAccent.text} />
-                    Address <span className="text-red-400">*</span>
+                    <MapPin className="w-4 h-4 shrink-0" style={themeAccent.text} />
+                    {isBrandMode
+                      ? "Head office address"
+                      : "Main venue address"}{" "}
+                    <span className="text-red-400">*</span>
                   </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    {isBrandMode
+                      ? "Where the brand is based — not a one-off event. We’ll use this as the event location next; you can change it there."
+                      : "Your venue. Event nights use this same pin — you only change it next if the night is off-site."}
+                  </p>
                   {showConfirmedAddress ? (
                     <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
@@ -1194,7 +1142,7 @@ export default function AICollectInfo({
                         </button>
                       </div>
                       <p className="text-xs text-slate-500 mt-1.5">
-                        Filled from your Google listing
+                        Filled from Google
                       </p>
                     </div>
                   ) : isBrandMode ||
@@ -1282,8 +1230,7 @@ export default function AICollectInfo({
                         </button>
                       ) : (
                         <p className="text-xs text-slate-500 mt-1.5">
-                          Pick a suggestion so city and phone can fill
-                          automatically.
+                          Pick a suggestion to fill city and phone.
                         </p>
                       )}
                     </>
@@ -1297,18 +1244,39 @@ export default function AICollectInfo({
                       {form.formState.errors.address.message}
                     </p>
                   )}
+                  <p className="mt-2 flex items-center gap-2 text-sm leading-5">
+                    <MapPin
+                      className="w-4 h-4 shrink-0"
+                      style={themeAccent.text}
+                    />
+                    <span className="font-medium text-slate-300">City</span>
+                    <span
+                      className={
+                        cityValue?.trim() ? "text-white" : "text-slate-500"
+                      }
+                    >
+                      {cityValue?.trim() || "Fills from the address you pick"}
+                    </span>
+                  </p>
+                  {form.formState.errors.city && (
+                    <p className="text-red-400 text-xs mt-1.5">
+                      {form.formState.errors.city.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                    <MapPin className="w-4 h-4" style={themeAccent.text} />
-                    Confirm on map <span className="text-red-400">*</span>
+                    <MapPin className="w-4 h-4 shrink-0" style={themeAccent.text} />
+                    Pin <span className="text-red-400">*</span>
+                    <span className="font-normal text-slate-500">
+                      — drag if it missed the entrance
+                    </span>
                   </label>
-                  <p className="text-xs text-slate-500 mb-3">
-                    Drag the pin if the address search did not land on your
-                    entrance — same as event location setup.
-                  </p>
                   <EventLocationMap
+                    compact
+                    heightClass="h-32"
+                    minHeightPx={128}
                     initialAddress={addressValue}
                     initialLatitude={latitudeValue}
                     initialLongitude={longitudeValue}
@@ -1346,33 +1314,9 @@ export default function AICollectInfo({
                     </p>
                   )}
                 </div>
-
-                <div className="sm:col-span-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                    <MapPin className="w-4 h-4" style={themeAccent.text} />
-                    City <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    {...form.register("city")}
-                    readOnly
-                    disabled
-                    autoComplete="off"
-                    placeholder="Auto-detected from address"
-                    className={`${INPUT_CLASS} cursor-not-allowed opacity-80`}
-                  />
-                  <p className="text-xs text-slate-500 mt-1.5">
-                    Filled from your Google listing. Edit the address above to
-                    change it.
-                  </p>
-                  {form.formState.errors.city && (
-                    <p className="text-red-400 text-xs mt-1.5">
-                      {form.formState.errors.city.message}
-                    </p>
-                  )}
-                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
                     <Mail className="w-4 h-4" style={themeAccent.text} />
@@ -1386,9 +1330,8 @@ export default function AICollectInfo({
                   />
                   {session?.user?.email &&
                   form.watch("email") === session.user.email ? (
-                    <p className="text-xs text-slate-500 mt-1.5">
-                      From your account — change it if this venue uses a
-                      different inbox.
+                    <p className="text-xs text-slate-500 mt-1">
+                      From your account
                     </p>
                   ) : null}
                   {form.formState.errors.email && (
@@ -1417,37 +1360,148 @@ export default function AICollectInfo({
                   )}
                 </div>
               </div>
+              <input type="hidden" {...form.register("city")} />
+            </div>
+
+            <div className="space-y-4 pt-3 border-t border-white/10">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                First event
+              </p>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-1.5">
+                <Globe className="w-4 h-4" style={themeAccent.text} />
+                Event Category <span className="text-red-400">*</span>
+              </label>
+              <p className="text-xs text-slate-500 mb-2">
+                Tap the type of night — so we draft Christmas, brunch, or NYE
+                correctly.
+              </p>
+              {isCategoriesLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <div
+                      key={i}
+                      className="h-12 rounded-lg bg-white/5 border border-white/10 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : eventCategories.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {firstPageCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          form.setValue("venueType", String(cat.id), {
+                            shouldValidate: true,
+                          })
+                        }
+                        className={`flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-lg border text-[11px] font-medium transition-all duration-200 min-h-[44px] ${
+                          selectedVenueType === String(cat.id)
+                            ? ""
+                            : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
+                        }`}
+                        style={
+                          selectedVenueType === String(cat.id)
+                            ? {
+                                ...themeAccent.selectedCard,
+                                color: `var(--color-primary, #93c5fd)`,
+                              }
+                            : undefined
+                        }
+                      >
+                        <span className="text-base leading-none">
+                          {getCategoryIcon(cat.name)}
+                        </span>
+                        <span className="text-center leading-tight line-clamp-2">
+                          {cat.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {hasMoreCategories && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllCategories((v) => !v)}
+                      className="w-full py-2 rounded-lg border border-white/10 bg-white/5 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                    >
+                      {showAllCategories
+                        ? "Show less"
+                        : `Show more categories (${restCategories.length})`}
+                    </button>
+                  )}
+                  {showAllCategories && hasMoreCategories && (
+                    <div className="max-h-44 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {restCategories.map((cat) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() =>
+                              form.setValue("venueType", String(cat.id), {
+                                shouldValidate: true,
+                              })
+                            }
+                            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg border text-[11px] font-medium transition-all duration-200 min-h-[48px] ${
+                              selectedVenueType === String(cat.id)
+                                ? ""
+                                : "bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300"
+                            }`}
+                            style={
+                              selectedVenueType === String(cat.id)
+                                ? {
+                                    ...themeAccent.selectedCard,
+                                    color: `var(--color-primary, #93c5fd)`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            <span className="text-base leading-none">
+                              {getCategoryIcon(cat.name)}
+                            </span>
+                            <span className="text-center leading-tight line-clamp-2">
+                              {cat.name}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No categories available. Please try again or switch to Manual
+                  setup.
+                </p>
+              )}
+              {form.formState.errors.venueType && (
+                <p className="text-red-400 text-xs mt-1.5">
+                  {form.formState.errors.venueType.message}
+                </p>
+              )}
             </div>
 
             {/* Description (optional — helps AI) */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-1.5">
                 <Info className="w-4 h-4" style={themeAccent.text} />
-                Describe your event setup{" "}
-                <span className="text-slate-500 font-normal">
-                  (optional but helps AI)
-                </span>
+                Event setup{" "}
+                <span className="text-slate-500 font-normal">(optional)</span>
               </label>
-
-              <p className="text-slate-500 text-xs mb-2.5 leading-relaxed">
-                Tables, prices, deposit %, and dates. We use your numbers as-is.
-                {hasRoomSystem === true
-                  ? " Say if every space shares the same setup, or which one is different."
-                  : ""}
-              </p>
-
               <textarea
                 {...form.register("description")}
                 placeholder={descriptionPlaceholder}
-                rows={5}
-                maxLength={800}
+                rows={3}
+                maxLength={2000}
                 className={`${INPUT_CLASS} resize-none`}
               />
               <div className="flex justify-end mt-1">
                 <p className="text-slate-600 text-xs">
-                  {form.watch("description")?.length || 0}/800
+                  {form.watch("description")?.length || 0}/2000
                 </p>
               </div>
+            </div>
             </div>
 
             {/* Actions */}

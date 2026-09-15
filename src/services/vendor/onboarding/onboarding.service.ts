@@ -176,7 +176,6 @@ function normalizeStepFiveDatePayload(
   date: StepFiveType["dates"][number],
 ): Record<string, unknown> {
   const anyDate = date as unknown as {
-    generate_qr_code?: boolean;
     show_on_frontend?: boolean;
   };
   const eventDate = resolveStepFiveEventDate(date);
@@ -207,7 +206,6 @@ function normalizeStepFiveDatePayload(
     total_table_types: tables.length,
     tables,
     total_ticket_types: tickets.length,
-    generate_qr_code: anyDate.generate_qr_code ?? true,
     tickets,
     show_on_frontend: anyDate.show_on_frontend ?? true,
   };

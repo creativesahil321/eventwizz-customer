@@ -16,7 +16,6 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
-import { createPortal } from "react-dom";
 import {
   useContext,
   useState,
@@ -64,7 +63,11 @@ import {
   previewLogoSizeClass,
 } from "@/lib/preview-container-layout";
 import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
-import { resolvePreviewMobileMenuHost } from "@/lib/preview-device";
+import {
+  lockPreviewMenuHostScroll,
+  resolvePreviewMobileMenuHost,
+} from "@/lib/preview-device";
+import { PreviewMobileMenuPortal } from "@/components/preview/preview-mobile-menu-portal";
 import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
 import { GuestAccountMenu } from "@/components/shared/guest-account-menu";
 import {
@@ -219,8 +222,10 @@ interface CommonHeaderProps {
   className?: string;
   hasBackgroundImage?: boolean; // New prop to indicate if there's a background image
   /**
-   * When variant is `preview`, add left padding for the floating "Back to Editor" control on `/preview/event`.
-   * Set false for embedded previews (e.g. admin event approval) where that button is not shown.
+   * When variant is `preview`, inset desktop chrome at `2xl+` so floating
+   * `/preview/event` controls (Back to Editor, Publish) do not sit under
+   * header pills. Below `2xl` those controls use a reserved bar instead.
+   * Set false for embedded previews (e.g. admin event approval).
    */
   previewBackButtonOffset?: boolean;
   /** Event PDFs (brochure / FAQ): one icon + dropdown so the bar stays compact */
@@ -572,7 +577,7 @@ export default function CommonHeader({
   );
 
   const mobileNavRowClass =
-    "flex min-h-12 items-center gap-3 text-[15px] font-medium font-sans text-[var(--color-on-header)]";
+    "flex min-h-12 items-center gap-3 text-[15px] font-medium font-sans text-current";
   const mobileNavIconWrap =
     "flex h-5 w-5 shrink-0 items-center justify-center [&_svg]:h-5 [&_svg]:w-5";
 
@@ -756,11 +761,7 @@ export default function CommonHeader({
 
   useEffect(() => {
     if (!mobileMenuOpen || !menuHost) return;
-    const previousOverflowY = menuHost.style.overflowY;
-    menuHost.style.overflowY = "hidden";
-    return () => {
-      menuHost.style.overflowY = previousOverflowY;
-    };
+    return lockPreviewMenuHostScroll(menuHost);
   }, [menuHost, mobileMenuOpen]);
   
     return (
@@ -768,10 +769,14 @@ export default function CommonHeader({
       ref={headerRootRef}
       className={cn(
         overlayInScrollPanel
-          ? "relative sticky top-0 z-[80] w-full overflow-visible"
+          ? cn(
+              "relative sticky top-0 w-full overflow-visible",
+              mobileMenuOpen ? "z-0" : "z-[80]",
+            )
           : usesStickyHeader
             ? cn(
-                "sticky top-0 z-50 w-full transition-all duration-300",
+                "sticky top-0 w-full transition-all duration-300",
+                mobileMenuOpen ? "z-0" : "z-50",
                 containMobileMenuInFrame && "relative overflow-visible",
               )
             : "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
@@ -795,7 +800,10 @@ export default function CommonHeader({
         className={cn(
           "w-full",
           (overlayInScrollPanel || containMobileMenuInFrame) &&
-            "relative z-[80] overflow-visible transition-all duration-300",
+            cn(
+              "relative overflow-visible transition-all duration-300",
+              mobileMenuOpen ? "z-0" : "z-[80]",
+            ),
           overlayInScrollPanel || topBanner ? styles.container : null,
           overlayInScrollPanel &&
             !overDarkHeroTransparent &&
@@ -816,7 +824,7 @@ export default function CommonHeader({
               "flex min-w-0 w-1/3 items-center gap-3",
               variant === "preview" &&
                 previewBackButtonOffset &&
-                "pl-[11.5rem]",
+                "2xl:pl-[11.5rem]",
             )}
           >
             {!hideBrowseEvents &&
@@ -944,7 +952,14 @@ export default function CommonHeader({
               </Link>
             )}
           </div>
-          <div className={desktopActionsRowClass}>
+          <div
+            className={cn(
+              desktopActionsRowClass,
+              variant === "preview" &&
+                previewBackButtonOffset &&
+                "2xl:pr-[12rem]",
+            )}
+          >
             {/* Cart (signed-in) or public location switcher (guest) */}
             {useNonInteractiveChrome ? (
               <VendorPublicLocationBookNow
@@ -1387,40 +1402,21 @@ export default function CommonHeader({
           </div>
         </div>
 
-        {(() => {
-          if (!mobileMenuOpen || !menuHost) return null;
-          const pinToFrame = menuHost !== document.body;
-          const mobileMenuLayer = (
-            <>
-        {/* Mobile Menu Overlay */}
-          <div
-            className={
-              pinToFrame
-                ? "absolute inset-0 z-[200] bg-black/50"
-                : "fixed inset-0 z-[200] bg-black/50"
-            }
-            onClick={toggleMobileMenu}
-          />
-
-        {/* Mobile Menu Panel */}
-        <div
-          className={cn(
-            "isolate flex w-[70%] max-w-xs flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] shadow-2xl transition-transform duration-300 ease-in-out",
-            pinToFrame
-              ? "absolute top-0 left-0 z-[210] h-full"
-              : "fixed top-0 left-0 z-[210] h-dvh",
-            "translate-x-0",
-          )}
-        >
-          <div className="flex items-center justify-between border-b border-[var(--color-on-header)]/20 px-4 py-4">
-            <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/80">
+        {mobileMenuOpen && menuHost ? (
+          <PreviewMobileMenuPortal
+            host={menuHost}
+            themeFrom={headerRootRef.current}
+            onDismiss={() => toggleMobileMenu()}
+          >
+          <div className="flex items-center justify-between border-b border-current/20 px-4 py-4">
+            <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-current/80">
               Menu
             </h2>
             <button
               type="button"
               onClick={toggleMobileMenu}
               aria-label="Close menu"
-              className="p-1 text-[var(--color-on-header)]"
+              className="p-1"
             >
               <X className="h-6 w-6" />
             </button>
@@ -1430,7 +1426,7 @@ export default function CommonHeader({
             className="flex flex-1 flex-col overflow-y-auto px-4 pb-8 font-sans"
             aria-label="Main navigation"
           >
-            <div className="flex flex-col divide-y divide-[var(--color-on-header)]/15">
+            <div className="flex flex-col divide-y divide-current/15">
               {!hideBrowseEvents &&
                 (useNonInteractiveChrome ? (
                   <div
@@ -1513,7 +1509,7 @@ export default function CommonHeader({
 
               {hasHeaderDownloads && (
                 <div className="py-3">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/55">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-current/55">
                     Downloads
                   </p>
                   <ul className="flex flex-col gap-2">
@@ -1617,8 +1613,8 @@ export default function CommonHeader({
             </div>
 
             {mobileContactLink && (
-              <div className="mt-6 border-t border-[var(--color-on-header)]/20 pt-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/55">
+              <div className="mt-6 border-t border-current/20 pt-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-current/55">
                   Contact
                 </p>
                 {useNonInteractiveChrome ? (
@@ -1658,11 +1654,8 @@ export default function CommonHeader({
               </div>
             )}
           </nav>
-        </div>
-            </>
-          );
-          return createPortal(mobileMenuLayer, menuHost);
-        })()}
+          </PreviewMobileMenuPortal>
+        ) : null}
       </div>
       </div>
     </section>

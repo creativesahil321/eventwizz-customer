@@ -22,6 +22,19 @@ import {
 // Browser environment check
 const isBrowser = typeof window !== "undefined";
 
+function isVendorDoorEntryRequest(url?: string): boolean {
+  return Boolean(url && url.includes("/vendor/bookings/door-entry/"));
+}
+
+function isInvalidAuthTokenMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("invalid token") ||
+    lower.includes("token mismatch") ||
+    lower.includes("token manipulation")
+  );
+}
+
 // Safe toast wrapper for client/server environments
 const safeToast = {
   success: (message: string) => {
@@ -402,6 +415,9 @@ apiClient.interceptors.response.use(
         message.toLowerCase().includes("unauthorized domain") ||
         message.toLowerCase().includes("coming from an unauthorized domain");
 
+      const requestUrl = response.config?.url || "";
+      const isDoorEntry = isVendorDoorEntryRequest(requestUrl);
+
       const isUnauthorizedMessage =
         message.toLowerCase().includes("not authorized") ||
         message.toLowerCase().includes("unauthorized") ||
@@ -409,9 +425,7 @@ apiClient.interceptors.response.use(
         message.toLowerCase().includes("permission denied");
 
       const isSecurityViolation =
-        message.toLowerCase().includes("invalid token") ||
-        message.toLowerCase().includes("token mismatch") ||
-        message.toLowerCase().includes("token manipulation");
+        !isDoorEntry && isInvalidAuthTokenMessage(message);
 
       // Handle domain authorization errors - show error without logout
       if (isDomainUnauthorized) {
@@ -420,7 +434,7 @@ apiClient.interceptors.response.use(
       }
 
       // Handle unauthorized responses - trigger logout
-      if (isUnauthorizedMessage) {
+      if (isUnauthorizedMessage && !isDoorEntry) {
         handleUnauthorizedAccess(message, isSecurityViolation);
         return Promise.reject(response.data);
       }
@@ -482,6 +496,11 @@ apiClient.interceptors.response.use(
         string,
         unknown
       >;
+      const requestUrl = error.config?.url || "";
+      const isDoorEntry = isVendorDoorEntryRequest(requestUrl);
+      const suppressErrorToast = (
+        error.config as RequestOptions | undefined
+      )?.suppressErrorToast;
 
       // Non-2xx responses can still carry the "already completed" signal
       if (
@@ -494,18 +513,30 @@ apiClient.interceptors.response.use(
 
       // Check for security violation indicators in error response
       const isSecurityViolation =
-        (typeof message === "string" &&
-          (message.toLowerCase().includes("invalid token") ||
-            message.toLowerCase().includes("token mismatch") ||
-            message.toLowerCase().includes("token manipulation"))) ||
-        (responseData?.status === false &&
-          responseData?.message ===
-          "You are not authorized to perform this action.");
+        !isDoorEntry &&
+        ((typeof message === "string" && isInvalidAuthTokenMessage(message)) ||
+          (responseData?.status === false &&
+            responseData?.message ===
+              "You are not authorized to perform this action."));
 
       // Handle specific status codes
       switch (error.response.status) {
         case 401:
-          // Handle unauthorized
+          // QR `invalid_token` must not log door staff out of their session.
+          if (
+            isDoorEntry &&
+            (responseData?.code === "invalid_token" ||
+              isInvalidAuthTokenMessage(String(message)))
+          ) {
+            if (!suppressErrorToast && !isLogoutInProgress) {
+              safeToast.error(
+                typeof message === "string" && message.trim()
+                  ? message
+                  : "This QR code is not valid.",
+              );
+            }
+            break;
+          }
           handleUnauthorizedAccess(message, isSecurityViolation);
           break;
         case 403: {
@@ -674,6 +705,7 @@ apiClient.interceptors.response.use(
           break;
         }
         case 409: {
+          if (suppressErrorToast) break;
           const conflictData = error.response.data as ApiErrorResponse;
           if (
             conflictData?.errors &&
@@ -696,7 +728,11 @@ apiClient.interceptors.response.use(
         }
         default:
           // Handle other errors - show toast for non-422 errors
-          if (!isLogoutInProgress && error.response.status !== 422) {
+          if (
+            !suppressErrorToast &&
+            !isLogoutInProgress &&
+            error.response.status !== 422
+          ) {
             safeToast.error(message);
           }
           break;

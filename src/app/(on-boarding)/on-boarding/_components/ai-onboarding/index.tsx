@@ -6,6 +6,7 @@ import AICollectInfo from "./collect-info";
 import AIOnboardingBuilding from "./building";
 import { useAIOnboarding } from "../../_lib/hooks/useAIOnboarding";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
+import { clearAiCollectDraft } from "../../_lib/ai-collect-draft-cache";
 
 interface AIOnboardingFlowProps {
   onComplete: () => void;
@@ -51,6 +52,7 @@ export default function AIOnboardingFlow({
   };
 
   const handleAIApplyComplete = () => {
+    clearAiCollectDraft();
     onComplete();
   };
 

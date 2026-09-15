@@ -22,6 +22,10 @@ import type {
   VendorRescheduleBookingPayload,
   VendorUpdateBookingStatusPayload,
   VendorUpdateBookingStatusResponse,
+  DoorEntryScanData,
+  DoorEntryScanResponse,
+  DoorEntryCheckInPayload,
+  DoorEntryCheckInResponse,
 } from "./type";
 
 export interface VendorBookingRoomFilterOption {
@@ -507,6 +511,55 @@ export const vendorBookingsService = {
   },
 
   /**
+   * Decode a door-entry QR payload. Auth + `X-Venue-Location-Id` come from the
+   * shared Axios client. Callers should suppress interceptor toasts and map `code`.
+   */
+  scanDoorEntry: async (token: string): Promise<DoorEntryScanData> => {
+    const response = await api.post<DoorEntryScanResponse>(
+      API_ENDPOINTS.VENDOR.BOOKING_HISTORY.DOOR_ENTRY.SCAN,
+      { token },
+      {
+        returnFullResponse: true,
+        suppressErrorToast: true,
+        suppressSuccessToast: true,
+      }
+    );
+
+    if (!response.status || !response.data) {
+      const error = new Error(response.message || "Unable to read this QR code");
+      (error as Error & { code?: string }).code = response.code;
+      throw error;
+    }
+
+    return normalizeDoorEntryScan(response.data);
+  },
+
+  /**
+   * Admit the whole booking for one date. Requires `update-booking`.
+   */
+  checkInDoorEntry: async (
+    payload: DoorEntryCheckInPayload
+  ): Promise<DoorEntryCheckInResponse> => {
+    const response = await api.post<DoorEntryCheckInResponse>(
+      API_ENDPOINTS.VENDOR.BOOKING_HISTORY.DOOR_ENTRY.CHECK_IN,
+      payload,
+      {
+        returnFullResponse: true,
+        suppressErrorToast: true,
+        suppressSuccessToast: true,
+      }
+    );
+
+    if (!response.status) {
+      const error = new Error(response.message || "Check-in failed");
+      (error as Error & { code?: string }).code = response.code;
+      throw error;
+    }
+
+    return response;
+  },
+
+  /**
    * Bulk delete bookings
    * @param bookingIds Array of booking IDs to delete
    * @returns Promise with bulk delete operation result
@@ -674,6 +727,35 @@ export const vendorBookingsService = {
     }
   },
 };
+
+function coerceDoorEntryId(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function normalizeDoorEntryScan(raw: DoorEntryScanData): DoorEntryScanData {
+  const suggested = coerceDoorEntryId(raw.suggested_booking_date_id);
+
+  return {
+    booking_id: coerceDoorEntryId(raw.booking_id) ?? 0,
+    booking_number: String(raw.booking_number ?? "").trim(),
+    guest_name: String(raw.guest_name ?? "").trim(),
+    event_name: String(raw.event_name ?? "").trim(),
+    suggested_booking_date_id: suggested,
+    dates: (raw.dates ?? [])
+      .map((row) => ({
+        booking_date_id: coerceDoorEntryId(row.booking_date_id) ?? 0,
+        booking_date: String(row.booking_date ?? ""),
+        room_name: row.room_name ? String(row.room_name) : null,
+        entry_status: row.entry_status ? String(row.entry_status) : null,
+        entry_label: String(row.entry_label ?? ""),
+        can_check_in: row.can_check_in === true,
+        checked_in_at: row.checked_in_at ? String(row.checked_in_at) : null,
+      }))
+      .filter((row) => row.booking_date_id > 0),
+  };
+}
 
 /**
  * When responseType is "blob", JSON error payloads skip the apiClient interceptor.

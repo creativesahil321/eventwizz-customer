@@ -5,6 +5,7 @@ import { authService } from "@/services/common/auth/auth.service";
 import { UserType, StaffRole } from "@/types/auth.types";
 import type { Session } from "next-auth";
 import { setLogoutInProgress } from "@/services/core/api-client";
+import { AI_COLLECT_DRAFT_STORAGE_KEY } from "@/app/(on-boarding)/on-boarding/_lib/ai-collect-draft-cache";
 
 /**
  * User data interface with properly typed fields to avoid 'any'
@@ -282,6 +283,7 @@ export const useAuthStore = create<AuthState>()(
           try {
             sessionStorage.removeItem(ONBOARDING_MODE_STORAGE_KEY);
             localStorage.removeItem(ONBOARDING_MODE_STORAGE_KEY);
+            sessionStorage.removeItem(AI_COLLECT_DRAFT_STORAGE_KEY);
           } catch {
             // ignore
           }

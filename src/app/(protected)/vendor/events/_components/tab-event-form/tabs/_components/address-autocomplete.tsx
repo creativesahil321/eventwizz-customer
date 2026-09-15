@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
+import { FieldClearButton } from "@/components/ui/field-clear-button";
+import { cn } from "@/lib/utils";
 import {
   isWithinVenueArea,
   venueAreaBoundsLiteral,
@@ -437,22 +439,31 @@ export default function AddressAutocomplete({
     };
   }, []);
 
-  const inputClassName = isDark
-    ? `h-10 w-full rounded-md border px-3 text-sm shadow-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#3b82f6)]/40 focus-visible:ring-offset-0 ${
-        isSelected
-          ? "border-emerald-500/35 bg-emerald-950/25 text-slate-100 cursor-default"
-          : "border-white/10 bg-white/5 text-white placeholder:text-slate-500"
-      }`
-    : `w-full border p-2 rounded ${
-        isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"
-      }`;
+  const inputClassName = cn(
+    isDark
+      ? `h-10 w-full rounded-md border px-3 text-sm shadow-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#3b82f6)]/40 focus-visible:ring-offset-0 ${
+          isSelected
+            ? "border-emerald-500/35 bg-emerald-950/25 text-slate-100 cursor-default"
+            : "border-white/10 bg-white/5 text-white placeholder:text-slate-500"
+        }`
+      : `w-full border p-2 rounded ${
+          isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"
+        }`,
+    (isSelected || Boolean(value?.trim()) || Boolean(searchQuery.trim())) &&
+      "pr-12",
+  );
+
+  const displayValue = isSelected ? value : searchQuery;
+  const showClear = Boolean(
+    displayValue?.trim() || (isSelected && value?.trim()),
+  );
 
   return (
     <div className={`relative w-full ${className}`}>
       <Input
         ref={inputRef}
         className={inputClassName}
-        value={isSelected ? value : searchQuery}
+        value={displayValue}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
           handleInputChange(e.target.value)
         }
@@ -474,9 +485,10 @@ export default function AddressAutocomplete({
         </p>
       )}
 
-      {/* Loading spinner */}
       {isSearching && !isSelected && (
-        <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 ${showClear ? "right-11" : "right-3"}`}
+        >
           <div
             className={`animate-spin rounded-full h-4 w-4 border-b-2 ${
               isDark ? "border-[var(--color-primary,#3b82f6)]" : "border-blue-600"
@@ -485,22 +497,11 @@ export default function AddressAutocomplete({
         </div>
       )}
 
-      {/* Clear button */}
-      {isSelected && (
-        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-          <button
-            type="button"
-            onClick={handleClear}
-            className={
-              isDark
-                ? "text-slate-500 hover:text-red-400 transition-colors font-bold text-sm"
-                : "text-gray-400 hover:text-red-600 transition-colors font-bold"
-            }
-            title="Clear selection"
-          >
-            ✕
-          </button>
-        </div>
+      {showClear && (
+        <FieldClearButton
+          variant={isDark ? "dark" : "default"}
+          onClick={handleClear}
+        />
       )}
 
       {/* Suggestions dropdown */}

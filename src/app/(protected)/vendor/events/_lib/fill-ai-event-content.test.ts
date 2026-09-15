@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { MESSY_XMAS_VENDOR_PROMPT } from "@/app/(on-boarding)/on-boarding/_lib/vendor-messy-prompt.fixture";
 import { fillAiEventGeneratedDefaults } from "./fill-ai-event-content";
 import type { AIEventInput } from "@/app/api/ai/generate-event/route";
 
@@ -94,6 +95,49 @@ test("empty AI catering still gets a fallback menu on every room", () => {
     assert.equal(room.catering_option, 1);
     assert.ok((room.menus?.length ?? 0) > 0);
   }
+});
+
+test("messy additional details fill menus and drinks when the model returned empty", () => {
+  const filled = fillAiEventGeneratedDefaults(
+    {
+      stepFour: {
+        catering_option: 0,
+        menu_title: "",
+        menu_description: "",
+        menus: [],
+      },
+      stepFive: {
+        drinks_option: 0,
+        drink_title: "",
+        drink_description: "",
+        packages: [],
+      },
+    },
+    {
+      eventName: "Xmas Party",
+      eventType: "christmas",
+      eventDescription: MESSY_XMAS_VENDOR_PROMPT,
+      has_room_system: true,
+      room_names: ["Ballroom", "Open Terrace", "Hall"],
+      venueAddress: "London",
+    },
+  );
+
+  assert.equal(filled.stepFour.catering_option, 1);
+  const titles = (filled.stepFour.menus ?? []).flatMap((m) =>
+    m.items.map((i) => i.title.toLowerCase()),
+  );
+  assert.ok(titles.some((t) => t.includes("tea")));
+  assert.ok(titles.some((t) => t.includes("paneer")));
+  assert.equal(filled.stepFive.drinks_option, 1);
+  assert.ok((filled.stepFive.packages?.length ?? 0) >= 3);
+  const drinksByRoom = Object.fromEntries(
+    (filled.stepFive.rooms ?? []).map((r) => [r.room_name, r]),
+  );
+  assert.equal(drinksByRoom.Ballroom?.drinks_option, 1);
+  assert.equal(drinksByRoom["Open Terrace"]?.drinks_option, 1);
+  assert.equal(drinksByRoom.Hall?.drinks_option, 0);
+  assert.equal(filled.stepThree.dates.length, 2);
 });
 
 test("vendor omit catering keeps every room without menus", () => {

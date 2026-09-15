@@ -1,6 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { FieldClearButton } from "@/components/ui/field-clear-button";
 import { cn } from "@/lib/utils";
 import React, { useEffect, useRef, useState } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
@@ -173,12 +174,14 @@ const GoogleLocationSearch: React.FC<Props> = ({
         isSelected
           ? "cursor-default bg-emerald-950/40 text-slate-100 ring-1 ring-emerald-500/30"
           : "bg-white/5",
+        isSelected && "pr-12",
       )
     : cn(
         "h-10 w-full border-white/10",
         isSelected
           ? "cursor-default bg-green-50 dark:bg-green-950/30"
           : "bg-white/5",
+        isSelected && "pr-12",
       );
 
   const listClassName = isDark
@@ -196,10 +199,6 @@ const GoogleLocationSearch: React.FC<Props> = ({
   const suggestionTextClassName = isDark
     ? "min-w-0 flex-1 text-sm font-medium leading-snug text-slate-200"
     : "min-w-0 flex-1 text-sm font-medium leading-snug text-slate-900 dark:text-slate-50";
-
-  const clearBtnClassName = isDark
-    ? "text-slate-400 hover:text-red-400"
-    : "text-muted-foreground hover:text-destructive";
 
   const noResultsClassName = isDark
     ? "absolute z-[300] mt-1 w-full rounded-lg border border-white/10 bg-slate-800 p-4 shadow-xl"
@@ -259,18 +258,10 @@ const GoogleLocationSearch: React.FC<Props> = ({
       )}
 
       {isSelected && !disabled && (
-        <button
-          type="button"
+        <FieldClearButton
+          variant={isDark ? "dark" : "default"}
           onClick={handleClear}
-          className={cn(
-            "absolute right-3 top-1/2 -translate-y-1/2 font-bold transition-colors",
-            clearBtnClassName,
-          )}
-          title="Clear selection"
-          aria-label="Clear selection"
-        >
-          ✕
-        </button>
+        />
       )}
 
       {suggestions.length > 0 && !isSelected && (

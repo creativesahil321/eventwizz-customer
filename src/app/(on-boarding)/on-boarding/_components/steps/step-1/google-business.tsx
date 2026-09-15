@@ -1,4 +1,6 @@
 import { Input } from "@/components/ui/input";
+import { FieldClearButton } from "@/components/ui/field-clear-button";
+import { cn } from "@/lib/utils";
 import React, { useEffect, useRef, useState } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 
@@ -127,9 +129,10 @@ const GoogleBusinessSearch: React.FC<Props> = ({
   return (
     <div className="relative w-full">
       <Input
-        className={`w-full border p-2 rounded ${
-          isSelected ? "bg-emerald-500/10 cursor-not-allowed" : "bg-white/5"
-        }`}
+        className={cn(
+          "w-full border p-2 rounded",
+          isSelected ? "bg-emerald-500/10 cursor-not-allowed pr-12" : "bg-white/5",
+        )}
         value={isSelected ? value : searchQuery}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
           handleInputChange(e.target.value)
@@ -171,16 +174,7 @@ const GoogleBusinessSearch: React.FC<Props> = ({
           </div>
         )}
       {isSelected && (
-        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-          <button
-            type="button"
-            onClick={handleClear}
-            className="text-slate-500 hover:text-red-400 transition-colors font-bold"
-            title="Clear selection"
-          >
-            ✕
-          </button>
-        </div>
+        <FieldClearButton variant="dark" onClick={handleClear} label="Clear venue" />
       )}
     </div>
   );

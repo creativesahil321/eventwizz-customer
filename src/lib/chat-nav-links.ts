@@ -77,6 +77,13 @@ const NAV_RULES: NavRule[] = [
     requiredPermission: "read-booking",
   },
   {
+    id: "door-scan",
+    pattern:
+      /\b(door\s*scan|door\s*entry|check[\s-]*in|scan\s+(the\s+)?qr|qr\s*scan|entrance\s+scan)\b/i,
+    vendor: { href: "/vendor/door-scan", label: "Open Door Scan" },
+    requiredPermission: "read-booking",
+  },
+  {
     id: "table-assignment",
     pattern: /\b(table assignment|seating plan|assign tables|floor plan)\b/i,
     vendor: { href: "/vendor/table-assignment", label: "Open Table Assignment" },
@@ -414,6 +421,7 @@ export function getAllowedNavLinksForPrompt(audience: ChatNavAudience): string {
     if (canAccess("read-site-essential")) lines.push("- Domain / subdomain → [Open Domain Settings](/vendor/domain-settings)");
     if (canAccess("read-event")) lines.push("- Events, dates, tickets, tables → [Open Events](/vendor/events)");
     if (canAccess("read-booking")) lines.push("- Bookings → [Open Bookings](/vendor/booking-history)");
+    if (canAccess("read-booking")) lines.push("- Door scan / QR check-in → [Open Door Scan](/vendor/door-scan)");
     if (canAccess("read-table-assignment")) lines.push("- Table Assignment → [Open Table Assignment](/vendor/table-assignment)");
     if (canAccess("read-customer")) lines.push("- Customers → [Open Customers](/vendor/customers)");
     if (canAccess(["read-menu-choice", "read-event-menu"])) lines.push("- Menu Choice → [Open Menu Choice](/vendor/menu-choices)");

@@ -1505,12 +1505,18 @@ export default function FormPreview() {
           ref={previewContainerRef}
           stageClassName="bg-slate-950 py-1 pl-8 pr-2 pt-1 sm:pl-8 sm:pr-3"
           frameClassName="bg-[color:var(--color-background,#fff)]"
+          style={
+            tryThemePreviewValues
+              ? siteEssentialsToPreviewRootStyle(tryThemePreviewValues)
+              : undefined
+          }
         >
           {/* Avoid transform / overflow-x-hidden here — both break sticky header + room bar. */}
           <div className="w-full min-h-0 min-w-0 max-w-full">
             {ONBOARDING_THEME_PREVIEW_STEPS.has(activeStep) &&
             tryThemePreviewValues ? (
               <div
+                data-preview-theme-root=""
                 style={siteEssentialsToPreviewRootStyle(tryThemePreviewValues)}
                 className="relative w-full min-h-0 bg-[color:var(--color-background)] text-[color:var(--color-text)] font-body"
               >

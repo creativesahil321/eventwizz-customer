@@ -54,6 +54,9 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
     );
   }, [isVendor, profileData?.data?.venue_name, session?.user?.name]);
 
+  const helpSupportHref =
+    accountType === "admin" ? "/admin/support" : "/vendor/support";
+
   const headerClass =
     "flex-none min-w-0 w-full border-b border-slate-200 bg-[var(--color-header)] text-[var(--color-on-header)] px-3 py-3 md:px-4 md:py-3 2xl:px-6 2xl:py-4 flex items-center gap-2 justify-between shadow-[0_1px_2px_0_rgba(0,0,0,0.05)]";
 
@@ -119,23 +122,14 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <Link
-                  href="/documentation"
-                  className="flex w-full items-center"
-                >
-                  Documentation
-                </Link>
+              <DropdownMenuItem asChild>
+                <Link href="/documentation">Documentation</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Link href="/support" className="flex w-full items-center">
-                  Support
-                </Link>
+              <DropdownMenuItem asChild>
+                <Link href={helpSupportHref}>Support</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Link href="/faq" className="flex w-full items-center">
-                  FAQs
-                </Link>
+              <DropdownMenuItem asChild>
+                <Link href="/faq">FAQs</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -62,7 +62,7 @@ const EventLocationMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <Skeleton className="h-64 w-full rounded-lg border border-white/10" />
+      <Skeleton className="h-40 w-full rounded-lg border border-white/10" />
     ),
   },
 );
@@ -777,10 +777,6 @@ export default function StepOne() {
                                   {...field}
                                 />
                               </FormControl>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Email must be entered manually for privacy
-                                reasons
-                              </p>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -819,11 +815,13 @@ export default function StepOne() {
                           Confirm on map{" "}
                           <span className="text-red-400">*</span>
                         </p>
-                        <p className="text-xs text-muted-foreground mb-3">
-                          Drag the pin to your venue entrance if search did not
-                          land exactly — required to save latitude and longitude.
+                        <p className="text-xs text-muted-foreground mb-1.5">
+                          Drag the pin if search missed the entrance.
                         </p>
                         <EventLocationMap
+                          compact
+                          heightClass="h-32"
+                          minHeightPx={128}
                           initialAddress={form.watch("address")}
                           initialLatitude={form.watch("latitude")}
                           initialLongitude={form.watch("longitude")}
@@ -872,7 +870,7 @@ export default function StepOne() {
                   <GuidedMultiSectionBottomActions
                     onApproveAll={guided.handleApproveAllSections}
                     allSectionsApproved={guided.allSectionsApproved}
-                    hasInput={guided.currentSectionHasInput}
+                    hasInput={guided.stepHasGuidedInput}
                     loading={loading}
                     onEditAll={() => guided.handleUnlockSection(0)}
                     onContinue={handleContinue}

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { createPortal } from "react-dom";
 import { Menu, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
@@ -23,7 +22,11 @@ import {
 } from "@/lib/preview-container-layout";
 import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
-import { resolvePreviewMobileMenuHost } from "@/lib/preview-device";
+import {
+  lockPreviewMenuHostScroll,
+  resolvePreviewMobileMenuHost,
+} from "@/lib/preview-device";
+import { PreviewMobileMenuPortal } from "@/components/preview/preview-mobile-menu-portal";
 import { GuestAccountMenu } from "@/components/shared/guest-account-menu";
 
 interface LocationSelectionHeaderProps {
@@ -121,11 +124,7 @@ export default function LocationSelectionHeader({
 
   useEffect(() => {
     if (!mobileMenuOpen || !menuHost) return;
-    const previousOverflowY = menuHost.style.overflowY;
-    menuHost.style.overflowY = "hidden";
-    return () => {
-      menuHost.style.overflowY = previousOverflowY;
-    };
+    return lockPreviewMenuHostScroll(menuHost);
   }, [menuHost, mobileMenuOpen]);
 
   // Close the drawer when switching Desktop ↔ Tablet/Mobile so chrome stays in sync.
@@ -282,7 +281,8 @@ export default function LocationSelectionHeader({
     <header
       ref={headerRootRef}
       className={cn(
-        "relative z-50 h-[60px] border-b border-[color:color-mix(in_srgb,var(--color-on-header)_8%,transparent)] text-[var(--color-on-header)]",
+        "relative h-[60px] border-b border-[color:color-mix(in_srgb,var(--color-on-header)_8%,transparent)] text-[var(--color-on-header)]",
+        mobileMenuOpen ? "z-0" : "z-50",
         // Solid header so scrolled content (e.g. Explore events) never shows through.
         "bg-[var(--color-header)] shadow-[0_8px_28px_-20px_rgba(0,0,0,0.45)]",
         usesStickyHeader
@@ -360,66 +360,50 @@ export default function LocationSelectionHeader({
         </div>
       </div>
 
-      {mobileMenuOpen && menuHost
-        ? createPortal(
-            <>
-              <div
-                className={
-                  menuHost !== document.body
-                    ? "absolute inset-0 z-[200] bg-black/50"
-                    : "fixed inset-0 z-[200] bg-black/50"
-                }
-                onClick={toggleMobileMenu}
+      {mobileMenuOpen && menuHost ? (
+        <PreviewMobileMenuPortal
+          host={menuHost}
+          themeFrom={headerRootRef.current}
+          onDismiss={() => toggleMobileMenu()}
+          panelClassName={mobileMenuVisibility}
+        >
+          <div className="flex items-center justify-between border-b border-current/20 px-4 py-4">
+            <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-current/80">
+              Menu
+            </h2>
+            <button
+              type="button"
+              onClick={toggleMobileMenu}
+              aria-label="Close menu"
+              className="p-1"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <nav
+            className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
+            aria-label="Main navigation"
+          >
+            <div className="flex flex-col gap-2">
+              <VendorPublicLocationBookNow
+                disabled={isPreviewMode}
+                pillGlassOnHero={false}
+                triggerClassName="!h-11 !w-full !rounded-xl !px-4 justify-center font-semibold"
+                menuContentClassName="!w-full max-w-none"
+                onLocationNavigate={() => {
+                  setMobileMenuOpen(false);
+                }}
+                align="center"
               />
-              <div
-                className={cn(
-                  mobileMenuVisibility,
-                  "isolate flex w-[70%] max-w-xs flex-col bg-[color:var(--color-header)] text-[var(--color-on-header)] shadow-2xl",
-                  menuHost !== document.body
-                    ? "absolute top-0 left-0 z-[210] h-full"
-                    : "fixed top-0 left-0 z-[210] h-dvh",
-                )}
-              >
-                <div className="flex items-center justify-between border-b border-[var(--color-on-header)]/20 px-4 py-4">
-                  <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-[var(--color-on-header)]/80">
-                    Menu
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={toggleMobileMenu}
-                    aria-label="Close menu"
-                    className="p-1 text-[var(--color-on-header)]"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-                <nav
-                  className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
-                  aria-label="Main navigation"
-                >
-                  <div className="flex flex-col gap-2">
-                    <VendorPublicLocationBookNow
-                      disabled={isPreviewMode}
-                      pillGlassOnHero={false}
-                      triggerClassName="!h-11 !w-full !rounded-xl !px-4 justify-center font-semibold"
-                      menuContentClassName="!w-full max-w-none"
-                      onLocationNavigate={() => {
-                        setMobileMenuOpen(false);
-                      }}
-                      align="center"
-                    />
-                    {authChrome(
-                      forceGuestAuthChrome,
-                      menuSurfaceChromeLinkClass,
-                      true,
-                    )}
-                  </div>
-                </nav>
-              </div>
-            </>,
-            menuHost,
-          )
-        : null}
+              {authChrome(
+                forceGuestAuthChrome,
+                menuSurfaceChromeLinkClass,
+                true,
+              )}
+            </div>
+          </nav>
+        </PreviewMobileMenuPortal>
+      ) : null}
     </header>
   );
 }

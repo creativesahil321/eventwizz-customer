@@ -1312,6 +1312,8 @@ export const stepEightSchema = z
     event_id: z.number(),
     reminder_email_before_days: z.number().optional(),
     reminder_menu_choices_before_days: menuChoicesReminderDaysSchema,
+    /** Door-entry QR printed on the customer booking invoice. Default off. */
+    generate_qr_code: z.boolean().optional(),
     submit_type: z.enum(["draft", "active"]),
     is_duplicate: z.boolean(),
     duplicate_target_type: z.enum(["existing", "new"]).optional(),

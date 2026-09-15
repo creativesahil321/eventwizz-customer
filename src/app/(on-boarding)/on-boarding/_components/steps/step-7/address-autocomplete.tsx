@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, forwardRef } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 import { Input } from "@/components/ui/input";
+import { FieldClearButton } from "@/components/ui/field-clear-button";
+import { cn } from "@/lib/utils";
 import { env } from "@/env";
 
 interface Suggestion {
@@ -130,9 +132,6 @@ const AddressAutocomplete = forwardRef<
       ? "absolute z-[100] w-full mt-1 bg-slate-900 border border-white/15 rounded-lg shadow-2xl shadow-black/50 max-h-60 overflow-y-auto"
       : "absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto");
   const suggestionItemTextClass = isDark ? "text-slate-200" : "text-gray-800";
-  const clearButtonClass = isDark
-    ? "text-slate-400 hover:text-red-400"
-    : "text-gray-400 hover:text-red-600";
   const noResultsClass = isDark
     ? "absolute z-[100] w-full mt-1 bg-slate-900 border border-white/15 rounded-lg shadow-2xl shadow-black/50 p-4 text-slate-400 text-sm"
     : "absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4 text-gray-500 text-sm";
@@ -405,15 +404,19 @@ const AddressAutocomplete = forwardRef<
     };
   }, []);
 
+  const displayValue = isSelected ? value : searchQuery;
+  const showClear = Boolean(displayValue?.trim() || (isSelected && value?.trim()));
+
   return (
     <div className={`relative w-full ${className}`}>
       <Input
         ref={setInputRef}
-        className={
+        className={cn(
           resolvedInputClassName ??
-          `w-full border p-2 rounded ${isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"}`
-        }
-        value={isSelected ? value : searchQuery}
+            `w-full border p-2 rounded ${isSelected ? "bg-green-50 cursor-not-allowed" : "bg-white"}`,
+          showClear && "pr-12",
+        )}
+        value={displayValue}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
           handleInputChange(e.target.value)
         }
@@ -430,22 +433,18 @@ const AddressAutocomplete = forwardRef<
       />
 
       {isSearching && !isSelected && (
-        <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 ${showClear ? "right-11" : "right-3"}`}
+        >
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
         </div>
       )}
 
-      {isSelected && (
-        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-          <button
-            type="button"
-            onClick={handleClear}
-            className={`${clearButtonClass} transition-colors font-bold`}
-            title="Clear selection"
-          >
-            ✕
-          </button>
-        </div>
+      {showClear && (
+        <FieldClearButton
+          variant={isDark ? "dark" : "default"}
+          onClick={handleClear}
+        />
       )}
 
       {suggestions.length > 0 && !isSelected && searchQuery && (

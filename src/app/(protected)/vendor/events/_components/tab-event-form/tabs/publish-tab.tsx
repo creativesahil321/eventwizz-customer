@@ -130,6 +130,7 @@ export default function PublishTab() {
       reminder_menu_choices_before_days: hydrateMenuChoicesReminderDays(
         savedStepEight?.reminder_menu_choices_before_days,
       ),
+      generate_qr_code: savedStepEight?.generate_qr_code === true,
       submit_type: savedStepEight?.submit_type || "draft",
       is_duplicate: savedStepEight?.is_duplicate ?? false,
       duplicate_target_type: savedStepEight?.duplicate_target_type || "existing",
@@ -244,6 +245,7 @@ export default function PublishTab() {
             serializeMenuChoicesReminderDays(
               data.reminder_menu_choices_before_days,
             ),
+          generate_qr_code: data.generate_qr_code === true,
           submit_type: data.submit_type,
           is_duplicate: data.is_duplicate,
           ...(data.is_duplicate && {
@@ -426,6 +428,93 @@ export default function PublishTab() {
                       again.
                     </p>
                   ) : null}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </section>
+
+          <section className="space-y-4 border-t border-gray-200 pt-6">
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold title-header">
+                Door entry QR
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                After a guest books, they receive a booking invoice. You can
+                print a unique QR code on that invoice so door staff can scan
+                it from Door Scan and let them into the venue.
+              </p>
+            </div>
+
+            <FormField
+              control={control}
+              name="generate_qr_code"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-sm font-medium">
+                    Show a QR scanner code on the booking invoice?
+                  </FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={(value) =>
+                        field.onChange(value === "true")
+                      }
+                      value={field.value === true ? "true" : "false"}
+                      className="grid gap-3"
+                      disabled={readOnly || isLoading}
+                    >
+                      <FormItem className="space-y-0">
+                        <FormControl>
+                          <RadioGroupItem
+                            value="false"
+                            className="sr-only"
+                            disabled={readOnly}
+                          />
+                        </FormControl>
+                        <FormLabel
+                          className={cn(
+                            "block cursor-pointer font-normal",
+                            readOnly && "cursor-not-allowed",
+                          )}
+                          onClick={() => {
+                            if (!readOnly) field.onChange(false);
+                          }}
+                        >
+                          <ChoiceOption
+                            selected={field.value !== true}
+                            disabled={readOnly}
+                            title="No — invoice only, no door QR"
+                            description="The invoice stays a receipt. Guests will need another check-in method at the entrance."
+                          />
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="space-y-0">
+                        <FormControl>
+                          <RadioGroupItem
+                            value="true"
+                            className="sr-only"
+                            disabled={readOnly}
+                          />
+                        </FormControl>
+                        <FormLabel
+                          className={cn(
+                            "block cursor-pointer font-normal",
+                            readOnly && "cursor-not-allowed",
+                          )}
+                          onClick={() => {
+                            if (!readOnly) field.onChange(true);
+                          }}
+                        >
+                          <ChoiceOption
+                            selected={field.value === true}
+                            disabled={readOnly}
+                            title="Yes — show the door-entry QR"
+                            description="Each invoice includes a unique QR code. Scan it at the door to confirm the booking and welcome the guest in."
+                          />
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

@@ -60,7 +60,15 @@ export default function VendorDashboardSkeleton() {
           columnCount={7}
           rowCount={10}
           filterCount={0}
-          cellWidths={["10rem", "12rem", "12rem", "6rem", "8rem", "6rem", "4rem"]}
+          cellWidths={[
+            "10rem",
+            "12rem",
+            "12rem",
+            "10.5rem",
+            "11.5rem",
+            "6rem",
+            "5.5rem",
+          ]}
           withPagination={false}
           withViewOptions={false}
           shrinkZero

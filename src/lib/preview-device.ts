@@ -52,6 +52,37 @@ export const DEFAULT_PREVIEW_DEVICE: PreviewDeviceId = "desktop";
 /** Named CSS container — pair with `@5xl/preview:` (1024px) / `@7xl/preview:` (1280px). */
 export const PREVIEW_CONTAINER_CLASS = "@container/preview";
 
+/** Theme tokens live on this node; the device frame (portal host) is outside it. */
+export const PREVIEW_THEME_ROOT_SELECTOR = "[data-preview-theme-root]";
+
+const PREVIEW_THEME_VAR_NAMES = [
+  "--color-header",
+  "--color-on-header",
+  "--color-surface",
+  "--color-text",
+  "--color-background",
+  "--color-primary",
+] as const;
+
+/**
+ * Copy preview brand tokens from the themed root (or `fromEl`) so a drawer
+ * portaled onto `[data-preview-device]` keeps readable header/on-header colors.
+ */
+export function readPreviewThemeVarStyle(
+  fromEl: HTMLElement | null,
+): Record<string, string> {
+  if (!fromEl || typeof getComputedStyle === "undefined") return {};
+  const root =
+    fromEl.closest<HTMLElement>(PREVIEW_THEME_ROOT_SELECTOR) ?? fromEl;
+  const computed = getComputedStyle(root);
+  const style: Record<string, string> = {};
+  for (const name of PREVIEW_THEME_VAR_NAMES) {
+    const value = computed.getPropertyValue(name).trim();
+    if (value) style[name] = value;
+  }
+  return style;
+}
+
 /**
  * Where the mobile nav drawer should mount.
  * Device frame first (onboarding / admin / `/preview/onboarding`), then an
@@ -63,8 +94,25 @@ export function resolvePreviewMobileMenuHost(
   fromEl: HTMLElement | null,
   embeddedScrollEl?: HTMLElement | null,
 ): HTMLElement | null {
-  const frame = fromEl?.closest<HTMLElement>("[data-preview-device]");
+  const frame =
+    fromEl?.closest<HTMLElement>("[data-preview-device]") ??
+    embeddedScrollEl?.closest?.("[data-preview-device]") ??
+    (typeof document !== "undefined"
+      ? document.querySelector<HTMLElement>("[data-preview-device]")
+      : null);
   if (frame) return frame;
   if (embeddedScrollEl) return embeddedScrollEl;
   return typeof document !== "undefined" ? document.body : null;
+}
+
+/** Lock scroll on the preview frame only — never `document.body` (that clips the onboarding approve bar). */
+export function lockPreviewMenuHostScroll(host: HTMLElement): () => void {
+  if (typeof document !== "undefined" && host === document.body) {
+    return () => undefined;
+  }
+  const previousOverflowY = host.style.overflowY;
+  host.style.overflowY = "hidden";
+  return () => {
+    host.style.overflowY = previousOverflowY;
+  };
 }

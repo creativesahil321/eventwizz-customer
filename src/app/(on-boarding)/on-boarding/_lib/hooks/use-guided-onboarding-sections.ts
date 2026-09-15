@@ -203,6 +203,17 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     persistedStepApproved,
   ]);
 
+  /** Bottom “Validate, approve & continue” — not tied to the section currently in view. */
+  const stepHasGuidedInput = useMemo(() => {
+    if (allSectionsApproved || approvedSectionCount > 0) return true;
+    return sectionFlow.some((section) => {
+      if (section.fields.length === 0) return true;
+      return section.fields.some((path) =>
+        fieldHasUserInput(getPathValue(formValues, String(path))),
+      );
+    });
+  }, [allSectionsApproved, approvedSectionCount, formValues, sectionFlow]);
+
   const canNavigateToIndex = useCallback(
     (index: number) => {
       for (let j = 0; j < index; j++) {
@@ -484,6 +495,7 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
     approvedSections,
     allSectionsApproved,
     currentSectionHasInput,
+    stepHasGuidedInput,
     isSectionActive,
     isChipInteractive,
     handleApproveSection,

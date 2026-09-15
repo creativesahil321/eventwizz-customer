@@ -1179,6 +1179,11 @@ export const eventsService = {
       );
     }
 
+    formData.append(
+      "generate_qr_code",
+      data.generate_qr_code === true ? "true" : "false",
+    );
+
     const response = await request<ApiResponse>({
       method: "POST",
       url: vendorEventUpdateUrl(data.event_id),

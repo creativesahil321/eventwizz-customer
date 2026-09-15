@@ -50,6 +50,7 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
 import { resolveVendorEventLifecycle } from "@/app/(protected)/vendor/events/_lib/vendor-event-lifecycle";
 import { hydrateMenuChoicesReminderDays } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
+import { coerceApiBoolean } from "@/lib/coerce-api-boolean";
 
 /** Positive event editor step from API fields, or 0 if unknown. */
 export function coercePositiveEventStep(value: unknown): number {
@@ -499,6 +500,12 @@ export function patchEventPayloadFromApi(
     stepEight: (() => {
       const persisted =
         eventDataAny.stepEight || initialData.stepEight;
+      const qrFromStep = coerceApiBoolean(
+        (persisted as { generate_qr_code?: unknown }).generate_qr_code,
+      );
+      const qrFromRoot = coerceApiBoolean(
+        (raw as { generate_qr_code?: unknown }).generate_qr_code,
+      );
       return {
         ...initialData.stepEight,
         ...persisted,
@@ -508,6 +515,7 @@ export function patchEventPayloadFromApi(
         reminder_menu_choices_before_days: hydrateMenuChoicesReminderDays(
           persisted.reminder_menu_choices_before_days,
         ),
+        generate_qr_code: qrFromStep === true || qrFromRoot === true,
       };
     })(),
   };

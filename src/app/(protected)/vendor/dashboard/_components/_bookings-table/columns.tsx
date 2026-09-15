@@ -171,11 +171,11 @@ export function getColumns({
     },
     {
       accessorKey: "total_amount",
-      size: 100,
-      minSize: 100,
+      size: 168,
+      minSize: 160,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground text-right w-full justify-end"
+          className="text-foreground ml-auto"
           column={column}
           title="Total"
         />
@@ -184,12 +184,12 @@ export function getColumns({
         const savedAmount = row.original.saved_amount;
         const couponCode = row.original.coupon_code;
         return (
-          <div className="flex flex-col items-end gap-0.5">
+          <div className="flex flex-col items-end gap-0.5 pr-1">
             <span className="font-medium text-right tabular-nums block">
               {formatMoneyLocale(bookingMoneyAmount(row.original.total_amount))}
             </span>
             {savedAmount != null ? (
-              <span className="text-[11px] font-semibold text-emerald-700">
+              <span className="text-[11px] font-semibold text-emerald-700 whitespace-nowrap">
                 You saved {formatMoneyLocale(savedAmount)}
               </span>
             ) : null}
@@ -206,30 +206,30 @@ export function getColumns({
       },
       enableSorting: true,
       enableHiding: false,
-      meta: { className: "text-right align-middle" },
+      meta: { className: "text-right align-middle px-5" },
       sortingFn: (rowA, rowB) =>
         bookingMoneyAmount(rowA.original.total_amount) -
         bookingMoneyAmount(rowB.original.total_amount),
     },
     {
       accessorKey: "balance_amount",
-      size: 110,
-      minSize: 110,
+      size: 180,
+      minSize: 168,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="text-foreground text-right w-full justify-end"
+          className="text-foreground ml-auto"
           column={column}
           title="Balance Due"
         />
       ),
       cell: ({ row }) => (
-        <span className="font-medium text-right tabular-nums block">
+        <span className="font-medium text-right tabular-nums block pl-1">
           {formatMoneyLocale(bookingMoneyAmount(row.original.balance_amount))}
         </span>
       ),
       enableSorting: true,
       enableHiding: false,
-      meta: { className: "text-right align-middle" },
+      meta: { className: "text-right align-middle px-5" },
       sortingFn: (rowA, rowB) =>
         bookingMoneyAmount(rowA.original.balance_amount) -
         bookingMoneyAmount(rowB.original.balance_amount),

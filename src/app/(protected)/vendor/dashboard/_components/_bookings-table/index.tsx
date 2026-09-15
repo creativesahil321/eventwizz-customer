@@ -68,8 +68,16 @@ export default function DashboardBookingsTable({
     <section className="w-full relative">
       {isLoading ? (
         <DataTableSkeleton
-          columnCount={6}
-          cellWidths={["10rem", "40rem", "12rem", "12rem", "8rem", "8rem"]}
+          columnCount={7}
+          cellWidths={[
+            "10rem",
+            "12rem",
+            "12rem",
+            "10.5rem",
+            "11.5rem",
+            "6rem",
+            "5.5rem",
+          ]}
           shrinkZero
         />
       ) : (
