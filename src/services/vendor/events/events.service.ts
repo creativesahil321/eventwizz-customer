@@ -17,6 +17,7 @@ import {
 } from "@/lib/parse-check-event-name";
 import { isRoomsToFormDataValue } from "@/lib/event-form-limits";
 import { toPositiveVendorEventPathId } from "@/app/(protected)/vendor/events/_lib/vendor-event-wizard-step";
+import { serializeMenuChoicesCloseDaysBefore } from "@/app/(protected)/vendor/events/_lib/menu-choices-close-days";
 import { serializeMenuChoicesReminderDays } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 import { buildVendorEventGetUrl } from "./build-vendor-event-get-url";
 import { filterSchedulerRowsForApi } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
@@ -878,6 +879,8 @@ export const eventsService = {
           catering_option: normalizeCateringOptionFlag(data.catering_option),
           menu_title: data.menu_title,
           menu_description: data.menu_description,
+          menu_choices_close_days_before:
+            data.menu_choices_close_days_before ?? undefined,
           menus: data.menus,
           menu_background_image: data.menu_background_image,
         });
@@ -893,6 +896,16 @@ export const eventsService = {
       }
       if (data.menu_description) {
         formData.append("menu_description", data.menu_description);
+      }
+      if (normalizeCateringOptionFlag(data.catering_option) === 1) {
+        formData.append(
+          "menu_choices_close_days_before",
+          String(
+            serializeMenuChoicesCloseDaysBefore(
+              data.menu_choices_close_days_before,
+            ),
+          ),
+        );
       }
       if (data.menus) {
         data.menus.forEach((menu, menuIndex) => {

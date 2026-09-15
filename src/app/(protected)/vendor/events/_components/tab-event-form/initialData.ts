@@ -1,4 +1,5 @@
 import { EventSchemaType } from "./schema";
+import { MENU_CHOICES_CLOSE_DEFAULT_DAYS } from "@/app/(protected)/vendor/events/_lib/menu-choices-close-days";
 import { MENU_CHOICES_REMINDER_DEFAULT_DAYS } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
 
 export const initialData: EventSchemaType = {
@@ -79,6 +80,7 @@ export const initialData: EventSchemaType = {
     event_menu_category_id: 0,
     menu_title: "",
     menu_description: "",
+    menu_choices_close_days_before: MENU_CHOICES_CLOSE_DEFAULT_DAYS,
     menus: [
       {
         name: "",

@@ -41,6 +41,7 @@ export function LocationGuard({
     "/auth/register",
     "/on-boarding",
     "/welcome/select-location",
+    "/vendor/door-scan",
   ];
 
   // Combine default and custom bypass paths

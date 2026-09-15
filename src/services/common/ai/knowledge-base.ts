@@ -348,9 +348,9 @@ After selecting a venue on the Welcome page, the vendor sees the **vendor dashbo
 
 1. **Dashboard** (/vendor/dashboard) — Main overview: Total Events, Active Event, Past Event, Draft Event; toggle **Bookings** vs **Commissions**; date range filter; metrics (Total Bookings, Total Payment, Partial Payment, Received Payment); **Recent Bookings** table (Transaction ID, Customer, Event, Total, Balance Due, Status, Actions). “Current location: [Venue]” is shown.
 
-2. **Events** (/vendor/events) — List of all events (tabs/filters: All, Active, Draft, etc.). **Create Event** is in the **header** (blue button), not only here. From the list you can select events and perform bulk actions (e.g. set to draft/active). Clicking an event opens event details/overview and the multi-step event form (event name, packages, dates/tickets/tables, menu, drinks, brochure, FAQs, publish).
+2. **Events** (/vendor/events) — List of all events (tabs/filters: All, Active, Draft, etc.). **Create Event** is in the **header** (blue button), not only here. From the list you can select events and perform bulk actions (e.g. set to draft/active). Clicking an event opens event details/overview and the multi-step event form (event name, packages, dates/tickets/tables, menu, drinks, brochure, FAQs, **Finalise**). On **Finalise**, **Door entry QR** controls whether each booking invoice shows a unique QR (**Yes — show the door-entry QR**). That is how you turn QR on for an event. **Door Scan** is only for scanning those invoices at the door — it does not enable QR.
 
-3. **Customers** (/vendor/customers) — Data table of customers (e.g. who booked). Search, filters, bulk actions (activate, deactivate, delete, restore). View and manage customer records.
+3. **Customers** (/vendor/customers) — Data table of customers (e.g. who booked). Search, filters, bulk actions (activate, deactivate, delete with owner OTP). Soft-deleted customers cannot be restored from the vendor panel. View and manage customer records.
 
 4. **Bookings** (/vendor/booking-history) — **Booking history** (not “Orders”): all customer bookings with search, status filter, date range. View transaction ID, customer, event, total, balance due, status, and actions. From a booking you can view details, adjust booking, reschedule, handle add-ons (tables, drinks), view menu choices, etc. **Door Scan** (/vendor/door-scan) is the entrance QR check-in screen: scan the invoice QR, pick a paid date (today is pre-selected when paid and not yet admitted), then Confirm check-in. Check-in requires the update-booking permission.
 
@@ -728,6 +728,7 @@ The full **11-step vendor onboarding** is described in the "Vendor Onboarding (F
 
 #### For Vendors (Dashboard — After Onboarding)
 - **"How do I create more events?"** - Click the blue **Create Event** button in the top header, or go to **Events** (/vendor/events) and create from there. Both use the same multi-step event form.
+- **"How do I turn on the QR code for an event?"** - Open **Events**, open the event, go to the **Finalise** tab, then under **Door entry QR** choose **Yes — show the door-entry QR**. Save / finalise. Guests get the QR on their booking invoice. **Door Scan** only scans that invoice at the door — it does not turn QR on.
 - **"Where do I see my bookings?"** - **Bookings** (/vendor/booking-history). Not “Order History” — the menu says Bookings.
 - **"How do I customize my site (logo, colors)?"** - **Sites Essentials** (/vendor/sites-essentials). Tabs: Branding, Colors, Typography, Social Media, SEO.
 - **"Where do I connect Stripe or PayPal?"** - **Payment Settings** (/vendor/payment-settings), or from profile dropdown → Settings → Payment Settings. Not “Transactions”; Transactions is for viewing payment history.
@@ -1025,7 +1026,7 @@ Manual steps:
 
 ## After vendor login
 - First: **Welcome — Select Location** — pick a venue → **Continue to Dashboard**. (Only when they are on that page — check CURRENT PAGE.)
-- Sidebar: **Dashboard**, **Events**, **Customers**, **Bookings**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**.
+- Sidebar: **Dashboard**, **Events**, **Customers**, **Bookings**, **Door Scan**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**.
 - Header: **Create Event**, location selector (if multiple), Help, profile.
 - Domain / VAT verification: profile → **Settings** → **Domain Settings** (not Sites Essentials). 72-hour verify window.
 - Connect payment gateways later: **Payment Settings**.
@@ -1041,7 +1042,8 @@ Branding sub-tabs:
 Presets = theme colours/fonts/heading style. Preview = review before save. Does **not** set event tickets/tables or domain.
 
 ## Creating / editing events (vendor)
-Entry: **Create Event** or **Events**. Tabs: **Event name** → **Timeline & package** → **Dates** → **Menu** → **Brochure Info** → **Other Packages** → **FAQs** → **Publish**.
+Entry: **Create Event** or **Events**. Tabs: **Event name** → **Packages & Gallery** → **Dates** → **Menu** → **Brochure** → **Drinks & extras** → **FAQs** → **Finalise**.
+On **Finalise**, **Door entry QR** (**Yes — show the door-entry QR**) prints a unique QR on each booking invoice. **Door Scan** is for scanning that invoice at the door, not for turning QR on.
 Dates: Tickets and/or Tables per date; deposits for tables/both; balance due date.
 **Table Assignment** = seating plan after bookings (not creating sellable table products).
 **Menu Choice** (vendor) = review customer dish selections.
@@ -1062,6 +1064,8 @@ Booking detail (**View**): **Pay … Now**, **Reschedule**, **Add extras for thi
 | Domain / subdomain | Profile → **Domain Settings** |
 | Stripe / PayPal | **Payment Settings** |
 | Tickets, tables, deposits | Event **Dates** |
+| Turn on invoice / door-entry QR | Event **Finalise** → Door entry QR |
+| Scan guest QR at the door | **Door Scan** |
 | Event address / brochure PDFs | **Brochure Info** |
 | Customer dish picks | Booking detail / vendor **Menu Choice** |
 | Seating after sale | **Table Assignment** |
@@ -1091,7 +1095,8 @@ IMPORTANT GUIDELINES:
   * On the **EventWizz platform / admin website** (e.g. eventwizz.com / eventwizz.vercel.app), public events CANNOT be booked. It is an event management software platform for venue owners, event organisers, and administrators.
   * Only vendors register ([Register as a Vendor](/auth/register)), log in, onboard, and manage venues here.
   * Public event booking ONLY happens on an individual venue's own website/storefront (e.g. stockbrook.xyz.com).
-  * If a user asks to book an event or see what's on while on the platform site, explain that this is the management software for venues, events cannot be booked on this domain, attendees must visit the specific venue's own website, and venue owners can register or book a demo. Never tell visitors on the platform site to "browse events on this site" or "add to cart".
+  * If a **guest or customer** asks to book an event or see what's on while on the platform site, explain that this is the management software for venues, events cannot be booked on this domain, attendees must visit the specific venue's own website, and venue owners can register or book a demo. Never tell visitors on the platform site to "browse events on this site" or "add to cart".
+  * If CURRENT USER SESSION is a **logged-in vendor or admin**, never use that public script. Help them operate the dashboard. To turn on QR for an event: **Events** → open the event → **Finalise** → **Door entry QR** → **Yes — show the door-entry QR**. **Door Scan** only scans invoices.
 - Focus on practical solutions and step-by-step guidance
 - Be professional but approachable
 - Tailor your responses to the user type when possible
@@ -1116,7 +1121,8 @@ For CUSTOMERS (event attendees — on venue storefront websites only):
 For VENDORS (venue owners):
 - **Onboarding**: AI-Powered or Manual. Steps in order: Venue, Site, Event, Timeline & Package, Dates, Catering, Brochure info, Other Packages, FAQs, Payment, Domain. Optional **Multiple event spaces** (rooms).
 - **After onboarding**: **Welcome — Select Location** only when they are on that page — then **Continue to Dashboard**. Use CURRENT PAGE if provided.
-- Sidebar labels: **Dashboard**, **Events**, **Customers**, **Bookings**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**. **Create Event** in the header. **Domain Settings** under profile → Settings (not Sites Essentials).
+- Sidebar labels: **Dashboard**, **Events**, **Customers**, **Bookings**, **Door Scan**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**. **Create Event** in the header. **Domain Settings** under profile → Settings (not Sites Essentials).
+- **Invoice QR**: Events → event → **Finalise** → **Door entry QR** → **Yes — show the door-entry QR**. **Door Scan** scans those invoices at the door.
 - **Sites Essentials**: Presets/Branding/Colors/Typography/Social/SEO — public look & copy. Main home page (multi-location hub) vs Location/Home page vs Info pages. Use **Preview** then **Save**.
 - **Dates**: tickets and/or tables; deposits for tables; Brochure Info for address/PDFs.
 

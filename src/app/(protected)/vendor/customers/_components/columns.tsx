@@ -3,10 +3,14 @@ import { Customer, DataTableRowAction } from "../_lib/types";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Mail, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { Mail, Pencil, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { createSelectColumn } from "@/components/data-table/data-table-column-select";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
+import {
+  shouldShowCustomerRowActions,
+  shouldShowCustomerRowSelection,
+} from "../_lib/customer-delete";
 
 // Map of status to CSS color variables
 const STATUS_COLORS = {
@@ -47,14 +51,19 @@ interface GetColumnsProps {
   setRowAction: React.Dispatch<
     React.SetStateAction<DataTableRowAction<Customer> | null>
   >;
-  currentFilter?: string; // Add current filter state
+  currentFilter?: string;
 }
 export function getColumns({
   setRowAction,
   currentFilter = "all",
 }: GetColumnsProps): ColumnDef<Customer>[] {
-  return [
-    createSelectColumn<Customer>(),
+  const columns: ColumnDef<Customer>[] = [];
+
+  if (shouldShowCustomerRowSelection(currentFilter)) {
+    columns.push(createSelectColumn<Customer>());
+  }
+
+  columns.push(
     {
       accessorKey: "first_name",
       header: ({ column }) => (
@@ -146,7 +155,6 @@ export function getColumns({
         const status = row.getValue("status") as string;
         if (!status) return null;
 
-        // Get color configuration for this status or use default
         const colorConfig = STATUS_COLORS[
           status.toLowerCase() as keyof typeof STATUS_COLORS
         ] || {
@@ -195,7 +203,10 @@ export function getColumns({
         return dateA - dateB;
       },
     },
-    {
+  );
+
+  if (shouldShowCustomerRowActions(currentFilter)) {
+    columns.push({
       id: "actions",
       header: ({ column }) => (
         <DataTableColumnHeader
@@ -205,73 +216,43 @@ export function getColumns({
         />
       ),
       cell: function Cell({ row }) {
-        const customer = row.original;
-
-        // Check if we're viewing deleted customers based on the filter
-        const isViewingDeleted = currentFilter === "delete";
-
-        // Also check if customer has deleted_at field (for future API compatibility)
-        const hasDeletedAt =
-          customer.deleted_at !== null && customer.deleted_at !== undefined;
-
-        if (isViewingDeleted || hasDeletedAt) {
-          // Show only restore button for deleted customers with dynamic theme
-          return (
-            <>
-              <nav className="flex space-x-3">
-                <PermissionGuard permissionKey="update-customer">
-                  <Button
-                    onClick={() => setRowAction({ row, type: "restore" })}
-                    variant="default"
-                    className="bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700 dark:bg-green-500 dark:hover:bg-green-600 dark:text-white dark:border-green-500"
-                    title="Restore Customer"
-                  >
-                    <RotateCcw size={16} />
-                  </Button>
-                </PermissionGuard>
-              </nav>
-            </>
-          );
-        }
-
-        // Show regular action buttons for active customers
         return (
-          <>
-            <nav className="flex space-x-3">
-              <PermissionGuard permissionKey="update-customer">
-                <Button
-                  onClick={() => setRowAction({ row, type: "edit" })}
-                  variant="event-outline"
-                  title="Edit Customer"
-                >
-                  <Pencil size={16} />
-                </Button>
-              </PermissionGuard>
-              <PermissionGuard permissionKey="send-mail-to-customer">
-                <Button
-                  onClick={() => setRowAction({ row, type: "mail" })}
-                  variant="event-outline"
-                  title="Send Mail"
-                >
-                  <Mail size={16} />
-                </Button>
-              </PermissionGuard>
-              <PermissionGuard permissionKey="delete-customer">
-                <Button
-                  onClick={() => setRowAction({ row, type: "delete" })}
-                  variant="destructive"
-                  title="Delete Customer"
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </PermissionGuard>
-            </nav>
-          </>
+          <nav className="flex space-x-3">
+            <PermissionGuard permissionKey="update-customer">
+              <Button
+                onClick={() => setRowAction({ row, type: "edit" })}
+                variant="event-outline"
+                title="Edit Customer"
+              >
+                <Pencil size={16} />
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard permissionKey="send-mail-to-customer">
+              <Button
+                onClick={() => setRowAction({ row, type: "mail" })}
+                variant="event-outline"
+                title="Send Mail"
+              >
+                <Mail size={16} />
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard permissionKey="delete-customer">
+              <Button
+                onClick={() => setRowAction({ row, type: "delete" })}
+                variant="destructive"
+                title="Delete Customer"
+              >
+                <Trash2 size={16} />
+              </Button>
+            </PermissionGuard>
+          </nav>
         );
       },
       size: 40,
       enableSorting: false,
       enableHiding: false,
-    },
-  ];
+    });
+  }
+
+  return columns;
 }

@@ -6,7 +6,7 @@ import { hasMenuPermission } from "@/services/common/permissions/utils";
 import { ReactNode, useMemo, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/store/auth.store";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { logout } from "@/lib/auth/logout";
 
 interface PermissionMenuProps {
@@ -32,6 +32,8 @@ export function PermissionMenu({
   const { isAuthenticated, isSessionChecked, active_role, account_type } =
     useAuthStore();
   const router = useRouter();
+  const pathname = usePathname();
+  const isDoorScan = pathname?.startsWith("/vendor/door-scan");
   const isCustomer =
     account_type === "customer" ||
     active_role === "customer" ||
@@ -40,6 +42,7 @@ export function PermissionMenu({
   // Security check: Handle auth state changes and redirects (customers skip permission requirement)
   useEffect(() => {
     if (!isSessionChecked) return;
+    if (isDoorScan) return;
     if (!isAuthenticated) {
       router.replace("/auth/login");
       return;
@@ -63,7 +66,14 @@ export function PermissionMenu({
       };
       handleSecurityViolation();
     }
-  }, [isAuthenticated, isSessionChecked, isLoaded, isCustomer, router]);
+  }, [
+    isAuthenticated,
+    isSessionChecked,
+    isLoaded,
+    isCustomer,
+    isDoorScan,
+    router,
+  ]);
 
   // Customers: no roles/permissions – show all menus immediately, no loading
   const filteredMenus = useMemo(() => {

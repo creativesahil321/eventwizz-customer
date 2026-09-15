@@ -39,6 +39,27 @@ export function getSafeCallbackUrl(
   return value;
 }
 
+export function peekAuthCallbackUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return getSafeCallbackUrl(sessionStorage.getItem(AUTH_CALLBACK_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function callbackPathname(safe: string): string {
+  return safe.split("?")[0]?.split("#")[0] ?? "";
+}
+
+/** Same-origin vendor door-entry return paths only. */
+export function isVendorDoorEntryCallback(raw: string | null | undefined): boolean {
+  const safe = getSafeCallbackUrl(raw);
+  if (!safe) return false;
+  const path = callbackPathname(safe);
+  return path === "/entry" || path === "/vendor/door-scan";
+}
+
 /** Persist callback across multi-step signup (OTP → create-password). */
 export function saveAuthCallbackUrl(raw: string | null | undefined): void {
   const safe = getSafeCallbackUrl(raw);
@@ -70,19 +91,32 @@ type ResolvePostLoginRedirectArgs = {
 /**
  * Role-aware post-login destination. Customers honor a safe callbackUrl
  * (e.g. /vendor/checkout after booking a date while logged out).
+ * Onboarded vendors honor a door-scan /entry callback so Google Lens
+ * can return staff to Door Scan after login.
  */
 export function resolvePostLoginRedirect({
   accountType,
   isVendorOnboarded = false,
   callbackUrl,
 }: ResolvePostLoginRedirectArgs): string {
+  const fromQuery = getSafeCallbackUrl(callbackUrl);
+  const fromStore = peekAuthCallbackUrl();
+  const safe = fromQuery || fromStore;
+
   if (accountType === "vendor") {
-    return isVendorOnboarded ? "/welcome/select-location" : "/on-boarding";
+    if (!isVendorOnboarded) return "/on-boarding";
+    if (safe && isVendorDoorEntryCallback(safe)) {
+      saveAuthCallbackUrl(safe);
+      return safe;
+    }
+    return "/welcome/select-location";
   }
 
-  const safe =
-    getSafeCallbackUrl(callbackUrl) || consumeAuthCallbackUrl();
   if (safe && accountType === "customer") {
+    consumeAuthCallbackUrl();
+    if (isVendorDoorEntryCallback(safe)) {
+      return "/customer/dashboard";
+    }
     return safe;
   }
 

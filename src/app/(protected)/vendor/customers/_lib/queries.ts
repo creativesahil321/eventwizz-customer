@@ -13,6 +13,12 @@ import {
   CustomerUpdatePayload,
 } from "./types";
 import {
+  buildBulkDeletePayload,
+  buildSendDeleteOtpPayload,
+  buildSingleDeletePayload,
+  buildVerifyDeleteOtpPayload,
+} from "./customer-delete";
+import {
   CustomerCreateResponse,
   CustomerUpdateResponse,
   CustomerDeleteResponse,
@@ -103,16 +109,44 @@ export const useUpdateCustomer = () => {
   });
 };
 
+export const useSendCustomerDeleteOtp = () => {
+  return useMutation({
+    mutationFn: (customerIds: Array<number | string>) =>
+      customersService.sendDeleteOtp(buildSendDeleteOtpPayload(customerIds)),
+  });
+};
+
+export const useVerifyCustomerDeleteOtp = () => {
+  return useMutation({
+    mutationFn: ({
+      customerIds,
+      otp,
+    }: {
+      customerIds: Array<number | string>;
+      otp: string;
+    }) =>
+      customersService.verifyDeleteOtp(
+        buildVerifyDeleteOtpPayload(customerIds, otp),
+      ),
+  });
+};
+
 export const useDeleteCustomer = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<CustomerDeleteResponse, Error, number>({
-    mutationFn: async (id: number) => {
-      const response = await customersService.deleteCustomer(id);
+  return useMutation<
+    CustomerDeleteResponse,
+    Error,
+    { id: number; otp: string }
+  >({
+    mutationFn: async ({ id, otp }) => {
+      const response = await customersService.deleteCustomer(
+        id,
+        buildSingleDeletePayload(otp),
+      );
       return response;
     },
-    onSuccess: (_, id) => {
-      // Invalidate specific customer query and lists
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({
         queryKey: customerKeys.detail(id),
       });
@@ -142,31 +176,6 @@ export const useSendEmailToCustomer = () => {
     },
     onError: (error: Error) => {
       console.error("Error sending email to customer:", error);
-    },
-  });
-};
-
-export const useRestoreCustomer = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    { status: boolean; message: string; data: unknown },
-    Error,
-    number
-  >({
-    mutationFn: async (id: number) => {
-      const response = await customersService.restoreCustomer(id);
-      return response;
-    },
-    onSuccess: (_, id) => {
-      // Invalidate customer queries to refresh the list
-      queryClient.invalidateQueries({
-        queryKey: customerKeys.detail(id),
-      });
-      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
-    },
-    onError: (error: Error) => {
-      console.error("Error restoring customer:", error);
     },
   });
 };
@@ -264,40 +273,19 @@ export const useBulkDeleteCustomers = () => {
   return useMutation<
     { status: boolean; message: string; data: unknown },
     Error,
-    (number | string)[]
+    { customerIds: Array<number | string>; otp: string }
   >({
-    mutationFn: async (customerIds) => {
-      const response = await customersService.bulkDeleteCustomers(customerIds);
+    mutationFn: async ({ customerIds, otp }) => {
+      const response = await customersService.bulkDeleteCustomers(
+        buildBulkDeletePayload(customerIds, otp),
+      );
       return response;
     },
     onSuccess: () => {
-      // Invalidate customers list to refresh data
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
     },
     onError: (error: Error) => {
       console.error("Error bulk deleting customers:", error);
-    },
-  });
-};
-
-export const useBulkRestoreCustomers = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    { status: boolean; message: string; data: unknown },
-    Error,
-    (number | string)[]
-  >({
-    mutationFn: async (customerIds) => {
-      const response = await customersService.bulkRestoreCustomers(customerIds);
-      return response;
-    },
-    onSuccess: () => {
-      // Invalidate customers list to refresh data
-      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
-    },
-    onError: (error: Error) => {
-      console.error("Error bulk restoring customers:", error);
     },
   });
 };

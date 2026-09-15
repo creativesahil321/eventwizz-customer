@@ -156,6 +156,7 @@ export const CHAT_RAISE_ENQUIRY_SEND = "raise a support enquiry";
 export function isChatBookingVenueEnquiryIntent(text: string): boolean {
   const n = text.toLowerCase().replace(/[’']/g, "'");
   if (/\bask the venue\b/.test(n)) return true;
+  if (/\bi have (a |an )?(enquiry|inquiry|query)\b/.test(n)) return true;
   return /\braise (a |an )?(support )?(enquiry|inquiry|ticket|query)\b/.test(n);
 }
 

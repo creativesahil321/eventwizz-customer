@@ -203,7 +203,8 @@ export const API_ENDPOINTS = {
       CREATE: "/vendor/customers/store",
       UPDATE: "/vendor/customers/update/{id}",
       DELETE: "/vendor/customers/delete/{id}",
-      RESTORE: "/vendor/customers/restore/{id}",
+      SEND_DELETE_OTP: "/vendor/customers/send-delete-otp",
+      VERIFY_DELETE_OTP: "/vendor/customers/verify-delete-otp",
       PERMANENT_DELETE: "/vendor/customers/permanent-delete/{id}",
       SEND_MAIL: "/vendor/customers/send-mail-to-customer",
       SEND_BULK_MAIL: "/vendor/customers/send-mail-to-all-customers",
@@ -212,7 +213,6 @@ export const API_ENDPOINTS = {
         BULK_ACTIVATE: "/vendor/customers/bulk-activate",
         BULK_DEACTIVATE: "/vendor/customers/bulk-deactivate",
         BULK_DELETE: "/vendor/customers/bulk-delete",
-        BULK_RESTORE: "/vendor/customers/bulk-restore",
       }
     },
     BOOKING_HISTORY: {

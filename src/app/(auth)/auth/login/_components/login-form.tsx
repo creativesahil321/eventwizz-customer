@@ -32,13 +32,21 @@ import { AuthAlternateLink } from "@/app/(auth)/_components/auth-alternate-link"
 import { AuthLegalNotice } from "@/app/(auth)/_components/auth-legal-notice";
 import { clearOnboardingBrowserState } from "@/lib/clear-vendor-browser-session";
 
-export default function LoginForm() {
+type LoginFormProps = {
+  stayOnPage?: boolean;
+  callbackUrlOverride?: string | null;
+};
+
+export default function LoginForm({
+  stayOnPage = false,
+  callbackUrlOverride,
+}: LoginFormProps = {}) {
   const [loading, setLoading] = React.useState(false);
   const [redirecting, setRedirecting] = React.useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { website_role, parentDomain } = useDomain();
-  const callbackUrl = searchParams.get("callbackUrl");
+  const callbackUrl = callbackUrlOverride ?? searchParams.get("callbackUrl");
 
   // Handle error from URL parameters (for OAuth errors)
   React.useEffect(() => {
@@ -189,8 +197,16 @@ export default function LoginForm() {
           throw new Error(result.error);
         }
 
-        // Prefer safe callbackUrl for customers (e.g. return to checkout after booking)
         try {
+          if (stayOnPage) {
+            const next =
+              callbackUrl ||
+              `${window.location.pathname}${window.location.search}` ||
+              "/vendor/door-scan";
+            window.location.replace(next);
+            return;
+          }
+
           router.push(
             resolvePostLoginRedirect({
               accountType: account_type,
@@ -237,6 +253,7 @@ export default function LoginForm() {
                   <OAuthButtons
                     website_role={website_role || undefined}
                     parentDomain={parentDomain || undefined}
+                    callbackUrl={callbackUrl || undefined}
                   />
                 )}
               </div>
@@ -340,7 +357,7 @@ export default function LoginForm() {
             </Button>
 
             <AuthLegalNotice variant="login" />
-            <AuthAlternateLink variant="login" />
+            <AuthAlternateLink variant="login" callbackUrl={callbackUrl} />
           </div>
         </form>
       </div>

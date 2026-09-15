@@ -71,6 +71,7 @@ import {
   buildBudgetEventsReply,
   isEventWindowFollowUp,
   isLiveEventAvailabilityQuestion,
+  isVendorEventQrSetupIntent,
   asWeakMatches,
   canonicalizeLiveEventHref,
   rewriteAssistantEventHrefs,
@@ -211,7 +212,10 @@ import {
 import {
   detectCustomerOnDemandQueryType,
   fetchCustomerOnDemandChatReply,
+  isCustomerEnquirySendIntent,
   isCustomerFollowUpQuery,
+  isCustomerRaiseEnquiryIntent,
+  isInactiveAccountAccessIntent,
   resolveCustomerTopicFromHistory,
   buildCustomerForbiddenReply,
   buildCustomerLoginReply,
@@ -555,10 +559,64 @@ function isSupportIntent(text: string): boolean {
   const t = text.trim();
   if (/i'?ll type the ticket quantity/i.test(t)) return false;
   if (/^\d{1,3}\s*[x×]\s+/i.test(t)) return false;
-  return SUPPORT_INTENT_RE.test(t);
+  return (
+    SUPPORT_INTENT_RE.test(t) ||
+    isCustomerRaiseEnquiryIntent(t) ||
+    isCustomerEnquirySendIntent(t)
+  );
+}
+
+function isBareSupportAsk(text: string): boolean {
+  const t = text
+    .trim()
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/[?.!]+$/g, "");
+  return /^(i have (a |an )?(issue|problem|query|enquiry)|i need (help|support)|i'?ve got (a |an )?(issue|problem|query|enquiry)|help)$/i.test(
+    t,
+  );
+}
+
+function isSubstantialSupportDescription(text: string): boolean {
+  const t = text.trim();
+  if (t.length < 12) return false;
+  if (isBareSupportAsk(t)) return false;
+  if (isCustomerEnquirySendIntent(t) && t.length < 40) return false;
+  if (
+    /\b(make|made|write|create|prepare).{0,28}\b(draft|enquiry|inquiry|ticket)\b/i.test(
+      t,
+    )
+  ) {
+    return false;
+  }
+  return t.length >= 24 || /\bmy (issue|problem|query|enquiry) is\b/i.test(t);
+}
+
+function extractEnquiryDraftFromAssistant(content: string): string | null {
+  const dashed = content.match(/---\s*([\s\S]*?)\s*---/);
+  if (dashed?.[1] && dashed[1].trim().length >= 20) {
+    return dashed[1].trim();
+  }
+  const desc = content.match(
+    /Description:\s*([\s\S]+?)(?:\n---|\n\nYou can copy|$)/i,
+  );
+  if (desc?.[1]?.trim().length >= 20) {
+    const subject = content.match(/Subject:\s*([^\n]+)/i)?.[1]?.trim();
+    const body = desc[1].trim();
+    return subject ? `Subject: ${subject}\n\n${body}` : body;
+  }
+  if (/here'?s a draft/i.test(content) && content.length > 120) {
+    const clipped = content
+      .replace(/^[\s\S]*?(?=Subject:|Hello[, ])/i, "")
+      .replace(/\n+You can copy[\s\S]*$/i, "")
+      .trim();
+    return clipped.length >= 20 ? clipped : null;
+  }
+  return null;
 }
 
 function isAuthIntent(text: string): boolean {
+  if (isInactiveAccountAccessIntent(text)) return false;
   return AUTH_INTENT_RE.test(text);
 }
 
@@ -1452,6 +1510,20 @@ export function ChatBot() {
   }, [pathname]);
 
   function startGuidedSupport(issueText: string) {
+    const priorIssue = [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === "user" &&
+          isSubstantialSupportDescription(message.content),
+      )?.content;
+    const seed = isSubstantialSupportDescription(issueText)
+      ? issueText.trim()
+      : priorIssue?.trim();
+    if (seed) {
+      showEnquiryDraftFromIssue(seed);
+      return;
+    }
     setSupportFlow({
       ...INITIAL_FLOW,
       step: "category",
@@ -1464,6 +1536,30 @@ export function ChatBot() {
         content:
           "I can raise a support enquiry for you. Please choose a category (or No thanks to cancel):",
         quickActions: CATEGORY_ACTIONS,
+      },
+    ]);
+  }
+
+  function showEnquiryDraftFromIssue(issue: string) {
+    setSupportFlow({
+      ...INITIAL_FLOW,
+      step: "review_draft",
+      category: "general_support",
+      description: issue,
+      issueSummary: issue.slice(0, 160),
+      prefilledDraft: true,
+    });
+    const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
+    setMessages((prev) => [
+      ...clearQuickActions(prev),
+      {
+        role: "assistant",
+        content: `I’ve drafted this enquiry${nameBit}. Check it — send this, or type a change and I’ll update it.\n\n${issue}`,
+        quickActions: [
+          { id: "confirm_draft", label: "Looks good" },
+          { id: "edit_draft", label: "I’ll edit this" },
+          { id: "cancel_flow", label: "Cancel" },
+        ],
       },
     ]);
   }
@@ -1642,19 +1738,21 @@ export function ChatBot() {
     }
   }
 
-  function askForPhone(category: SupportCategory) {
+  function askForPhone(category: SupportCategory, prefilled?: boolean) {
+    const drafted = prefilled === true || supportFlow.prefilledDraft;
     setSupportFlow((prev) => ({
       ...prev,
       step: "phone",
       category,
       phone: "",
+      prefilledDraft: drafted || prev.prefilledDraft,
     }));
 
     setMessages((prev) => [
       ...clearQuickActions(prev),
       {
         role: "assistant",
-        content: supportFlow.prefilledDraft
+        content: drafted
           ? "Thank you. What’s the best telephone number to reach you on? I’ll send this enquiry to the venue as soon as I have it."
           : "Thank you. What’s the best telephone number to reach you on?",
       },
@@ -2189,6 +2287,10 @@ export function ChatBot() {
         askForPhone("general_support");
         return;
       }
+      if (isSubstantialSupportDescription(userText)) {
+        showEnquiryDraft(userText.trim());
+        return;
+      }
       setMessages((prev) => [
         ...clearQuickActions(prev),
         {
@@ -2435,6 +2537,41 @@ export function ChatBot() {
       }
     }
 
+    if (isLoggedInVendor && isVendorEventQrSetupIntent(userText)) {
+      const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
+      const named = userText
+        .replace(/[–—]/g, "-")
+        .match(/\bfor\s+(?:the\s+)?(.+?)\s*$/i)?.[1]
+        ?.replace(/\s+event$/i, "")
+        .trim();
+      const looksLikeEventName =
+        named &&
+        named.length >= 3 &&
+        named.length <= 80 &&
+        !/\b(qr|invoice|door)\b/i.test(named);
+      const eventBit = looksLikeEventName ? `**${named}**` : "the event";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `I can’t flip that switch from chat${nameBit} — QR is turned on in the event form, on the booking invoice.\n\n1. Open **Events**.\n2. Open ${eventBit}.\n3. Go to the **Finalise** tab.\n4. Under **Door entry QR**, choose **Yes — show the door-entry QR**.\n5. Save / finalise the event.\n\nGuests then get a unique QR on their invoice. Staff scan it from **Door Scan** — that screen does not turn QR on.\n\n[Open Events](/vendor/events) · [Open Door Scan](/vendor/door-scan)`,
+          quickActions: [
+            {
+              id: "open-events",
+              label: "Open Events",
+              href: "/vendor/events",
+            },
+            {
+              id: "open-door-scan",
+              label: "Open Door Scan",
+              href: "/vendor/door-scan",
+            },
+          ],
+        },
+      ]);
+      return;
+    }
+
     // ── Vendor on-demand live data queries ──
     if (isLoggedInVendor && !isVendorStorefront) {
       let vendorQueryType = detectVendorOnDemandQueryType(userText);
@@ -2596,6 +2733,8 @@ export function ChatBot() {
 
     const isPlatformEventBookingQuestion =
       !isVendorStorefront &&
+      !isLoggedInVendor &&
+      !isLoggedInAdmin &&
       (isLiveEventBookingIntent(userText) ||
         isBroadEventListIntent(userText) ||
         isLiveEventAvailabilityQuestion(userText));
@@ -2740,13 +2879,74 @@ export function ChatBot() {
       }
     }
 
-    // Logged-in customer on vendor site: start professional enquiry wizard
-    if (isVendorStorefront && isLoggedInCustomer && isSupportIntent(userText)) {
-      startGuidedSupport(userText);
-      return;
+    // Logged-in customer on vendor site: send an already-drafted enquiry, or start the wizard
+    if (isVendorStorefront && isLoggedInCustomer) {
+      if (isCustomerEnquirySendIntent(userText)) {
+        const lastAssistant = [...messages]
+          .reverse()
+          .find((message) => message.role === "assistant")?.content;
+        const drafted =
+          (lastAssistant
+            ? extractEnquiryDraftFromAssistant(lastAssistant)
+            : null) ||
+          [...messages]
+            .reverse()
+            .find(
+              (message) =>
+                message.role === "user" &&
+                isSubstantialSupportDescription(message.content),
+            )?.content;
+        if (drafted) {
+          setSupportFlow({
+            ...INITIAL_FLOW,
+            step: "review_draft",
+            category: "general_support",
+            description: drafted,
+            issueSummary: drafted.slice(0, 160),
+            prefilledDraft: true,
+          });
+          askForPhone("general_support", true);
+          return;
+        }
+      }
+      if (isSupportIntent(userText)) {
+        startGuidedSupport(userText);
+        return;
+      }
     }
 
     // Guest on vendor site: offer Register / Log in buttons
+    if (
+      isVendorStorefront &&
+      isInactiveAccountAccessIntent(userText)
+    ) {
+      const nameBit = userName?.trim() ? `, ${userName.trim()}` : "";
+      const contactLines = [
+        contactPhone ? `Phone: **${contactPhone}**` : "",
+        contactEmail ? `Email: **${contactEmail}**` : "",
+      ].filter(Boolean);
+      const contactBit =
+        contactLines.length > 0 ? `\n\n${contactLines.join("\n")}` : "";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `That login message means this venue has marked the account as **inactive**${nameBit}. I can’t turn it back on from chat, and creating a new account won’t fix it.\n\nPlease contact the venue and ask them to check the account and reactivate it if that’s right.${contactBit}`,
+          quickActions: [
+            {
+              id: "contact-venue",
+              label: "Contact the venue",
+              href: "/contact",
+            },
+          ],
+          supportCta: isLoggedInCustomer
+            ? { href: "/customer/support/new", label: "Open New enquiry" }
+            : { href: "/contact", label: "Contact the venue" },
+        },
+      ]);
+      return;
+    }
+
     if (isVendorStorefront && !isLoggedInCustomer && isAuthIntent(userText)) {
       offerGuestAuthOptions();
       return;
@@ -3413,7 +3613,12 @@ Is there anything else I can help you with?`,
       }
       const locationPick = isLiveEventLocationChoiceText(userText, liveEvents);
       let pickedLiveEvent: LiveEventChatMatch | undefined;
-      if (isVendorStorefront && !eventBookingBrief && tenantHost) {
+      if (
+        isVendorStorefront &&
+        !eventBookingBrief &&
+        tenantHost &&
+        !isSupportIntent(userText)
+      ) {
         const conversationMatches = matchLiveEventsFromConversation(
           userText,
           messages,

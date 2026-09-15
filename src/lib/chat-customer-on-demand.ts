@@ -136,11 +136,77 @@ export function isCustomerAccountIntent(text: string): boolean {
   );
 }
 
+/** Login failed because the venue marked the account inactive — not a sign-up ask. */
+export function isInactiveAccountAccessIntent(text: string): boolean {
+  const t = norm(text).toLowerCase().replace(/[’']/g, "'");
+  if (!t) return false;
+  if (
+    /\b(account is inactive|inactive account|account (has been |was )?(deactivated|disabled|suspended|blocked))\b/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(inactive|deactivated|disabled|suspended)\b/.test(t) &&
+    /\b(log\s*in|login|sign\s*in|account|error)\b/.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function isCustomerSupportInboxIntent(text: string): boolean {
   const t = norm(text);
   return /\b(my support (requests?|tickets?)|show (me )?(my )?support|status of my support|reply to support)\b/i.test(
     t,
   );
+}
+
+/** Customer wants a venue support ticket — not a catalogue browse. */
+export function isCustomerRaiseEnquiryIntent(text: string): boolean {
+  const t = norm(text).toLowerCase().replace(/[’']/g, "'");
+  if (!t) return false;
+  if (
+    /\b(book an event|what events|upcoming events|what's on|whats on)\b/.test(t)
+  ) {
+    return false;
+  }
+  if (
+    /\b(i have (a |an )?(issue|problem|query|enquiry)|i'?ve got (a |an )?(issue|problem|query|enquiry)|having (a |an )?(issue|problem)|my (issue|problem|query|enquiry) is)\b/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(make|made|write|create|prepare|draft).{0,28}\b(draft|enquiry|inquiry|ticket)\b/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\braise (a |an )?(support )?(enquiry|inquiry|ticket|query)\b/.test(t) ||
+    /\b(new enquiry|formal (enquiry|ticket)|support ticket)\b/.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function isCustomerEnquirySendIntent(text: string): boolean {
+  const t = norm(text).toLowerCase().replace(/[’']/g, "'");
+  if (/\b(brochure|tickets?|menu|email updates?)\b/.test(t)) return false;
+  if (/\bsend (the )?(enquiry|inquiry|ticket|draft)\b/.test(t)) return true;
+  if (
+    /^(yes|yeah|yep|ok|okay|sure)([,.]?\s+(please\s+)?send(\s+(it|this|now))?)?$/.test(
+      t,
+    )
+  ) {
+    return /\bsend\b/.test(t);
+  }
+  return /^(please\s+)?send(\s+(it|this|now))?$/.test(t);
 }
 
 export function isCustomerCancelIntent(text: string): boolean {

@@ -180,6 +180,18 @@ export type DoorEntryErrorCode =
   | "wrong_venue"
   | "permission_denied";
 
+export interface DoorEntryTicketLine {
+  name: string;
+  quantity: number;
+}
+
+export interface DoorEntryTableLine {
+  id: number;
+  name: string;
+  table_size: number;
+  people: number;
+}
+
 export interface DoorEntryDateRow {
   booking_date_id: number;
   booking_date: string;
@@ -188,6 +200,9 @@ export interface DoorEntryDateRow {
   entry_label: string;
   can_check_in: boolean;
   checked_in_at?: string | null;
+  guest_count: number;
+  tickets: DoorEntryTicketLine[];
+  tables: DoorEntryTableLine[];
 }
 
 export interface DoorEntryScanData {

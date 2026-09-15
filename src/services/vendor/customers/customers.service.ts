@@ -8,6 +8,12 @@ import {
   CustomerCreateResponse,
   CustomerUpdateResponse,
   CustomerDeleteResponse,
+  CustomerDeletePayload,
+  CustomerSendDeleteOtpPayload,
+  CustomerSendDeleteOtpResponse,
+  CustomerVerifyDeleteOtpPayload,
+  CustomerVerifyDeleteOtpResponse,
+  CustomerBulkDeletePayload,
 } from "./types";
 import {
   getCurrentUserRole,
@@ -109,11 +115,61 @@ export const customersService = {
   },
 
   /**
-   * Delete a customer
-   * @param id Customer ID to delete
-   * @returns Promise with delete operation result
+   * Email a delete OTP to the vendor owner (never staff).
+   * POST /vendor/customers/send-delete-otp
    */
-  deleteCustomer: (id: number | string) => {
+  sendDeleteOtp: (payload: CustomerSendDeleteOtpPayload) => {
+    const role = getCurrentUserRole();
+    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
+      "CUSTOMERS",
+      role
+    );
+
+    if (!endpoints.SEND_DELETE_OTP) {
+      throw new Error("SEND_DELETE_OTP endpoint not configured for customers");
+    }
+
+    return api.post<CustomerSendDeleteOtpResponse>(
+      endpoints.SEND_DELETE_OTP,
+      payload,
+      {
+        returnFullResponse: true,
+      }
+    );
+  },
+
+  /**
+   * Verify the delete OTP before unlocking the confirmation phrase.
+   * POST /vendor/customers/verify-delete-otp
+   */
+  verifyDeleteOtp: (payload: CustomerVerifyDeleteOtpPayload) => {
+    const role = getCurrentUserRole();
+    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
+      "CUSTOMERS",
+      role
+    );
+
+    if (!endpoints.VERIFY_DELETE_OTP) {
+      throw new Error(
+        "VERIFY_DELETE_OTP endpoint not configured for customers"
+      );
+    }
+
+    return api.post<CustomerVerifyDeleteOtpResponse>(
+      endpoints.VERIFY_DELETE_OTP,
+      payload,
+      {
+        returnFullResponse: true,
+      }
+    );
+  },
+
+  /**
+   * Soft-delete a customer after OTP + typed confirmation phrase.
+   * DELETE /vendor/customers/delete/{id}
+   * Body: { otp, confirmation: "delete this customer" }
+   */
+  deleteCustomer: (id: number | string, payload: CustomerDeletePayload) => {
     const role = getCurrentUserRole();
     const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
       "CUSTOMERS",
@@ -125,24 +181,10 @@ export const customersService = {
       throw new Error("DELETE endpoint not configured for customers");
     }
 
-    return api
-      .delete<CustomerDeleteResponse>(url, {
-        returnFullResponse: true,
-      })
-      .catch((error) => {
-        console.error("API error in deleteCustomer:", error);
-
-        if (error.response && error.response.data) {
-          return error.response.data;
-        }
-
-        return {
-          status: false,
-          message: error.message || "Failed to delete customer",
-          errors: [],
-          data: null,
-        };
-      });
+    return api.delete<CustomerDeleteResponse>(url, {
+      data: payload,
+      returnFullResponse: true,
+    });
   },
 
   /**
@@ -286,32 +328,6 @@ export const customersService = {
   },
 
   /**
-   * Restore a soft-deleted customer
-   * @param id Customer ID to restore
-   * @returns Promise with restore operation result
-   */
-  restoreCustomer: (id: number | string) => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
-      "CUSTOMERS",
-      role
-    );
-
-    const url = endpoints.RESTORE?.replace("{id}", id.toString());
-    if (!url) {
-      throw new Error("RESTORE endpoint not configured for customers");
-    }
-
-    return api.put<{ status: boolean; message: string; data: unknown }>(
-      url,
-      {},
-      {
-        returnFullResponse: true,
-      }
-    );
-  },
-
-  /**
    * Permanently delete a customer
    * @param id Customer ID to permanently delete
    * @returns Promise with permanent delete operation result
@@ -405,11 +421,11 @@ export const customersService = {
   },
 
   /**
-   * Bulk delete customers
-   * @param customerIds Array of customer IDs to delete
-   * @returns Promise with bulk delete operation result
+   * Bulk soft-delete customers after OTP + typed confirmation phrase.
+   * POST /vendor/customers/bulk-delete
+   * Body: { customer_ids, otp, confirmation: "delete this customer" }
    */
-  bulkDeleteCustomers: (customerIds: (number | string)[]) => {
+  bulkDeleteCustomers: (payload: CustomerBulkDeletePayload) => {
     const role = getCurrentUserRole();
     const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
       "CUSTOMERS",
@@ -420,54 +436,11 @@ export const customersService = {
       throw new Error("BULK_DELETE endpoint not configured for customers");
     }
 
-    // Format payload as FormData with array notation: customer_ids[0]:4, customer_ids[1]:36, etc.
-    const formData = new FormData();
-    customerIds.forEach((id, index) => {
-      formData.append(`customer_ids[${index}]`, id.toString());
-    });
-
     return api.post<{ status: boolean; message: string; data: unknown }>(
       endpoints.MULTIPLE_ACTIONS.BULK_DELETE,
-      formData,
+      payload,
       {
         returnFullResponse: true,
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-  },
-
-  /**
-   * Bulk restore customers
-   * @param customerIds Array of customer IDs to restore
-   * @returns Promise with bulk restore operation result
-   */
-  bulkRestoreCustomers: (customerIds: (number | string)[]) => {
-    const role = getCurrentUserRole();
-    const endpoints = getEndpointsByRole<typeof API_ENDPOINTS.VENDOR.CUSTOMERS>(
-      "CUSTOMERS",
-      role
-    );
-
-    if (!endpoints.MULTIPLE_ACTIONS?.BULK_RESTORE) {
-      throw new Error("BULK_RESTORE endpoint not configured for customers");
-    }
-
-    // Format payload as FormData with array notation: customer_ids[0]:4, customer_ids[1]:36, etc.
-    const formData = new FormData();
-    customerIds.forEach((id, index) => {
-      formData.append(`customer_ids[${index}]`, id.toString());
-    });
-
-    return api.post<{ status: boolean; message: string; data: unknown }>(
-      endpoints.MULTIPLE_ACTIONS.BULK_RESTORE,
-      formData,
-      {
-        returnFullResponse: true,
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
       }
     );
   },

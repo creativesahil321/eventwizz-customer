@@ -51,13 +51,7 @@ export interface CustomerResponse {
  */
 export type DataTableRowAction<TData> = {
   row: Row<TData>;
-  type:
-    | "show"
-    | "delete"
-    | "edit"
-    | "mail"
-    | "restore"
-    | "permanent-delete";
+  type: "show" | "delete" | "edit" | "mail" | "permanent-delete";
 };
 
 /**

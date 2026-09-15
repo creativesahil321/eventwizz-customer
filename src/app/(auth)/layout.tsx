@@ -5,7 +5,12 @@ import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { AuthContent } from "./_components/auth-content";
 import { AuthSkeleton } from "./_components/auth-skeleton";
-import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url";
+import {
+  getSafeCallbackUrl,
+  isVendorDoorEntryCallback,
+  resolvePostLoginRedirect,
+  saveAuthCallbackUrl,
+} from "@/lib/auth/safe-callback-url";
 import LocationSelectionHeader from "@/app/(public)/vendor/_components/LocationPage/location-selection-header";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
@@ -26,6 +31,19 @@ export default function AuthLayout({
   const isSecurityViolation =
     searchParams.get("error") === "security_violation";
   const callbackUrl = searchParams.get("callbackUrl");
+  const doorScanReturn = isVendorDoorEntryCallback(callbackUrl)
+    ? getSafeCallbackUrl(callbackUrl)
+    : null;
+
+  useEffect(() => {
+    if (callbackUrl) saveAuthCallbackUrl(callbackUrl);
+  }, [callbackUrl]);
+
+  useEffect(() => {
+    if (!doorScanReturn) return;
+    setIsRedirecting(true);
+    router.replace(doorScanReturn);
+  }, [doorScanReturn, router]);
 
   useEffect(() => {
     if (!isSecurityViolation || status !== "authenticated") return;
@@ -36,6 +54,7 @@ export default function AuthLayout({
   }, [isSecurityViolation, status]);
 
   useEffect(() => {
+    if (doorScanReturn) return;
     if (
       status === "authenticated" &&
       session?.user &&
@@ -62,9 +81,11 @@ export default function AuthLayout({
     isSecurityViolation,
     isSigningOutSecurity,
     callbackUrl,
+    doorScanReturn,
   ]);
 
   if (
+    doorScanReturn ||
     status === "loading" ||
     status === "authenticated" ||
     isRedirecting ||

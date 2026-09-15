@@ -28,6 +28,7 @@ const RESERVED_LOCATION_SLUGS = new Set([
   "policies",
   "terms",
   "privacy",
+  "entry",
 ]);
 
 export async function generateMetadata(props: {

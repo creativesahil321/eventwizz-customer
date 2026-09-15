@@ -7,6 +7,7 @@ import { getSafeCallbackUrl } from "@/lib/auth/safe-callback-url";
 
 type AuthAlternateLinkProps = {
   variant: "login" | "register";
+  callbackUrl?: string | null;
 };
 
 function getRegistrationPath(website_role: string | null | undefined) {
@@ -30,10 +31,13 @@ function withCallbackUrl(path: string, callbackUrl: string | null): string {
   return `${path}${separator}callbackUrl=${encodeURIComponent(safe)}`;
 }
 
-export function AuthAlternateLink({ variant }: AuthAlternateLinkProps) {
+export function AuthAlternateLink({
+  variant,
+  callbackUrl: callbackUrlProp,
+}: AuthAlternateLinkProps) {
   const { website_role } = useDomain();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl");
+  const callbackUrl = callbackUrlProp ?? searchParams.get("callbackUrl");
 
   const linkClassName =
     "font-medium text-[var(--color-text)] hover:text-[var(--color-primary)] hover:underline";

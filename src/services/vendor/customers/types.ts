@@ -113,3 +113,34 @@ export interface CustomerUpdateResponse extends ApiResponse {
 export interface CustomerDeleteResponse extends ApiResponse {
   data: null;
 }
+
+export interface CustomerSendDeleteOtpPayload {
+  customer_ids: number[];
+}
+
+export type CustomerSendDeleteOtpResponse = ApiResponse<{
+  masked_email?: string;
+  expires_in?: number;
+  resend_after?: number;
+  customer_count?: number;
+}>;
+
+export interface CustomerVerifyDeleteOtpPayload {
+  customer_ids: number[];
+  otp: string;
+}
+
+export type CustomerVerifyDeleteOtpResponse = ApiResponse<{
+  verified?: boolean;
+}>;
+
+export interface CustomerDeletePayload {
+  otp: string;
+  confirmation: string;
+}
+
+export interface CustomerBulkDeletePayload {
+  customer_ids: number[];
+  otp: string;
+  confirmation: string;
+}

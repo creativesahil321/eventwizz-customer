@@ -35,6 +35,7 @@ import {
   cleanVendorStepThreeDatesForForm,
   formatVendorStepThreeDateForApi,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
+import { hydrateMenuChoicesCloseDaysBefore } from "@/app/(protected)/vendor/events/_lib/menu-choices-close-days";
 import {
   normalizeVendorStepFourMenus,
   type VendorStepFourRoomEntry,
@@ -604,6 +605,13 @@ async function applyAIGeneratedEventToBackendInner(params: {
       catering_option: roomCatering as 0 | 1,
       menu_title: roomCatering === 1 ? resolved.menu_title : "",
       menu_description: roomCatering === 1 ? resolved.menu_description : "",
+      menu_choices_close_days_before: hydrateMenuChoicesCloseDaysBefore(
+        (
+          s.stepFour as {
+            menu_choices_close_days_before?: unknown;
+          }
+        ).menu_choices_close_days_before,
+      ),
       event_menu_category_id: roomCatering === 1 ? roomCategoryId : 0,
       menus: roomCatering === 1 ? roomMenus : [],
       menu_background_image: menuBgFile ?? null,
@@ -623,6 +631,8 @@ async function applyAIGeneratedEventToBackendInner(params: {
       catering_option: activeMenu.catering_option,
       menu_title: activeMenu.menu_title,
       menu_description: activeMenu.menu_description,
+      menu_choices_close_days_before:
+        activeMenu.menu_choices_close_days_before,
       event_menu_category_id: activeMenu.event_menu_category_id,
       menus: activeMenu.menus,
       menu_background_image: activeMenu.menu_background_image ?? undefined,
@@ -636,6 +646,15 @@ async function applyAIGeneratedEventToBackendInner(params: {
       menu_title: cateringPersistable ? s.stepFour.menu_title : undefined,
       menu_description: cateringPersistable
         ? s.stepFour.menu_description
+        : undefined,
+      menu_choices_close_days_before: cateringPersistable
+        ? hydrateMenuChoicesCloseDaysBefore(
+            (
+              s.stepFour as {
+                menu_choices_close_days_before?: unknown;
+              }
+            ).menu_choices_close_days_before,
+          )
         : undefined,
       event_menu_category_id: cateringPersistable
         ? defaultMenuCategoryId

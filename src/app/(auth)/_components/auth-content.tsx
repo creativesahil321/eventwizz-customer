@@ -82,6 +82,10 @@ export function AuthContent({
   const isCustomer = segments.includes("customer");
   const isVendor = segments.includes("vendor");
   const isLogin = segments.includes("login");
+  const isDoorScan =
+    pathname?.startsWith("/vendor/door-scan") ||
+    (callbackUrl ?? "").includes("/vendor/door-scan") ||
+    (callbackUrl ?? "").includes("/entry");
   const isVendorOnboarding =
     (callbackUrl ?? "").includes("/on-boarding");
 
@@ -115,7 +119,17 @@ export function AuthContent({
     );
   }
 
-  if (isLogin) {
+  if (isLogin || isDoorScan) {
+    if (isDoorScan) {
+      return (
+        <AuthPanel
+          title="Check guests in"
+          description={`Sign in with your ${siteName} staff account to open Door Scan. If you are already signed in as a venue user, this page opens the scanner.`}
+          trust="Door staff sign-in stays on this page"
+        />
+      );
+    }
+
     if (isVendorOnboarding) {
       return (
         <AuthPanel

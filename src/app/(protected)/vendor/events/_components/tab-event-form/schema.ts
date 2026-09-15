@@ -37,6 +37,7 @@ import {
 } from "@/lib/event-menu-categories";
 import { getContactNumberIssue } from "@/lib/contact-number";
 import { menuChoicesReminderDaysSchema } from "@/app/(protected)/vendor/events/_lib/menu-choices-reminder-days";
+import { menuChoicesCloseDaysBeforeSchema } from "@/app/(protected)/vendor/events/_lib/menu-choices-close-days";
 
 // Validation functions for event scheduler
 // Removed future time validation - only keeping sequence validation
@@ -972,6 +973,7 @@ const stepFourRoomEntrySchema = z.object({
   catering_option: z.number().min(0).max(1).optional(),
   menu_title: z.string().optional(),
   menu_description: z.string().optional(),
+  menu_choices_close_days_before: z.number().optional(),
   event_menu_category_id: z.number().optional(),
   menus: z.array(z.record(z.string(), z.unknown())).optional(),
   menu_background_image: z
@@ -994,6 +996,7 @@ export const stepFourSchema = z
       .string()
       .max(160, "Menu description must not exceed 160 characters")
       .optional(),
+    menu_choices_close_days_before: menuChoicesCloseDaysBeforeSchema,
     event_menu_category_id: z.number().optional(),
     menus: stepFourMenusSchema,
     menu_background_image: z

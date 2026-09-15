@@ -2,12 +2,17 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/authOptions";
 import { ServerRoleGuard } from "@/components/auth/ServerRoleGuard";
+import { isDoorScanRequest } from "@/lib/auth/is-door-scan-request";
 
 export default async function VendorLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  if (await isDoorScanRequest()) {
+    return <>{children}</>;
+  }
+
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {

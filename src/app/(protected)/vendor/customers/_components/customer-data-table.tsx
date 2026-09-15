@@ -10,10 +10,6 @@ const DeleteCustomerDialog = dynamic(
   () => import("./_customer-delete").then((mod) => mod.DeleteCustomerDialog),
   { ssr: false }
 );
-const RestoreCustomerDialog = dynamic(
-  () => import("./_customer-restore").then((mod) => mod.RestoreCustomerDialog),
-  { ssr: false }
-);
 const MailCustomerDialog = dynamic(
   () => import("./_customer-mail").then((mod) => mod.MailCustomerDialog),
   { ssr: false }
@@ -100,17 +96,17 @@ export default function CustomerDataTable({
   return (
     <>
       <DataTable table={table} />
-      {rowAction?.type === "delete" && (
-        <>
-          <DeleteCustomerDialog
-            open={rowAction?.type === "delete"}
-            onOpenChange={() => setRowAction(null)}
-            showTrigger={false}
-            customer={rowAction?.row?.original ? rowAction?.row.original : null}
-            onSuccess={() => rowAction?.row?.toggleSelected(false)}
-          />
-        </>
-      )}
+      {rowAction?.type === "delete" && rowAction.row.original ? (
+        <DeleteCustomerDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setRowAction(null);
+          }}
+          customerIds={[rowAction.row.original.id]}
+          customers={[rowAction.row.original]}
+          onSuccess={() => rowAction.row.toggleSelected(false)}
+        />
+      ) : null}
       {rowAction?.type === "edit" && (
         <>
           <UpdateCustomerDialog
@@ -130,17 +126,6 @@ export default function CustomerDataTable({
         <>
           <MailCustomerDialog
             open={rowAction?.type === "mail"}
-            onOpenChange={() => setRowAction(null)}
-            customer={rowAction?.row?.original ? rowAction?.row.original : null}
-            showTrigger={false}
-            onSuccess={() => rowAction?.row.toggleSelected(false)}
-          />
-        </>
-      )}
-      {rowAction?.type === "restore" && (
-        <>
-          <RestoreCustomerDialog
-            open={rowAction?.type === "restore"}
             onOpenChange={() => setRowAction(null)}
             customer={rowAction?.row?.original ? rowAction?.row.original : null}
             showTrigger={false}

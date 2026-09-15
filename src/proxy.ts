@@ -4,6 +4,15 @@ import { env } from "@/env";
 
 type UserType = "admin" | "vendor" | "customer";
 
+function redirectToLogin(req: NextRequest): NextResponse {
+  const login = new URL("/auth/login", req.url);
+  const returnTo = `${req.nextUrl.pathname}${req.nextUrl.search}`;
+  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+    login.searchParams.set("callbackUrl", returnTo);
+  }
+  return NextResponse.redirect(login);
+}
+
 // Constants for routes
 const PROTECTED_ROUTES = ["/admin", "/customer", "/vendor"];
 const VALID_USER_TYPES: UserType[] = ["admin", "vendor", "customer"];
@@ -121,7 +130,7 @@ async function handleSubdomainRouting(
       !token.account_type ||
       !VALID_USER_TYPES.includes(token.account_type as UserType)
     ) {
-      return NextResponse.redirect(new URL("/auth/login", req.url));
+      return redirectToLogin(req);
     }
 
     // Apply cross-domain access rules
@@ -154,12 +163,16 @@ async function handleProtectedRoutes(
 ): Promise<NextResponse | null> {
   const { pathname } = req.nextUrl;
 
+  if (pathname.startsWith("/vendor/door-scan")) {
+    return NextResponse.next();
+  }
+
   // Skip redirects for welcome routes but make sure user is authenticated and is a vendor
   if (pathname.startsWith("/welcome/")) {
     const token = await getToken({ req, secret: env.NEXTAUTH_SECRET });
 
     if (!token || !token.account_type) {
-      return NextResponse.redirect(new URL("/auth/login", req.url));
+      return redirectToLogin(req);
     }
 
     // Only vendors can access welcome routes
@@ -187,7 +200,7 @@ async function handleProtectedRoutes(
     !token.account_type ||
     !VALID_USER_TYPES.includes(token.account_type as UserType)
   ) {
-    return NextResponse.redirect(new URL("/auth/login", req.url));
+    return redirectToLogin(req);
   }
 
   const accountType = token.account_type as UserType;
@@ -246,6 +259,16 @@ async function handleProtectedRoutes(
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Door Scan must stay on /vendor/door-scan (login is in-page). Do not bounce
+  // unauthenticated staff to /auth/login?callbackUrl=… — that loop gets stuck.
+  if (pathname.startsWith("/vendor/door-scan")) {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-pathname", pathname);
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
+
   // Allow public routes and assets
   if (
     pathname === "/theme-test" ||
@@ -261,6 +284,8 @@ export async function proxy(req: NextRequest) {
     pathname === "/terms" ||
     pathname === "/privacy" ||
     pathname === "/contact" ||
+    pathname === "/entry" ||
+    pathname.startsWith("/entry/") ||
     // Allow direct access to event detail pages
     pathname.match(/^\/[^\/]+\/events\/[^\/]+\/?$/) || // Matches /{locationSlug}/events/{eventSlug} pattern
     // Allow checkout and payment page access (customer `/checkout` + legacy `/vendor/checkout`)

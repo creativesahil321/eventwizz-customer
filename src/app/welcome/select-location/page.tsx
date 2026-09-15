@@ -34,7 +34,10 @@ function stableImageUrl(url: string | null | undefined): string {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { logout } from "@/lib/auth/logout";
-import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
+import {
+  consumeAuthCallbackUrl,
+  isVendorDoorEntryCallback,
+} from "@/lib/auth/safe-callback-url";
 import {
   LocationActiveEventsCount,
   formatLiveEventsLabel,
@@ -85,6 +88,11 @@ export default function WelcomeLocationSelectionPage() {
     if (!selectedLocationId) return;
     switchLocation(selectedLocationId, {
       onSuccess: () => {
+        const resume = consumeAuthCallbackUrl();
+        if (resume && isVendorDoorEntryCallback(resume)) {
+          router.push(resume);
+          return;
+        }
         const perms = session?.user?.permissions;
         const next = getFirstAccessibleVendorPath(
           Array.isArray(perms) ? perms : undefined,

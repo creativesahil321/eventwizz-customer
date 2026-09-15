@@ -1,10 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Camera, ImageUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
@@ -13,11 +11,14 @@ import {
   isCameraApiAvailable,
   isInsecureCameraOrigin,
 } from "../_lib/decode-qr";
+import { unlockDoorScanAudio } from "../_lib/door-scan-sounds";
+
+export type DoorScanTokenSource = "camera" | "photo";
 
 type DoorQrScannerProps = {
   enabled: boolean;
   pausedLabel?: string;
-  onToken: (token: string) => void;
+  onToken: (token: string, source: DoorScanTokenSource) => void;
 };
 
 export function DoorQrScanner({
@@ -34,7 +35,6 @@ export function DoorQrScanner({
   const [cameraState, setCameraState] = useState<
     "idle" | "starting" | "live" | "denied" | "insecure" | "unsupported"
   >("idle");
-  const [manualToken, setManualToken] = useState("");
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isReadingPhoto, setIsReadingPhoto] = useState(false);
 
@@ -68,12 +68,9 @@ export function DoorQrScanner({
     const start = async () => {
       setCameraState("starting");
       try {
+        // Keep constraints loose — iOS Safari often fails with exact width/height.
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
+          video: { facingMode: { ideal: "environment" } },
           audio: false,
         });
         if (cancelled) {
@@ -83,6 +80,7 @@ export function DoorQrScanner({
         streamRef.current = stream;
         const video = videoRef.current;
         if (video) {
+          video.setAttribute("playsinline", "true");
           video.srcObject = stream;
           await video.play();
         }
@@ -124,7 +122,7 @@ export function DoorQrScanner({
         inFlight = true;
         try {
           const token = decodeQrFromVideoFrame(video, canvas);
-          if (token) onTokenRef.current(token);
+          if (token) onTokenRef.current(token, "camera");
         } catch {
           // Keep scanning; a single failed frame is not an error.
         } finally {
@@ -153,142 +151,105 @@ export function DoorQrScanner({
         );
         return;
       }
-      onToken(token);
+      onToken(token, "photo");
     } catch {
-      setPhotoError(
-        "Could not read that photo. Try another shot or paste the code.",
-      );
+      setPhotoError("Could not read that photo. Try another shot.");
     } finally {
       setIsReadingPhoto(false);
     }
   };
 
-  const submitManual = () => {
-    const token = manualToken.trim();
-    if (!token) return;
-    onToken(token);
-  };
+  const viewportClass = enabled
+    ? "relative overflow-hidden rounded-2xl bg-black min-h-[min(72vw,22rem)] sm:min-h-0 aspect-[3/4] sm:aspect-[4/3]"
+    : "relative overflow-hidden rounded-xl bg-zinc-900 min-h-[4.5rem]";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" onPointerDown={unlockDoorScanAudio}>
       <canvas ref={canvasRef} className="hidden" aria-hidden />
-      <div className="relative overflow-hidden rounded-lg border border-[var(--color-border)] bg-black">
-        {cameraState === "starting" ? (
-          <Skeleton className="aspect-[4/3] w-full rounded-none bg-zinc-800" />
+      <div className={viewportClass}>
+        {cameraState === "starting" && enabled ? (
+          <Skeleton className="absolute inset-0 rounded-none bg-zinc-800" />
         ) : null}
         <video
           ref={videoRef}
           className={cn(
-            "aspect-[4/3] w-full object-cover",
-            cameraState === "live" ? "block" : "hidden",
+            "absolute inset-0 h-full w-full object-cover",
+            cameraState === "live" && enabled ? "block" : "hidden",
           )}
           playsInline
           muted
           autoPlay
         />
-        {cameraState === "live" ? (
+        {cameraState === "live" && enabled ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-40 w-40 rounded-md border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+            <div className="h-44 w-44 sm:h-40 sm:w-40 rounded-2xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]" />
           </div>
         ) : null}
-        {cameraState === "denied" ? (
-          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 bg-zinc-900 px-6 text-center text-sm text-white">
-            <Camera className="h-8 w-8 text-white/70" />
-            <p>
-              Camera access is blocked. Allow the camera, or photograph the QR
-              / paste the code below.
-            </p>
-          </div>
+        {enabled && cameraState === "denied" ? (
+          <CameraStatusMessage>
+            Camera access is blocked. Allow the camera in Settings, or
+            photograph the QR below.
+          </CameraStatusMessage>
         ) : null}
-        {cameraState === "insecure" ? (
-          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 bg-zinc-900 px-6 text-center text-sm text-white">
-            <Camera className="h-8 w-8 text-white/70" />
-            <p>
-              Live camera needs HTTPS (this page is HTTP). Photograph the QR or
-              paste the code. For live scan, open Door Scan on HTTPS or
-              localhost.
-            </p>
-          </div>
+        {enabled && cameraState === "insecure" ? (
+          <CameraStatusMessage>
+            Live camera needs HTTPS. Photograph the QR below.
+          </CameraStatusMessage>
         ) : null}
-        {cameraState === "unsupported" ? (
-          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 bg-zinc-900 px-6 text-center text-sm text-white">
-            <Camera className="h-8 w-8 text-white/70" />
-            <p>
-              This browser cannot open a live camera. Photograph the QR or
-              paste the code.
-            </p>
-          </div>
+        {enabled && cameraState === "unsupported" ? (
+          <CameraStatusMessage>
+            This browser cannot open a live camera. Photograph the QR below.
+          </CameraStatusMessage>
         ) : null}
         {cameraState === "idle" && enabled ? (
-          <Skeleton className="aspect-[4/3] w-full rounded-none bg-zinc-800" />
+          <Skeleton className="absolute inset-0 rounded-none bg-zinc-800" />
         ) : null}
         {!enabled ? (
-          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 bg-zinc-900 px-6 text-center text-sm text-white/80">
-            <p>{pausedLabel}</p>
+          <div className="flex min-h-[4.5rem] items-center justify-center px-4 py-3 text-center text-sm text-white/85">
+            {pausedLabel}
           </div>
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            void handlePhoto(file);
-            event.target.value = "";
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          className="flex-1"
-          disabled={isReadingPhoto}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {isReadingPhoto ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <ImageUp className="h-4 w-4" />
-          )}
-          {isReadingPhoto ? "Reading photo…" : "Photograph QR"}
-        </Button>
-      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          void handlePhoto(file);
+          event.target.value = "";
+        }}
+      />
+      <Button
+        type="button"
+        variant="event-outline"
+        size="lg"
+        className="h-12 w-full"
+        disabled={isReadingPhoto}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        {isReadingPhoto ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <ImageUp className="h-4 w-4" />
+        )}
+        {isReadingPhoto ? "Reading photo…" : "Photograph QR"}
+      </Button>
       {photoError ? (
         <p className="text-sm text-destructive">{photoError}</p>
       ) : null}
+    </div>
+  );
+}
 
-      <div className="space-y-2">
-        <Label htmlFor="door-entry-token">Or paste the QR code</Label>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            id="door-entry-token"
-            value={manualToken}
-            onChange={(event) => setManualToken(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submitManual();
-              }
-            }}
-            placeholder="Scanned QR payload"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            className="shrink-0"
-            onClick={submitManual}
-            disabled={!manualToken.trim()}
-          >
-            Look up
-          </Button>
-        </div>
-      </div>
+function CameraStatusMessage({ children }: { children: ReactNode }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-zinc-900 px-5 text-center text-sm leading-relaxed text-white">
+      <Camera className="h-8 w-8 text-white/70" />
+      <p>{children}</p>
     </div>
   );
 }

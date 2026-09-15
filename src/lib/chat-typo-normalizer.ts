@@ -92,6 +92,13 @@ export function normalizeVendorChatText(rawText: string): string {
   text = text.replace(/\b(reservtions?|reservatons?)\b/gi, (m) =>
     m.toLowerCase().endsWith("s") ? "reservations" : "reservation",
   );
+  text = text.replace(
+    /\b(equery|enquery|enquiery|inquery|inqury|enquirry|querry)\b/gi,
+    "enquiry",
+  );
+  text = text.replace(/\b(isssue|issuse|isue)\b/gi, "issue");
+  text = text.replace(/\b(suffring|sufferin)\b/gi, "suffering");
+  text = text.replace(/\b(fermo|fromo)\b/gi, "from");
 
   // Merged Words & Spacing Typos
   text = text.replace(/\b(activecurrently|activecurrenly|activecurrentaly)\b/gi, "active currently");

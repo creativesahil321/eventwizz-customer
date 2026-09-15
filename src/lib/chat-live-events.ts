@@ -643,8 +643,26 @@ export function normalizeChatBookingQuery(text: string): string {
     .replace(/\b(londn|londan|londom)\b/gi, "london")
     .replace(/\b(nearme|near-me)\b/gi, "near me")
     .replace(/\beventsnearme\b/gi, "events near me")
+    .replace(/codefor\b/gi, "code for")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function isVendorEventQrSetupIntent(text: string): boolean {
+  const t = normalizeChatBookingQuery(text);
+  if (!t) return false;
+  if (!/\bqr\b/i.test(t)) return false;
+  if (
+    /\b(scan|check[\s-]*in|door\s*scan)\b/i.test(t) &&
+    !/\b(turn on|enable|generate|activate)\b/i.test(t)
+  ) {
+    return false;
+  }
+  return (
+    /\b(turn on|enable|switch on|generate|activate|set up|setup)\b/i.test(t) ||
+    /\bshow (a |the )?(door[- ]entry |invoice )?qr\b/i.test(t) ||
+    /\bqr\s*codes?\s+(on|for)\b/i.test(t)
+  );
 }
 
 /** Customer wants to find / book a live event on the public venue site. */
@@ -653,6 +671,7 @@ export function isLiveEventBookingIntent(text: string): boolean {
   if (!t) return false;
   if (isDisallowedChatSafetyIntent(t)) return false;
   if (/\breschedule\b/i.test(t) && !isBookEventInCityTap(t)) return false;
+  if (isVendorEventQrSetupIntent(t)) return false;
 
   if (isBroadEventListIntent(t)) {
     return true;
@@ -1361,7 +1380,9 @@ export function matchLiveEventsFromConversation(
   const fromUsers = matchLiveEvents(userCorpus, liveEvents);
   if (fromUsers.length > 0) return fromUsers;
 
-  return matchLiveEvents(corpus, liveEvents);
+  // Do not score the assistant greeting (“Book an event / what’s on”) as
+  // the customer asking for the catalogue.
+  return [];
 }
 
 /** True when chat should ask city / list events — not load one event’s rooms yet. */

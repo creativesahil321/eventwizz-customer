@@ -20,6 +20,7 @@ import {
   normalizeVendorStepThreeRooms,
   syncStepThreeRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
+import { hydrateMenuChoicesCloseDaysBefore } from "@/app/(protected)/vendor/events/_lib/menu-choices-close-days";
 import {
   findStepFourMenuForRoom,
   normalizeVendorStepFourRooms,
@@ -367,6 +368,9 @@ export function patchEventPayloadFromApi(
           ...initialData.stepFour,
           ...rawStepFour,
           catering_option: resolveCateringOptionFlag(raw),
+          menu_choices_close_days_before: hydrateMenuChoicesCloseDaysBefore(
+            raw.menu_choices_close_days_before,
+          ),
           is_rooms: 0 as const,
         } as StepFourType;
       }

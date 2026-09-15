@@ -29,6 +29,12 @@ import {
   syncStepFourRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-four-rooms";
 import {
+  hydrateMenuChoicesCloseDaysBefore,
+  MENU_CHOICES_CLOSE_DEFAULT_DAYS,
+  MENU_CHOICES_CLOSE_MIN_DAYS,
+  serializeMenuChoicesCloseDaysBefore,
+} from "@/app/(protected)/vendor/events/_lib/menu-choices-close-days";
+import {
   isVendorEventStructureLocked,
   vendorEventStructureLockMessage,
 } from "@/app/(protected)/vendor/events/_lib/vendor-event-lifecycle";
@@ -43,6 +49,7 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
@@ -157,6 +164,9 @@ export default function CateringTab() {
       }),
       menu_title: stepFourDefaults?.menu_title || "",
       menu_description: stepFourDefaults?.menu_description || "",
+      menu_choices_close_days_before: hydrateMenuChoicesCloseDaysBefore(
+        stepFourDefaults?.menu_choices_close_days_before,
+      ),
       event_menu_category_id: stepFourDefaults?.event_menu_category_id || 0,
       menus: stepFourDefaults?.menus || [],
       menu_background_image: stepFourDefaults?.menu_background_image || null,
@@ -846,6 +856,10 @@ export default function CateringTab() {
             ...flatMenu,
             is_rooms: 0,
             event_menu_category_id: data.event_menu_category_id || 0,
+            menu_choices_close_days_before:
+              serializeMenuChoicesCloseDaysBefore(
+                data.menu_choices_close_days_before,
+              ),
           };
         }
 
@@ -1045,6 +1059,14 @@ export default function CateringTab() {
                         if (numValue === 0) {
                           setValue("menus", []);
                           globalForm.setValue("stepFour.menus", []);
+                        } else if (
+                          getValues("menu_choices_close_days_before") == null
+                        ) {
+                          setValue(
+                            "menu_choices_close_days_before",
+                            MENU_CHOICES_CLOSE_DEFAULT_DAYS,
+                            { shouldDirty: false, shouldValidate: false },
+                          );
                         }
                       }}
                       value={String(normalizeCateringOptionFlag(field.value))}
@@ -1159,6 +1181,78 @@ export default function CateringTab() {
                     }}
                   />
                 </div>
+
+                <FormField
+                  control={control}
+                  name="menu_choices_close_days_before"
+                  render={({ field }) => {
+                    const persistCloseDays = (next: number | null) => {
+                      field.onChange(next);
+                      globalForm.setValue(
+                        "stepFour.menu_choices_close_days_before",
+                        next,
+                        { shouldDirty: true, shouldValidate: false },
+                      );
+                      if (isRoomsEnabled && stepTwoRooms.length > 0) {
+                        persistActiveRoomMenuToGlobal(resolvedRoomIndex, {
+                          ...getValues(),
+                          menu_choices_close_days_before: next,
+                        });
+                      }
+                    };
+
+                    return (
+                      <FormItem className="max-w-md mt-6">
+                        <FormLabel className="text-sm font-medium">
+                          Close menu choices (days before event)
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min={MENU_CHOICES_CLOSE_MIN_DAYS}
+                            step={1}
+                            placeholder={String(
+                              MENU_CHOICES_CLOSE_DEFAULT_DAYS,
+                            )}
+                            disabled={readOnly || lockStructure}
+                            className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
+                            name={field.name}
+                            value={field.value ?? ""}
+                            onBlur={() => {
+                              field.onBlur();
+                              if (field.value == null) {
+                                persistCloseDays(
+                                  MENU_CHOICES_CLOSE_DEFAULT_DAYS,
+                                );
+                              }
+                            }}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              if (value === "") {
+                                persistCloseDays(null);
+                                return;
+                              }
+                              const parsed = Number(value);
+                              if (Number.isNaN(parsed)) {
+                                field.onChange(value);
+                                return;
+                              }
+                              persistCloseDays(parsed);
+                            }}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Customers cannot add or edit menu choices from this
+                          many days before the event date. Default{" "}
+                          {MENU_CHOICES_CLOSE_DEFAULT_DAYS}.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+
 
                 {/* Menu Category field */}
                 <FormItem className="mt-4">

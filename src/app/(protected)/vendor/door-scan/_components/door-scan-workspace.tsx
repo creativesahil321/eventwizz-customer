@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2, QrCode } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/shell";
-import { LocationScopedTitle } from "@/components/location-indicator";
+import {
+  ProtectedPageHeader,
+  pageCardClassName,
+} from "@/app/(protected)/_components/page-header-card";
 import { usePermissions } from "@/hooks/usePermission";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,12 +22,16 @@ import {
   useScanDoorEntry,
 } from "@/services/vendor/bookings/query";
 import type { DoorEntryScanData } from "@/services/vendor/bookings/type";
-import { DoorQrScanner } from "./door-qr-scanner";
+import { DoorQrScanner, type DoorScanTokenSource } from "./door-qr-scanner";
+import { DoorScanDateMerchandise } from "./door-scan-date-merchandise";
 import { getDoorEntryError } from "../_lib/door-entry-errors";
 import {
-  isEventWizzDoorEntryToken,
-  NOT_EVENTWIZZ_QR_MESSAGE,
+  extractDoorEntryToken,
+  isNamedVendorSite,
+  notVenueInvoiceQrMessage,
 } from "../_lib/door-entry-token";
+import { useVendorSiteIdentity } from "../_lib/use-vendor-site-identity";
+import { playDoorScanSound } from "../_lib/door-scan-sounds";
 import {
   formatDoorEntryDate,
   formatDoorEntryDateTime,
@@ -47,8 +55,16 @@ function dateRowTone(row: DoorEntryScanData["dates"][number]) {
 export function DoorScanWorkspace() {
   const { permissions, isLoaded: permissionsReady } = usePermissions();
   const canUpdateBooking = permissions.includes("update-booking");
+  const siteName = useVendorSiteIdentity();
+  const namedSite = isNamedVendorSite(siteName);
+  const rejectQrMessage = notVenueInvoiceQrMessage(siteName);
   const scanMutation = useScanDoorEntry();
   const checkInMutation = useCheckInDoorEntry();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const queryToken =
+    searchParams.get("t") || searchParams.get("token") || "";
 
   const [token, setToken] = useState<string | null>(null);
   const [result, setResult] = useState<DoorEntryScanData | null>(null);
@@ -59,7 +75,9 @@ export function DoorScanWorkspace() {
   } | null>(null);
 
   const lastTokenRef = useRef("");
+  const lookupGenerationRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bookingPanelRef = useRef<HTMLElement>(null);
 
   const clearRetryTimer = () => {
     if (retryTimerRef.current != null) {
@@ -70,6 +88,7 @@ export function DoorScanWorkspace() {
 
   const resetForNextGuest = useCallback(() => {
     clearRetryTimer();
+    lookupGenerationRef.current += 1;
     lastTokenRef.current = "";
     setToken(null);
     setResult(null);
@@ -77,7 +96,23 @@ export function DoorScanWorkspace() {
     setBanner(null);
     scanMutation.reset();
     checkInMutation.reset();
-  }, [checkInMutation, scanMutation]);
+    if (queryToken) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("t");
+      params.delete("token");
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    }
+  }, [
+    checkInMutation,
+    pathname,
+    queryToken,
+    router,
+    scanMutation,
+    searchParams,
+  ]);
 
   useEffect(() => () => clearRetryTimer(), []);
 
@@ -91,46 +126,99 @@ export function DoorScanWorkspace() {
     setSelectedDateId(suggested ? String(suggested.booking_date_id) : "");
   }, []);
 
+  useEffect(() => {
+    if (!result?.booking_id) return;
+    const timer = window.setTimeout(() => {
+      bookingPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [result?.booking_id]);
+
+  const syncTokenQuery = useCallback(
+    (nextToken: string) => {
+      const current = extractDoorEntryToken(queryToken);
+      if (current === nextToken) return;
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("token");
+      params.set("t", nextToken);
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    },
+    [pathname, queryToken, router, searchParams],
+  );
+
   const lookupToken = useCallback(
-    (raw: string) => {
+    (raw: string, source: DoorScanTokenSource | "url" | "refresh" = "camera") => {
       const next = raw.trim();
       if (!next) return;
-      if (next === lastTokenRef.current) return;
-
-      if (!isEventWizzDoorEntryToken(next)) {
+      const extracted = extractDoorEntryToken(next);
+      const force = source === "photo" || source === "refresh";
+      if (!extracted) {
+        if (!force && next === lastTokenRef.current) return;
+        lookupGenerationRef.current += 1;
         lastTokenRef.current = next;
         setToken(null);
         setResult(null);
         setSelectedDateId("");
-        setBanner({ tone: "error", message: NOT_EVENTWIZZ_QR_MESSAGE });
-        toast.error(NOT_EVENTWIZZ_QR_MESSAGE);
+        setBanner({ tone: "error", message: rejectQrMessage });
+        toast.error(rejectQrMessage);
+        playDoorScanSound("error");
         retryTimerRef.current = setTimeout(() => {
           lastTokenRef.current = "";
         }, 1500);
         return;
       }
 
-      lastTokenRef.current = next;
-      setToken(next);
+      if (!force && extracted === lastTokenRef.current) return;
+
+      clearRetryTimer();
+      lookupGenerationRef.current += 1;
+      const generation = lookupGenerationRef.current;
+      lastTokenRef.current = extracted;
+      setToken(extracted);
       setBanner(null);
-      scanMutation.mutate(next, {
+      if (source !== "refresh") {
+        setResult(null);
+        setSelectedDateId("");
+      }
+      if (source === "photo") {
+        syncTokenQuery(extracted);
+      }
+      scanMutation.mutate(extracted, {
         onSuccess: (data) => {
+          if (generation !== lookupGenerationRef.current) return;
           applyScanResult(data);
+          playDoorScanSound("found");
         },
         onError: (error) => {
+          if (generation !== lookupGenerationRef.current) return;
           const mapped = getDoorEntryError(error);
           setResult(null);
           setSelectedDateId("");
           setBanner({ tone: "error", message: mapped.message });
           toast.error(mapped.message);
+          playDoorScanSound("error");
           retryTimerRef.current = setTimeout(() => {
             lastTokenRef.current = "";
           }, 1500);
         },
       });
     },
-    [applyScanResult, scanMutation],
+    [applyScanResult, rejectQrMessage, scanMutation, syncTokenQuery],
   );
+
+  const lookupTokenRef = useRef(lookupToken);
+  lookupTokenRef.current = lookupToken;
+
+  useEffect(() => {
+    if (!queryToken) return;
+    lookupTokenRef.current(queryToken, "url");
+  }, [queryToken]);
 
   const selectedDate = useMemo(
     () =>
@@ -161,69 +249,80 @@ export function DoorScanWorkspace() {
             "Checked in. The whole booking is admitted for that date.";
           setBanner({ tone: "success", message });
           toast.success(message);
-          scanMutation.mutate(token, {
-            onSuccess: (data) => applyScanResult(data),
-          });
+          playDoorScanSound("success");
+          lookupToken(token, "refresh");
         },
         onError: (error) => {
           const mapped = getDoorEntryError(error);
           setBanner({ tone: "error", message: mapped.message });
           toast.error(mapped.message);
+          playDoorScanSound("error");
         },
       },
     );
   };
 
   const cameraEnabled = !result && !scanMutation.isPending;
+  const showBookingPanel =
+    Boolean(result) || scanMutation.isPending || Boolean(banner);
 
   return (
-    <Shell className="gap-2">
-      <div className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-6 mb-4 min-w-0">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-2">
-            <h1 className="text-2xl title-header font-bold text-black flex items-center gap-2">
-              <QrCode className="h-6 w-6" />
-              <LocationScopedTitle title="Door Scan" />
-            </h1>
-            <p className="text-muted-foreground max-w-2xl">
-              Scan the QR on the guest invoice. Confirm check-in for one date —
-              that admits the whole booking for that night. Switch venue in the
-              header if you are on the door at another location.
-            </p>
-          </div>
-          {result ? (
-            <Button type="button" variant="outline" onClick={resetForNextGuest}>
+    <Shell className="gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <ProtectedPageHeader
+        locationScope="venue"
+        title="Door Scan"
+        className="min-w-0"
+        description={
+          namedSite
+            ? `Point the camera at the ${siteName} invoice QR, then confirm check-in.`
+            : "Point the camera at the invoice QR, then confirm check-in."
+        }
+        actions={
+          result ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={resetForNextGuest}
+            >
               Scan next guest
             </Button>
-          ) : null}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <section className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 min-w-0">
-          <h2 className="text-lg font-semibold mb-4">Scanner</h2>
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <section className={pageCardClassName("min-w-0")}>
+          <h2 className="text-base font-semibold mb-3">Scanner</h2>
           <DoorQrScanner
             enabled={cameraEnabled}
             pausedLabel={
               scanMutation.isPending
                 ? "Looking up this booking…"
-                : "Camera paused while you confirm this booking."
+                : "Camera paused — confirm below."
             }
             onToken={lookupToken}
           />
         </section>
 
-        <section className="bg-white rounded-lg border border-[var(--color-border)] shadow-md p-4 sm:p-6 min-w-0">
-          <h2 className="text-lg font-semibold mb-4">Booking</h2>
+        <section
+          ref={bookingPanelRef}
+          tabIndex={-1}
+          className={cn(
+            pageCardClassName("min-w-0 scroll-mt-24 outline-none"),
+            !showBookingPanel && "hidden lg:block",
+          )}
+        >
+          <h2 className="text-base font-semibold mb-3">Booking</h2>
 
           {banner ? (
             <div
               role="status"
               className={cn(
-                "mb-4 rounded-md border px-3 py-2 text-sm",
+                "mb-4 rounded-xl border px-3 py-2.5 text-sm font-medium",
                 banner.tone === "success"
                   ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                  : "border-destructive/40 bg-destructive/5 text-destructive",
+                  : "border-destructive/30 bg-destructive/5 text-destructive",
               )}
             >
               {banner.message}
@@ -244,33 +343,27 @@ export function DoorScanWorkspace() {
           ) : null}
 
           {!scanMutation.isPending && !result ? (
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>
-                Photograph or paste the QR from a <strong>booking invoice</strong>
-                — not a Google or random test QR.
-              </p>
-              <p>
-                To get one: Finalize with Door entry QR = Yes, make a paid
-                booking, download the invoice, then scan that code. Invoices
-                printed before this deploy need to be downloaded again. Check-in
-                needs the update-booking permission.
-              </p>
-            </div>
+            <p className="hidden lg:block text-sm text-muted-foreground leading-relaxed">
+              {namedSite
+                ? `Scan a ${siteName} invoice QR. Today's paid date is selected when there is one — then tap Confirm check-in.`
+                : "Scan an invoice QR. Today's paid date is selected when there is one — then tap Confirm check-in."}
+            </p>
           ) : null}
 
           {result ? (
-            <div className={cn("space-y-5", scanMutation.isPending && "opacity-70")}
-            >
+            <div className={cn("space-y-5", scanMutation.isPending && "opacity-70")}>
               <div className="space-y-1">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Booking
+                  Guest
                 </p>
-                <p className="text-xl font-semibold">{result.booking_number}</p>
-                <p className="text-base">{result.guest_name}</p>
+                <p className="text-2xl font-semibold tracking-tight">
+                  {result.booking_number}
+                </p>
+                <p className="text-base font-medium">{result.guest_name}</p>
                 <p className="text-sm text-muted-foreground">{result.event_name}</p>
                 <Link
                   href={`/vendor/booking-history/${result.booking_id}`}
-                  className="text-sm text-[var(--color-primary)] underline-offset-4 hover:underline"
+                  className="inline-block pt-1 text-sm text-[var(--color-primary)] underline-offset-4 hover:underline"
                 >
                   Open booking
                 </Link>
@@ -292,7 +385,7 @@ export function DoorScanWorkspace() {
                         key={id}
                         htmlFor={`door-date-${id}`}
                         className={cn(
-                          "flex items-start gap-3 rounded-lg border p-3 font-normal",
+                          "flex items-start gap-3 rounded-xl border p-3.5 font-normal",
                           dateRowTone(row),
                           selectedDateId === id &&
                             row.can_check_in &&
@@ -321,6 +414,7 @@ export function DoorScanWorkspace() {
                             </p>
                           ) : null}
                           <p className="text-sm">{row.entry_label}</p>
+                          <DoorScanDateMerchandise row={row} />
                           {row.checked_in_at ? (
                             <p className="text-xs text-muted-foreground">
                               Checked in {formatDoorEntryDateTime(row.checked_in_at)}
@@ -333,14 +427,14 @@ export function DoorScanWorkspace() {
                 </RadioGroup>
               </div>
 
-              <div className="sticky bottom-0 -mx-4 sm:-mx-6 border-t border-[var(--color-border)] bg-white px-4 py-3 sm:px-6">
+              <div className="sticky bottom-0 -mx-4 sm:-mx-6 border-t border-[var(--color-border)] bg-white px-4 py-3 sm:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 {!permissionsReady ? (
                   <Skeleton className="h-12 w-full" />
                 ) : canUpdateBooking ? (
                   <Button
                     type="button"
                     size="lg"
-                    className="h-12 w-full"
+                    className="h-12 w-full text-base"
                     disabled={!canConfirm}
                     onClick={handleCheckIn}
                   >

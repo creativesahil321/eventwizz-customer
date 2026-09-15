@@ -77,9 +77,16 @@ const NAV_RULES: NavRule[] = [
     requiredPermission: "read-booking",
   },
   {
+    id: "events-door-qr",
+    pattern:
+      /\b((turn on|enable|switch on|generate|activate|set up|setup).{0,32}\bqr\b|\bqr\s*codes?\s+(on|for)\b|\bdoor[- ]entry\s+qr\b|\binvoice\s+qr\b)/i,
+    vendor: { href: "/vendor/events", label: "Open Events" },
+    requiredPermission: "read-event",
+  },
+  {
     id: "door-scan",
     pattern:
-      /\b(door\s*scan|door\s*entry|check[\s-]*in|scan\s+(the\s+)?qr|qr\s*scan|entrance\s+scan)\b/i,
+      /\b(door\s*scan|check[\s-]*in|scan\s+(the\s+)?qr|qr\s*scan|entrance\s+scan)\b/i,
     vendor: { href: "/vendor/door-scan", label: "Open Door Scan" },
     requiredPermission: "read-booking",
   },
@@ -419,9 +426,9 @@ export function getAllowedNavLinksForPrompt(audience: ChatNavAudience): string {
     if (canAccess("read-account")) lines.push("- Payment gateway / Stripe / PayPal → [Open Payment Settings](/vendor/payment-settings)");
     if (canAccess("read-site-essential")) lines.push("- Logo, colours, fonts, SEO, home/location/info pages, theme → [Open Sites Essentials](/vendor/sites-essentials)");
     if (canAccess("read-site-essential")) lines.push("- Domain / subdomain → [Open Domain Settings](/vendor/domain-settings)");
-    if (canAccess("read-event")) lines.push("- Events, dates, tickets, tables → [Open Events](/vendor/events)");
+    if (canAccess("read-event")) lines.push("- Events, dates, tickets, tables, turn on invoice QR (Finalise → Door entry QR) → [Open Events](/vendor/events)");
     if (canAccess("read-booking")) lines.push("- Bookings → [Open Bookings](/vendor/booking-history)");
-    if (canAccess("read-booking")) lines.push("- Door scan / QR check-in → [Open Door Scan](/vendor/door-scan)");
+    if (canAccess("read-booking")) lines.push("- Door scan / scan invoice QR at the door → [Open Door Scan](/vendor/door-scan)");
     if (canAccess("read-table-assignment")) lines.push("- Table Assignment → [Open Table Assignment](/vendor/table-assignment)");
     if (canAccess("read-customer")) lines.push("- Customers → [Open Customers](/vendor/customers)");
     if (canAccess(["read-menu-choice", "read-event-menu"])) lines.push("- Menu Choice → [Open Menu Choice](/vendor/menu-choices)");

@@ -26,6 +26,7 @@ import type {
   DoorEntryScanResponse,
   DoorEntryCheckInPayload,
   DoorEntryCheckInResponse,
+  DoorEntryDateRow,
 } from "./type";
 
 export interface VendorBookingRoomFilterOption {
@@ -522,6 +523,9 @@ export const vendorBookingsService = {
         returnFullResponse: true,
         suppressErrorToast: true,
         suppressSuccessToast: true,
+        headers: {
+          "Cache-Control": "no-store",
+        },
       }
     );
 
@@ -734,6 +738,41 @@ function coerceDoorEntryId(value: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function coerceDoorEntryCount(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function normalizeDoorEntryTickets(
+  raw: DoorEntryDateRow["tickets"] | undefined,
+): DoorEntryDateRow["tickets"] {
+  return (raw ?? [])
+    .map((ticket) => ({
+      name: String(ticket?.name ?? "").trim(),
+      quantity: coerceDoorEntryCount(ticket?.quantity),
+    }))
+    .filter((ticket) => ticket.name.length > 0 && ticket.quantity > 0);
+}
+
+function normalizeDoorEntryTables(
+  raw: DoorEntryDateRow["tables"] | undefined,
+): DoorEntryDateRow["tables"] {
+  return (raw ?? [])
+    .map((table) => {
+      const tableSize = coerceDoorEntryCount(table?.table_size);
+      const name =
+        String(table?.name ?? "").trim() ||
+        (tableSize > 0 ? `Table of ${tableSize}` : "Table");
+      return {
+        id: coerceDoorEntryId(table?.id) ?? 0,
+        name,
+        table_size: tableSize,
+        people: coerceDoorEntryCount(table?.people),
+      };
+    })
+    .filter((table) => table.id > 0);
+}
+
 function normalizeDoorEntryScan(raw: DoorEntryScanData): DoorEntryScanData {
   const suggested = coerceDoorEntryId(raw.suggested_booking_date_id);
 
@@ -744,15 +783,25 @@ function normalizeDoorEntryScan(raw: DoorEntryScanData): DoorEntryScanData {
     event_name: String(raw.event_name ?? "").trim(),
     suggested_booking_date_id: suggested,
     dates: (raw.dates ?? [])
-      .map((row) => ({
-        booking_date_id: coerceDoorEntryId(row.booking_date_id) ?? 0,
-        booking_date: String(row.booking_date ?? ""),
-        room_name: row.room_name ? String(row.room_name) : null,
-        entry_status: row.entry_status ? String(row.entry_status) : null,
-        entry_label: String(row.entry_label ?? ""),
-        can_check_in: row.can_check_in === true,
-        checked_in_at: row.checked_in_at ? String(row.checked_in_at) : null,
-      }))
+      .map((row) => {
+        const tables = normalizeDoorEntryTables(row.tables);
+        const guestCount = coerceDoorEntryCount(row.guest_count);
+        return {
+          booking_date_id: coerceDoorEntryId(row.booking_date_id) ?? 0,
+          booking_date: String(row.booking_date ?? ""),
+          room_name: row.room_name ? String(row.room_name) : null,
+          entry_status: row.entry_status ? String(row.entry_status) : null,
+          entry_label: String(row.entry_label ?? ""),
+          can_check_in: row.can_check_in === true,
+          checked_in_at: row.checked_in_at ? String(row.checked_in_at) : null,
+          tickets: normalizeDoorEntryTickets(row.tickets),
+          tables,
+          guest_count:
+            guestCount > 0
+              ? guestCount
+              : tables.reduce((sum, table) => sum + table.people, 0),
+        };
+      })
       .filter((row) => row.booking_date_id > 0),
   };
 }

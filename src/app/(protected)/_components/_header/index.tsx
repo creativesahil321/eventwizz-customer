@@ -8,6 +8,7 @@ import { MenuItemProps } from "@/config/menus/types";
 import { Button } from "@/components/ui/button";
 import { Building2, HelpCircle, PlusCircle } from "lucide-react";
 import Link from "next/link";
+import { DoorScanLink } from "@/app/(protected)/_components/door-scan-link";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -134,6 +135,8 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {isVendor && <DoorScanLink compact />}
 
         {isVendor && (
           <PermissionGuard permissionKey="create-event">

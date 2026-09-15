@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import { useDomainStore } from "@/store/domain.store";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import { usePermissionStore } from "@/store/permission.store";
 import { logout } from "@/lib/auth/logout";
@@ -24,11 +24,14 @@ export default function PageWrapper({
   const { isAuthenticated, isSessionChecked, account_type } = useAuthStore();
   const { isLoaded: permissionsLoaded } = usePermissionStore();
   const router = useRouter();
+  const pathname = usePathname();
   const isCustomer = account_type === "customer";
+  const isDoorScan = pathname?.startsWith("/vendor/door-scan");
 
   // Security validation that runs on every protected page
   useEffect(() => {
     if (!isSessionChecked) return;
+    if (isDoorScan) return;
 
     if (!isAuthenticated) {
       router.replace("/auth/login");
@@ -54,6 +57,7 @@ export default function PageWrapper({
     isSessionChecked,
     permissionsLoaded,
     isCustomer,
+    isDoorScan,
     router,
   ]);
 

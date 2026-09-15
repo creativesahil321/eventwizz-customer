@@ -1,5 +1,9 @@
 import type { StepFourType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
 import { coerceApiFlag } from "@/lib/coerce-api-boolean";
+import {
+  hydrateMenuChoicesCloseDaysBefore,
+  serializeMenuChoicesCloseDaysBefore,
+} from "@/app/(protected)/vendor/events/_lib/menu-choices-close-days";
 
 export type VendorStepFourMenuItem = {
   title: string;
@@ -16,6 +20,7 @@ export type VendorStepFourRoomEntry = {
   catering_option: 0 | 1;
   menu_title?: string;
   menu_description?: string;
+  menu_choices_close_days_before?: number;
   event_menu_category_id?: number;
   menus?: VendorStepFourMenuCategory[];
   menu_background_image?: string | File | null;
@@ -93,6 +98,9 @@ function mapPayloadToRoomEntry(
     catering_option: resolveCateringOptionFlag(payload),
     menu_title: String(payload.menu_title ?? "").trim(),
     menu_description: String(payload.menu_description ?? "").trim(),
+    menu_choices_close_days_before: hydrateMenuChoicesCloseDaysBefore(
+      payload.menu_choices_close_days_before,
+    ),
     event_menu_category_id: Number(payload.event_menu_category_id) || 0,
     menus: normalizeMenus(payload.menus),
     menu_background_image:
@@ -135,6 +143,7 @@ export function defaultVendorStepFourRoomMenu(): Omit<
     catering_option: 0,
     menu_title: "",
     menu_description: "",
+    menu_choices_close_days_before: hydrateMenuChoicesCloseDaysBefore(undefined),
     event_menu_category_id: 0,
     menus: [],
     menu_background_image: null,
@@ -171,6 +180,7 @@ export function roomEntryToStepFourFields(
   | "catering_option"
   | "menu_title"
   | "menu_description"
+  | "menu_choices_close_days_before"
   | "event_menu_category_id"
   | "menus"
   | "menu_background_image"
@@ -179,6 +189,9 @@ export function roomEntryToStepFourFields(
     catering_option: entry.catering_option,
     menu_title: entry.menu_title ?? "",
     menu_description: entry.menu_description ?? "",
+    menu_choices_close_days_before: hydrateMenuChoicesCloseDaysBefore(
+      entry.menu_choices_close_days_before,
+    ),
     event_menu_category_id: entry.event_menu_category_id ?? 0,
     menus: entry.menus ?? [],
     menu_background_image: entry.menu_background_image ?? null,
@@ -192,6 +205,7 @@ export function stepFourFieldsToRoomEntry(
     | "catering_option"
     | "menu_title"
     | "menu_description"
+    | "menu_choices_close_days_before"
     | "event_menu_category_id"
     | "menus"
     | "menu_background_image"
@@ -202,6 +216,9 @@ export function stepFourFieldsToRoomEntry(
     catering_option: normalizeCateringOptionFlag(data.catering_option),
     menu_title: String(data.menu_title ?? "").trim(),
     menu_description: String(data.menu_description ?? "").trim(),
+    menu_choices_close_days_before: serializeMenuChoicesCloseDaysBefore(
+      data.menu_choices_close_days_before,
+    ),
     event_menu_category_id: Number(data.event_menu_category_id) || 0,
     menus: normalizeMenus(data.menus),
     menu_background_image: data.menu_background_image ?? null,
@@ -215,6 +232,9 @@ export function cloneVendorStepFourRoomMenu(
     catering_option: source.catering_option,
     menu_title: source.menu_title ?? "",
     menu_description: source.menu_description ?? "",
+    menu_choices_close_days_before: serializeMenuChoicesCloseDaysBefore(
+      source.menu_choices_close_days_before,
+    ),
     event_menu_category_id: source.event_menu_category_id ?? 0,
     menus: normalizeMenus(source.menus),
     menu_background_image: source.menu_background_image ?? null,
@@ -285,6 +305,14 @@ function appendVendorStepFourMenuFields(
   if (room.menu_description) {
     formData.append(field("menu_description"), room.menu_description);
   }
+  formData.append(
+    field("menu_choices_close_days_before"),
+    String(
+      serializeMenuChoicesCloseDaysBefore(
+        room.menu_choices_close_days_before,
+      ),
+    ),
+  );
 
   normalizeMenus(room.menus).forEach((menu, menuIndex) => {
     formData.append(`${menusField}[${menuIndex}][name]`, menu.name);

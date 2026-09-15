@@ -175,6 +175,7 @@ export interface EventDetailStepFour {
   catering_option?: number; // 0/1
   menu_title?: string;
   menu_description?: string;
+  menu_choices_close_days_before?: number | null;
   event_menu_category_id?: number | null;
   menus?: Array<{
     name: string;

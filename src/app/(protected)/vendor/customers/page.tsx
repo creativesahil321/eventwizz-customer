@@ -11,7 +11,6 @@ import {
   ChevronDown,
   MoreHorizontal,
   Trash2,
-  RotateCcw,
   FileDown,
 } from "lucide-react";
 import {
@@ -27,7 +26,6 @@ import dynamic from "next/dynamic";
 import { Shell } from "@/components/shell";
 import { SearchParams } from "./_lib/types";
 import { Input } from "@/components/ui/input";
-import { exportTableToCSV } from "@/lib/export";
 import {
   Select,
   SelectContent,
@@ -41,8 +39,6 @@ import {
   useCustomers,
   useBulkActivateCustomers,
   useBulkDeactivateCustomers,
-  useBulkDeleteCustomers,
-  useBulkRestoreCustomers,
   useExportCustomersCSV,
 } from "./_lib/queries";
 import { useDebounce } from "@/hooks/data-table/use-debounce";
@@ -53,6 +49,7 @@ import { Customer } from "./_lib/types";
 import { PermissionGuard } from "@/components/permission/PermissionGuard";
 import { PermissionRoute } from "@/components/permission";
 import { AllLocationsBadge } from "@/components/location-indicator";
+import { isSoftDeletedCustomersView } from "./_lib/customer-delete";
 
 // Dynamic import of the customer create dialog
 const CreateCustomerDialog = dynamic(
@@ -65,6 +62,14 @@ const CreateCustomerDialog = dynamic(
   }
 );
 
+const DeleteCustomerDialog = dynamic(
+  () =>
+    import("./_components/_customer-delete").then(
+      (mod) => mod.DeleteCustomerDialog
+    ),
+  { ssr: false }
+);
+
 // Simple wrapper component for the dialog
 function CreateCustomerButton() {
   return <CreateCustomerDialog />;
@@ -74,15 +79,21 @@ export default function CustomersPage() {
   const [globalFilterValue, setGlobalFilterValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedRowCount, setSelectedRowCount] = useState(0);
+  const [pendingDelete, setPendingDelete] = useState<{
+    ids: Array<number | string>;
+    customers: Customer[];
+  } | null>(null);
   const tableRef = React.useRef<Table<Customer> | null>(null);
 
   // Debounce search input using existing hook
   const debouncedSearch = useDebounce(globalFilterValue, 500);
   const [, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
+  const isSoftDeletedView = isSoftDeletedCustomersView(statusFilter);
 
   // Reset page to 1 when search or status filter changes
   useEffect(() => {
     setPage(1);
+    tableRef.current?.resetRowSelection();
   }, [debouncedSearch, statusFilter, setPage]);
 
   const hasActiveFilters = !!debouncedSearch || statusFilter !== "all";
@@ -107,8 +118,6 @@ export default function CustomersPage() {
   // Bulk operations mutations
   const bulkActivateMutation = useBulkActivateCustomers();
   const bulkDeactivateMutation = useBulkDeactivateCustomers();
-  const bulkDeleteMutation = useBulkDeleteCustomers();
-  const bulkRestoreMutation = useBulkRestoreCustomers();
 
   // Update selected row count when table selection changes
   React.useEffect(() => {
@@ -235,8 +244,8 @@ export default function CustomersPage() {
     }
   };
 
-  // Handle bulk delete
-  const handleBulkDelete = async () => {
+  // Handle bulk delete — capture the selected IDs, then run OTP in the modal
+  const handleBulkDelete = () => {
     const selectedIds = getSelectedCustomerIds();
 
     if (selectedIds.length === 0) {
@@ -244,46 +253,16 @@ export default function CustomersPage() {
       return;
     }
 
-    try {
-      await bulkDeleteMutation.mutateAsync(selectedIds);
-      // Clear selection after successful deletion
-      if (tableRef.current) {
-        tableRef.current.resetRowSelection();
-      }
-    } catch (error) {
-      // Error is already handled by the mutation and API interceptor
-      console.error("Error deleting customers:", error);
-    }
-  };
-
-  // Handle bulk restore
-  const handleBulkRestore = async () => {
-    const selectedIds = getSelectedCustomerIds();
-
-    if (selectedIds.length === 0) {
-      toast.error("Please select at least one customer to restore");
-      return;
-    }
-
-    try {
-      await bulkRestoreMutation.mutateAsync(selectedIds);
-      // Clear selection after successful restore
-      if (tableRef.current) {
-        tableRef.current.resetRowSelection();
-      }
-    } catch (error) {
-      // Error is already handled by the mutation and API interceptor
-      console.error("Error restoring customers:", error);
-    }
+    setPendingDelete({
+      ids: selectedIds,
+      customers: getSelectedCustomers(),
+    });
   };
 
   const isBulkOperationLoading =
-    bulkActivateMutation.isPending ||
-    bulkDeactivateMutation.isPending ||
-    bulkDeleteMutation.isPending ||
-    bulkRestoreMutation.isPending;
+    bulkActivateMutation.isPending || bulkDeactivateMutation.isPending;
 
-  const hasSelectedRows = selectedRowCount > 0;
+  const hasSelectedRows = selectedRowCount > 0 && !isSoftDeletedView;
 
   return (
     <PermissionRoute
@@ -401,19 +380,19 @@ export default function CustomersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
-                        {/* When viewing deleted customers, only show Restore option */}
-                        {statusFilter === "delete" ? (
+                        {/* Activate Selected - Only show if not all are already active */}
+                        {!areAllSelectedCustomersStatusActive() && (
                           <DropdownMenuItem
-                            onClick={handleBulkRestore}
-                            disabled={bulkRestoreMutation.isPending}
-                            className="cursor-pointer focus:bg-green-50 focus:text-green-700 dark:focus:bg-green-900/20 dark:focus:text-green-400"
+                            onClick={handleBulkActivate}
+                            disabled={bulkActivateMutation.isPending}
+                            className="cursor-pointer focus:bg-green-50 focus:text-green-700"
                           >
-                            {bulkRestoreMutation.isPending ? (
+                            {bulkActivateMutation.isPending ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
-                              <RotateCcw className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
+                              <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
                             )}
-                            <span>Restore Selected</span>
+                            <span>Activate Selected</span>
                             <span className="ml-auto text-xs text-muted-foreground">
                               {selectedRowCount}{" "}
                               {selectedRowCount === 1
@@ -421,86 +400,57 @@ export default function CustomersPage() {
                                 : "customers"}
                             </span>
                           </DropdownMenuItem>
-                        ) : (
-                          <>
-                            {/* Activate Selected - Only show if not all are already active */}
-                            {!areAllSelectedCustomersStatusActive() && (
-                              <DropdownMenuItem
-                                onClick={handleBulkActivate}
-                                disabled={bulkActivateMutation.isPending}
-                                className="cursor-pointer focus:bg-green-50 focus:text-green-700"
-                              >
-                                {bulkActivateMutation.isPending ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
-                                )}
-                                <span>Activate Selected</span>
-                                <span className="ml-auto text-xs text-muted-foreground">
-                                  {selectedRowCount}{" "}
-                                  {selectedRowCount === 1
-                                    ? "customer"
-                                    : "customers"}
-                                </span>
-                              </DropdownMenuItem>
+                        )}
+
+                        {/* Separator between Activate and Deactivate */}
+                        {!areAllSelectedCustomersStatusActive() &&
+                          !areAllSelectedCustomersStatusInactive() && (
+                            <DropdownMenuSeparator />
+                          )}
+
+                        {/* Deactivate Selected - Only show if not all are already inactive */}
+                        {!areAllSelectedCustomersStatusInactive() && (
+                          <DropdownMenuItem
+                            onClick={handleBulkDeactivate}
+                            disabled={bulkDeactivateMutation.isPending}
+                            className="cursor-pointer focus:bg-red-50 focus:text-red-700"
+                          >
+                            {bulkDeactivateMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <XCircle className="mr-2 h-4 w-4 text-red-600" />
                             )}
+                            <span>Deactivate Selected</span>
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {selectedRowCount}{" "}
+                              {selectedRowCount === 1
+                                ? "customer"
+                                : "customers"}
+                            </span>
+                          </DropdownMenuItem>
+                        )}
 
-                            {/* Separator between Activate and Deactivate */}
-                            {!areAllSelectedCustomersStatusActive() &&
-                              !areAllSelectedCustomersStatusInactive() && (
-                                <DropdownMenuSeparator />
-                              )}
+                        {/* Separator between Deactivate and Delete */}
+                        {!areAllSelectedCustomersStatusInactive() &&
+                          !areAllSelectedCustomersDeleted() && (
+                            <DropdownMenuSeparator />
+                          )}
 
-                            {/* Deactivate Selected - Only show if not all are already inactive */}
-                            {!areAllSelectedCustomersStatusInactive() && (
-                              <DropdownMenuItem
-                                onClick={handleBulkDeactivate}
-                                disabled={bulkDeactivateMutation.isPending}
-                                className="cursor-pointer focus:bg-red-50 focus:text-red-700"
-                              >
-                                {bulkDeactivateMutation.isPending ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <XCircle className="mr-2 h-4 w-4 text-red-600" />
-                                )}
-                                <span>Deactivate Selected</span>
-                                <span className="ml-auto text-xs text-muted-foreground">
-                                  {selectedRowCount}{" "}
-                                  {selectedRowCount === 1
-                                    ? "customer"
-                                    : "customers"}
-                                </span>
-                              </DropdownMenuItem>
-                            )}
-
-                            {/* Separator between Deactivate and Delete */}
-                            {!areAllSelectedCustomersStatusInactive() &&
-                              !areAllSelectedCustomersDeleted() && (
-                                <DropdownMenuSeparator />
-                              )}
-
-                            {/* Delete Selected - Only show if not all are already deleted */}
-                            {!areAllSelectedCustomersDeleted() && (
-                              <DropdownMenuItem
-                                onClick={handleBulkDelete}
-                                disabled={bulkDeleteMutation.isPending}
-                                className="cursor-pointer focus:bg-red-50 focus:text-red-700"
-                              >
-                                {bulkDeleteMutation.isPending ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="mr-2 h-4 w-4 text-red-600" />
-                                )}
-                                <span>Delete Selected</span>
-                                <span className="ml-auto text-xs text-muted-foreground">
-                                  {selectedRowCount}{" "}
-                                  {selectedRowCount === 1
-                                    ? "customer"
-                                    : "customers"}
-                                </span>
-                              </DropdownMenuItem>
-                            )}
-                          </>
+                        {/* Delete Selected — OTP required; not shown on Soft Deleted */}
+                        {!areAllSelectedCustomersDeleted() && (
+                          <DropdownMenuItem
+                            onClick={handleBulkDelete}
+                            className="cursor-pointer focus:bg-red-50 focus:text-red-700"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                            <span>Delete Selected</span>
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {selectedRowCount}{" "}
+                              {selectedRowCount === 1
+                                ? "customer"
+                                : "customers"}
+                            </span>
+                          </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -537,6 +487,20 @@ export default function CustomersPage() {
               </Suspense>
             </div>
           )}
+          {pendingDelete ? (
+            <DeleteCustomerDialog
+              open
+              onOpenChange={(open) => {
+                if (!open) setPendingDelete(null);
+              }}
+              customerIds={pendingDelete.ids}
+              customers={pendingDelete.customers}
+              onSuccess={() => {
+                tableRef.current?.resetRowSelection();
+                setPendingDelete(null);
+              }}
+            />
+          ) : null}
         </div>
       </Shell>
     </section>
