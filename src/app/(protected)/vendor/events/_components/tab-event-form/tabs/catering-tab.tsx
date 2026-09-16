@@ -1343,7 +1343,8 @@ export default function CateringTab() {
                       type="multiple"
                       value={isMenuDragging ? [] : openMenuIds}
                       onValueChange={(ids) => {
-                        if (!isMenuDragging) setOpenMenuIds(ids);
+                        setIsMenuDragging(false);
+                        setOpenMenuIds(ids);
                       }}
                       className="space-y-3"
                     >

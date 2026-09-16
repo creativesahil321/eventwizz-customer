@@ -4,6 +4,7 @@ import type { DoorEntryErrorCode } from "@/services/vendor/bookings/type";
 const DOOR_ENTRY_ERROR_COPY: Record<DoorEntryErrorCode, string> = {
   already_admitted: "This guest is already checked in for that date.",
   not_paid: "This date is not fully paid. Entry is not allowed.",
+  not_tonight: "This date is not today. Check in only on the event day.",
   cancelled: "This booking is cancelled.",
   refunded: "This booking was refunded.",
   invalid_token:

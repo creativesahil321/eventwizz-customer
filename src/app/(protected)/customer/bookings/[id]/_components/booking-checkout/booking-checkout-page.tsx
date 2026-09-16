@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -276,6 +276,7 @@ export default function BookingCheckoutPage({
   const [stripePaymentSession, setStripePaymentSession] =
     useState<CheckoutStripePaymentSession | null>(null);
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
+  const stripePaymentCompletedRef = useRef(false);
   const [selectedPaymentGatewayId, setSelectedPaymentGatewayId] = useState<
     number | null
   >(null);
@@ -349,8 +350,7 @@ export default function BookingCheckoutPage({
       return {
         card,
         pendingDue,
-        // Sticky footer owns Pay Now / Pay All (mobile-first). Date cards show due only.
-        showDatePay: false,
+        showDatePay: Boolean(dateMeta && isDatePayable(dateMeta)),
         isFullyPaid: isDateFullyPaid(pendingDue),
         hasRescheduleRequest: hasPendingReschedulePayment(dateMeta ?? {}),
         statusLabel: getDateDisplayStatusLabel(
@@ -472,6 +472,7 @@ export default function BookingCheckoutPage({
           setRescheduleModalOpen(false);
           setSelectedDateForReschedule(null);
           setStripePaymentSession(action.session);
+          stripePaymentCompletedRef.current = false;
           setIsStripePaymentOpen(true);
           return;
         }
@@ -503,6 +504,7 @@ export default function BookingCheckoutPage({
       if (action?.type === "stripe") {
         setPaymentModalOpen(false);
         setStripePaymentSession(action.session);
+        stripePaymentCompletedRef.current = false;
         setIsStripePaymentOpen(true);
         return;
       }
@@ -523,6 +525,7 @@ export default function BookingCheckoutPage({
   );
 
   const handleStripePaymentComplete = useCallback(() => {
+    stripePaymentCompletedRef.current = true;
     queryClient.invalidateQueries({
       queryKey: bookingsKeys.bookingDetails(),
     });
@@ -1057,7 +1060,11 @@ export default function BookingCheckoutPage({
         open={isStripePaymentOpen}
         onOpenChange={(open) => {
           setIsStripePaymentOpen(open);
-          if (!open && stripePaymentSession) {
+          if (
+            !open &&
+            stripePaymentSession &&
+            !stripePaymentCompletedRef.current
+          ) {
             toast.message("Payment not completed", {
               description: `Booking ${stripePaymentSession.bookingNumber} — select Pay now when you’re ready to continue.`,
             });

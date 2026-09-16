@@ -12,9 +12,7 @@ import {
 } from "@/app/(protected)/_components/page-header-card";
 import { usePermissions } from "@/hooks/usePermission";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+import { RadioGroup } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
@@ -23,8 +21,9 @@ import {
 } from "@/services/vendor/bookings/query";
 import type { DoorEntryScanData } from "@/services/vendor/bookings/type";
 import { DoorQrScanner, type DoorScanTokenSource } from "./door-qr-scanner";
-import { DoorScanDateMerchandise } from "./door-scan-date-merchandise";
+import { DoorScanDateOption } from "./door-scan-date-option";
 import { getDoorEntryError } from "../_lib/door-entry-errors";
+import { doorScanConfirmHint } from "../_lib/door-entry-date-kind";
 import {
   extractDoorEntryToken,
   isNamedVendorSite,
@@ -32,25 +31,6 @@ import {
 } from "../_lib/door-entry-token";
 import { useVendorSiteIdentity } from "../_lib/use-vendor-site-identity";
 import { playDoorScanSound } from "../_lib/door-scan-sounds";
-import {
-  formatDoorEntryDate,
-  formatDoorEntryDateTime,
-} from "../_lib/format-door-entry-date";
-
-function dateRowTone(row: DoorEntryScanData["dates"][number]) {
-  const status = (row.entry_status || "").toLowerCase();
-  const label = row.entry_label.toLowerCase();
-  if (row.can_check_in) {
-    return "border-emerald-200 bg-emerald-50/70";
-  }
-  if (status.includes("checked") || label.includes("checked in")) {
-    return "border-sky-200 bg-sky-50/70";
-  }
-  if (status.includes("cancel") || status.includes("refund") || label.includes("cancel") || label.includes("refund")) {
-    return "border-rose-200 bg-rose-50/70";
-  }
-  return "border-[var(--color-border)] bg-muted/40";
-}
 
 export function DoorScanWorkspace() {
   const { permissions, isLoaded: permissionsReady } = usePermissions();
@@ -234,6 +214,7 @@ export function DoorScanWorkspace() {
     Boolean(selectedDate?.can_check_in) &&
     !checkInMutation.isPending &&
     !scanMutation.isPending;
+  const confirmHint = result ? doorScanConfirmHint(result.dates) : null;
 
   const handleCheckIn = () => {
     if (!token || !selectedDate?.can_check_in) return;
@@ -274,8 +255,8 @@ export function DoorScanWorkspace() {
         className="min-w-0"
         description={
           namedSite
-            ? `Point the camera at the ${siteName} invoice QR, then confirm check-in.`
-            : "Point the camera at the invoice QR, then confirm check-in."
+            ? `Point the camera at the ${siteName} invoice QR. Check-in is only for today's event date.`
+            : "Point the camera at the invoice QR. Check-in is only for today's event date."
         }
         actions={
           result ? (
@@ -345,8 +326,8 @@ export function DoorScanWorkspace() {
           {!scanMutation.isPending && !result ? (
             <p className="hidden lg:block text-sm text-muted-foreground leading-relaxed">
               {namedSite
-                ? `Scan a ${siteName} invoice QR. Today's paid date is selected when there is one — then tap Confirm check-in.`
-                : "Scan an invoice QR. Today's paid date is selected when there is one — then tap Confirm check-in."}
+                ? `Scan a ${siteName} invoice QR. Today's paid date is selected when there is one — other dates wait until their event day.`
+                : "Scan an invoice QR. Today's paid date is selected when there is one — other dates wait until their event day."}
             </p>
           ) : null}
 
@@ -370,60 +351,28 @@ export function DoorScanWorkspace() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-sm font-medium">Event dates</p>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Event dates</p>
+                  <p className="text-sm text-muted-foreground">
+                    Only today's event date can be checked in. Other paid dates
+                    stay on the booking until their day.
+                  </p>
+                </div>
                 <RadioGroup
                   value={selectedDateId || undefined}
                   onValueChange={setSelectedDateId}
                   className="gap-2"
                 >
-                  {result.dates.map((row) => {
-                    const id = String(row.booking_date_id);
-                    const isSuggested =
-                      result.suggested_booking_date_id === row.booking_date_id;
-                    return (
-                      <Label
-                        key={id}
-                        htmlFor={`door-date-${id}`}
-                        className={cn(
-                          "flex items-start gap-3 rounded-xl border p-3.5 font-normal",
-                          dateRowTone(row),
-                          selectedDateId === id &&
-                            row.can_check_in &&
-                            "ring-2 ring-[var(--color-primary)]",
-                          !row.can_check_in && "cursor-not-allowed opacity-80",
-                        )}
-                      >
-                        <RadioGroupItem
-                          id={`door-date-${id}`}
-                          value={id}
-                          disabled={!row.can_check_in}
-                          className="mt-1"
-                        />
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">
-                              {formatDoorEntryDate(row.booking_date)}
-                            </span>
-                            {isSuggested ? (
-                              <Badge variant="primary">Today</Badge>
-                            ) : null}
-                          </div>
-                          {row.room_name ? (
-                            <p className="text-sm text-muted-foreground">
-                              {row.room_name}
-                            </p>
-                          ) : null}
-                          <p className="text-sm">{row.entry_label}</p>
-                          <DoorScanDateMerchandise row={row} />
-                          {row.checked_in_at ? (
-                            <p className="text-xs text-muted-foreground">
-                              Checked in {formatDoorEntryDateTime(row.checked_in_at)}
-                            </p>
-                          ) : null}
-                        </div>
-                      </Label>
-                    );
-                  })}
+                  {result.dates.map((row) => (
+                    <DoorScanDateOption
+                      key={row.booking_date_id}
+                      row={row}
+                      selected={selectedDateId === String(row.booking_date_id)}
+                      isVenueToday={
+                        result.suggested_booking_date_id === row.booking_date_id
+                      }
+                    />
+                  ))}
                 </RadioGroup>
               </div>
 
@@ -431,20 +380,27 @@ export function DoorScanWorkspace() {
                 {!permissionsReady ? (
                   <Skeleton className="h-12 w-full" />
                 ) : canUpdateBooking ? (
-                  <Button
-                    type="button"
-                    size="lg"
-                    className="h-12 w-full text-base"
-                    disabled={!canConfirm}
-                    onClick={handleCheckIn}
-                  >
-                    {checkInMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4" />
-                    )}
-                    Confirm check-in
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="h-12 w-full text-base"
+                      disabled={!canConfirm}
+                      onClick={handleCheckIn}
+                    >
+                      {checkInMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4" />
+                      )}
+                      Confirm check-in
+                    </Button>
+                    {confirmHint ? (
+                      <p className="text-center text-sm text-muted-foreground">
+                        {confirmHint}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     You can view this booking, but check-in needs the

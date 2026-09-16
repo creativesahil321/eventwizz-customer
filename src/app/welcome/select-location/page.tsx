@@ -38,6 +38,7 @@ import {
   consumeAuthCallbackUrl,
   isVendorDoorEntryCallback,
 } from "@/lib/auth/safe-callback-url";
+import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
 import {
   LocationActiveEventsCount,
   formatLiveEventsLabel,

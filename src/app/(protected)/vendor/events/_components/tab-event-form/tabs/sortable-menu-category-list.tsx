@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useRef,
-  type ReactNode,
-} from "react";
+import { useRef, type ReactNode } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -25,11 +20,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const DragIntentContext = createContext<{
-  onStart: () => void;
-  onEnd: () => void;
-} | null>(null);
-
 type SortableMenuCategoryListProps = {
   ids: string[];
   disabled?: boolean;
@@ -45,7 +35,6 @@ export function SortableMenuCategoryList({
   onDraggingChange,
   children,
 }: SortableMenuCategoryListProps) {
-  const dragActiveRef = useRef(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, {
@@ -63,8 +52,11 @@ export function SortableMenuCategoryList({
     onReorder(fromIndex, toIndex);
   };
 
+  // Only collapse menus once a real drag has started. Collapsing on pointer
+  // down made the last category jump (open content above it shrinks) so
+  // pointerup never fired and the accordion stayed locked shut.
   const setDragging = (dragging: boolean) => {
-    if (disabled) return;
+    if (dragging && disabled) return;
     onDraggingChange?.(dragging);
   };
 
@@ -72,35 +64,15 @@ export function SortableMenuCategoryList({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
-      onDragStart={() => {
-        dragActiveRef.current = true;
-        setDragging(true);
-      }}
+      onDragStart={() => setDragging(true)}
       onDragEnd={(event) => {
-        dragActiveRef.current = false;
         handleDragEnd(event);
         setDragging(false);
       }}
-      onDragCancel={() => {
-        dragActiveRef.current = false;
-        setDragging(false);
-      }}
+      onDragCancel={() => setDragging(false)}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <div className="mt-4">
-          <DragIntentContext.Provider
-            value={{
-              onStart: () => setDragging(true),
-              onEnd: () => {
-                requestAnimationFrame(() => {
-                  if (!dragActiveRef.current) setDragging(false);
-                });
-              },
-            }}
-          >
-            {children}
-          </DragIntentContext.Provider>
-        </div>
+        <div className="mt-4">{children}</div>
       </SortableContext>
     </DndContext>
   );
@@ -117,7 +89,6 @@ export function SortableMenuCategoryItem({
   disabled = false,
   children,
 }: SortableMenuCategoryItemProps) {
-  const dragIntent = useContext(DragIntentContext);
   const {
     attributes,
     listeners,
@@ -130,30 +101,13 @@ export function SortableMenuCategoryItem({
     disabled,
   });
 
-  const { onPointerDown, onPointerUp, onKeyDown, ...restListeners } =
-    listeners ?? {};
-
   const handle = disabled ? null : (
     <button
       type="button"
       className="touch-none cursor-grab rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing"
       aria-label="Drag to change the order this menu appears on your event page"
       {...attributes}
-      {...restListeners}
-      onPointerDown={(event) => {
-        dragIntent?.onStart();
-        onPointerDown?.(event);
-      }}
-      onPointerUp={(event) => {
-        onPointerUp?.(event);
-        dragIntent?.onEnd();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === " " || event.key === "Enter") {
-          dragIntent?.onStart();
-        }
-        onKeyDown?.(event);
-      }}
+      {...listeners}
     >
       <GripVertical className="h-4 w-4" />
     </button>
@@ -166,7 +120,10 @@ export function SortableMenuCategoryItem({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={cn(isDragging && "relative z-10 opacity-80 shadow-md")}
+      className={cn(
+        "relative z-0",
+        isDragging && "z-10 opacity-80 shadow-md",
+      )}
     >
       {children(handle)}
     </div>

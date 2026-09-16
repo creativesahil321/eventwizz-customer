@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -210,6 +210,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   const [stripePaymentSession, setStripePaymentSession] =
     useState<CheckoutStripePaymentSession | null>(null);
   const [isStripePaymentOpen, setIsStripePaymentOpen] = useState(false);
+  const stripePaymentCompletedRef = useRef(false);
   const [expandedAllocations, setExpandedAllocations] = useState<
     Record<string, boolean>
   >({});
@@ -388,6 +389,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
           setRescheduleModalOpen(false);
           setSelectedDateForReschedule(null);
           setStripePaymentSession(action.session);
+          stripePaymentCompletedRef.current = false;
           setIsStripePaymentOpen(true);
           return;
         }
@@ -480,6 +482,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
         if (action?.type === "stripe") {
           setSingleDatePaymentModalOpen(false);
           setStripePaymentSession(action.session);
+          stripePaymentCompletedRef.current = false;
           setIsStripePaymentOpen(true);
           return;
         }
@@ -500,6 +503,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   };
 
   const handleStripePaymentComplete = useCallback(() => {
+    stripePaymentCompletedRef.current = true;
     queryClient.invalidateQueries({
       queryKey: bookingsKeys.bookingDetails(),
     });
@@ -2031,7 +2035,11 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
         open={isStripePaymentOpen}
         onOpenChange={(open) => {
           setIsStripePaymentOpen(open);
-          if (!open && stripePaymentSession) {
+          if (
+            !open &&
+            stripePaymentSession &&
+            !stripePaymentCompletedRef.current
+          ) {
             toast.message("Payment not completed", {
               description: `Booking ${stripePaymentSession.bookingNumber} — select Pay when you’re ready to continue.`,
             });

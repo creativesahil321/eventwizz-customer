@@ -352,7 +352,7 @@ After selecting a venue on the Welcome page, the vendor sees the **vendor dashbo
 
 3. **Customers** (/vendor/customers) — Data table of customers (e.g. who booked). Search, filters, bulk actions (activate, deactivate, delete with owner OTP). Soft-deleted customers cannot be restored from the vendor panel. View and manage customer records.
 
-4. **Bookings** (/vendor/booking-history) — **Booking history** (not “Orders”): all customer bookings with search, status filter, date range. View transaction ID, customer, event, total, balance due, status, and actions. From a booking you can view details, adjust booking, reschedule, handle add-ons (tables, drinks), view menu choices, etc. **Door Scan** (/vendor/door-scan) is the entrance QR check-in screen: scan the invoice QR, pick a paid date (today is pre-selected when paid and not yet admitted), then Confirm check-in. Check-in requires the update-booking permission.
+4. **Bookings** (/vendor/booking-history) — **Booking history** (not “Orders”): all customer bookings with search, status filter, date range. View transaction ID, customer, event, total, balance due, status, and actions. From a booking you can view details, adjust booking, reschedule, handle add-ons (tables, drinks), view menu choices, etc. **Door Scan** (/vendor/door-scan) is the entrance QR check-in screen: scan the invoice QR, pick a paid date (London calendar today is pre-selected when paid and not yet admitted). Other paid dates show as Not today and cannot be checked in until that day. Works for day and evening events. Check-in requires the update-booking permission.
 
 5. **Email Templates** (/vendor/email-templates) — Manage automated email templates used for notifications and communications.
 

@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Rocket, RotateCcw } from "lucide-react";
+import { ArrowLeft, Loader2, Rocket, RotateCcw, Save } from "lucide-react";
 import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-preview";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EventDetailData } from "@/services/vendor/events/type";
@@ -45,6 +45,10 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/event-form-discard";
 import { patchEventPayloadFromApi } from "@/app/(protected)/vendor/events/_lib/hydrate-event-from-api";
 import type { EventSchemaType } from "@/app/(protected)/vendor/events/_components/tab-event-form/schema";
+import {
+  getVendorPublishCopy,
+  resolveVendorEventLifecycle,
+} from "@/app/(protected)/vendor/events/_lib/vendor-event-lifecycle";
 
 function resolveEventPreviewLocationSlug(
   data: EventDetailData | undefined,
@@ -248,6 +252,10 @@ function EventPreviewPageContent() {
   };
 
   const eventPayloadRoot = eventData?.data as EventDetailData | undefined;
+  const isLiveEvent =
+    resolveVendorEventLifecycle(eventData).isLive ||
+    resolveVendorEventLifecycle(eventPayloadRoot).isLive;
+  const publishCopy = getVendorPublishCopy(isLiveEvent);
   const savedPreviewForm = useMemo(() => {
     if (!eventPayloadRoot || typeof eventPayloadRoot !== "object") return null;
     return patchEventPayloadFromApi(
@@ -273,7 +281,7 @@ function EventPreviewPageContent() {
   const handlePublishEvent = async () => {
     if (!eventId || !/^\d+$/.test(eventId) || !eventPayloadRoot) {
       toast({
-        title: "Cannot publish",
+        title: isLiveEvent ? "Cannot save" : "Cannot publish",
         description:
           "Event data is not loaded. Go back to the editor and try again.",
         variant: "destructive",
@@ -283,7 +291,9 @@ function EventPreviewPageContent() {
     if (isEventCancelled) {
       toast({
         title: "Event is cancelled",
-        description: "Cancelled events cannot be published.",
+        description: isLiveEvent
+          ? "Cancelled events cannot be saved from preview."
+          : "Cancelled events cannot be published.",
         variant: "destructive",
       });
       return;
@@ -307,7 +317,9 @@ function EventPreviewPageContent() {
     const parsed = stepEightSchema.safeParse(stepEightPayload);
     if (!parsed.success) {
       toast({
-        title: "Cannot publish from preview",
+        title: isLiveEvent
+          ? "Cannot save from preview"
+          : "Cannot publish from preview",
         description:
           "Complete the Publish tab in the event editor (e.g. duplicate location fields) and submit from there.",
         variant: "destructive",
@@ -323,14 +335,15 @@ function EventPreviewPageContent() {
         invalidateCache?.();
         setPublishDialogOpen(false);
         toast({
-          title: "Event published",
-          description:
-            "Your event was submitted as live. Redirecting to events…",
+          title: publishCopy.toastActive,
+          description: isLiveEvent
+            ? "Your live event was updated. Redirecting to events…"
+            : "Your event was submitted as live. Redirecting to events…",
         });
         router.push("/vendor/events");
       } else {
         toast({
-          title: "Publish failed",
+          title: isLiveEvent ? "Save failed" : "Publish failed",
           description:
             response?.message ||
             "Use the Publish tab in the editor to fix any issues and try again.",
@@ -339,7 +352,7 @@ function EventPreviewPageContent() {
       }
     } catch {
       toast({
-        title: "Publish failed",
+        title: isLiveEvent ? "Save failed" : "Publish failed",
         description: "Use the Publish tab in the editor or try again shortly.",
         variant: "destructive",
       });
@@ -488,9 +501,26 @@ function EventPreviewPageContent() {
               onClick={() => setPublishDialogOpen(true)}
               className="shadow-md ring-1 ring-black/10"
             >
-              <Rocket className="mr-2 h-4 w-4" />
-              <span className="sm:hidden">Publish</span>
-              <span className="hidden sm:inline">Publish event</span>
+              {isPublishing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <span>{publishCopy.busyActive}</span>
+                </>
+              ) : (
+                <>
+                  {isLiveEvent ? (
+                    <Save className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Rocket className="mr-2 h-4 w-4" />
+                  )}
+                  <span className="sm:hidden">
+                    {publishCopy.previewActionShort}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {publishCopy.actionActive}
+                  </span>
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -542,13 +572,9 @@ function EventPreviewPageContent() {
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Publish this event?</AlertDialogTitle>
+              <AlertDialogTitle>{publishCopy.previewDialogTitle}</AlertDialogTitle>
               <AlertDialogDescription>
-                This uses the same action as the editor&apos;s Publish tab: the
-                event will be submitted as{" "}
-                <span className="font-medium text-foreground">live</span>{" "}
-                (reminder email settings from your last saved publish step
-                apply). You can still edit the event later from Events.
+                {publishCopy.previewDialogDescription}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -564,7 +590,7 @@ function EventPreviewPageContent() {
                 {isPublishing ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Publish now
+                {isPublishing ? publishCopy.busyActive : publishCopy.previewConfirm}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

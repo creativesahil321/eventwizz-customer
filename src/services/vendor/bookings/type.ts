@@ -174,6 +174,7 @@ export interface VendorUpdateBookingStatusResponse {
 export type DoorEntryErrorCode =
   | "already_admitted"
   | "not_paid"
+  | "not_tonight"
   | "cancelled"
   | "refunded"
   | "invalid_token"

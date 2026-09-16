@@ -92,6 +92,10 @@ export type VendorPublishCopy = {
   busyDraft: string;
   duplicateKeepTitle: string;
   duplicateKeepDescription: string;
+  previewActionShort: string;
+  previewDialogTitle: string;
+  previewDialogDescription: string;
+  previewConfirm: string;
 };
 
 export function getVendorPublishCopy(isLive: boolean): VendorPublishCopy {
@@ -115,6 +119,11 @@ export function getVendorPublishCopy(isLive: boolean): VendorPublishCopy {
       busyDraft: "Taking offline…",
       duplicateKeepTitle: "No, this location only",
       duplicateKeepDescription: "Save changes for the current venue.",
+      previewActionShort: "Save",
+      previewDialogTitle: "Save this live event?",
+      previewDialogDescription:
+        "This event is already live. Save your edits so customers keep seeing the latest version. You can take it offline later from the Publish tab.",
+      previewConfirm: "Save now",
     };
   }
 
@@ -135,5 +144,10 @@ export function getVendorPublishCopy(isLive: boolean): VendorPublishCopy {
     busyDraft: "Saving…",
     duplicateKeepTitle: "No, this location only",
     duplicateKeepDescription: "Finish for the current venue.",
+    previewActionShort: "Publish",
+    previewDialogTitle: "Publish this event?",
+    previewDialogDescription:
+      "This uses the same action as the editor's Publish tab: the event will go live so customers can book. You can still edit it later from Events.",
+    previewConfirm: "Publish now",
   };
 }

@@ -41,8 +41,11 @@ test("getVendorPublishCopy uses live wording when the event is already published
   assert.equal(live.activeTitle, "Keep it live");
   assert.equal(live.actionActive, "Save live event");
   assert.equal(live.draftTitle, "Take offline");
+  assert.equal(live.previewActionShort, "Save");
+  assert.equal(live.previewConfirm, "Save now");
 
   const draft = getVendorPublishCopy(false);
   assert.equal(draft.activeTitle, "Publish event");
   assert.equal(draft.actionDraft, "Save as draft");
+  assert.equal(draft.previewActionShort, "Publish");
 });

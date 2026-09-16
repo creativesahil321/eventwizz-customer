@@ -10,10 +10,9 @@ export interface BookingPayAllVisibility {
   /**
    * Sticky footer "Pay Now" when exactly one date is unpaid
    * (single-date bookings + multi-date with one remaining).
-   * Critical for mobile — always visible without scrolling.
    */
   showSinglePayButton: boolean;
-  /** Global footer CTA when multiple dates still have a balance. */
+  /** Footer CTA to pay every unpaid date at once. Date cards still have Pay Now. */
   showPayAllButton: boolean;
   /** Show helper text listing how many dates are payable. */
   showPayableDatesHint: boolean;
@@ -22,9 +21,9 @@ export interface BookingPayAllVisibility {
 }
 
 /**
- * Sticky Payment Summary footer owns the primary pay CTA (mobile-first):
- * - 1 unpaid date → "Pay Now"
- * - 2+ unpaid dates → "Pay All"
+ * Footer pay CTA:
+ * - 1 unpaid date → "Pay Now" (same date as the card button)
+ * - 2+ unpaid dates → "Pay All" (optional; each date card also has Pay Now)
  */
 export function resolveBookingPayAllVisibility(
   input: BookingPayAllVisibilityInput,
