@@ -53,7 +53,7 @@ export const getSiteEssentials = async (
 
 /**
  * Reset colors + typography to platform defaults; logo, copy, and media unchanged.
- * @see docs/SITE_ESSENTIALS_RESET_THEME_DEFAULT_API.md
+ * @see docs/backend-contracts/site-essentials-reset-theme.md
  */
 export const resetSiteEssentialsThemeToDefault = async (): Promise<SiteEssentials> => {
   try {

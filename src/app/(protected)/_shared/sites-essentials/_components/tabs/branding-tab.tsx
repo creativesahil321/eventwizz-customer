@@ -445,7 +445,10 @@ export function BrandingTab({
     const fileWithPreview = ensureFilePreview(processed);
     setLogoFiles([fileWithPreview]);
     setLogoUrl("");
-    form.setValue("logo", fileWithPreview);
+    form.setValue("logo", fileWithPreview, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
   };
 
   const handleFaviconFileChange = (files: File[]) => {
@@ -801,9 +804,10 @@ export function BrandingTab({
                 <FormLabel>Logo</FormLabel>
                 <FormDescription>
                   Upload your site logo ({LOGO_SUPPORTED_FORMATS_LABEL}, max 2MB).
-                  We automatically remove the background and adjust contrast for
-                  your header color. {LOGO_UPLOAD_HINT} Recommended size:
-                  240×60px.
+                  We remove the background so it sits cleanly on your header. A
+                  white or silver mark on a light header is darkened so it stays
+                  visible — black logos are left as uploaded. {LOGO_UPLOAD_HINT}{" "}
+                  Recommended size: 240×60px.
                 </FormDescription>
                 <FormControl>
                   {isProcessingLogo ? (

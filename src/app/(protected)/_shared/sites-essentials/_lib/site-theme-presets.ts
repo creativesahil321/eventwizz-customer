@@ -2,6 +2,7 @@ import type { UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import type { SiteEssentialsFormValues } from "./schema";
 import { normalizeCustomFontStylesheetUrls } from "@/lib/site-custom-font-stylesheets";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import type { ThemePresetGroup } from "@/services/common/theme/theme-presets.type";
 import {
   collectSiteEssentialsGoogleFamilies,
   siteEssentialsGoogleFontStack,
@@ -31,6 +32,23 @@ const SOCIAL_LOGIN_LIGHT: SocialLoginColors = {
 
 export type SiteThemePresetId = string;
 
+export const PREMIUM_THEME_PRESET_IDS = [
+  "gallery-neutral",
+  "country-estate",
+  "harbour-slate",
+  "boardroom-navy",
+  "porcelain-blush",
+  "walled-garden",
+  "claret-reserve",
+  "evergreen-noel",
+  "midnight-champagne",
+  "smoked-oak",
+] as const;
+
+export function isPremiumThemePresetId(id: SiteThemePresetId): boolean {
+  return (PREMIUM_THEME_PRESET_IDS as readonly string[]).includes(id);
+}
+
 export function isVenueThemePresetId(id: SiteThemePresetId): boolean {
   return id.startsWith("venue-");
 }
@@ -43,6 +61,8 @@ export interface SiteThemePreset {
   bodyFontLabel: string;
   swatch: [string, string, string];
   colors: SiteEssentialsFormValues["colors"];
+  /** Catalog group from GET /theme/presets. Omitted on static fallback recipes. */
+  group?: ThemePresetGroup;
   /** Landing / site-wide heading style this recipe is designed for. */
   headingEmphasis?: HeadingEmphasis;
   typography: Pick<

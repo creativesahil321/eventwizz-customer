@@ -5,6 +5,7 @@ import {
   TRY_THEME_FONT_GRID_OPTIONS,
   allPresetGridCdnStylesheetUrls,
   allPresetGridGoogleFontFamilies,
+  isPremiumThemePresetId,
   isVenueThemePresetId,
   siteEssentialsFontPairKey,
   type SiteThemePreset,
@@ -14,7 +15,12 @@ import {
 import { normalizeCustomFontStylesheetUrls } from "@/lib/site-custom-font-stylesheets";
 import { isLightUiBackground } from "@/lib/wcag-color-contrast";
 
-export type ThemePresetGroupKey = "venue" | "modern" | "classic" | "extra";
+export type ThemePresetGroupKey =
+  | "premium"
+  | "venue"
+  | "modern"
+  | "classic"
+  | "extra";
 
 export type CatalogColorGridOption = TryThemeColorGridOption & {
   group: ThemePresetGroupKey;
@@ -39,6 +45,7 @@ export type TryThemeCatalogView = {
 };
 
 function groupFromPresetId(id: string): ThemePresetGroupKey {
+  if (isPremiumThemePresetId(id)) return "premium";
   if (id.startsWith("venue-")) return "venue";
   if (id.startsWith("lovable-")) return "modern";
   return "classic";
@@ -57,6 +64,7 @@ function catalogPresetToSiteThemePreset(
     headingEmphasis: preset.headingEmphasis,
     swatch: preset.swatch,
     colors: preset.colors,
+    group: preset.group,
     typography: {
       fontFamily: { ...preset.typography.fontFamily },
       customFontStylesheetUrls: [
@@ -149,7 +157,7 @@ function buildFromApiCatalog(catalog: ThemePresetsCatalog): TryThemeCatalogView 
       headingStack: recipe.typography.fontFamily.heading,
       bodyStack: recipe.typography.fontFamily.body,
       tagline: recipe.tagline,
-      group: groupFromPresetId(recipe.id),
+      group: recipe.group ?? groupFromPresetId(recipe.id),
     });
   }
   for (const pair of catalog.fontPairs) {
@@ -181,7 +189,7 @@ function buildFromApiCatalog(catalog: ThemePresetsCatalog): TryThemeCatalogView 
   }
 
   return {
-    defaultPresetId: catalog.defaultPresetId || "lovable-clean-white",
+    defaultPresetId: catalog.defaultPresetId || "gallery-neutral",
     colorOptions,
     fontOptions,
     googleFamilies:
@@ -236,7 +244,7 @@ function buildFromStaticFallback(): TryThemeCatalogView {
   );
 
   return {
-    defaultPresetId: "lovable-clean-white",
+    defaultPresetId: "gallery-neutral",
     colorOptions,
     fontOptions,
     googleFamilies: allPresetGridGoogleFontFamilies(),
@@ -252,4 +260,4 @@ export function isRecipeColorOption(
   return opt.kind === "recipe" && opt.source === "preset";
 }
 
-export { isVenueThemePresetId };
+export { isPremiumThemePresetId, isVenueThemePresetId };

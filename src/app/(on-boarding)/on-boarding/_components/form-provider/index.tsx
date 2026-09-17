@@ -32,7 +32,7 @@ interface FormContextType {
   lastCompletedStep: number; // Add lastCompletedStep
   /** True after persistence GET was merged into the form (per-step `isApproved` is reliable). */
   persistedProgressHydrated: boolean;
-  /** Vendor-site preview theme from persistence `default_theme` (Clean White fallback). */
+  /** Vendor-site preview theme from persistence `default_theme` (Gallery Neutral fallback). */
   previewTheme: ThemeSchema;
   activeField: string | null;
   setActiveField: (fieldName: string | null) => void;

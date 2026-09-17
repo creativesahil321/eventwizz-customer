@@ -973,7 +973,7 @@ const stepFourRoomEntrySchema = z.object({
   catering_option: z.number().min(0).max(1).optional(),
   menu_title: z.string().optional(),
   menu_description: z.string().optional(),
-  menu_choices_close_days_before: z.number().optional(),
+  menu_choices_close_days_before: menuChoicesCloseDaysBeforeSchema,
   event_menu_category_id: z.number().optional(),
   menus: z.array(z.record(z.string(), z.unknown())).optional(),
   menu_background_image: z

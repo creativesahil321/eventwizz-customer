@@ -3,11 +3,41 @@ import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import type { Colors, Typography } from "@/services/common/site-essentials/type";
 
 export type ThemePresetKind = "recipe" | "palette";
-export type ThemePresetGroup = "venue" | "modern" | "classic" | "extra";
+export type ThemePresetGroup =
+  | "premium"
+  | "venue"
+  | "modern"
+  | "classic"
+  | "extra";
+
+export const PLATFORM_DEFAULT_PRESET_ID = "gallery-neutral";
 
 export type ThemePresetColors = Colors;
 
 export type ThemePresetTypography = Typography;
+
+export type ThemePresetTokensV2 = {
+  background: string;
+  surface: string;
+  secondary: string;
+  header: string;
+  onHeader: string;
+  footer: string;
+  onFooter: string;
+  onFooterMuted: string;
+  text: string;
+  muted: string;
+  border: string;
+  borderStrong: string;
+  primary: string;
+  accent: string;
+  accentText: string;
+  button: string;
+  buttonText: string;
+  buttonHover: string;
+  focus: string;
+  overlay: string;
+};
 
 export type ThemeCatalogPreset = {
   id: string;
@@ -21,7 +51,9 @@ export type ThemeCatalogPreset = {
   swatch: [string, string, string];
   sortOrder: number;
   isLight: boolean;
+  version?: number;
   colors: ThemePresetColors;
+  tokens?: ThemePresetTokensV2;
   typography?: ThemePresetTypography;
 };
 
@@ -36,6 +68,7 @@ export type ThemeCatalogFontPair = {
 
 export type ThemePresetsCatalog = {
   defaultPresetId: string;
+  themeSchemaVersion?: number;
   presets: ThemeCatalogPreset[];
   fontPairs: ThemeCatalogFontPair[];
   googleFamilies: string[];
@@ -98,13 +131,68 @@ function normalizeKind(raw: string): ThemePresetKind {
   return raw === "palette" ? "palette" : "recipe";
 }
 
+const PREMIUM_PRESET_IDS = new Set([
+  "gallery-neutral",
+  "country-estate",
+  "harbour-slate",
+  "boardroom-navy",
+  "porcelain-blush",
+  "walled-garden",
+  "claret-reserve",
+  "evergreen-noel",
+  "midnight-champagne",
+  "smoked-oak",
+]);
+
 function normalizeGroup(id: string, raw: string): ThemePresetGroup {
-  if (raw === "venue" || raw === "modern" || raw === "classic" || raw === "extra") {
+  if (
+    raw === "premium" ||
+    raw === "venue" ||
+    raw === "modern" ||
+    raw === "classic" ||
+    raw === "extra"
+  ) {
     return raw;
   }
+  if (PREMIUM_PRESET_IDS.has(id)) return "premium";
   if (id.startsWith("venue-")) return "venue";
   if (id.startsWith("lovable-")) return "modern";
   return "classic";
+}
+
+const TOKEN_KEYS: (keyof ThemePresetTokensV2)[] = [
+  "background",
+  "surface",
+  "secondary",
+  "header",
+  "onHeader",
+  "footer",
+  "onFooter",
+  "onFooterMuted",
+  "text",
+  "muted",
+  "border",
+  "borderStrong",
+  "primary",
+  "accent",
+  "accentText",
+  "button",
+  "buttonText",
+  "buttonHover",
+  "focus",
+  "overlay",
+];
+
+function normalizeTokens(raw: unknown): ThemePresetTokensV2 | undefined {
+  const record = asRecord(raw);
+  if (!record) return undefined;
+  const tokens = {} as ThemePresetTokensV2;
+  for (const key of TOKEN_KEYS) {
+    const value = record[key];
+    if (typeof value !== "string" || !value.trim()) return undefined;
+    tokens[key] = value.trim();
+  }
+  return tokens;
 }
 
 function normalizeSwatch(
@@ -210,7 +298,9 @@ function normalizePreset(raw: unknown): ThemeCatalogPreset | null {
     swatch: normalizeSwatch(record.swatch, colors),
     sortOrder: readNumber(record, "sortOrder", "sort_order", 0),
     isLight: readBoolean(record, "isLight", "is_light", false),
+    version: readNumber(record, "version", "version", 0) || undefined,
     colors,
+    tokens: normalizeTokens(record.tokens),
     typography: normalizeTypography(record.typography),
   };
 }
@@ -269,7 +359,10 @@ export function normalizeThemePresetsCatalog(
   return {
     defaultPresetId:
       readString(record, "defaultPresetId", "default_preset_id") ||
-      "lovable-clean-white",
+      PLATFORM_DEFAULT_PRESET_ID,
+    themeSchemaVersion:
+      readNumber(record, "themeSchemaVersion", "theme_schema_version", 0) ||
+      undefined,
     presets,
     fontPairs,
     googleFamilies,

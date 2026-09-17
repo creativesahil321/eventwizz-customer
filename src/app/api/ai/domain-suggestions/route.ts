@@ -28,13 +28,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the request data
-    const { venueName } = await req.json();
+    const body = await req.json();
+    const rawName = body?.venueName;
 
-    // Validate input
-    if (!venueName || typeof venueName !== "string") {
-      console.log("API Route: Invalid venue name:", venueName);
+    if (!rawName || typeof rawName !== "string") {
       return NextResponse.json(
-        { error: "Venue name is required and must be a string" },
+        { error: "Enter a subdomain of at least 3 letters or numbers." },
+        { status: 400 }
+      );
+    }
+
+    const venueName = rawName.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (venueName.length < 3 || !/[a-z0-9]/.test(venueName)) {
+      return NextResponse.json(
+        { error: "Enter a subdomain of at least 3 letters or numbers." },
         { status: 400 }
       );
     }

@@ -22,11 +22,9 @@ export const TRANSACTION_TYPES = [
 
 export const PAYMENT_METHODS = [
   { value: "all", label: "All Methods" },
-  { value: "stripe", label: "Card Payment" }, // API uses "stripe" key
-  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "stripe", label: "Card Payment" },
   { value: "paypal", label: "PayPal" },
-  { value: "klarna", label: "Klarna" },
-  { value: "truelayer", label: "TrueLayer" },
+  { value: "truelayer", label: "Bank Transfer" },
 ];
 
 // Status configuration with colors and icons

@@ -11,6 +11,7 @@ import { SitePreview } from "@/app/(protected)/_shared/sites-essentials/_compone
 import { MainLandingSitePreview } from "@/app/(protected)/_shared/sites-essentials/_components/main-landing-site-preview";
 import { SitePreviewReviewChrome } from "@/app/(protected)/_shared/sites-essentials/_components/site-preview-review-chrome";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+import { toMutableSiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/to-mutable-form-values";
 import { toSiteEssentialsUpdatePayload } from "@/app/(protected)/_shared/sites-essentials/_lib/payload";
 import { hydratePreviewMediaForSave } from "@/app/(protected)/_shared/sites-essentials/_lib/hydrate-preview-media-for-save";
 import {
@@ -454,7 +455,8 @@ export default function SitePreviewPage() {
 
     if (previewData) {
       try {
-        const clonedData = JSON.parse(JSON.stringify(previewData));
+        // Preserve File / blob logos — JSON.stringify turns File into `{}`.
+        const clonedData = toMutableSiteEssentialsFormValues(previewData);
         if (isMounted) {
           setFormData(clonedData);
           // Capture once per preview visit — later imports/theme tries can Discard
@@ -960,23 +962,25 @@ export default function SitePreviewPage() {
       await queryClient.invalidateQueries({
         queryKey: siteEssentialsKeys.details(),
       });
-      router.refresh();
-      // Refresh discard baseline so Discard no longer undoes a published theme.
-      try {
-        sessionBaselineRef.current = JSON.parse(
-          JSON.stringify(dataForSave),
-        ) as SiteEssentialsFormValues;
-        baselineRequiresSaveRef.current =
-          useSitePreviewStore.getState().previewRequiresSave;
-      } catch {
-        sessionBaselineRef.current = dataForSave;
-      }
-      setHasSessionEdits(false);
+      locationList.forEach((loc) => {
+        void queryClient.invalidateQueries({
+          queryKey: siteEssentialsKeys.bySlug(loc.slug),
+        });
+      });
+
+      useSitePreviewStore.getState().setPreviewRequiresSave(false);
+      useSitePreviewStore.getState().consumePreviewFresh();
+      setIsExiting(true);
       toast({
         title: "Theme saved",
         description: "Colors and fonts were updated.",
       });
+      router.replace(editorPathForSession(session?.user?.account_type));
+      window.setTimeout(() => {
+        clearPreviewData();
+      }, 400);
     } catch {
+      setIsExiting(false);
       toast({
         title: "Could not save theme",
         variant: "destructive",
@@ -990,11 +994,13 @@ export default function SitePreviewPage() {
     locationList,
     switchLocation,
     session?.user?.vendor_location_id,
+    session?.user?.account_type,
     queryClient,
     router,
     saveSiteEssentials,
     applyThemePreset,
     toast,
+    clearPreviewData,
   ]);
 
   // Prefer the pinned/smooth canvas values so the customizer doesn't thrash to an

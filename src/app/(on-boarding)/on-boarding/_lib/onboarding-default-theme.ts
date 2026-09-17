@@ -10,19 +10,19 @@ const DEFAULT_SOCIAL_LINKS: SocialLinks = {
 };
 
 /**
- * Default vendor-site preview theme for onboarding (Site Essentials preset: Clean White).
- * Mirrors backend `default_theme` until persistence GET returns vendor-specific values.
+ * Default vendor-site preview theme for onboarding (Site Essentials preset: Gallery Neutral).
+ * Mirrors backend `default_preset_id` until persistence GET returns vendor-specific values.
  */
 export const ONBOARDING_DEFAULT_THEME: ThemeSchema = {
   colors: {
-    primary: "#4747d1",
-    secondary: "#f4f4f5",
+    primary: "#2A2A28",
+    secondary: "#EEEDEA",
     header: "#ffffff",
-    footer: "#f4f4f5",
-    background: "#ffffff",
+    footer: "#EEEDEA",
+    background: "#F7F7F5",
     surface: "#ffffff",
-    text: "#17171c",
-    textDimmed: "#71717a",
+    text: "#1C1C1B",
+    textDimmed: "#5C5C57",
     socialLogin: {
       google: "#4285F4",
       microsoft: "#1877f2",
@@ -30,11 +30,11 @@ export const ONBOARDING_DEFAULT_THEME: ThemeSchema = {
   },
   typography: {
     fontFamily: {
-      heading: "Space Grotesk, sans-serif",
+      heading: "Archivo, sans-serif",
       body: "Inter, sans-serif",
     },
     customFontStylesheetUrls: [],
-    headingEmphasis: "accent_tail",
+    headingEmphasis: "uniform",
   },
   socialLinks: DEFAULT_SOCIAL_LINKS,
 };

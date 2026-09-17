@@ -1,8 +1,6 @@
 "use client";
 
-import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { shouldUseNextImageOptimization } from "@/lib/image-utils";
 
 type BrandLogoImageProps = {
   src: string;
@@ -14,7 +12,8 @@ type BrandLogoImageProps = {
 
 /**
  * Shared logo renderer for header, footer, and onboarding chrome.
- * Uses next/image when the host is allowlisted for AVIF/WebP + explicit dimensions.
+ * Native `img` (same as Site Essentials) so next/image AVIF/WebP cannot
+ * wash a black wordmark into a cream/white mark in /preview/site.
  */
 export function BrandLogoImage({
   src,
@@ -24,14 +23,13 @@ export function BrandLogoImage({
   height = 116,
 }: BrandLogoImageProps) {
   return (
-    <Image
+    <img
       src={src}
       alt={alt}
       width={width}
       height={height}
-      sizes="(max-width: 768px) 128px, 200px"
+      decoding="async"
       className={cn("h-auto w-auto object-contain", className)}
-      unoptimized={!shouldUseNextImageOptimization(src)}
     />
   );
 }

@@ -1,14 +1,20 @@
 import type { UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import { ONBOARDING_DEFAULT_THEME } from "@/app/(on-boarding)/on-boarding/_lib/onboarding-default-theme";
+import type { ThemePresetsCatalog } from "@/services/common/theme/theme-presets.type";
 import type { SiteEssentialsFormValues } from "./schema";
-import {
-  SITE_THEME_PRESETS,
-  type SiteThemePresetId,
-} from "./site-theme-presets";
+import { type SiteThemePresetId } from "./site-theme-presets";
+import { buildTryThemeCatalogView } from "./theme-preset-catalog";
 
-/** Platform default — matches backend `default_theme` / Clean White preset. */
+/** Last-resort id if the catalog request has not loaded yet. */
 export const SITE_ESSENTIALS_DEFAULT_PRESET_ID: SiteThemePresetId =
-  "lovable-clean-white";
+  "gallery-neutral";
+
+export function resolveCatalogDefaultPresetId(
+  catalog?: ThemePresetsCatalog | null,
+): SiteThemePresetId {
+  const fromCatalog = catalog?.defaultPresetId?.trim();
+  return fromCatalog || SITE_ESSENTIALS_DEFAULT_PRESET_ID;
+}
 
 export function getSiteEssentialsDefaultThemeFields(): Pick<
   SiteEssentialsFormValues,
@@ -35,27 +41,28 @@ export function getSiteEssentialsDefaultThemeFields(): Pick<
     typography: {
       fontFamily: {
         heading:
-          typography.fontFamily?.heading ?? "Space Grotesk, sans-serif",
+          typography.fontFamily?.heading ?? "Archivo, sans-serif",
         body: typography.fontFamily?.body ?? "Inter, sans-serif",
       },
       customFontStylesheetUrls: typography.customFontStylesheetUrls ?? [],
-      headingEmphasis: typography.headingEmphasis ?? "accent_tail",
+      headingEmphasis: typography.headingEmphasis ?? "uniform",
     },
   };
 }
 
 /**
  * Pure merge — returns a new values object with platform-default colors/typography.
- * Logo, copy, images, and SEO are left untouched. Use from preview store or any
- * non-RHF host; RHF callers can still use `applySiteEssentialsDefaultTheme`.
+ * Prefers GET /theme/presets (`default_preset_id` + recipe tokens). Logo, copy,
+ * images, and SEO are left untouched.
  */
 export function mergeSiteEssentialsDefaultTheme(
   values: SiteEssentialsFormValues,
+  catalog?: ThemePresetsCatalog | null,
 ): SiteEssentialsFormValues {
   const defaults = getSiteEssentialsDefaultThemeFields();
-  const preset = SITE_THEME_PRESETS.find(
-    (item) => item.id === SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-  );
+  const view = buildTryThemeCatalogView(catalog);
+  const defaultId = resolveCatalogDefaultPresetId(catalog);
+  const preset = view.recipesById.get(defaultId);
 
   return {
     ...values,
@@ -71,10 +78,11 @@ export function mergeSiteEssentialsDefaultTheme(
           []),
       ],
       headingEmphasis:
+        preset?.headingEmphasis ??
         defaults.typography.headingEmphasis ??
         values.typography?.headingEmphasis,
     },
-    theme_preset_id: SITE_ESSENTIALS_DEFAULT_PRESET_ID,
+    theme_preset_id: defaultId,
   };
 }
 
@@ -82,13 +90,14 @@ export function mergeSiteEssentialsDefaultTheme(
 export function applySiteEssentialsDefaultTheme(
   setValue: UseFormSetValue<SiteEssentialsFormValues>,
   getValues: UseFormGetValues<SiteEssentialsFormValues>,
+  catalog?: ThemePresetsCatalog | null,
 ): SiteThemePresetId {
-  const next = mergeSiteEssentialsDefaultTheme(getValues());
+  const next = mergeSiteEssentialsDefaultTheme(getValues(), catalog);
   const opts = { shouldDirty: true, shouldTouch: true } as const;
 
   setValue("colors", next.colors, opts);
   setValue("typography", next.typography, opts);
-  setValue("theme_preset_id", SITE_ESSENTIALS_DEFAULT_PRESET_ID, opts);
+  setValue("theme_preset_id", next.theme_preset_id ?? null, opts);
 
-  return SITE_ESSENTIALS_DEFAULT_PRESET_ID;
+  return next.theme_preset_id ?? SITE_ESSENTIALS_DEFAULT_PRESET_ID;
 }

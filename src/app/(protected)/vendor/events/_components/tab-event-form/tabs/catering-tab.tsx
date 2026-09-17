@@ -32,6 +32,7 @@ import {
   hydrateMenuChoicesCloseDaysBefore,
   MENU_CHOICES_CLOSE_DEFAULT_DAYS,
   MENU_CHOICES_CLOSE_MIN_DAYS,
+  MENU_CHOICES_CLOSE_MAX_DAYS,
   serializeMenuChoicesCloseDaysBefore,
 } from "@/app/(protected)/vendor/events/_lib/menu-choices-close-days";
 import {
@@ -1211,6 +1212,7 @@ export default function CateringTab() {
                             type="number"
                             inputMode="numeric"
                             min={MENU_CHOICES_CLOSE_MIN_DAYS}
+                            max={MENU_CHOICES_CLOSE_MAX_DAYS}
                             step={1}
                             placeholder={String(
                               MENU_CHOICES_CLOSE_DEFAULT_DAYS,
@@ -1244,7 +1246,9 @@ export default function CateringTab() {
                         </FormControl>
                         <FormDescription>
                           Customers cannot add or edit menu choices from this
-                          many days before the event date. Default{" "}
+                          many days before the event. Use{" "}
+                          {MENU_CHOICES_CLOSE_MIN_DAYS}–
+                          {MENU_CHOICES_CLOSE_MAX_DAYS} days. Default{" "}
                           {MENU_CHOICES_CLOSE_DEFAULT_DAYS}.
                         </FormDescription>
                         <FormMessage />

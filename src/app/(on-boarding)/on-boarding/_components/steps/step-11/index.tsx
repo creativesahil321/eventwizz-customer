@@ -40,7 +40,7 @@ import GoogleLocationSearch from "./google-location-search";
 import { cityFromFormattedAddress } from "../step-7/address-autocomplete";
 import { fetchLocationDetails, geocodeLocation } from "./_lib/actions";
 import { env } from "@/env";
-import { useDomainSuggestions } from "./_lib/hooks/useDomainSuggestions";
+import { useDomainSuggestions, normalizeDomainSuggestionQuery } from "./_lib/hooks/useDomainSuggestions";
 import { Loader2, Globe, Mail, MapPin } from "lucide-react";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
@@ -165,8 +165,8 @@ export default function StepEleven() {
     ) {
       return "This subdomain name may not be appropriate for a professional event venue. Please try a different name.";
     }
-    if (error.includes("model") || error.includes("API")) {
-      return "Unable to generate suggestions at the moment. Please try again.";
+    if (error.includes("busy") || error.includes("429") || error.includes("quota")) {
+      return "Suggestions are busy. Pause typing for a moment, then continue.";
     }
     // Don't truncate error messages - let them display fully
     return error;
@@ -557,19 +557,19 @@ export default function StepEleven() {
                                     placeholder="Enter subdomain name"
                                     value={selectedDomain || ""}
                                     onChange={(e) => {
-                                      const value = e.target.value
-                                        .toLowerCase()
-                                        .replace(/[^a-z0-9-]/g, "");
-                                      applyDomainChange(value);
-
-                                      // Generate suggestions based on typing
-                                      if (value && value.length >= 3) {
-                                        generateSuggestions(
-                                          value, // Use the typed value
-                                          venueType,
-                                          venueLocation,
+                                      const value =
+                                        normalizeDomainSuggestionQuery(
+                                          e.target.value,
                                         );
+                                      if (value === (selectedDomain || "")) {
+                                        return;
                                       }
+                                      applyDomainChange(value);
+                                      generateSuggestions(
+                                        value,
+                                        venueType,
+                                        venueLocation,
+                                      );
                                     }}
                                     className="h-9 flex-1 border-0 bg-transparent pr-8 text-sm shadow-none focus-visible:ring-0"
                                     maxLength={63}

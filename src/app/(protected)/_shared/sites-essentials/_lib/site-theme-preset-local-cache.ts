@@ -7,7 +7,7 @@ function storageKey(accountKey: string | undefined): string {
 }
 
 function isKnownPresetId(id: string): id is SiteThemePresetId {
-  return SITE_THEME_PRESETS.some((p) => p.id === id);
+  return id.trim().length > 0;
 }
 
 /** Last preset the vendor clicked “Apply preset” for — survives refresh & form reset (browser only). */

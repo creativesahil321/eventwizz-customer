@@ -19,10 +19,15 @@ function coalesceMedia(
   if (typeof formVal === "string" && formVal.trim().length > 0) {
     return formVal;
   }
+  // JSON.parse(JSON.stringify(File)) becomes `{}` — treat as missing so we
+  // do not skip the API URL, and never pass a non-URL into <img src>.
   if (typeof apiVal === "string" && apiVal.trim().length > 0) {
     return apiVal;
   }
-  return formVal ?? apiVal ?? null;
+  if (typeof formVal === "string" || formVal instanceof File || formVal == null) {
+    return formVal ?? apiVal ?? null;
+  }
+  return apiVal ?? null;
 }
 
 function coalesceText(

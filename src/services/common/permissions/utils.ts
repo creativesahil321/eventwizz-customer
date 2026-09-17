@@ -48,7 +48,7 @@ export const hasMenuPermission = (
   if (!menuPermission) return true; // No permission required
   if (!permissions || !Array.isArray(permissions)) return false;
 
-  // Exact match only – backend and frontend use the same keys (see docs/CLEAN_PERMISSIONS_SPEC_FOR_BACKEND.md)
+  // Exact match only – backend and frontend use the same keys (see docs/backend-contracts/permissions-spec-clean.md)
   if (permissions.includes(menuPermission)) {
     return true;
   }

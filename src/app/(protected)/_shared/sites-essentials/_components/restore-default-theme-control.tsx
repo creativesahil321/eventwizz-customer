@@ -14,10 +14,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { useResetSiteEssentialsThemeMutation } from "../_lib/queries";
+import {
+  useResetSiteEssentialsThemeMutation,
+  useThemePresetsCatalogQuery,
+} from "../_lib/queries";
 import {
   mergeSiteEssentialsDefaultTheme,
-  SITE_ESSENTIALS_DEFAULT_PRESET_ID,
+  resolveCatalogDefaultPresetId,
 } from "../_lib/default-site-theme";
 import { writeLastAppliedSiteThemePresetId } from "../_lib/site-theme-preset-local-cache";
 import { toMutableSiteEssentialsFormValues } from "../_lib/to-mutable-form-values";
@@ -41,18 +44,20 @@ export function RestoreDefaultThemeControl({
 }: RestoreDefaultThemeControlProps) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { data: themeCatalog } = useThemePresetsCatalogQuery();
   const {
     mutateAsync: resetThemeToDefault,
     isPending: isResetting,
   } = useResetSiteEssentialsThemeMutation();
 
   const handleConfirm = async () => {
+    const catalogDefaultId = resolveCatalogDefaultPresetId(themeCatalog);
     try {
       const updated = await resetThemeToDefault();
       onApplied(toMutableSiteEssentialsFormValues(updated));
       writeLastAppliedSiteThemePresetId(
         presetCacheUserKey,
-        SITE_ESSENTIALS_DEFAULT_PRESET_ID,
+        updated.theme_preset_id ?? catalogDefaultId,
       );
       setDialogOpen(false);
       toast({
@@ -61,11 +66,8 @@ export function RestoreDefaultThemeControl({
           "Colors and fonts were reset to EventWizz defaults. Your logo, copy, and images are unchanged.",
       });
     } catch {
-      onApplied(mergeSiteEssentialsDefaultTheme(getValues()));
-      writeLastAppliedSiteThemePresetId(
-        presetCacheUserKey,
-        SITE_ESSENTIALS_DEFAULT_PRESET_ID,
-      );
+      onApplied(mergeSiteEssentialsDefaultTheme(getValues(), themeCatalog));
+      writeLastAppliedSiteThemePresetId(presetCacheUserKey, catalogDefaultId);
       setDialogOpen(false);
       toast({
         title: "Default theme applied locally",
@@ -110,7 +112,7 @@ export function RestoreDefaultThemeControl({
                   <span className="font-medium text-foreground">
                     colors, fonts, and heading style
                   </span>{" "}
-                  with the EventWizz default theme (Clean White).
+                  with the EventWizz default theme (Gallery Neutral).
                 </p>
                 <p>
                   Your logo, page copy, images, social links, and SEO settings

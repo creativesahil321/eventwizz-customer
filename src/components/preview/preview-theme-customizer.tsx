@@ -46,8 +46,6 @@ import {
   mergeFullPresetIntoValues,
   siteEssentialsColorsMatch,
   siteEssentialsFontPairKey,
-  tryThemeColorGridOptionStorageKey,
-  tryThemeFontGridOptionStorageKey,
 } from "@/app/(protected)/_shared/sites-essentials/_lib/site-theme-presets";
 import {
   buildTryThemeCatalogView,
@@ -69,10 +67,6 @@ import { useSiteEssentialsPresetFontsPreload } from "@/hooks/use-site-essentials
 import { paletteAccessibilityFlags } from "@/lib/wcag-color-contrast";
 import { usePermission } from "@/hooks/usePermission";
 import { useMediaQuery } from "@/hooks/use-media-query";
-
-const PREVIEW_TRY_THEME_LAST_FONT_KEY = "eventwizz:preview-try-theme:last-font";
-const PREVIEW_TRY_THEME_LAST_COLOR_KEY =
-  "eventwizz:preview-try-theme:last-color";
 
 const DEFAULT_SHEET_DESCRIPTION =
   "Tap a font or color to preview. Bonus palettes and pairs live here first—publish from Site Essentials when you are ready.";
@@ -135,14 +129,12 @@ const SECTION_HINT_CLASS = "text-[11px] leading-snug text-slate-400";
 function ColorPresetCard({
   opt,
   active,
-  showRecent,
   layout,
   fontLabel,
   onSelect,
 }: {
   opt: CatalogColorGridOption;
   active: boolean;
-  showRecent: boolean;
   layout: "recipe" | "compact";
   fontLabel?: string;
   onSelect: () => void;
@@ -151,16 +143,11 @@ function ColorPresetCard({
   const acc = paletteAccessibilityFlags(opt.colors);
   const contrastWarn = !(acc.bodyTextAa && acc.primaryOnSurfaceUi);
 
-  const statusChip =
-    active ? (
-      <span className="shrink-0 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-medium text-white">
-        In use
-      </span>
-    ) : showRecent ? (
-      <span className="shrink-0 rounded-full border border-slate-200 px-1.5 py-0.5 text-[9px] font-medium text-slate-500">
-        Recent
-      </span>
-    ) : null;
+  const statusChip = active ? (
+    <span className="shrink-0 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-medium text-white">
+      * In use
+    </span>
+  ) : null;
 
   const swatches = (
     <div className="flex shrink-0 gap-0.5" aria-hidden>
@@ -286,20 +273,6 @@ function SegmentGroup<T extends string>({
   );
 }
 
-function sortTryThemeOptionsFirst<T>(
-  items: readonly T[],
-  pinnedKey: string | null,
-  keyOf: (item: T) => string,
-): T[] {
-  if (!pinnedKey) return [...items];
-  const head: T[] = [];
-  const tail: T[] = [];
-  for (const item of items) {
-    (keyOf(item) === pinnedKey ? head : tail).push(item);
-  }
-  return [...head, ...tail];
-}
-
 type PreviewThemeCustomizerProps = {
   values: SiteEssentialsFormValues;
   onValuesChange: (next: SiteEssentialsFormValues) => void;
@@ -333,6 +306,8 @@ type PreviewThemeCustomizerProps = {
 
 function groupLabelForColors(key: ThemePresetGroupKey): string {
   switch (key) {
+    case "premium":
+      return "Premium themes";
     case "venue":
       return "Venue recipes";
     case "modern":
@@ -346,6 +321,8 @@ function groupLabelForColors(key: ThemePresetGroupKey): string {
 
 function groupLabelForFonts(key: ThemePresetGroupKey): string {
   switch (key) {
+    case "premium":
+      return "Premium font pairs";
     case "venue":
       return "Venue font pairs";
     case "modern":
@@ -355,6 +332,10 @@ function groupLabelForFonts(key: ThemePresetGroupKey): string {
     default:
       return "Extra font pairs";
   }
+}
+
+function isRecipeGroup(key: ThemePresetGroupKey): boolean {
+  return key === "premium" || key === "venue";
 }
 
 export function PreviewThemeCustomizer({
@@ -385,23 +366,11 @@ export function PreviewThemeCustomizer({
   const [colorFilter, setColorFilter] = useState<"all" | "dark" | "light">(
     "all",
   );
-  const [lastFontKey, setLastFontKey] = useState<string | null>(null);
-  const [lastColorKey, setLastColorKey] = useState<string | null>(null);
   const snapshotRef = useRef<SiteEssentialsFormValues | null>(null);
   const valuesRef = useRef(values);
   useEffect(() => {
     valuesRef.current = values;
   }, [values]);
-
-  useEffect(() => {
-    if (!open || typeof window === "undefined") return;
-    try {
-      setLastFontKey(sessionStorage.getItem(PREVIEW_TRY_THEME_LAST_FONT_KEY));
-      setLastColorKey(sessionStorage.getItem(PREVIEW_TRY_THEME_LAST_COLOR_KEY));
-    } catch {
-      /* private mode */
-    }
-  }, [open]);
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
@@ -437,13 +406,6 @@ export function PreviewThemeCustomizer({
         }
         onValuesChange(mergeColorPaletteIntoValues(cur, opt.colors));
       }
-      const k = tryThemeColorGridOptionStorageKey(opt);
-      setLastColorKey(k);
-      try {
-        sessionStorage.setItem(PREVIEW_TRY_THEME_LAST_COLOR_KEY, k);
-      } catch {
-        /* private mode */
-      }
     },
     [catalogView, onValuesChange],
   );
@@ -477,13 +439,6 @@ export function PreviewThemeCustomizer({
             opt.bodyStack,
           ),
         );
-      }
-      const k = tryThemeFontGridOptionStorageKey(opt);
-      setLastFontKey(k);
-      try {
-        sessionStorage.setItem(PREVIEW_TRY_THEME_LAST_FONT_KEY, k);
-      } catch {
-        /* private mode */
       }
     },
     [applyFonts, onValuesChange],
@@ -550,21 +505,14 @@ export function PreviewThemeCustomizer({
 
   const currentFontKey = siteEssentialsFontPairKey(values.typography);
 
-  const orderedFontGridOptions = useMemo(
-    () =>
-      sortTryThemeOptionsFirst(
-        catalogView?.fontOptions ?? [],
-        lastFontKey,
-        tryThemeFontGridOptionStorageKey,
-      ),
-    [catalogView, lastFontKey],
-  );
+  const orderedFontGridOptions = catalogView?.fontOptions ?? [];
 
   const groupedFontGridOptions = useMemo(() => {
     const groups: Record<
       ThemePresetGroupKey,
       { key: ThemePresetGroupKey; label: string; items: typeof orderedFontGridOptions }
     > = {
+      premium: { key: "premium", label: groupLabelForFonts("premium"), items: [] },
       venue: { key: "venue", label: groupLabelForFonts("venue"), items: [] },
       modern: { key: "modern", label: groupLabelForFonts("modern"), items: [] },
       classic: { key: "classic", label: groupLabelForFonts("classic"), items: [] },
@@ -585,12 +533,8 @@ export function PreviewThemeCustomizer({
     } else if (colorFilter === "light") {
       list = list.filter((o) => o.isLight);
     }
-    return sortTryThemeOptionsFirst(
-      list,
-      lastColorKey,
-      tryThemeColorGridOptionStorageKey,
-    );
-  }, [catalogView, colorFilter, lastColorKey]);
+    return list;
+  }, [catalogView, colorFilter]);
 
   const groupedColorGridOptions = useMemo(() => {
     const groups: Record<
@@ -601,6 +545,11 @@ export function PreviewThemeCustomizer({
         items: typeof orderedColorGridOptions;
       }
     > = {
+      premium: {
+        key: "premium",
+        label: groupLabelForColors("premium"),
+        items: [],
+      },
       venue: { key: "venue", label: groupLabelForColors("venue"), items: [] },
       modern: { key: "modern", label: groupLabelForColors("modern"), items: [] },
       classic: {
@@ -868,9 +817,9 @@ export function PreviewThemeCustomizer({
                   ))}
                 </div>
                 <p className={SECTION_HINT_CLASS}>
-                  Start with a venue recipe — it sets colors, fonts, and
-                  heading style together. Gold/brass is for badges, not body
-                  text. More palettes are collapsed below.
+                  Start with a Premium theme — it sets colors and fonts
+                  together. Venue recipes stay below. Gold/brass is for
+                  badges, not body text.
                 </p>
                 {!catalogView ? (
                   <div className="space-y-2" aria-hidden>
@@ -881,7 +830,11 @@ export function PreviewThemeCustomizer({
                 ) : (
                   <Accordion
                     type="multiple"
-                    defaultValue={["venue"]}
+                    defaultValue={
+                      groupedColorGridOptions[0]
+                        ? [groupedColorGridOptions[0].key]
+                        : []
+                    }
                     className="w-full"
                   >
                   {groupedColorGridOptions.map((group) => (
@@ -902,7 +855,7 @@ export function PreviewThemeCustomizer({
                         <div
                           className={cn(
                             "grid gap-2",
-                            group.key === "venue"
+                            isRecipeGroup(group.key)
                               ? "grid-cols-1"
                               : "grid-cols-2",
                           )}
@@ -915,9 +868,6 @@ export function PreviewThemeCustomizer({
                                   values.colors,
                                   opt.colors,
                                 );
-                            const pinned =
-                              tryThemeColorGridOptionStorageKey(opt) ===
-                              lastColorKey;
                             return (
                               <ColorPresetCard
                                 key={
@@ -927,12 +877,11 @@ export function PreviewThemeCustomizer({
                                 }
                                 opt={opt}
                                 active={active}
-                                showRecent={pinned && !active}
                                 layout={
-                                  group.key === "venue" ? "recipe" : "compact"
+                                  isRecipeGroup(group.key) ? "recipe" : "compact"
                                 }
                                 fontLabel={
-                                  group.key === "venue" &&
+                                  isRecipeGroup(group.key) &&
                                   opt.headingFontLabel &&
                                   opt.bodyFontLabel
                                     ? `${opt.headingFontLabel} / ${opt.bodyFontLabel}`
@@ -953,8 +902,8 @@ export function PreviewThemeCustomizer({
               <div className="space-y-2.5">
                 <h3 className={SECTION_LABEL_CLASS}>Fonts</h3>
                 <p className={SECTION_HINT_CLASS}>
-                  Venue recipes already include a font pair. Change this only
-                  if you want a different heading/body mix.
+                  Premium and venue recipes already include a font pair.
+                  Change this only if you want a different heading/body mix.
                 </p>
                 {!catalogView ? (
                   <div className="grid grid-cols-2 gap-2" aria-hidden>
@@ -965,7 +914,11 @@ export function PreviewThemeCustomizer({
                 ) : (
                   <Accordion
                     type="multiple"
-                    defaultValue={["venue"]}
+                    defaultValue={
+                      groupedFontGridOptions[0]
+                        ? [groupedFontGridOptions[0].key]
+                        : []
+                    }
                     className="w-full"
                   >
                   {groupedFontGridOptions.map((group) => (
@@ -993,10 +946,6 @@ export function PreviewThemeCustomizer({
                                   body: opt.bodyStack,
                                 },
                               });
-                            const pinned =
-                              tryThemeFontGridOptionStorageKey(opt) ===
-                              lastFontKey;
-                            const showRecent = pinned && !active;
                             return (
                               <button
                                 key={
@@ -1021,20 +970,8 @@ export function PreviewThemeCustomizer({
                                 }
                               >
                                 {active ? (
-                                  <span className="absolute left-1/2 top-1.5 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-2 py-0.5 text-[9px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-                                    <span
-                                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
-                                      aria-hidden
-                                    />
-                                    In use
-                                  </span>
-                                ) : null}
-                                {showRecent ? (
-                                  <span
-                                    className="absolute right-1 top-1 z-10 rounded-full border border-slate-200/90 bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-500 shadow-sm"
-                                    title="Last picked this session"
-                                  >
-                                    Recent
+                                  <span className="absolute left-1/2 top-1.5 z-10 -translate-x-1/2 rounded-full border border-slate-200/80 bg-white/95 px-2 py-0.5 text-[9px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+                                    * In use
                                   </span>
                                 ) : null}
                                 <span
