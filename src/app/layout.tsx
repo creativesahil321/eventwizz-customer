@@ -27,7 +27,6 @@ import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { fontInter } from "@/lib/fonts";
 import { addCacheBustingSSR, shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { resolveVendorMainLandingHeroSrc } from "@/lib/resolve-hero-cover-image";
-import { cn } from "@/lib/utils";
 
 /**
  * Dynamic metadata — single source of truth for brand name, favicon, and title template.
@@ -131,7 +130,7 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning={true}
-      className={cn("[scrollbar-gutter:stable]", fontInter.variable)}
+      className={fontInter.variable}
       data-heading-emphasis={normalizeHeadingEmphasis(
         initialTheme?.typography?.headingEmphasis,
       )}
