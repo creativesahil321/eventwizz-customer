@@ -3,10 +3,12 @@ import { test } from "node:test";
 import {
   applyVendorBookingFactsToDates,
   buildAiOnboardingSystemPrompt,
+  ensureOnboardingDates,
   ensureStepSevenRooms,
   extractVendorBookingFacts,
   formatVendorFactsForPrompt,
   parseVendorDescriptionHints,
+  uniqueAiDatesByEventDate,
 } from "./ai-onboarding-sanitize";
 import { MESSY_XMAS_VENDOR_PROMPT } from "./vendor-messy-prompt.fixture";
 
@@ -144,4 +146,57 @@ test("onboarding system prompt trains the model on messy vendor English", () => 
   assert.match(prompt, /MESSY VENDOR ENGLISH/);
   assert.match(prompt, /PRICE LABEL/);
   assert.match(prompt, /do not create a promo/i);
+  assert.match(prompt, /EACH event_date may appear ONCE/i);
+});
+
+function ticketDate(iso: string, title: string) {
+  return {
+    event_date: iso,
+    booking_type: "tickets" as const,
+    tickets: [
+      {
+        title,
+        description: title,
+        total_capacity: "10",
+        price: "10",
+      },
+    ],
+    tables: [],
+  };
+}
+
+test("uniqueAiDatesByEventDate keeps one object per calendar day", () => {
+  const dates = uniqueAiDatesByEventDate([
+    ticketDate("2026-12-18", "Morning"),
+    ticketDate("2026-12-18", "Evening"),
+    ticketDate("2026-12-19 ", "Day 2 a"),
+    ticketDate("2026-12-19", "Day 2 b"),
+  ]);
+  assert.deepEqual(
+    dates.map((d) => d.event_date),
+    ["2026-12-18", "2026-12-19"],
+  );
+});
+
+test("ensureOnboardingDates collapses duplicate AI calendar days", () => {
+  const dates = ensureOnboardingDates(
+    [
+      ticketDate("2026-12-18", "A"),
+      ticketDate("2026-12-18", "B"),
+      ticketDate("2026-12-19", "C"),
+      ticketDate("2026-12-19", "D"),
+    ],
+    extractVendorBookingFacts(""),
+  );
+  const days = dates.map((d) => d.event_date);
+  assert.equal(new Set(days).size, days.length);
+  assert.deepEqual(days, ["2026-12-18", "2026-12-19"]);
+});
+
+test("listed event dates win over a requested date count", () => {
+  const facts = extractVendorBookingFacts(
+    "4 dates please, 2026-12-18 and 2026-12-19",
+  );
+  assert.equal(facts.requestedDateCount, undefined);
+  assert.deepEqual(facts.eventDates, ["2026-12-18", "2026-12-19"]);
 });

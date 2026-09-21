@@ -361,6 +361,18 @@ const timelineStyles = `
   }
 }
 
+.tl-section--compact {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .tl-section--compact:not(.tl-section--preview-narrow) {
+    padding-top: 1.75rem;
+    padding-bottom: 1.75rem;
+  }
+}
+
 /* ── Decorative ambient glow ── */
 .tl-section__glow {
   pointer-events: none;
@@ -502,6 +514,14 @@ const timelineStyles = `
 .tl-container--has-arrows {
   padding-left: 2.75rem;
   padding-right: 2.75rem;
+}
+
+.tl-container--compact {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 @media (min-width: 640px) {
@@ -1024,9 +1044,14 @@ export default function Timeline({
       ({
         minWidth: `${CARD_MIN_WIDTH}px`,
         maxWidth: `${CARD_MIN_WIDTH + 40}px`,
-        flex: showArrows ? `0 0 ${CARD_MIN_WIDTH}px` : "1 1 0",
+        flex:
+          showArrows
+            ? `0 0 ${CARD_MIN_WIDTH}px`
+            : displaySchedules.length <= 2
+              ? "0 0 auto"
+              : "1 1 0",
       }) as CSSProperties,
-    [showArrows],
+    [showArrows, displaySchedules.length],
   );
 
   const checkScrollability = () => {
@@ -1135,6 +1160,8 @@ export default function Timeline({
   const subtitle = eventSchedularCopy?.trim() || "";
   const scheduleTitle = eventSchedularTitle?.trim() || "What to Expect";
   const hasScheduleRows = displaySchedules.length > 0;
+  const isSingleItem = displaySchedules.length === 1;
+  const isCompact = displaySchedules.length <= 2;
 
   return (
     <>
@@ -1144,6 +1171,7 @@ export default function Timeline({
         className={cn(
           "tl-section",
           narrowPreview && "tl-section--preview-narrow",
+          isCompact && "tl-section--compact",
         )}
       >
         {/* Background */}
@@ -1187,7 +1215,7 @@ export default function Timeline({
             </p>
           ) : (
           <div
-            className={`tl-container ${showArrows ? "tl-container--has-arrows" : ""}`}
+            className={`tl-container ${showArrows ? "tl-container--has-arrows" : ""} ${isCompact ? "tl-container--compact" : ""}`}
           >
             {/* Navigation arrows */}
             {showArrows ? (
@@ -1259,6 +1287,7 @@ export default function Timeline({
                       role="listitem"
                     >
                       {/* Progress track */}
+                      {!isSingleItem ? (
                       <div className="tl-track">
                         {!isFirst ? (
                           <TimelineConnector
@@ -1286,6 +1315,7 @@ export default function Timeline({
                           <span style={{ flex: 1 }} aria-hidden />
                         )}
                       </div>
+                      ) : null}
 
                       {/* Card */}
                       <article

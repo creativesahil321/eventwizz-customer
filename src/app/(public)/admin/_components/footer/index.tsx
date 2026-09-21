@@ -20,6 +20,7 @@ import {
 } from "@/lib/admin-cms-content";
 import { ThemeSchema } from "@/types/theme.types";
 import FAQSection from "../faq-section";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import { cn } from "@/lib/utils";
 
@@ -95,10 +96,11 @@ export default function AdminFooter() {
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-12 lg:gap-8">
           {/* Brand */}
           <div className="lg:col-span-4">
-            <img
+            <BrandLogoImage
               src={addCacheBusting(logoPath)}
               alt="EventWizz"
               className="h-9 w-auto"
+              chrome="footer"
             />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-[var(--color-on-footer)]/75">
               {ADMIN_FOOTER_BRAND_DESCRIPTION}

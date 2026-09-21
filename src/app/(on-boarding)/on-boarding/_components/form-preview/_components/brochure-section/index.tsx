@@ -47,12 +47,12 @@ export default function BrochureSection({
     <section className="bg-[color:var(--color-background)] px-4 py-16">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 space-y-3 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
             Location
           </p>
           <SiteHeading
             level={2}
-            title="Check Out The Latest Dates To Be Released — Get In Quick!"
+            title="Find us"
             variant="onSurface"
             align="center"
             emphasis={headingEmphasis as HeadingEmphasis | undefined}

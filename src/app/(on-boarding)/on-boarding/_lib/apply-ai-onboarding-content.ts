@@ -36,6 +36,7 @@ import {
   formatAIDateForStepFive,
   normalizeAiRoomNames,
   parseVendorDescriptionHints,
+  uniqueAiDatesByEventDate,
 } from "./ai-onboarding-sanitize";
 import { resolveAiDrinksEnabled } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import {
@@ -590,10 +591,10 @@ async function applyAIGeneratedOnboardingContentInner({
     await resetVendorRoomsBeforeAiApply();
   }
   if (typeof window !== "undefined") {
-    sessionStorage.setItem(
-      "onboarding_is_rooms",
-      useRoomSystem ? "true" : "false",
+    const { writeOnboardingSavedIsRoomsFlag } = await import(
+      "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms"
     );
+    writeOnboardingSavedIsRoomsFlag(useRoomSystem);
   }
   let roomPayloadsForSubmit: Array<{
     id: number;
@@ -659,24 +660,9 @@ async function applyAIGeneratedOnboardingContentInner({
   // --- Step 5: Dates, Tickets & Tables ---
   setStep(4);
   const bookingFacts = vendorHints.bookingFacts;
-  const ensuredDates = ensureOnboardingDates(
-    editedContent.stepFive?.dates,
-    bookingFacts,
+  const aiDates = uniqueAiDatesByEventDate(
+    ensureOnboardingDates(editedContent.stepFive?.dates, bookingFacts),
   );
-  const rawAiDates = ensuredDates;
-  const aiDates = (() => {
-    const sorted = [...rawAiDates].sort(
-      (a, b) =>
-        new Date(a.event_date + "T00:00:00").getTime() -
-        new Date(b.event_date + "T00:00:00").getTime(),
-    );
-    const seen = new Set<string>();
-    return sorted.filter((d) => {
-      if (!d.event_date || seen.has(d.event_date)) return false;
-      seen.add(d.event_date);
-      return true;
-    });
-  })();
   const formattedDates = aiDates.map((d) =>
     formatAIDateForStepFive(d),
   );
@@ -693,9 +679,9 @@ async function applyAIGeneratedOnboardingContentInner({
     ? new Map(
         coerceAiStepFiveRooms(editedContent.stepFive?.rooms).map((room) => [
           room.room_name.trim().toLowerCase(),
-          ensureOnboardingDates(room.dates, bookingFacts).map((d) =>
-            formatAIDateForStepFive(d),
-          ) as StepFiveType["dates"],
+          uniqueAiDatesByEventDate(
+            ensureOnboardingDates(room.dates, bookingFacts),
+          ).map((d) => formatAIDateForStepFive(d)) as StepFiveType["dates"],
         ]),
       )
     : new Map<string, StepFiveType["dates"]>();

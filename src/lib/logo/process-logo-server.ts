@@ -10,6 +10,9 @@ import {
   LOGO_LIGHT_AVG_LUMINANCE,
   LOGO_LIGHT_MONOCHROME_RATIO,
   LOGO_LIGHT_PIXEL_RATIO,
+  LOGO_DARK_AVG_LUMINANCE,
+  LOGO_DARK_MONOCHROME_RATIO,
+  LOGO_DARK_PIXEL_RATIO,
   LOGO_MAX_HEIGHT,
   LOGO_MAX_WIDTH,
   LOGO_WHITE_FUZZ,
@@ -334,6 +337,47 @@ function isPredominantlyLightLogo(data: Buffer, channels: number): boolean {
   );
 }
 
+/** True when opaque pixels are mostly black/charcoal — invisible on a dark header. */
+function isPredominantlyDarkLogo(data: Buffer, channels: number): boolean {
+  if (channels < 4) return false;
+
+  let opaque = 0;
+  let dark = 0;
+  let totalLum = 0;
+  let darkMonochrome = 0;
+
+  for (let i = 0; i < data.length; i += channels) {
+    const alpha = data[i + 3]!;
+    if (alpha < 64) continue;
+
+    opaque++;
+    const r = data[i]!;
+    const g = data[i + 1]!;
+    const b = data[i + 2]!;
+    const lum = pixelLuminance(r, g, b);
+    totalLum += lum;
+
+    if (lum <= 55) dark++;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const sat = max === 0 ? 0 : (max - min) / max;
+    if (lum <= 90 && sat <= 0.25) darkMonochrome++;
+  }
+
+  if (opaque < 40) return false;
+
+  const avgLum = totalLum / opaque;
+  const darkRatio = dark / opaque;
+  const monoDarkRatio = darkMonochrome / opaque;
+
+  return (
+    avgLum <= LOGO_DARK_AVG_LUMINANCE &&
+    darkRatio >= LOGO_DARK_PIXEL_RATIO &&
+    monoDarkRatio >= LOGO_DARK_MONOCHROME_RATIO
+  );
+}
+
 function isLightHeaderBackground(headerBackgroundColor: string): boolean {
   return (
     relativeLuminance(getAnchorColor(headerBackgroundColor)) >= 0.5
@@ -350,10 +394,12 @@ async function ensureVisibleOnHeaderBackground(
     .toBuffer({ resolveWithObject: true });
 
   const headerIsLight = isLightHeaderBackground(headerBackgroundColor);
-  // Only darken a white/silver mark on a light header. Never flip a black
-  // brand wordmark to white — that fought uploaded colours in site preview.
-  const shouldInvert =
-    headerIsLight && isPredominantlyLightLogo(data, info.channels);
+  // Light header: invert white/silver marks. Dark header: invert black/charcoal
+  // marks. Never flip a black wordmark to white on a light header — that fought
+  // uploaded colours in site preview. Footer contrast is handled at render time.
+  const shouldInvert = headerIsLight
+    ? isPredominantlyLightLogo(data, info.channels)
+    : isPredominantlyDarkLogo(data, info.channels);
 
   if (!shouldInvert) {
     return { buffer: input, inverted: false };

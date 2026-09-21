@@ -103,6 +103,7 @@ export const DateCard = ({
           offer={dateItem.offer}
           compact={narrowPreview}
           bookingType={soldOut ? null : bookingType}
+          actionHint={soldOut ? undefined : "Book"}
         />
       </div>
     </motion.button>

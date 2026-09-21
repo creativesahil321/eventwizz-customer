@@ -8,7 +8,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { Button } from "@/components/ui/button";
 import { ChevronDown, MapPin } from "lucide-react";
 import {
   DropdownMenu,
@@ -280,10 +279,10 @@ export function VendorPublicLocationBookNow({
       : "inline";
 
   const bookNowPillClass = cn(
-    "!rounded-full h-9 gap-1.5 border-0 !px-3.5 font-semibold backdrop-blur-sm transition-all duration-200",
-    "inline-flex shrink-0 items-center justify-center",
-    pillGlassOnHero &&
-      "shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)] ring-1 ring-white/25",
+    "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold backdrop-blur-md transition-all duration-200",
+    pillGlassOnHero
+      ? "bg-white/10 hover:bg-white/15 border-[color:color-mix(in_srgb,var(--color-primary)_55%,white_18%)] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)]"
+      : "bg-[color:color-mix(in_srgb,var(--color-header)_72%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-header)_82%,transparent)] border-[color:color-mix(in_srgb,var(--color-primary)_28%,var(--color-on-header)_16%)] shadow-[0_12px_28px_-18px_rgba(15,23,42,0.22)]",
     triggerClassName,
   );
 
@@ -381,8 +380,7 @@ export function VendorPublicLocationBookNow({
       <div
         className={cn(
           bookNowPillClass,
-          "inline-flex cursor-not-allowed items-center justify-center gap-1 opacity-60",
-          "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]",
+          "cursor-not-allowed opacity-60",
         )}
         aria-label="Locations"
         aria-hidden
@@ -411,16 +409,15 @@ export function VendorPublicLocationBookNow({
               <MapPin className="h-5 w-5" />
             </button>
           ) : (
-            <Button
-              size="sm"
-              variant="event-primary"
+            <button
+              type="button"
               className={bookNowPillClass}
               aria-label="Locations"
             >
               <MapPin className="h-4 w-4 shrink-0" />
               <span className={locationsLabelClass}>Locations</span>
               <ChevronDown size={14} className="opacity-80" />
-            </Button>
+            </button>
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent

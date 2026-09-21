@@ -279,12 +279,19 @@ export const onboardingService = {
       "X-Venue-Location-Id": String(locationId),
     };
 
-    const fetchOnce = async (isRooms: boolean) => {
+    const fetchPayload = async (previewIsRooms?: boolean) => {
+      const url =
+        typeof previewIsRooms === "boolean"
+          ? API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
+              "{location_id}",
+              String(locationId),
+            ).replace("{is_rooms}", previewIsRooms ? "true" : "false")
+          : API_ENDPOINTS.VENDOR.ONBOARDING.GET_SAVED_STEPS.replace(
+              "{location_id}",
+              String(locationId),
+            );
       const response = await request<ApiResponse>({
-        url: API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
-          "{location_id}",
-          String(locationId),
-        ).replace("{is_rooms}", isRooms ? "true" : "false"),
+        url,
         method: "GET",
         headers,
         returnFullResponse: true,
@@ -294,8 +301,9 @@ export const onboardingService = {
     };
 
     const payload =
-      (await fetchOnce(true).catch(() => null)) ||
-      (await fetchOnce(false).catch(() => null));
+      (await fetchPayload().catch(() => null)) ||
+      (await fetchPayload(true).catch(() => null)) ||
+      (await fetchPayload(false).catch(() => null));
     if (!payload || typeof payload !== "object") return undefined;
 
     const root = payload as unknown as Record<string, unknown>;

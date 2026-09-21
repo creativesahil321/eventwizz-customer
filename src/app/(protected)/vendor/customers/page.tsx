@@ -228,7 +228,7 @@ export default function CustomersPage() {
     const selectedIds = getSelectedCustomerIds();
 
     if (selectedIds.length === 0) {
-      toast.error("Please select at least one customer to deactivate");
+      toast.error("Please select at least one customer to set as inactive");
       return;
     }
 
@@ -420,7 +420,7 @@ export default function CustomersPage() {
                             ) : (
                               <XCircle className="mr-2 h-4 w-4 text-red-600" />
                             )}
-                            <span>Deactivate Selected</span>
+                            <span>Inactive Selected</span>
                             <span className="ml-auto text-xs text-muted-foreground">
                               {selectedRowCount}{" "}
                               {selectedRowCount === 1

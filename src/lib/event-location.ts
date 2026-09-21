@@ -59,6 +59,41 @@ export function formatEventLocationLabel(
   return `${normalized.slice(0, Math.max(maxLength - 1, 1)).trimEnd()}…`;
 }
 
+const EARTH_RADIUS_KM = 6371;
+
+function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
+/** Great-circle distance between two WGS84 points. */
+export function kmBetweenCoords(
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
+): number {
+  const dLat = toRadians(b.latitude - a.latitude);
+  const dLng = toRadians(b.longitude - a.longitude);
+  const lat1 = toRadians(a.latitude);
+  const lat2 = toRadians(b.latitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Stored pins farther than this from a geocoded address are treated as stale
+ * (e.g. venue default coords left on an event with a different address).
+ */
+export const MAP_PIN_ADDRESS_MISMATCH_KM = 50;
+
+export function shouldReplaceMapPinWithGeocode(
+  stored: { latitude: number; longitude: number },
+  geocoded: { latitude: number; longitude: number },
+  thresholdKm = MAP_PIN_ADDRESS_MISMATCH_KM,
+): boolean {
+  return kmBetweenCoords(stored, geocoded) > thresholdKm;
+}
+
 /**
  * Resolves only event-specific sources. Callers must not pass parent venue data.
  * Address and coordinates retain source priority independently so a legacy

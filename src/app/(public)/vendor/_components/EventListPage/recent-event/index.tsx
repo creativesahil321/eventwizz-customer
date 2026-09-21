@@ -17,6 +17,8 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
 import { GalleryLightbox } from "@/components/public/gallery-lightbox";
 import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
+import { eventCarouselNavButtonClass } from "../event-carousel-classes";
+import { PUBLIC_SECTION_CONTAINER_CLASS } from "@/lib/public-rhythm";
 
 // Default fallback images
 const defaultEventImages = [
@@ -75,8 +77,8 @@ export default function RecentEventsGlimpse({
   };
 
   return (
-    <section className="bg-transparent px-4 py-16 md:py-28">
-      <div className="max-w-7xl mx-auto">
+    <section className="bg-transparent py-16 md:py-28">
+      <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <div className="text-center mb-8 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
             Latest Memories
@@ -183,16 +185,13 @@ export default function RecentEventsGlimpse({
             </button>
           </div>
         ) : (
-          <div className="relative w-full overflow-hidden px-2 md:px-4">
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-y-0 left-0 w-1/12 bg-gradient-to-r from-[var(--color-background)] to-transparent z-10"></div>
-              <div className="absolute inset-y-0 right-0 w-1/12 bg-gradient-to-l from-[var(--color-background)] to-transparent z-10"></div>
-            </div>
-
-            <Carousel className="relative">
+          <div className="relative w-full overflow-hidden">
+            <Carousel className="relative px-11 sm:px-12">
               <CarouselPrevious
                 className={cn(
-                  "absolute left-8 top-1/2 -translate-y-1/2 z-20 size-9 rounded-full border-0 shadow-md bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:scale-95 transition-[opacity,transform] [&_svg]:size-4 [&_svg]:stroke-[2.5]",
+                  eventCarouselNavButtonClass(
+                    "absolute left-0 top-1/2 z-20 -translate-y-1/2",
+                  ),
                   !showNavigationDesktop && "md:hidden",
                 )}
               />
@@ -239,7 +238,9 @@ export default function RecentEventsGlimpse({
 
               <CarouselNext
                 className={cn(
-                  "absolute right-8 top-1/2 -translate-y-1/2 z-20 size-9 rounded-full border-0 shadow-md bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:scale-95 transition-[opacity,transform] [&_svg]:size-4 [&_svg]:stroke-[2.5]",
+                  eventCarouselNavButtonClass(
+                    "absolute right-0 top-1/2 z-20 -translate-y-1/2",
+                  ),
                   !showNavigationDesktop && "md:hidden",
                 )}
               />

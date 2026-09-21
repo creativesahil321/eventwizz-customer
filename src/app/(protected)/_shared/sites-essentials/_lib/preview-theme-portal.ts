@@ -24,6 +24,10 @@ const PREVIEW_THEME_CSS_VARS = [
   "--color-on-footer",
   "--color-on-surface",
   "--color-on-background",
+  "--logo-on-header-filter",
+  "--logo-on-footer-filter",
+  "--logo-on-dark-panel-filter",
+  "--logo-on-light-panel-filter",
   "--font-heading",
   "--font-body",
 ] as const;

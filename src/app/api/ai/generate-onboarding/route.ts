@@ -35,6 +35,7 @@ import {
   normalizeAiRoomNames,
   parseVendorDescriptionHints,
   sanitizeVendorDescription,
+  uniqueAiDatesByEventDate,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import { normalizeDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { isEventDateBeforeMinimum } from "@/lib/min-event-date";
@@ -435,18 +436,7 @@ export async function POST(req: NextRequest) {
           return normalizeAIDatePaymentFields(draft);
         });
 
-        const seen = new Set<string>();
-        return normalized
-          .sort(
-            (a, b) =>
-              new Date(a.event_date + "T00:00:00").getTime() -
-              new Date(b.event_date + "T00:00:00").getTime(),
-          )
-          .filter((d) => {
-            if (!d.event_date || seen.has(d.event_date)) return false;
-            seen.add(d.event_date);
-            return true;
-          });
+        return uniqueAiDatesByEventDate(normalized);
       };
 
       // Enforce stepFive validation

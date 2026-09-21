@@ -497,6 +497,7 @@ function OnboardingPreviewContent() {
                 <SitePreview
                   formValues={locationSiteEssentials}
                   scrollContainerRef={deviceFrameRef}
+                  hasMultipleLocations={hasMultipleLocations}
                 />
               ) : null}
             </>

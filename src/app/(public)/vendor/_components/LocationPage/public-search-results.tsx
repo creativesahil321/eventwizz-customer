@@ -335,7 +335,7 @@ export function PublicSearchResults({
                     </span>
                   ) : null}
                 </p>
-                <p className="mt-0.5 truncate text-sm text-[var(--color-text)]">
+                <p className="mt-0.5 line-clamp-2 text-sm text-[var(--color-text)]">
                   {slot.event.name}
                 </p>
                 <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--color-text-dimmed)]">

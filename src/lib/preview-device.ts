@@ -58,10 +58,14 @@ export const PREVIEW_THEME_ROOT_SELECTOR = "[data-preview-theme-root]";
 const PREVIEW_THEME_VAR_NAMES = [
   "--color-header",
   "--color-on-header",
+  "--color-footer",
+  "--color-on-footer",
   "--color-surface",
   "--color-text",
   "--color-background",
   "--color-primary",
+  "--logo-on-header-filter",
+  "--logo-on-footer-filter",
 ] as const;
 
 /**

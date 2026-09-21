@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import type { FieldValues, UseFormReturn } from "react-hook-form";
+import { cn } from "@/lib/utils";
 import {
   GuidedSectionActionFooter,
   GuidedWholeStepApproveButton,
@@ -40,6 +41,11 @@ type Props<T extends FieldValues> = {
   persistedStepApproved?: boolean;
   /** When set, preview clicks unlock this whole-step guided shell. */
   previewFocusStep?: number;
+  /**
+   * Extra whole-step check after schema trigger (and the source of truth when
+   * fields are collapsed/unmounted, e.g. date accordions). Return false to block approve.
+   */
+  validateFullStep?: () => boolean | Promise<boolean>;
 };
 
 /**
@@ -56,6 +62,7 @@ export function WholeStepGuidedShell<T extends FieldValues>({
   persistenceHydrated = false,
   persistedStepApproved = false,
   previewFocusStep,
+  validateFullStep,
 }: Props<T>) {
   const sectionConfigs = useMemo((): GuidedSectionConfig<T>[] => {
     return [
@@ -66,10 +73,13 @@ export function WholeStepGuidedShell<T extends FieldValues>({
         fields: [],
         validate: lenientApproval
           ? async () => true
-          : async () => form.trigger(undefined, { shouldFocus: true }),
+          : async () =>
+              form.trigger(undefined, {
+                shouldFocus: !validateFullStep,
+              }),
       },
     ];
-  }, [form, sectionId, chipLabel, chipDescription, lenientApproval]);
+  }, [form, sectionId, chipLabel, chipDescription, lenientApproval, validateFullStep]);
 
   const guided = useGuidedOnboardingSections({
     form,
@@ -78,6 +88,7 @@ export function WholeStepGuidedShell<T extends FieldValues>({
     skipFullFormTriggerOnApproveAll: lenientApproval,
     persistenceHydrated,
     persistedStepApproved,
+    validateFullStep,
   });
 
   useOnboardingPreviewFieldFocus(
@@ -85,12 +96,18 @@ export function WholeStepGuidedShell<T extends FieldValues>({
     guided.focusGuidedSection,
   );
 
+  const isSectionActive = guided.currentSectionIndex === 0;
+
   return (
     <>
       <section
         data-guided-section={sectionId}
         tabIndex={-1}
-        className={guidedSectionSurfaceClass(true, "overflow-hidden p-0")}
+        className={cn(
+          guidedSectionSurfaceClass(isSectionActive, "overflow-hidden p-0"),
+          // Keep Edit + Save/Skip readable; only the fields dim like steps 1–4.
+          !isSectionActive && "opacity-100 hover:opacity-100",
+        )}
       >
         <div className="space-y-4 p-4 sm:p-5">
           <GuidedSectionTitleBar
@@ -100,30 +117,30 @@ export function WholeStepGuidedShell<T extends FieldValues>({
             title={chipLabel}
           />
           <fieldset
-            disabled={guided.currentSectionIndex !== 0}
-            className={
-              guided.currentSectionIndex !== 0
-                ? "min-w-0 border-0 p-0 pointer-events-none"
-                : "min-w-0 border-0 p-0"
-            }
+            disabled={!isSectionActive}
+            className={cn(
+              "min-w-0 border-0 p-0",
+              !isSectionActive &&
+                "pointer-events-none cursor-not-allowed opacity-[0.68]",
+            )}
           >
             {children(guided)}
           </fieldset>
-          <GuidedSectionActionFooter
-            isActive
-            sectionLabel={chipLabel}
-            sectionProgress="1 / 1"
-          >
-            {renderFooter ? (
-              renderFooter({ guided, sectionId })
-            ) : (
-              <GuidedWholeStepApproveButton
-                guided={guided}
-                sectionId={sectionId}
-              />
-            )}
-          </GuidedSectionActionFooter>
         </div>
+        <GuidedSectionActionFooter
+          isActive
+          hideSectionMeta
+          variant="dock"
+        >
+          {renderFooter ? (
+            renderFooter({ guided, sectionId })
+          ) : (
+            <GuidedWholeStepApproveButton
+              guided={guided}
+              sectionId={sectionId}
+            />
+          )}
+        </GuidedSectionActionFooter>
       </section>
     </>
   );

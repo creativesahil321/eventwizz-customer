@@ -375,7 +375,10 @@ function GuestSubscribeForm() {
       ) : null}
       <form
         onSubmit={handleSubmit}
-        className={subscribeCardClass(narrowPreview)}
+        className={cn(
+          "mx-auto grid max-w-4xl grid-cols-1 items-start gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.28)]",
+          !narrowPreview && "md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center md:p-6",
+        )}
       >
         <Input
           type="text"
@@ -384,19 +387,10 @@ function GuestSubscribeForm() {
           value={formData.name}
           onChange={handleChange}
           disabled={subscribeMutation.isPending}
-          className={cn(
-            fieldClass,
-            "w-full",
-            !narrowPreview && "md:min-w-[160px] md:flex-1",
-          )}
+          className={cn(fieldClass, "w-full min-w-0")}
         />
 
-        <div
-          className={cn(
-            "w-full",
-            !narrowPreview && "md:min-w-[200px] md:flex-1",
-          )}
-        >
+        <div className="min-w-0 w-full">
           <Input
             type="email"
             name="email"
@@ -427,11 +421,7 @@ function GuestSubscribeForm() {
           value={formData.phone}
           onChange={handleChange}
           disabled={subscribeMutation.isPending}
-          className={cn(
-            fieldClass,
-            "w-full",
-            !narrowPreview && "md:min-w-[160px] md:flex-1",
-          )}
+          className={cn(fieldClass, "w-full min-w-0")}
         />
 
         <Button

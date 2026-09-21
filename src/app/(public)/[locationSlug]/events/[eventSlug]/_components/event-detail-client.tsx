@@ -55,7 +55,6 @@ import {
   labelsFromEventHeroSlices,
   readEventCategoryLabel,
 } from "@/lib/event-hero-meta";
-import { formatEventLocationLabel } from "@/lib/event-location";
 import { locationDisplayName } from "@/lib/slug-short-label";
 import { buildEventAboutHighlights } from "@/lib/event-about-highlights";
 import {
@@ -333,9 +332,7 @@ export default function EventDetailClient({
     : roomBarStickyTop;
   const sectionAnchorClass = `scroll-mt-[var(--event-sticky-offset,${EVENT_STICKY_SCROLL_MT_FALLBACK})]`;
 
-  const eventLocationLabel = formatEventLocationLabel(
-    slices.event_address ?? "",
-  );
+  const eventLocationLabel = (slices.event_address ?? "").trim();
   /** Parent venue location from the URL (`/kangra-7/...`), not the event address. */
   const parentLocationLabel = useMemo(() => {
     const matched = vendorTheme?.locations?.find(
@@ -378,6 +375,7 @@ export default function EventDetailClient({
           variant="default"
           headerDownloads={pdfDownloadLinks}
           hideHeaderPhone
+          hideBrowseEvents
           compactGuestAuth
           topBanner={
             showCouponStrip && couponStripProps ? (
@@ -440,6 +438,7 @@ export default function EventDetailClient({
             items={sectionNavItems}
             stickyTop={sectionNavStickyTop}
             headerOffsetPx={headerOffsetPx}
+            bookNowId={EVENT_SECTION_IDS.dates}
           />
         ) : null}
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   guidedOnboardingApproveStepButtonClass,
   guidedOnboardingSaveNextButtonClass,
+  guidedOnboardingActionDockStandaloneClass,
 } from "./guided-sticky-approval-bar";
 import {
   Tooltip,
@@ -142,13 +143,13 @@ export function GuidedApproveAllStatusMessage({
 }) {
   if (!allSectionsApproved) {
     return (
-      <span className="text-center text-xs text-slate-500">
+      <span className="max-w-md text-center text-sm leading-snug text-slate-200">
         One button below checks every section, saves, and takes you forward.
       </span>
     );
   }
   return (
-    <span className="text-center text-xs text-emerald-400/90">
+    <span className="max-w-md text-center text-sm font-medium leading-snug text-emerald-300">
       All sections approved — save and continue when you&apos;re ready.
     </span>
   );
@@ -213,7 +214,7 @@ export function GuidedMultiSectionBottomActions({
   return (
     <div
       className={cn(
-        "sticky bottom-0 z-30 mt-6 flex w-full min-w-0 flex-col items-center justify-center gap-3 border-t border-white/[0.08] bg-slate-950 pt-5 pb-4",
+        guidedOnboardingActionDockStandaloneClass,
         className,
       )}
     >

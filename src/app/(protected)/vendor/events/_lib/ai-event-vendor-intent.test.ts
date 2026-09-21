@@ -57,6 +57,7 @@ test("vendor event system prompt trains the model on messy vendor English", () =
   const prompt = buildAiEventSystemPrompt(10);
   assert.match(prompt, /MESSY VENDOR ENGLISH/);
   assert.match(prompt, /PRICE LABEL/);
+  assert.match(prompt, /EACH event_date may appear ONCE/i);
 });
 
 test("a room with its own menus keeps them", () => {

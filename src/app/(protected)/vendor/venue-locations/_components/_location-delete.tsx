@@ -155,8 +155,8 @@ export default function DeleteLocationDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
-        <AlertDialogHeader className="space-y-4 border-b border-border px-6 py-5 text-left">
+      <AlertDialogContent className="flex w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-lg p-0 max-h-[min(92dvh,calc(100dvh-1.5rem))]">
+        <AlertDialogHeader className="shrink-0 space-y-3 border-b border-border px-4 py-4 text-left sm:space-y-4 sm:px-6 sm:py-5">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 ring-1 ring-red-100">
               <ShieldCheck className="h-5 w-5" aria-hidden />
@@ -232,7 +232,7 @@ export default function DeleteLocationDialog({
           </ol>
         </AlertDialogHeader>
 
-        <div className="space-y-4 px-6 py-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
           {step === "send" ? (
             <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
               <div className="flex gap-3">
@@ -288,7 +288,7 @@ export default function DeleteLocationDialog({
                 </p>
               </div>
 
-              <div className="flex justify-center py-1">
+              <div className="flex justify-center overflow-x-auto py-1">
                 <InputOTP
                   maxLength={OTP_LENGTH}
                   value={otp}
@@ -297,21 +297,21 @@ export default function DeleteLocationDialog({
                   inputMode="numeric"
                   autoFocus
                   disabled={isBusy}
-                  containerClassName="gap-2"
+                  containerClassName="gap-1.5 sm:gap-2"
                 >
-                  <InputOTPGroup className="gap-2">
+                  <InputOTPGroup className="gap-1.5 sm:gap-2">
                     {Array.from({ length: OTP_LENGTH }).map((_, index) => (
                       <InputOTPSlot
                         key={index}
                         index={index}
-                        className="h-12 w-11 rounded-lg border border-input bg-white text-lg font-bold text-slate-900 shadow-sm first:rounded-lg first:border-l last:rounded-lg"
+                        className="h-11 w-10 rounded-lg border border-input bg-white text-lg font-bold text-slate-900 shadow-sm first:rounded-lg first:border-l last:rounded-lg sm:h-12 sm:w-11"
                       />
                     ))}
                   </InputOTPGroup>
                 </InputOTP>
               </div>
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <button
                   type="button"
                   className="text-xs font-medium text-[var(--color-primary)] underline-offset-2 hover:underline disabled:no-underline disabled:opacity-50"
@@ -323,6 +323,7 @@ export default function DeleteLocationDialog({
                 <Button
                   type="button"
                   variant="event-primary"
+                  className="w-full sm:w-auto"
                   disabled={!otpReady || isBusy}
                   onClick={() => void handleVerifyOtp()}
                 >
@@ -403,15 +404,18 @@ export default function DeleteLocationDialog({
           </div>
         </div>
 
-        <AlertDialogFooter className="border-t border-border bg-muted/20 px-6 py-4 sm:space-x-2">
-          <AlertDialogCancel disabled={isBusy} className="min-w-[96px]">
+        <AlertDialogFooter className="shrink-0 gap-2 border-t border-border bg-muted/20 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:px-6 sm:py-4">
+          <AlertDialogCancel
+            disabled={isBusy}
+            className="mt-0 w-full min-w-0 sm:w-auto sm:min-w-[96px]"
+          >
             Cancel
           </AlertDialogCancel>
           <Button
             type="button"
             variant="destructive"
             disabled={step !== "confirm" || !phraseReady || isBusy}
-            className="min-w-[150px]"
+            className="w-full min-w-0 sm:w-auto sm:min-w-[150px]"
             onClick={() => void handleDelete()}
           >
             {deleteMutation.isPending ? (

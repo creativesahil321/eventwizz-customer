@@ -3,6 +3,15 @@ import { parseEventIsRoomsFlag } from "@/lib/event-form-limits";
 const VENDOR_EVENT_IS_ROOMS_STORAGE_PREFIX = "vendor_event_is_rooms:";
 const ONBOARDING_IS_ROOMS_SESSION_KEY = "onboarding_is_rooms";
 
+/** Same-tab signal after onboarding writes `onboarding_is_rooms` (storage events do not fire). */
+export const ONBOARDING_IS_ROOMS_FLAG_CHANGED_EVENT =
+  "onboarding-is-rooms-flag-changed";
+
+export function dispatchOnboardingIsRoomsFlagChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(ONBOARDING_IS_ROOMS_FLAG_CHANGED_EVENT));
+}
+
 export function vendorEventIsRoomsStorageKey(eventId: number | string): string {
   return `${VENDOR_EVENT_IS_ROOMS_STORAGE_PREFIX}${eventId}`;
 }
@@ -13,13 +22,38 @@ function parseStoredRoomsFlag(raw: string | null): boolean | undefined {
   return undefined;
 }
 
-/** Venue-level flag set during onboarding when multi-space is enabled. */
+/** Last committed event `is_rooms` from GET saved steps or Step 4 POST. Not the Step 4 toggle. */
 export function readOnboardingIsRoomsSessionFlag(): boolean | undefined {
   if (typeof window === "undefined") return undefined;
   const raw = sessionStorage.getItem(ONBOARDING_IS_ROOMS_SESSION_KEY);
   if (raw === "true") return true;
   if (raw === "false") return false;
   return undefined;
+}
+
+/** Persist committed event `is_rooms` only — never call from the rooms Yes/No toggle. */
+export function writeOnboardingSavedIsRoomsFlag(isRooms: boolean): void {
+  if (typeof window === "undefined") return;
+  const next = isRooms ? "true" : "false";
+  const prev = sessionStorage.getItem(ONBOARDING_IS_ROOMS_SESSION_KEY);
+  if (prev === next) return;
+  sessionStorage.setItem(ONBOARDING_IS_ROOMS_SESSION_KEY, next);
+  dispatchOnboardingIsRoomsFlagChanged();
+}
+
+/**
+ * After a successful Step 4 store (any POST that includes `is_rooms`).
+ * Syncs session + vendor-event GET mode to the saved DB value.
+ */
+export function commitOnboardingEventIsRooms(
+  isRooms: boolean,
+  eventId?: number | string | null,
+): void {
+  writeOnboardingSavedIsRoomsFlag(isRooms);
+  const id = Number(eventId);
+  if (Number.isFinite(id) && id > 0) {
+    writeVendorEventIsRoomsFlag(id, isRooms);
+  }
 }
 
 function countStepTwoRooms(rooms: unknown): number {

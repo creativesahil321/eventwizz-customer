@@ -286,6 +286,7 @@ export function DiscountCustomerDatesPreview({
                             }
                             offer={showBadgeOnPage ? item.offer : null}
                             compact
+                            actionHint="Book"
                           />
                         )}
                       </div>

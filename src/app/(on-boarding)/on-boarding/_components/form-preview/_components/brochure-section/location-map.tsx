@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import {
   buildEventDirectionsUrl,
   hasPublicEventMapCoordinates,
+  shouldReplaceMapPinWithGeocode,
 } from "@/lib/event-location";
 import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
 import { cn } from "@/lib/utils";
@@ -168,7 +169,6 @@ export default function LocationMap({
 
         markerRef.current = markerInstance;
 
-        // Set initial location
         const initialLocation: MapLocation = {
           address: address || "Selected Location",
           latitude: center.lat,
@@ -199,6 +199,47 @@ export default function LocationMap({
         setError("Failed to create map. Please try again.");
         setIsLoading(false);
       }
+    },
+    [],
+  );
+
+  const correctPinToGeocodedAddress = useCallback(
+    (
+      address: string,
+      stored: { latitude: number; longitude: number },
+    ) => {
+      if (!window.google?.maps?.Geocoder) return;
+      const geocoder = geocoderRef.current ?? new google.maps.Geocoder();
+      geocoderRef.current = geocoder;
+      geocoder.geocode(
+        { address, componentRestrictions: { country: "gb" } },
+        (results, status) => {
+          const apply = (result: google.maps.GeocoderResult) => {
+            const loc = result.geometry.location;
+            const geocoded = { latitude: loc.lat(), longitude: loc.lng() };
+            if (!shouldReplaceMapPinWithGeocode(stored, geocoded)) return;
+            const next = { lat: geocoded.latitude, lng: geocoded.longitude };
+            mapInstanceRef.current?.panTo(next);
+            markerRef.current?.setPosition(next);
+            setCurrentLocation({
+              address,
+              latitude: geocoded.latitude,
+              longitude: geocoded.longitude,
+            });
+          };
+
+          if (status === "OK" && results?.[0]) {
+            apply(results[0]);
+            return;
+          }
+
+          geocoder.geocode({ address }, (fallbackResults, fallbackStatus) => {
+            if (fallbackStatus === "OK" && fallbackResults?.[0]) {
+              apply(fallbackResults[0]);
+            }
+          });
+        },
+      );
     },
     [],
   );
@@ -279,6 +320,13 @@ export default function LocationMap({
         eventAddress ||
         `Location (${pinLatitude.toFixed(6)}, ${pinLongitude.toFixed(6)})`;
       initializeMapWithCenter(mapCenter, mapAddress);
+
+      if (eventAddress) {
+        correctPinToGeocodedAddress(eventAddress, {
+          latitude: pinLatitude,
+          longitude: pinLongitude,
+        });
+      }
     } catch (err) {
       console.error("🗺️ Error initializing map:", err);
 
@@ -293,7 +341,13 @@ export default function LocationMap({
       );
       setIsLoading(false);
     }
-  }, [displayAddress, latitude, longitude, initializeMapWithCenter]);
+  }, [
+    displayAddress,
+    latitude,
+    longitude,
+    initializeMapWithCenter,
+    correctPinToGeocodedAddress,
+  ]);
 
   // Initialize map only when mapLoaded is true.
   // Important: when the Maps script is already on window (e.g. after client navigation), we must still
@@ -503,7 +557,7 @@ export default function LocationMap({
               {fallbackDirectionsTarget ? (
                 <>
                   <div className="w-full rounded-md bg-black/20 px-3 py-2.5 text-left">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">
                       Event location
                     </p>
                     <p className="mt-1 break-words text-sm font-medium leading-relaxed [overflow-wrap:anywhere]">
@@ -604,10 +658,10 @@ export default function LocationMap({
                 window.open(mapsUrl, "_blank", "noopener,noreferrer");
               }}
               className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md shadow-lg text-xs font-medium transition-colors"
-              title="View on Google Maps"
+              title="Open this location in Google Maps"
             >
               <MapPin className="h-3 w-3" />
-              <span className="hidden sm:inline">View Map</span>
+              <span className="hidden sm:inline">Open in Google Maps</span>
             </button>
           </div>
         )}

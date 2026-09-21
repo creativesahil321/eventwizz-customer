@@ -34,6 +34,7 @@ import { isCoarseUkFallbackPin } from "@/lib/sync-event-location-map";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Settings2 } from "lucide-react";
+import { NameAvailabilityInputCue } from "@/components/name-availability-input-cue";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OnboardingCard } from "@/components/ui/card";
 import { OnboardingFieldGroupTitle } from "@/components/ui/typography";
@@ -580,15 +581,25 @@ export default function StepOne() {
                               </FormLabel>
                               <FormControl>
                                 {isBrandMode ? (
-                                  <Input
-                                    placeholder="e.g. Acme Events Co."
-                                    className="bg-white/5"
-                                    maxLength={120}
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(e.target.value)
-                                    }
-                                  />
+                                  <div className="relative">
+                                    <Input
+                                      placeholder="e.g. Acme Events Co."
+                                      className="bg-white/5 pr-10"
+                                      maxLength={120}
+                                      aria-busy={brandNameChecking || undefined}
+                                      {...field}
+                                      onChange={(e) =>
+                                        field.onChange(e.target.value)
+                                      }
+                                    />
+                                    <NameAvailabilityInputCue
+                                      checking={brandNameChecking}
+                                      available={
+                                        brandNameCheckStatus === "available" &&
+                                        (nameValue?.trim().length ?? 0) >= 2
+                                      }
+                                    />
+                                  </div>
                                 ) : (
                                   <GoogleBusinessSearch
                                     apiKey={env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
@@ -605,19 +616,6 @@ export default function StepOne() {
                                   ? "ⓘ Type your trading or brand name — it does not need to match a Google listing."
                                   : "ⓘ Only verified venues from Google Places can be selected"}
                               </p>
-                              {brandNameChecking ? (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Checking name availability…
-                                </p>
-                              ) : null}
-                              {brandNameCheckStatus === "available" &&
-                              (nameValue?.trim().length ?? 0) >= 2 ? (
-                                <p className="text-xs text-emerald-400/90 mt-1">
-                                  {isBrandMode
-                                    ? "This brand name is available."
-                                    : "This venue name is available."}
-                                </p>
-                              ) : null}
                               {brandNameCheckStatus === "taken" &&
                               (nameValue?.trim().length ?? 0) >= 2 &&
                               brandNameCheckMessage ? (

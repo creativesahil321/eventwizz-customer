@@ -237,9 +237,9 @@ export default function LocationGrid({
 
                 <span
                   className={cn(
-                    "absolute left-2 top-2 z-[1] inline-flex rounded-full bg-[var(--color-secondary)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--color-secondary-foreground)] shadow-sm",
+                    "absolute left-2 top-2 z-[1] inline-flex rounded-full bg-[var(--color-secondary)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-secondary-foreground)] shadow-sm",
                     !narrowPreview &&
-                      "md:left-4 md:top-4 md:px-2.5 md:py-1 md:text-[11px]",
+                      "md:left-4 md:top-4 md:px-2.5 md:py-1 md:text-xs",
                   )}
                 >
                   {totalEvents} event{totalEvents !== 1 ? "s" : ""}
@@ -256,7 +256,7 @@ export default function LocationGrid({
                     className={cn(
                       // Compact cards: body font + normal leading so ascenders
                       // aren't clipped by overflow-hidden + tight display fonts.
-                      "truncate text-[15px] font-semibold leading-normal tracking-tight text-[var(--color-text)]",
+                      "line-clamp-2 text-[15px] font-semibold leading-normal tracking-tight text-[var(--color-text)]",
                       !narrowPreview &&
                         "md:mb-2 md:text-[1.85rem] md:font-normal md:leading-[1.2] md:text-white md:[font-family:var(--font-heading,inherit)]",
                     )}
@@ -268,7 +268,7 @@ export default function LocationGrid({
                     <>
                       <p
                         className={cn(
-                          "flex min-w-0 items-center gap-1 text-[11px] text-[var(--color-text-dimmed)]",
+                          "flex min-w-0 items-center gap-1 text-xs text-[var(--color-text-dimmed)]",
                           !narrowPreview && "md:hidden",
                         )}
                       >
@@ -276,7 +276,7 @@ export default function LocationGrid({
                           className="h-3 w-3 shrink-0 opacity-90"
                           aria-hidden
                         />
-                        <span className="truncate font-medium text-[var(--color-text)]">
+                        <span className="min-w-0 font-medium text-[var(--color-text)] line-clamp-1">
                           {upcomingEvent.name}
                         </span>
                         <span className="shrink-0 opacity-50">·</span>
@@ -290,7 +290,7 @@ export default function LocationGrid({
                         >
                           <div className="min-h-0 overflow-hidden">
                             <div className="space-y-1 border-l-2 border-white/25 pl-3">
-                              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/55">
+                              <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">
                                 Next up
                               </p>
                               <p className="line-clamp-2 text-sm font-semibold leading-snug text-white sm:text-base">

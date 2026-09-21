@@ -25,6 +25,7 @@ import {
   extractOnboardingPreviewTheme,
   ONBOARDING_DEFAULT_THEME,
 } from "../../_lib/onboarding-default-theme";
+import { revertOnboardingRoomsDraftToSaved } from "../../_lib/revert-onboarding-rooms-draft";
 
 interface FormContextType {
   form: UseFormReturn<OnboardingFormData>;
@@ -150,6 +151,9 @@ export function FormProvider({
   const maxSteps = 11;
   const dataLoadAttempted = useRef(false);
   const didInitActiveStepFromServer = useRef(false);
+  const activeStepRef = useRef(activeStep);
+  activeStepRef.current = activeStep;
+  const persistedProgressHydratedRef = useRef(false);
 
   // Merge server data with default values
   const mergedDefaults = useMemo(() => {
@@ -201,15 +205,18 @@ export function FormProvider({
         const incomingMultiSpace = dataAny.multiSpace as
           | { enabled?: boolean; currentRoomIndex?: number; rooms?: unknown[] }
           | undefined;
-        if (
-          previousMultiSpace?.enabled === true &&
-          incomingMultiSpace &&
-          typeof incomingMultiSpace === "object"
-        ) {
+        if (incomingMultiSpace && typeof incomingMultiSpace === "object") {
           const roomCount = incomingMultiSpace.rooms?.length ?? 0;
-          const prevIndex = previousMultiSpace.currentRoomIndex ?? 0;
+          const prevIndex = previousMultiSpace?.currentRoomIndex ?? 0;
+          const keepStepFourDraft =
+            persistedProgressHydratedRef.current &&
+            activeStepRef.current === 4 &&
+            previousMultiSpace != null;
           dataAny.multiSpace = {
             ...incomingMultiSpace,
+            ...(keepStepFourDraft
+              ? { enabled: previousMultiSpace.enabled }
+              : {}),
             currentRoomIndex: Math.min(
               Math.max(prevIndex, 0),
               Math.max(roomCount - 1, 0),
@@ -218,6 +225,7 @@ export function FormProvider({
         }
 
         form.reset(dataAny as unknown as OnboardingFormData);
+        persistedProgressHydratedRef.current = true;
         setPersistedProgressHydrated(true);
 
         // Only trust explicit “current step” keys — not `default_venue_location.onboarding_step`,
@@ -293,11 +301,13 @@ export function FormProvider({
   // Custom function to set active step and update session - instant with no delay
   const updateActiveStep = useCallback(
     async (step: number, options?: { skipSessionSync?: boolean }) => {
-      setActiveField(null); // Reset active field when changing steps
-      // Once user/code drives navigation, don't let later refetches re-init from stale payloads.
+      setActiveField(null);
       didInitActiveStepFromServer.current = true;
 
-      // Update step immediately - no delay, no blank screen
+      if (activeStep === 4 && step !== 4) {
+        revertOnboardingRoomsDraftToSaved(form);
+      }
+
       setActiveStep(step);
 
       // Update last completed step if moving forward
@@ -319,7 +329,7 @@ export function FormProvider({
         console.error("Failed to update session with step:", error);
       }
     },
-    [setActiveStep, lastCompletedStep, updateSession],
+    [activeStep, form, lastCompletedStep, updateSession],
   );
 
   // Use a separate useEffect for hydration safety

@@ -3,6 +3,8 @@ import { test } from "node:test";
 import {
   resolvePublicEventMapLocation,
   hasPublicEventMapCoordinates,
+  kmBetweenCoords,
+  shouldReplaceMapPinWithGeocode,
 } from "./event-location";
 import { LONDON_DEFAULT_LAT, LONDON_DEFAULT_LNG } from "./london-default-coords";
 
@@ -70,4 +72,22 @@ test("empty or omitted lat/long skip the map pin", () => {
     hasPublicEventMapCoordinates({ lat: "55.08", long: "-1.53" }),
     true,
   );
+});
+
+test("kmBetweenCoords is ~0 for the same point", () => {
+  const point = { latitude: 51.4545, longitude: -2.5879 };
+  assert.ok(kmBetweenCoords(point, point) < 0.01);
+});
+
+test("shouldReplaceMapPinWithGeocode is true for Fortrose vs Bristol", () => {
+  const bristol = { latitude: 51.4545, longitude: -2.5879 };
+  const fortrose = { latitude: 57.5808, longitude: -4.1324 };
+  assert.equal(shouldReplaceMapPinWithGeocode(bristol, fortrose), true);
+  assert.ok(kmBetweenCoords(bristol, fortrose) > 600);
+});
+
+test("shouldReplaceMapPinWithGeocode is false for nearby pins", () => {
+  const venue = { latitude: 51.4545, longitude: -2.5879 };
+  const entrance = { latitude: 51.455, longitude: -2.5885 };
+  assert.equal(shouldReplaceMapPinWithGeocode(venue, entrance), false);
 });

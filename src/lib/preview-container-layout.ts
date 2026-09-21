@@ -111,7 +111,7 @@ export const previewSearchFieldsMultiUntilSm =
 export const previewSearchFieldsLocationUntilSm =
   "@max-sm/preview:!grid-cols-[minmax(0,1fr)_auto]";
 
-export const previewSearchSubmitUntilSm = "@max-sm/preview:!h-10 @max-sm/preview:!px-3";
+export const previewSearchSubmitUntilSm = "@max-sm/preview:!h-11 @max-sm/preview:!px-3";
 
 export const previewSearchSubmitFullUntilSm =
-  "@max-sm/preview:!col-span-2 @max-sm/preview:!h-10";
+  "@max-sm/preview:!col-span-2 @max-sm/preview:!h-11";

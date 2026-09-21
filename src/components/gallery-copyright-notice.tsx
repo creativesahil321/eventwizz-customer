@@ -12,11 +12,16 @@ export function GalleryCopyrightNotice({ className }: { className?: string }) {
     <div
       role="note"
       className={cn(
-        "flex gap-2.5 rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-sm leading-relaxed text-amber-950",
+        "flex gap-2.5 rounded-lg border px-3 py-2.5 text-sm leading-relaxed",
+        "border-amber-500/40 bg-amber-50 text-amber-950",
+        "[.onboarding-dark_&]:border-amber-300/40 [.onboarding-dark_&]:bg-amber-400/15 [.onboarding-dark_&]:text-amber-100",
         className,
       )}
     >
-      <Copyright className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+      <Copyright
+        className="mt-0.5 h-4 w-4 shrink-0 text-amber-800 [.onboarding-dark_&]:text-amber-200"
+        aria-hidden
+      />
       <p>{GALLERY_COPYRIGHT_NOTICE}</p>
     </div>
   );

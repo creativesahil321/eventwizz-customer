@@ -122,7 +122,7 @@ export function LocationEventCard({
         />
 
         {event.category ? (
-          <div className="absolute left-2.5 top-2.5 z-[1] rounded-full bg-black/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
+          <div className="absolute left-2.5 top-2.5 z-[1] rounded-full bg-black/80 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
             {event.category}
           </div>
         ) : null}
@@ -130,7 +130,7 @@ export function LocationEventCard({
         {hasDistance ? (
           <div
             className={cn(
-              "absolute z-[1] flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold tabular-nums text-white backdrop-blur-sm",
+              "absolute z-[1] flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-xs font-semibold tabular-nums text-white backdrop-blur-sm",
               event.category ? "right-2.5 top-2.5" : "left-2.5 top-2.5",
             )}
           >
@@ -169,9 +169,11 @@ export function LocationEventCard({
         ) : null}
 
         {showPlace && placeLabel ? (
-          <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-[var(--color-text-dimmed)]">
-            <MapPin className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
-            <span className="truncate">{placeLabel}</span>
+          <p className="mt-1.5 flex items-start gap-1 text-xs font-medium text-[var(--color-text-dimmed)]">
+            <MapPin className="mt-0.5 h-3 w-3 shrink-0 opacity-90" aria-hidden />
+            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] line-clamp-2">
+              {placeLabel}
+            </span>
           </p>
         ) : null}
 
@@ -184,7 +186,7 @@ export function LocationEventCard({
                 className="shrink-0 text-[color:var(--color-primary)]"
                 labelled
               />
-              <span className={cn(PUBLIC_PRICE_TEXT_CLASS, "truncate")}>
+              <span className={cn(PUBLIC_PRICE_TEXT_CLASS, "min-w-0 break-words")}>
                 {fromPrice}
               </span>
             </span>

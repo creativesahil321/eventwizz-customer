@@ -8,6 +8,7 @@ import { ServerContext } from "@/lib/server-context";
 import { useAuthStore } from "@/store/auth.store";
 import { addCacheBusting } from "@/lib/image-utils";
 import BookACallModal from "../book-a-call-modal";
+import { BrandLogoImage } from "@/components/shared/brand-logo-image";
 import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import { cn } from "@/lib/utils";
 
@@ -54,10 +55,11 @@ export default function AdminHeader() {
         >
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center">
-              <img
+              <BrandLogoImage
                 src={addCacheBusting(logoPath)}
                 alt={theme?.name || "EventWizz"}
                 className="h-8 w-auto"
+                chrome="header"
               />
             </Link>
           </div>

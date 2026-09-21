@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
 import {
   useState,
@@ -317,6 +316,7 @@ function DateCardFooterContent({
         offer={offer}
         compact={compact}
         bookingType={showBookingIcons ? bookingType : null}
+        actionHint="Book"
       />
     );
   }
@@ -425,6 +425,35 @@ function DateRowsScroller({
   );
 }
 
+function AlreadyBookedLogin({
+  visible,
+  className,
+  onLogin,
+}: {
+  visible: boolean;
+  className?: string;
+  onLogin: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <p
+      className={cn(
+        "relative z-10 text-center text-sm text-white/70",
+        className,
+      )}
+    >
+      Already booked?{" "}
+      <button
+        type="button"
+        className="font-medium text-white underline decoration-white/45 underline-offset-4 hover:decoration-white"
+        onClick={onLogin}
+      >
+        Log in
+      </button>
+    </p>
+  );
+}
+
 export default function DatesSection({
   dates,
   eventSlug,
@@ -487,13 +516,10 @@ export default function DatesSection({
     if (!eventSlug || !apiCartData) return null;
     return findApiCartEventBySlug(apiCartData, eventSlug);
   }, [apiCartData, eventSlug]);
-  const sectionLabel = "Book Your Places Now";
+  const sectionLabel = "Book your places now";
   const heading = "Select a Date";
-  const text = "Already Booked? Log In Here";
   /** Log-in CTA only for guests; hide when already signed in (still show in onboarding preview). */
   const showAlreadyBookedLoginCta = isPreviewMode || status !== "authenticated";
-  const [isVisible, setIsVisible] = useState(false);
-  const [screenSize, setScreenSize] = useState({ width: 0, height: 0 });
   const [isClient, setIsClient] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [selectingDateKey, setSelectingDateKey] = useState<string | null>(null);
@@ -532,39 +558,21 @@ export default function DatesSection({
       : "!text-3xl sm:!text-4xl md:!text-5xl",
   );
   const headerWrapClass = cn(
-    "relative z-10 mb-6 flex w-full flex-col items-center gap-3 px-4 text-center",
-    !narrowPreview && "sm:mb-8 sm:gap-4",
+    "relative z-10 mb-5 flex w-full flex-col items-center gap-2 px-4 text-center",
+    !narrowPreview && "sm:mb-6",
   );
   const cardsWrapClass = cn(
     "relative z-10 mx-auto w-full max-w-5xl px-2",
     !narrowPreview && "sm:px-8 md:px-12",
   );
-  const loginCtaClass = cn(
-    "mt-2 min-h-12 shrink-0 rounded-full border-2 border-white/30 bg-white/10 px-8 font-semibold !text-white shadow-sm backdrop-blur-sm transition-colors hover:border-white/45 hover:bg-white/15",
-    narrowPreview
-      ? "text-xs"
-      : "text-xs sm:text-sm",
-  );
+
+  const goToLogin = useCallback(() => {
+    if (!isPreviewMode) router.push("/auth/login");
+  }, [isPreviewMode, router]);
 
   // Setup client-side detection and window measurements
   useEffect(() => {
     setIsClient(true);
-    if (typeof window !== "undefined") {
-      setScreenSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-
-      const handleResize = () => {
-        setScreenSize({
-          width: window.innerWidth,
-          height: window.innerHeight,
-        });
-      };
-
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    }
   }, []);
 
   useEffect(() => {
@@ -573,13 +581,6 @@ export default function DatesSection({
       .getState()
       .setCurrentEvent(eventSlug, roomId, roomIndex);
   }, [eventSlug, roomId, roomIndex]);
-
-  // Animation visibility trigger - reduced delay for smoother transition
-  useEffect(() => {
-    if (!isClient) return;
-    const timer = setTimeout(() => setIsVisible(true), 100);
-    return () => clearTimeout(timer);
-  }, [isClient]);
 
   const getDateCartStatus = useCallback(
     (dateToCheck: string) => {
@@ -1070,7 +1071,7 @@ export default function DatesSection({
     return (
       <section className={cn(sectionClass, "px-4 py-10")}>
         <div className={headerWrapClass}>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+          <p className="text-sm font-semibold tracking-wide text-[color:var(--color-primary)] sm:text-base">
             {sectionLabel}
           </p>
           <SiteHeading
@@ -1103,37 +1104,20 @@ export default function DatesSection({
   const canGoLeft = needsPagination && currentPage > 0;
   const canGoRight = needsPagination && currentPage < maxPages;
 
-  // Decorative particles — off in onboarding preview (full-viewport coords + noise).
-  const particles =
-    isClient && !isPreviewMode
-      ? Array.from({ length: 10 }, (_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-2 h-2 bg-white/20 rounded-full"
-            initial={{
-              x: Math.random() * (screenSize.width || 500),
-              y: Math.random() * (screenSize.height || 400),
-            }}
-            animate={{
-              x: Math.random() * (screenSize.width || 500),
-              y: Math.random() * (screenSize.height || 400),
-            }}
-            transition={{
-              duration: Math.random() * 15 + 10,
-              repeat: Infinity,
-              repeatType: "reverse",
-              ease: "linear",
-            }}
-          />
-        ))
-      : [];
+  const dateArrowClass = cn(
+    "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+    narrowPreview ? "p-1" : "p-1 sm:p-2",
+  );
+  const dateArrowIconClass = cn(
+    "text-[#8f96c3]",
+    narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
+  );
 
-  // Simple non-animated fallback for SSR that matches the client layout
   if (!isClient) {
     return (
       <section className={sectionClass}>
         <div className={headerWrapClass}>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+          <p className="text-sm font-semibold tracking-wide text-[color:var(--color-primary)] sm:text-base">
             {sectionLabel}
           </p>
           <SiteHeading
@@ -1152,22 +1136,9 @@ export default function DatesSection({
           >
             Choose a date below to continue booking
           </p>
-          {showAlreadyBookedLoginCta && (
-            <Button
-              type="button"
-              variant="outline"
-              className={loginCtaClass}
-              onClick={() => {
-                if (!isPreviewMode) router.push("/auth/login");
-              }}
-            >
-              {text}
-            </Button>
-          )}
         </div>
 
         <div className={cardsWrapClass}>
-          {/* Left arrow - Only show if pagination is needed and not on first page */}
           {needsPagination && (
             <div
               className={cn(
@@ -1175,22 +1146,19 @@ export default function DatesSection({
                 !narrowPreview && "sm:left-2",
               )}
             >
-              <div
+              <button
+                type="button"
+                aria-label="Previous dates"
+                disabled={!canGoLeft}
                 className={cn(
-                  "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
-                  narrowPreview ? "p-1" : "p-1 sm:p-2",
+                  dateArrowClass,
                   canGoLeft
                     ? "cursor-pointer hover:bg-[#2a2b4a]"
                     : "cursor-not-allowed opacity-30",
                 )}
               >
-                <CircleChevronLeft
-                  className={cn(
-                    "text-[#8f96c3]",
-                    narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
-                  )}
-                />
-              </div>
+                <CircleChevronLeft className={dateArrowIconClass} />
+              </button>
             </div>
           )}
 
@@ -1208,7 +1176,6 @@ export default function DatesSection({
             }
           />
 
-          {/* Right arrow - Only show if pagination is needed */}
           {needsPagination && (
             <div
               className={cn(
@@ -1216,30 +1183,31 @@ export default function DatesSection({
                 !narrowPreview && "sm:right-2",
               )}
             >
-              <div
+              <button
+                type="button"
+                aria-label="Next dates"
+                disabled={!canGoRight}
                 className={cn(
-                  "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
-                  narrowPreview ? "p-1" : "p-1 sm:p-2",
+                  dateArrowClass,
                   canGoRight
                     ? "cursor-pointer hover:bg-[#2a2b4a]"
                     : "cursor-not-allowed opacity-30",
                 )}
               >
-                <CircleChevronRight
-                  className={cn(
-                    "text-[#8f96c3]",
-                    narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
-                  )}
-                />
-              </div>
+                <CircleChevronRight className={dateArrowIconClass} />
+              </button>
             </div>
           )}
         </div>
+        <AlreadyBookedLogin
+          visible={showAlreadyBookedLoginCta}
+          className="mt-6"
+          onLogin={goToLogin}
+        />
       </section>
     );
   }
 
-  // Full animated version for client-side
   return (
     <motion.section
       className={sectionClass}
@@ -1247,7 +1215,6 @@ export default function DatesSection({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
     >
-      {/* Background — decorative; empty alt + onError avoids visible alt on broken asset */}
       <div className="absolute inset-0 z-0">
         {!datesBackgroundImageFailed ? (
           <img
@@ -1258,16 +1225,7 @@ export default function DatesSection({
             className="absolute inset-0 h-full w-full object-cover rounded-3xl opacity-40"
           />
         ) : null}
-        <div
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px)`,
-            backgroundSize: "20px 20px",
-          }}
-        />
-
-        {/* Floating particles - only rendered client-side */}
-        <AnimatePresence>{isVisible && particles}</AnimatePresence>
+        <div className="absolute inset-0 bg-black/35" aria-hidden />
       </div>
 
       <div className={headerWrapClass}>
@@ -1290,18 +1248,6 @@ export default function DatesSection({
         >
           Choose a date below to continue booking
         </p>
-        {showAlreadyBookedLoginCta && (
-          <Button
-            type="button"
-            variant="outline"
-            className={loginCtaClass}
-            onClick={() => {
-              if (!isPreviewMode) router.push("/auth/login");
-            }}
-          >
-            {text}
-          </Button>
-        )}
       </div>
 
       <div className={cardsWrapClass}>
@@ -1311,26 +1257,23 @@ export default function DatesSection({
               "absolute top-1/2 z-20 -translate-y-1/2 transform left-0",
               !narrowPreview && "sm:left-2",
             )}
-            onClick={() =>
-              canGoLeft && setCurrentPage((prev) => Math.max(0, prev - 1))
-            }
           >
-            <div
+            <button
+              type="button"
+              aria-label="Previous dates"
+              disabled={!canGoLeft}
+              onClick={() =>
+                canGoLeft && setCurrentPage((prev) => Math.max(0, prev - 1))
+              }
               className={cn(
-                "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
-                narrowPreview ? "p-1" : "p-1 sm:p-2",
+                dateArrowClass,
                 canGoLeft
                   ? "cursor-pointer hover:bg-[#2a2b4a]"
                   : "cursor-not-allowed opacity-30",
               )}
             >
-              <CircleChevronLeft
-                className={cn(
-                  "text-[#8f96c3]",
-                  narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
-                )}
-              />
-            </div>
+              <CircleChevronLeft className={dateArrowIconClass} />
+            </button>
           </div>
         )}
 
@@ -1353,31 +1296,33 @@ export default function DatesSection({
               "absolute top-1/2 z-20 -translate-y-1/2 transform right-0",
               !narrowPreview && "sm:right-2",
             )}
-            onClick={() => {
-              if (canGoRight) {
-                setCurrentPage((prev) => Math.min(maxPages, prev + 1));
-              }
-            }}
           >
-            <div
+            <button
+              type="button"
+              aria-label="Next dates"
+              disabled={!canGoRight}
+              onClick={() => {
+                if (canGoRight) {
+                  setCurrentPage((prev) => Math.min(maxPages, prev + 1));
+                }
+              }}
               className={cn(
-                "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
-                narrowPreview ? "p-1" : "p-1 sm:p-2",
+                dateArrowClass,
                 canGoRight
                   ? "cursor-pointer hover:bg-[#2a2b4a]"
                   : "cursor-not-allowed opacity-30",
               )}
             >
-              <CircleChevronRight
-                className={cn(
-                  "text-[#8f96c3]",
-                  narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
-                )}
-              />
-            </div>
+              <CircleChevronRight className={dateArrowIconClass} />
+            </button>
           </div>
         )}
       </div>
+      <AlreadyBookedLogin
+        visible={showAlreadyBookedLoginCta}
+        className="mt-6"
+        onLogin={goToLogin}
+      />
     </motion.section>
   );
 }

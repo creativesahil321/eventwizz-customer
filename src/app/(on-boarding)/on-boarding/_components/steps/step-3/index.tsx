@@ -31,6 +31,7 @@ import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { setEventIdInForm } from "../../../_lib/hooks/useEventId";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
+import { MAX_VIDEO_SIZE_BYTES, MAX_VIDEO_SIZE_MB } from "@/utils/video-validator";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -446,7 +447,7 @@ export default function StepThree() {
       try {
         // Validate video compatibility
         const { validateVideo } = await import("@/utils/video-validator");
-        const validation = await validateVideo(file, 10);
+        const validation = await validateVideo(file);
 
         if (!validation.isValid) {
           toast.error(validation.errors.join(". ") || "Invalid video file", {
@@ -1096,7 +1097,7 @@ export default function StepThree() {
                                         )
                                       }
                                       maxFileCount={1}
-                                      maxSize={50 * 1024 * 1024}
+                                      maxSize={MAX_VIDEO_SIZE_BYTES}
                                       onRemove={() =>
                                         handleRemoveBannerVideo(field.onChange)
                                       }
@@ -1117,8 +1118,8 @@ export default function StepThree() {
                                     <>
                                       <p className="mt-2 text-sm text-muted-foreground">
                                         Upload a banner video for your event
-                                        header (MP4, WebM, or OGG format, max
-                                        50MB)
+                                        header (MP4, WebM, or OGG format, max{" "}
+                                        {MAX_VIDEO_SIZE_MB}MB)
                                       </p>
                                       <div className="w-full mt-3">
                                         <VideoFormatInfo variant="compact" />

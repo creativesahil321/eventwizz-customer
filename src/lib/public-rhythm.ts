@@ -40,7 +40,7 @@ export const PUBLIC_EVENT_NAV_TAB_BASE_CLASS =
   "relative flex shrink-0 items-center text-[13px] font-medium leading-none tracking-wide transition-colors duration-200 ease-out sm:text-sm";
 
 export const PUBLIC_EVENT_NAV_TAB_ACTIVE_CLASS =
-  "font-semibold text-[var(--color-text)]";
+  "font-semibold text-[color:var(--color-primary)]";
 
 export const PUBLIC_EVENT_NAV_TAB_INACTIVE_CLASS =
   "text-[var(--color-text-dimmed)] hover:text-[var(--color-text)]";

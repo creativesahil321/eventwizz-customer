@@ -319,7 +319,9 @@ export function useGuidedOnboardingSections<T extends FieldValues>({
       return false;
     }
 
-    const schemaOk = await form.trigger(undefined, { shouldFocus: true });
+    const schemaOk = await form.trigger(undefined, {
+      shouldFocus: !validateFullStep,
+    });
     const extraOk = validateFullStep
       ? await Promise.resolve(validateFullStep())
       : true;

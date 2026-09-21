@@ -49,6 +49,7 @@ import {
   usePublicEventCatalog,
 } from "@/services/common/public-search";
 import type { LocationSearchFilters } from "./_lib/search-filters";
+import { locationSearchQueryPlaceholder } from "./_lib/search-filters";
 
 export type SearchAvailabilityScope = {
   domain?: string | null;
@@ -69,6 +70,8 @@ export type LocationSearchBarProps = {
   onChange: (value: LocationSearchFilters) => void;
   onSearch: () => void;
   hideCity?: boolean;
+  /** Multi-location vendors search this venue; single-location vendors search events. */
+  hasMultipleLocations?: boolean;
   /** Optional. Kept for callers; location chrome no longer shows a city chip. */
   lockedCityLabel?: string | null;
   /**
@@ -107,6 +110,7 @@ export function LocationSearchBar({
   onChange,
   onSearch,
   hideCity = false,
+  hasMultipleLocations = false,
   availability,
   enableNearMe = false,
 }: LocationSearchBarProps) {
@@ -135,6 +139,10 @@ export function LocationSearchBar({
     onChange({ ...value, ...partial });
   };
 
+  const queryPlaceholder = locationSearchQueryPlaceholder({
+    hideCity,
+    hasMultipleLocations,
+  });
   const cityFieldLabel = value.nearMe ? "Near Me" : (value.city ?? "Any city");
 
   const handleSelectAnyCity = () => {
@@ -246,9 +254,9 @@ export function LocationSearchBar({
     availableDateSet.size > 0;
 
   const fieldBtnClass = cn(
-    "flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-full px-2 py-2.5 text-left text-sm transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-text)_4%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:min-h-0 sm:min-w-[9rem] sm:gap-2 sm:px-3 sm:py-2",
-    "@max-sm/preview:!min-h-11 @max-sm/preview:!min-w-0 @max-sm/preview:!px-2",
-    isPreviewMobile && "!min-h-11 !min-w-0 !px-2",
+    "flex h-11 min-w-0 flex-1 items-center gap-1 rounded-full px-3 text-left text-sm transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-text)_4%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:min-w-[9rem] sm:gap-2 sm:px-3.5",
+    "@max-sm/preview:!h-11 @max-sm/preview:!min-w-0 @max-sm/preview:!px-3",
+    isPreviewMobile && "!h-11 !min-w-0 !px-3",
   );
 
   return (
@@ -274,7 +282,7 @@ export function LocationSearchBar({
             isPreviewMobile && "!flex-col !items-stretch !gap-1",
           )}
         >
-          <label className="relative flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2.5 py-2.5 sm:min-h-0 sm:px-3.5 sm:py-2 @max-sm/preview:!min-h-11 @max-sm/preview:!px-2">
+          <label className="relative flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-4 sm:px-5 @max-sm/preview:!h-11 @max-sm/preview:!px-4">
             <Search
               className="h-4 w-4 shrink-0 text-[var(--color-primary)]"
               aria-hidden
@@ -284,17 +292,9 @@ export function LocationSearchBar({
               type="search"
               value={value.query}
               onChange={(e) => patch({ query: e.target.value })}
-              placeholder={
-                hideCity
-                  ? "Search location events"
-                  : "Search event and category"
-              }
+              placeholder={queryPlaceholder}
               className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-dimmed)] max-sm:placeholder:text-xs"
-              aria-label={
-                hideCity
-                  ? "Search location events"
-                  : "Search event and category"
-              }
+              aria-label={queryPlaceholder}
             />
           </label>
 
@@ -381,7 +381,7 @@ export function LocationSearchBar({
                         }}
                       />
                       {nearMeError ? (
-                        <p className="px-2.5 py-1.5 text-[11px] leading-snug text-red-600">
+                        <p className="px-3 py-2 text-xs leading-snug text-red-600">
                           {nearMeError}
                         </p>
                       ) : null}
@@ -478,7 +478,7 @@ export function LocationSearchBar({
                   />
                 )}
                 {availabilityEnabled ? (
-                  <p className="border-t border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] px-3 py-2 text-[11px] text-[var(--color-text-dimmed)]">
+                  <p className="border-t border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] px-3 py-2 text-xs text-[var(--color-text-dimmed)]">
                     {availabilityQuery.isError
                       ? "Couldn’t load available dates — any future day is selectable."
                       : availableDateSet.size === 0 &&
@@ -508,12 +508,12 @@ export function LocationSearchBar({
               type="submit"
               aria-label="Search events"
               className={cn(
-                "inline-flex h-12 min-h-12 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[var(--color-footer)] px-3 text-sm font-semibold text-[var(--color-on-footer)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:h-11 sm:min-h-0 sm:px-5",
+                "inline-flex h-11 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[var(--color-footer)] px-4 text-sm font-semibold text-[var(--color-on-footer)] shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:min-w-[9rem] sm:px-5",
                 !hideCity && "col-span-2 sm:col-span-1",
                 hideCity
                   ? previewSearchSubmitUntilSm
                   : previewSearchSubmitFullUntilSm,
-                isPreviewMobile && "!h-12 !min-h-12",
+                isPreviewMobile && "!h-11",
                 isPreviewMobile && !hideCity && "!col-span-2",
               )}
             >

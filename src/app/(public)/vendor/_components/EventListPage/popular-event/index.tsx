@@ -18,7 +18,6 @@ const eventImages = [
 import { EventComponentProps } from "../event-types";
 import { resolveCurrencySymbol } from "@/lib/currency-format";
 import {
-  eventCarouselNavButtonClass,
   eventListingManyScrollItemClass,
   mobileEventRowPeekScrollItemClass,
 } from "../event-carousel-classes";
@@ -27,6 +26,7 @@ import { SingleEventShowcase } from "../single-event-showcase";
 import { DualEventShowcase } from "../dual-event-showcase";
 import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { EventSectionHeader } from "../event-section-header";
+import { PUBLIC_SECTION_CONTAINER_CLASS } from "@/lib/public-rhythm";
 
 export default function PopularEvents({
   events: apiEvents,
@@ -101,22 +101,14 @@ export default function PopularEvents({
         id="latest-events"
         className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
       >
-        <div className="container mx-auto max-w-7xl px-4">
+        <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
           <EventSectionHeader
             sectionLabel="Popular Events"
             sectionTitle={sectionTitleText}
           />
 
           <div className={cn("relative w-full", !narrowPreview && "md:hidden")}>
-            <EventListingHorizontalScroll
-              watchKey={scrollWatchKey}
-              leftButtonClassName={eventCarouselNavButtonClass(
-                "absolute left-0 top-1/2 -translate-y-1/2",
-              )}
-              rightButtonClassName={eventCarouselNavButtonClass(
-                "absolute right-0 top-1/2 -translate-y-1/2",
-              )}
-            >
+            <EventListingHorizontalScroll watchKey={scrollWatchKey}>
               {events.map((event, index) => (
                 <div
                   key={event.slug || index}
@@ -171,21 +163,13 @@ export default function PopularEvents({
       id="latest-events"
       className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
     >
-      <div className="container mx-auto max-w-7xl px-4">
+      <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <EventSectionHeader
           sectionLabel="Popular Events"
           sectionTitle={sectionTitleText}
         />
         <div className="relative w-full">
-          <EventListingHorizontalScroll
-            watchKey={scrollWatchKey}
-            leftButtonClassName={eventCarouselNavButtonClass(
-              "absolute left-0 top-1/2 -translate-y-1/2 md:-left-1 lg:-left-2",
-            )}
-            rightButtonClassName={eventCarouselNavButtonClass(
-              "absolute right-0 top-1/2 -translate-y-1/2 md:-right-1 lg:-right-2",
-            )}
-          >
+          <EventListingHorizontalScroll watchKey={scrollWatchKey}>
             {events.map((data, index) => (
               <div key={data.slug || index} className={eventListingManyScrollItemClass}>
                 <div className="h-full w-full pb-1 pt-0.5">

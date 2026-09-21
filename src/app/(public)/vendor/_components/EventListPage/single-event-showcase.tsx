@@ -4,6 +4,7 @@ import type { LocationEventCardModel } from "./location-event-card";
 import { LocationEventHeroCard } from "./location-event-hero-card";
 import { singleEventShowcaseSlideClass } from "./event-carousel-classes";
 import { EventSectionHeader } from "./event-section-header";
+import { PUBLIC_SECTION_CONTAINER_CLASS } from "@/lib/public-rhythm";
 type SingleEventShowcaseProps = {
   sectionId: string;
   sectionLabel: string;
@@ -38,7 +39,7 @@ export function SingleEventShowcase({
       id={sectionId}
       className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
     >
-      <div className="container mx-auto max-w-7xl px-4">
+      <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <EventSectionHeader
           sectionLabel={sectionLabel}
           sectionTitle={sectionTitle}

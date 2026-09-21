@@ -150,10 +150,10 @@ export function LocationSelector({
             key={location.id}
             onClick={() => handleLocationChange(location.id)}
             className={cn(
-              "cursor-pointer items-start px-4 py-2.5",
+              "cursor-pointer items-start px-4 py-2.5 data-[disabled]:opacity-100",
               selectedLocation.id === location.id ? "bg-accent" : "",
             )}
-            disabled={isPending || selectedLocation.id === location.id}
+            disabled={isPending}
           >
             <LocationOptionContent
               location={location}
@@ -225,8 +225,8 @@ function LocationOptionContent({
           </span>
         ) : null}
         {location.is_default ? (
-          <span className="whitespace-nowrap text-xs font-medium text-[var(--color-secondary,#009ead)]">
-            (In use)
+          <span className="whitespace-nowrap rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-emerald-800">
+            In use
           </span>
         ) : null}
         {location.status === false && (

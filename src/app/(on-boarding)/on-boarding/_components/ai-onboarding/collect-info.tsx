@@ -24,6 +24,7 @@ import {
   X,
   Info,
 } from "lucide-react";
+import { NameAvailabilityInputCue } from "@/components/name-availability-input-cue";
 import { useSession } from "next-auth/react";
 import { env } from "@/env";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
@@ -885,12 +886,22 @@ export default function AICollectInfo({
               </label>
               {isBrandMode ? (
                 <>
-                  <input
-                    {...form.register("venueName")}
-                    maxLength={120}
-                    placeholder="e.g. Acme Events Co."
-                    className={INPUT_CLASS}
-                  />
+                  <div className="relative">
+                    <input
+                      {...form.register("venueName")}
+                      maxLength={120}
+                      placeholder="e.g. Acme Events Co."
+                      aria-busy={brandNameChecking || undefined}
+                      className={`${INPUT_CLASS} pr-10`}
+                    />
+                    <NameAvailabilityInputCue
+                      checking={brandNameChecking}
+                      available={
+                        brandNameCheckStatus === "available" &&
+                        (venueNameValue?.trim().length ?? 0) >= 2
+                      }
+                    />
+                  </div>
                   <p className="text-xs text-slate-500 mt-1.5">
                     Trading name — no Google listing needed.
                   </p>
@@ -977,19 +988,6 @@ export default function AICollectInfo({
                   </p>
                 </>
               )}
-              {brandNameChecking ? (
-                <p className="text-xs text-slate-500 mt-1.5">
-                  Checking name availability…
-                </p>
-              ) : null}
-              {brandNameCheckStatus === "available" &&
-              (venueNameValue?.trim().length ?? 0) >= 2 ? (
-                <p className="text-xs text-emerald-400/90 mt-1.5">
-                  {isBrandMode
-                    ? "This brand name is available."
-                    : "This venue name is available."}
-                </p>
-              ) : null}
               {brandNameCheckStatus === "taken" &&
               (venueNameValue?.trim().length ?? 0) >= 2 &&
               brandNameCheckMessage ? (

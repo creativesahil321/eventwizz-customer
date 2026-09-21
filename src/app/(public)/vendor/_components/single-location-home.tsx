@@ -62,6 +62,7 @@ export function SingleLocationHome({
       locationData={locationData}
       locationSlug={slug}
       settings={settings}
+      hasMultipleLocations={false}
     />
   );
 }

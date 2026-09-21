@@ -20,7 +20,6 @@ import { EventComponentProps } from "../event-types";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { resolveCurrencySymbol } from "@/lib/currency-format";
 import {
-  eventCarouselNavButtonClass,
   eventListingManyScrollItemClass,
   mobileEventRowPeekScrollItemClass,
 } from "../event-carousel-classes";
@@ -30,6 +29,7 @@ import { DualEventShowcase } from "../dual-event-showcase";
 import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { EventSectionHeader } from "../event-section-header";
 import { SiteHeading } from "@/components/public/site-heading";
+import { PUBLIC_SECTION_CONTAINER_CLASS } from "@/lib/public-rhythm";
 
 export default function UpcomingEvents({
   events: apiEvents,
@@ -70,7 +70,7 @@ export default function UpcomingEvents({
 
     return (
       <section className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28">
-        <div className="container mx-auto max-w-7xl px-4">
+        <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
           <EventSectionHeader
             sectionLabel="Upcoming Events"
             sectionTitle={sectionTitleText}
@@ -194,7 +194,7 @@ export default function UpcomingEvents({
         id="upcoming-events"
         className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
       >
-        <div className="container mx-auto max-w-7xl px-4">
+        <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
           <div className="mb-8 w-full text-left space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
               Upcoming Events
@@ -208,15 +208,7 @@ export default function UpcomingEvents({
           </div>
 
           <div className={cn("relative w-full", !narrowPreview && "md:hidden")}>
-            <EventListingHorizontalScroll
-              watchKey={scrollWatchKey}
-              leftButtonClassName={eventCarouselNavButtonClass(
-                "absolute left-0 top-1/2 -translate-y-1/2",
-              )}
-              rightButtonClassName={eventCarouselNavButtonClass(
-                "absolute right-0 top-1/2 -translate-y-1/2",
-              )}
-            >
+            <EventListingHorizontalScroll watchKey={scrollWatchKey}>
               {events.map((event, index) => (
                 <div
                   key={event.slug || index}
@@ -271,21 +263,13 @@ export default function UpcomingEvents({
       id="upcoming-events"
       className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
     >
-      <div className="container mx-auto max-w-7xl px-4">
+      <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <EventSectionHeader
           sectionLabel="Upcoming Events"
           sectionTitle={sectionTitleText}
         />
         <div className="relative w-full">
-          <EventListingHorizontalScroll
-            watchKey={scrollWatchKey}
-            leftButtonClassName={eventCarouselNavButtonClass(
-              "absolute left-0 top-1/2 -translate-y-1/2 md:-left-1 lg:-left-2",
-            )}
-            rightButtonClassName={eventCarouselNavButtonClass(
-              "absolute right-0 top-1/2 -translate-y-1/2 md:-right-1 lg:-right-2",
-            )}
-          >
+          <EventListingHorizontalScroll watchKey={scrollWatchKey}>
             {events.map((data, index) => (
               <div
                 key={data.slug || index}

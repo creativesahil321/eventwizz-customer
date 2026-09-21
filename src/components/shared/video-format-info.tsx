@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MAX_VIDEO_SIZE_MB } from "@/utils/video-validator";
 
 interface VideoFormatInfoProps {
   variant?: "default" | "compact";
@@ -11,7 +12,8 @@ export function VideoFormatInfo({ variant = "default" }: VideoFormatInfoProps) {
       <div className="text-sm text-muted-foreground space-y-1">
         <p className="font-medium">Recommended format: MP4 (H.264)</p>
         <p className="text-xs">
-          Max size: 10MB • Avoid HEVC/H.265 for best compatibility
+          Max size: {MAX_VIDEO_SIZE_MB}MB • Avoid HEVC/H.265 for best
+          compatibility
         </p>
       </div>
     );
@@ -48,7 +50,7 @@ export function VideoFormatInfo({ variant = "default" }: VideoFormatInfoProps) {
           <div className="mt-3 pt-2 border-t">
             <p className="text-xs font-medium mb-1">File Requirements:</p>
             <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
-              <li>• Maximum file size: 10MB</li>
+              <li>• Maximum file size: {MAX_VIDEO_SIZE_MB}MB</li>
               <li>• Format: MP4, WebM, or OGG</li>
               <li>• Codec: H.264 (AVC) recommended</li>
               <li>• Resolution: 1920x1080 or lower</li>

@@ -54,7 +54,7 @@ export default function AboutEventSec({
       <div
         className={cn(
           "mx-auto grid w-full max-w-7xl items-start gap-8 px-4 md:px-6 sm:gap-10",
-          "lg:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)] lg:gap-14",
+          "lg:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)] lg:items-center lg:gap-14",
           previewPhonePx4,
           "@max-md/preview:!gap-8",
           previewUndoLgSplit,
@@ -92,10 +92,10 @@ export default function AboutEventSec({
 
           {highlights.length > 0 && (
             <div className="mt-8 border-t border-[color:color-mix(in_srgb,var(--color-primary)_24%,transparent)] pt-5 sm:mt-9 sm:pt-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-dimmed)]">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-[color:var(--color-text)]">
                 At a glance
               </p>
-              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 sm:mt-5 sm:gap-x-8 sm:gap-y-5">
+              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 border-b border-[color:color-mix(in_srgb,var(--color-primary)_24%,transparent)] pb-4 sm:mt-5 sm:gap-x-8 sm:gap-y-5 sm:pb-5">
                 {highlights.map((highlight) => {
                   const body = (
                     <div className="min-w-0 border-t border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] pt-2.5 sm:pt-3">
@@ -145,7 +145,7 @@ export default function AboutEventSec({
               src={addCacheBusting(eventImage)}
               alt={imageAlt || "Event"}
               loading="lazy"
-              className="aspect-[4/3] w-full object-cover lg:aspect-[4/5] @max-5xl/preview:!aspect-[4/3]"
+              className="aspect-[4/3] w-full object-cover lg:aspect-[5/4] @max-5xl/preview:!aspect-[4/3]"
             />
           </div>
         ) : null}

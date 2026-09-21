@@ -3,6 +3,10 @@
  * Validates video files for browser compatibility
  */
 
+/** Shared banner/cover video cap used by Site Essentials, events, and onboarding. */
+export const MAX_VIDEO_SIZE_MB = 30;
+export const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+
 /**
  * Validates if a video file is compatible with most browsers
  * Checks for H.264 codec compatibility by attempting to play it
@@ -76,12 +80,12 @@ export async function validateVideoCodec(file: File): Promise<{
 /**
  * Check if video file size is within acceptable limits
  * @param file - Video file to check
- * @param maxSizeMB - Maximum size in megabytes (default 10MB)
+ * @param maxSizeMB - Maximum size in megabytes (default {@link MAX_VIDEO_SIZE_MB})
  * @returns Object with validation result
  */
 export function validateVideoSize(
   file: File,
-  maxSizeMB: number = 10
+  maxSizeMB: number = MAX_VIDEO_SIZE_MB
 ): {
   isValid: boolean;
   error?: string;
@@ -163,7 +167,7 @@ export async function getVideoCodecInfo(file: File): Promise<{
  */
 export async function validateVideo(
   file: File,
-  maxSizeMB: number = 10
+  maxSizeMB: number = MAX_VIDEO_SIZE_MB
 ): Promise<{
   isValid: boolean;
   errors: string[];

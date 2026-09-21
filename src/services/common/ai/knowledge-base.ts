@@ -276,11 +276,9 @@ Site Essentials is a comprehensive configuration module that allows vendors and 
 - Meta Description: Add a brief description of your site (150-160 characters recommended)
 - Meta Keywords: Set comma-separated keywords related to your business and events
 
-### Domain Settings
-- Domain Management: Your domain is automatically created during onboarding based on venue name
-- Domain Verification: Complete verification within 72 hours to maintain full account access
-- Custom Domain: Option to update your subdomain name during the verification period
+### Business Settings
 - Business Verification: Upload VAT number and business document to verify your business credentials
+- Access: profile dropdown → Settings → Business Settings (/vendor/domain-settings). Not in the sidebar. Not under Sites Essentials.
 
 All settings are saved in real-time and can be previewed before publishing. The Site Essentials module uses TanStack Query for efficient data fetching and caching, with React Hook Form for form management and validation.
 
@@ -360,7 +358,7 @@ After selecting a venue on the Welcome page, the vendor sees the **vendor dashbo
 
 7. **Transactions** (/vendor/transactions) — View **transaction/payment records**: list of payments received, with export/receipt options. Use this to see what money came in, not to connect Stripe/PayPal.
 
-8. **Sites Essentials** (/vendor/sites-essentials) — **Site branding and configuration** for the **current location**. Tabs: **Branding** (site name, logo, favicon, copyright, footer brand description, landing banner image/video, about section), **Colors** (primary, secondary, layout, background, status colors), **Typography** (heading and body fonts), **Social Media** (Facebook, Twitter, Instagram, LinkedIn, YouTube), **SEO** (meta title, description, keywords). Optional: gallery title and other location-specific settings. Saves per location. This does **not** include domain or business verification — those are under Domain Settings.
+8. **Sites Essentials** (/vendor/sites-essentials) — **Site branding and configuration** for the **current location**. Tabs: **Branding** (site name, logo, favicon, copyright, footer brand description, landing banner image/video, about section), **Colors** (primary, secondary, layout, background, status colors), **Typography** (heading and body fonts), **Social Media** (Facebook, Twitter, Instagram, LinkedIn, YouTube), **SEO** (meta title, description, keywords). Optional: gallery title and other location-specific settings. Saves per location. This does **not** include business verification — that is under Business Settings.
 
 9. **Locations** (/vendor/venue-locations) — **Manage venues/locations** on the account. List of all locations (name, address, slug). Add new location (“+ Add Location”), edit, delete. Each location has its own subdomain, events, and Site Essentials. This is the same “locations” list you see on the Welcome page; managing them here lets you add/edit/delete.
 
@@ -396,19 +394,18 @@ After selecting a venue on the Welcome page, the vendor sees the **vendor dashbo
 - **Create Event** — Blue button; goes to create-new-event flow (same as creating from Events).
 - **User profile dropdown** — Name, avatar. Menu items:
   - **Settings** submenu:
-    - **Domain Settings** — Opens /vendor/domain-settings (see below). Not in the sidebar.
+    - **Business Settings** — Opens /vendor/domain-settings (see below). Not in the sidebar.
     - **Payment Settings** — Same as sidebar “Payment Settings” (/vendor/payment-settings).
   - **Log Out**.
 
-### Domain Settings (user menu → Settings → Domain Settings)
+### Business Settings (user menu → Settings → Business Settings)
 
-- **Route**: /vendor/domain-settings (not under Sites Essentials; access from **profile dropdown → Settings → Domain Settings**).
-- **Purpose**: Manage **subdomain** and **business verification** so the venue can stay fully active.
-- **Tabs**: (1) **Domain Settings** (2) **Business Verification**.
-- **Domain tab**: Shows **Your Domain** (e.g. yourbusiness.eventwizz.vercel.app), status (e.g. Pending Verification). **Update Domain** to change the subdomain name. **Important**: There is a **72-hour window** after creation to verify or update the domain; a countdown and warning (“Domain Verification Required — X hours remaining”) are shown. After that, account access can be restricted until verification is complete. Details shown: Created date, Edit expires (72h countdown), Status, Business Verification status.
-- **Business Verification tab**: Upload **VAT number** and **business document** to verify the business. Required to unlock all platform features and complete verification.
+- **Route**: /vendor/domain-settings (not under Sites Essentials; access from **profile dropdown → Settings → Business Settings**).
+- **Purpose**: **Business verification** so the venue can stay fully active.
+- Upload **VAT number** and **business document**. Required to unlock all platform features.
+- Do **not** tell vendors they can edit a subdomain here. Do not mention a Domain Settings tab.
 
-Do not tell vendors that Domain Settings is under Site Essentials; it is under the **user profile → Settings → Domain Settings**. Do not say they have unlimited time to verify; they have **72 hours** to verify or update the domain before restrictions may apply.
+Do not tell vendors that Business Settings is under Site Essentials; it is under the **user profile → Settings → Business Settings**.
 
 ## Admin Dashboard — All Pages & Menus
 
@@ -558,7 +555,7 @@ EventWizz is a comprehensive multi-tenant event management platform that serves 
   - **Dashboard** (/vendor/dashboard): Summary (Total/Active/Past/Draft events), Bookings vs Commissions toggle, recent bookings table.
   - **Events** (/vendor/events): Event list and **Create Event** (header button); multi-step event form.
   - **Customers** (/vendor/customers), **Bookings** (/vendor/booking-history), **Email Templates** (/vendor/email-templates), **Menu Choice** (/vendor/menu-choices — customer menu choices per booking), **Transactions** (/vendor/transactions — payment history), **Sites Essentials** (/vendor/sites-essentials — branding, colors, typography, SEO), **Locations** (/vendor/venue-locations — add/edit venues), **Marketing**, **Newsletter**, **Email Logs**, **System Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings** (/vendor/payment-settings — connect Stripe/PayPal etc.).
-  - **Domain Settings**: Under **profile dropdown → Settings → Domain Settings** (/vendor/domain-settings), not in sidebar. Manages subdomain and 72-hour verification window; Business Verification tab for VAT and documents.
+  - **Business Settings**: Under **profile dropdown → Settings → Business Settings** (/vendor/domain-settings), not in sidebar. VAT number and business document verification.
 
 #### 👥 Customer Portal (website_role="customer")
 - **Who**: Event attendees and booking customers
@@ -733,7 +730,7 @@ The full **11-step vendor onboarding** is described in the "Vendor Onboarding (F
 - **"How do I customize my site (logo, colors)?"** - **Sites Essentials** (/vendor/sites-essentials). Tabs: Branding, Colors, Typography, Social Media, SEO.
 - **"Where do I connect Stripe or PayPal?"** - **Payment Settings** (/vendor/payment-settings), or from profile dropdown → Settings → Payment Settings. Not “Transactions”; Transactions is for viewing payment history.
 - **"Where do I see payments I received?"** - **Transactions** (/vendor/transactions). For connecting gateways use **Payment Settings**.
-- **"Where is domain / subdomain verification?"** - **Profile dropdown (top right) → Settings → Domain Settings** (/vendor/domain-settings). Not under Site Essentials. You have 72 hours to verify or update the domain after creation.
+- **"Where is VAT / business verification?"** - **Profile dropdown (top right) → Settings → Business Settings** (/vendor/domain-settings). Not under Site Essentials.
 - **"What is Menu Choice?"** - **Menu Choice** (/vendor/menu-choices) is where you see **customer menu choices per booking** (e.g. what dishes they selected). For editing the catering menu itself, do that in the event form or in the event’s menu section.
 - **"How do I manage staff?"** - **Staff Management** (/vendor/staff-management). **Manage Roles** (/vendor/manage-roles) is where you define roles and permissions.
 - **"How do I track performance?"** - **Dashboard** (/vendor/dashboard): summary counts, Bookings/Commissions toggle, and Recent Bookings table.
@@ -1028,7 +1025,7 @@ Manual steps:
 - First: **Welcome — Select Location** — pick a venue → **Continue to Dashboard**. (Only when they are on that page — check CURRENT PAGE.)
 - Sidebar: **Dashboard**, **Events**, **Customers**, **Bookings**, **Door Scan**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**.
 - Header: **Create Event**, location selector (if multiple), Help, profile.
-- Domain / VAT verification: profile → **Settings** → **Domain Settings** (not Sites Essentials). 72-hour verify window.
+- VAT / business verification: profile → **Settings** → **Business Settings** (not Sites Essentials).
 - Connect payment gateways later: **Payment Settings**.
 
 ## Sites Essentials (public site look & copy — per location)
@@ -1061,7 +1058,7 @@ Booking detail (**View**): **Pay … Now**, **Reschedule**, **Add extras for thi
 | Goal | Place |
 |------|--------|
 | Logo, colours, fonts, SEO, home copy | **Sites Essentials** |
-| Domain / subdomain | Profile → **Domain Settings** |
+| VAT / business verification | Profile → **Business Settings** |
 | Stripe / PayPal | **Payment Settings** |
 | Tickets, tables, deposits | Event **Dates** |
 | Turn on invoice / door-entry QR | Event **Finalise** → Door entry QR |
@@ -1121,7 +1118,7 @@ For CUSTOMERS (event attendees — on venue storefront websites only):
 For VENDORS (venue owners):
 - **Onboarding**: AI-Powered or Manual. Steps in order: Venue, Site, Event, Timeline & Package, Dates, Catering, Brochure info, Other Packages, FAQs, Payment, Domain. Optional **Multiple event spaces** (rooms).
 - **After onboarding**: **Welcome — Select Location** only when they are on that page — then **Continue to Dashboard**. Use CURRENT PAGE if provided.
-- Sidebar labels: **Dashboard**, **Events**, **Customers**, **Bookings**, **Door Scan**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**. **Create Event** in the header. **Domain Settings** under profile → Settings (not Sites Essentials).
+- Sidebar labels: **Dashboard**, **Events**, **Customers**, **Bookings**, **Door Scan**, **Table Assignment**, **Email Templates**, **Menu Choice**, **Transactions**, **Sites Essentials**, **Locations**, **Marketing**, **Newsletter**, **Email Logs**, **Manage Roles**, **Staff Management**, **Seo Tools**, **Notifications**, **Support**, **Dispute Resolution**, **Payment Settings**. **Create Event** in the header. **Business Settings** under profile → Settings (not Sites Essentials).
 - **Invoice QR**: Events → event → **Finalise** → **Door entry QR** → **Yes — show the door-entry QR**. **Door Scan** scans those invoices at the door.
 - **Sites Essentials**: Presets/Branding/Colors/Typography/Social/SEO — public look & copy. Main home page (multi-location hub) vs Location/Home page vs Info pages. Use **Preview** then **Save**.
 - **Dates**: tickets and/or tables; deposits for tables; Brochure Info for address/PDFs.

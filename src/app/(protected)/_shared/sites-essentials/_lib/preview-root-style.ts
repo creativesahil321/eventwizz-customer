@@ -4,6 +4,7 @@ import {
   pickHeroOverlayColor,
   pickReadableForeground,
 } from "@/lib/color-contrast";
+import { logoContrastCssProperties } from "@/lib/logo/chrome-contrast";
 import type { SiteEssentialsFormValues } from "./schema";
 
 /** CSS variable bundle for Site Essentials / onboarding live preview roots. */
@@ -41,6 +42,7 @@ export function siteEssentialsToPreviewRootStyle(
     "--color-on-footer": pickReadableForeground(footer),
     "--color-on-surface": pickReadableForeground(surface),
     "--color-on-background": pickReadableForeground(background),
+    ...logoContrastCssProperties(header, footer),
     "--font-heading":
       formValues.typography?.fontFamily?.heading || "'Inter', sans-serif",
     "--font-body":

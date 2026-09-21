@@ -147,7 +147,12 @@ function CartOrLocationSlot({
       />
     );
   }
-  return <VendorPublicLocationBookNow pillGlassOnHero={pillGlassOnHero} />;
+  return (
+    <VendorPublicLocationBookNow
+      pillGlassOnHero={pillGlassOnHero}
+      triggerClassName={cn(pillClassName, textColorClass, hoverColorClass)}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -833,7 +838,7 @@ export default function CommonHeader({
                   className={cn(
                     topBarPillDisabledClass,
                     styles.textColor,
-                    "inline-flex items-center gap-1.5",
+                    "inline-flex h-9 items-center gap-1.5",
                     desktopIconActionClass,
                   )}
                   aria-label={headerData.browseEvent.linkText}
@@ -850,7 +855,7 @@ export default function CommonHeader({
                     topBarPillClass,
                     styles.textColor,
                     styles.hoverColor,
-                    "inline-flex items-center gap-1.5",
+                    "inline-flex h-9 items-center gap-1.5",
                     desktopIconActionClass,
                   )}
                   aria-label={headerData.browseEvent.linkText}
@@ -965,6 +970,10 @@ export default function CommonHeader({
               <VendorPublicLocationBookNow
                 disabled
                 pillGlassOnHero={pillGlassOnHero}
+                triggerClassName={cn(
+                  topBarPillClass,
+                  styles.textColor,
+                )}
               />
             ) : commerceSlotLoading ? (
               <div
@@ -986,7 +995,14 @@ export default function CommonHeader({
                 variant="pill"
               />
             ) : (
-              <VendorPublicLocationBookNow pillGlassOnHero={pillGlassOnHero} />
+              <VendorPublicLocationBookNow
+                pillGlassOnHero={pillGlassOnHero}
+                triggerClassName={cn(
+                  topBarPillClass,
+                  styles.textColor,
+                  styles.hoverColor,
+                )}
+              />
             )}
 
             {hasHeaderDownloads &&

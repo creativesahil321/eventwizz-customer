@@ -29,9 +29,29 @@ export const guidedOnboardingApproveStepButtonClass =
 export const guidedOnboardingSaveNextButtonClass =
   "shrink-0 rounded-full px-8 py-2 text-white";
 export const guidedOnboardingSkipButtonClass =
-  "shrink-0 rounded-full border-white/10 bg-transparent px-6 py-2 text-slate-400 hover:border-white/20 hover:bg-white/5 hover:text-slate-200";
+  "shrink-0 rounded-full border-white/25 bg-white/[0.04] px-6 py-2 text-white hover:border-white/40 hover:bg-white/10 hover:text-white";
 export const guidedOnboardingNextSectionButtonClass =
   "shrink-0 rounded-full border-white/20 bg-transparent text-white hover:bg-white/10";
+
+/**
+ * Shared continue-bar surface so every onboarding step uses the same dock.
+ * Lifted from the card (`black/65` + visible border) so it does not melt into
+ * the navy section background.
+ */
+export const guidedOnboardingActionDockClass =
+  "flex w-full min-w-0 flex-col items-center justify-center gap-3 rounded-xl border border-white/15 bg-black/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:px-5 sm:py-5";
+
+/** Inset bar at the bottom of a rounded guided card (steps 4–11). */
+export const guidedOnboardingActionDockAttachedClass = cn(
+  guidedOnboardingActionDockClass,
+  "m-3 mt-1",
+);
+
+/** Standalone dock under stacked section cards (steps 1–3). Static — same as 4–11. */
+export const guidedOnboardingActionDockStandaloneClass = cn(
+  guidedOnboardingActionDockClass,
+  "mt-6",
+);
 
 type SectionFooterProps = {
   /** Only render when this section is the current one — keeps actions scoped and avoids duplicate controls. */
@@ -45,6 +65,11 @@ type SectionFooterProps = {
   centeredActions?: boolean;
   /** Hide section title / n-of-m row (use when step chips were removed). */
   hideSectionMeta?: boolean;
+  /**
+   * `inline` — hairline under section fields (Approve section).
+   * `dock` — dark continue bar, same as steps 1–3.
+   */
+  variant?: "inline" | "dock";
 };
 
 /**
@@ -59,28 +84,32 @@ export function GuidedSectionActionFooter({
   className,
   centeredActions = true,
   hideSectionMeta = false,
+  variant = "inline",
 }: SectionFooterProps) {
   if (!isActive) return null;
   const actionRow = Children.toArray(children).filter(
     (c) => c != null && typeof c !== "boolean",
   );
   if (actionRow.length === 0) return null;
+  const isDock = variant === "dock";
   return (
     <div
       className={cn(
-        "mt-6 border-t border-white/[0.08] pt-5",
+        isDock
+          ? guidedOnboardingActionDockAttachedClass
+          : "mt-6 border-t border-white/[0.08] pt-5",
         className,
       )}
     >
       {!hideSectionMeta && (sectionLabel || sectionProgress) ? (
         <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-2">
           {sectionLabel ? (
-            <p className="text-xs font-medium text-slate-300">{sectionLabel}</p>
+            <p className="text-xs font-medium text-slate-100">{sectionLabel}</p>
           ) : (
             <span />
           )}
           {sectionProgress ? (
-            <span className="shrink-0 text-[11px] text-slate-500 tabular-nums">
+            <span className="shrink-0 text-[11px] text-slate-300 tabular-nums">
               {sectionProgress}
             </span>
           ) : null}
@@ -88,9 +117,11 @@ export function GuidedSectionActionFooter({
       ) : null}
       <div
         className={cn(
-          centeredActions
-            ? "flex w-full min-w-0 flex-row flex-wrap items-center justify-center gap-3"
-            : "flex max-w-full flex-row flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:thin]",
+          isDock
+            ? "flex w-full min-w-0 flex-col items-center justify-center gap-3"
+            : centeredActions
+              ? "flex w-full min-w-0 flex-row flex-wrap items-center justify-center gap-3"
+              : "flex max-w-full flex-row flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:thin]",
         )}
       >
         {actionRow}

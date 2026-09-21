@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/typography";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
+import { commitOnboardingEventIsRooms } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
 import { roomService } from "@/services/vendor/onboarding/room.service";
 import { Accept } from "react-dropzone";
 import GalleryUploader from "./gallery-uploader";
@@ -556,6 +557,7 @@ const StepFour = () => {
           });
 
         if (response?.status) {
+            commitOnboardingEventIsRooms(true, eventId);
             setDeleteGalleryIds([]);
             const currentMultiSpace = globalForm.getValues("multiSpace");
             if (currentMultiSpace) {
@@ -615,6 +617,7 @@ const StepFour = () => {
           replace_gallery: number[];
         });
         if (response?.status) {
+          commitOnboardingEventIsRooms(false, eventId);
           setDeleteGalleryIds([]);
           globalForm.setValue("stepFour", payload);
           const responseData = response.data as unknown as {

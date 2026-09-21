@@ -30,6 +30,7 @@ import { AdminHomePageSection } from "./admin-home-page-section";
 import { InfoPagesTab } from "./info-pages-tab";
 import { SectionCard } from "../ui/section-card";
 import { VideoFormatInfo } from "@/components/shared/video-format-info";
+import { MAX_VIDEO_SIZE_BYTES, MAX_VIDEO_SIZE_MB } from "@/utils/video-validator";
 import { addCacheBusting } from "@/lib/image-utils";
 import { LocationIndicator } from "@/components/location-indicator";
 import { MapPin } from "lucide-react";
@@ -507,7 +508,7 @@ export function BrandingTab({
     try {
       // Validate video compatibility
       const { validateVideo } = await import("@/utils/video-validator");
-      const validation = await validateVideo(file, 10);
+      const validation = await validateVideo(file);
 
       if (!validation.isValid) {
         const toast = (await import("sonner")).toast;
@@ -1143,7 +1144,7 @@ export function BrandingTab({
                       <FormLabel>Banner Video</FormLabel>
                       <FormDescription>
                         Upload a video for your landing page banner (MP4 format,
-                        max 10MB)
+                        max {MAX_VIDEO_SIZE_MB}MB)
                       </FormDescription>
                       <FormControl>
                         <div className="space-y-4">
@@ -1178,7 +1179,7 @@ export function BrandingTab({
                                 value={landingPageVideoFiles}
                                 onValueChange={handleLandingPageVideoChange}
                                 maxFileCount={1}
-                                maxSize={10 * 1024 * 1024} // 10MB for banner video
+                                maxSize={MAX_VIDEO_SIZE_BYTES}
                                 onRemove={handleRemoveLandingPageVideo}
                                 disabled={readOnly}
                                 accept={{

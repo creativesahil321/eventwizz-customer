@@ -21,7 +21,10 @@ import {
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { locationDisplayName } from "@/lib/slug-short-label";
 import { ServerContext } from "@/lib/server-context";
-import { useIsPreviewMode } from "@/contexts/preview-context";
+import {
+  useIsPreviewMode,
+  usePreviewLocationNavigation,
+} from "@/contexts/preview-context";
 import CommonHeader from "@/components/shared/common-header";
 import { LocationMarketingBody } from "@/components/public/location-marketing-sections";
 import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
@@ -40,6 +43,7 @@ import {
   LocationPageHeroSearch,
   useLocationPageSearch,
 } from "./location-page-hero-search";
+import { resolveVendorHasMultipleLocations } from "./_lib/search-filters";
 
 export type LocationPagePreviewEdit = {
   onEditCover?: () => void;
@@ -86,6 +90,13 @@ type LocationPageViewProps = {
   footerBrandDescription?: string | null;
   /** Onboarding / editor preview: click a region to jump to the matching form. */
   previewEdit?: LocationPagePreviewEdit;
+  /**
+   * When set, drives the hero search placeholder. Omit on live pages to
+   * derive from listed venues (`theme.locations` / preview location list).
+   * Do not pass onboarding `has_multiple_locations` — that flag is brand mode,
+   * not “this vendor already has 2+ venues”.
+   */
+  hasMultipleLocations?: boolean;
 };
 
 /**
@@ -110,9 +121,11 @@ export function LocationPageView({
   footerSocialLinksOverride,
   footerBrandDescription,
   previewEdit,
+  hasMultipleLocations,
 }: LocationPageViewProps) {
   const { theme } = useContext(ServerContext) || { theme: null };
   const isPreviewMode = useIsPreviewMode();
+  const { previewLocations } = usePreviewLocationNavigation();
   const liveTheme = theme as ThemeSchema | null;
   const latestEvents = locationData.latest_events || [];
   const upcomingEvents = locationData.upcoming_events || [];
@@ -176,6 +189,29 @@ export function LocationPageView({
     isLoading: isSearchLoading,
     isError: isSearchError,
   });
+  const listedLocationCount = useMemo(() => {
+    if (previewLocations && previewLocations.length > 0) {
+      return previewLocations.length;
+    }
+    // Previews must not inherit the host/vendor theme location list.
+    if (forcePreviewSearch || isPreviewMode) {
+      return footerContactTheme?.locations?.length ?? 0;
+    }
+    return (
+      liveTheme?.locations?.length ?? footerContactTheme?.locations?.length ?? 0
+    );
+  }, [
+    previewLocations,
+    forcePreviewSearch,
+    isPreviewMode,
+    footerContactTheme?.locations?.length,
+    liveTheme?.locations?.length,
+  ]);
+  const isMultiLocationVendor = resolveVendorHasMultipleLocations(
+    listedLocationCount,
+    hasMultipleLocations,
+  );
+
   const searchBar = (
     <LocationPageHeroSearch
       cityLabel={cityLabel || null}
@@ -187,6 +223,7 @@ export function LocationPageView({
         scrollToEvents();
       }}
       enableAvailability={useApi}
+      hasMultipleLocations={isMultiLocationVendor}
     />
   );
 

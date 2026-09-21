@@ -156,6 +156,7 @@ export default function WelcomeLocationSelectionPage() {
                 src={logoSrc}
                 alt={appConfig.name}
                 className="h-10 w-auto max-w-[180px] object-contain"
+                chrome="light-panel"
               />
             </Link>
           </header>
@@ -285,6 +286,7 @@ export default function WelcomeLocationSelectionPage() {
               src={logoSrc}
               alt={appConfig.name}
               className="h-8 w-auto max-w-[120px] object-contain"
+              chrome="light-panel"
             />
           </Link>
 

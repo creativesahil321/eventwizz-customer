@@ -48,7 +48,7 @@ const VENDOR_PAGES: Array<{ prefix: string; label: string; hints?: string }> = [
   { prefix: "/vendor/support", label: "Support" },
   { prefix: "/vendor/dispute-resolution", label: "Dispute Resolution" },
   { prefix: "/vendor/payment-settings", label: "Payment Settings" },
-  { prefix: "/vendor/domain-settings", label: "Domain Settings" },
+  { prefix: "/vendor/domain-settings", label: "Business Settings" },
   { prefix: "/vendor/profile", label: "Profile" },
   { prefix: "/vendor/settings", label: "Settings" },
 ];

@@ -1114,6 +1114,7 @@ export default function FormPreview() {
             stickyTop={sectionNavStickyTop}
             headerOffsetPx={HEADER_OFFSET_PX}
             scrollContainerRef={previewContainerRef}
+            bookNowId={EVENT_SECTION_IDS.dates}
             onItemClick={(id) => {
               const target = PREVIEW_SECTION_EDITOR[id];
               if (!target) return;

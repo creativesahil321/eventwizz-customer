@@ -38,8 +38,9 @@ const NAV_RULES: NavRule[] = [
   },
   {
     id: "domain",
-    pattern: /\b(domain|subdomain|custom domain|vat|verify domain)\b/i,
-    vendor: { href: "/vendor/domain-settings", label: "Open Domain Settings" },
+    pattern:
+      /\b(vat|business verification|verify (my )?business|business settings)\b/i,
+    vendor: { href: "/vendor/domain-settings", label: "Open Business Settings" },
     requiredPermission: "read-site-essential",
   },
   {
@@ -425,7 +426,7 @@ export function getAllowedNavLinksForPrompt(audience: ChatNavAudience): string {
 
     if (canAccess("read-account")) lines.push("- Payment gateway / Stripe / PayPal → [Open Payment Settings](/vendor/payment-settings)");
     if (canAccess("read-site-essential")) lines.push("- Logo, colours, fonts, SEO, home/location/info pages, theme → [Open Sites Essentials](/vendor/sites-essentials)");
-    if (canAccess("read-site-essential")) lines.push("- Domain / subdomain → [Open Domain Settings](/vendor/domain-settings)");
+    if (canAccess("read-site-essential")) lines.push("- VAT / business verification → [Open Business Settings](/vendor/domain-settings)");
     if (canAccess("read-event")) lines.push("- Events, dates, tickets, tables, turn on invoice QR (Finalise → Door entry QR) → [Open Events](/vendor/events)");
     if (canAccess("read-booking")) lines.push("- Bookings → [Open Bookings](/vendor/booking-history)");
     if (canAccess("read-booking")) lines.push("- Door scan / scan invoice QR at the door → [Open Door Scan](/vendor/door-scan)");

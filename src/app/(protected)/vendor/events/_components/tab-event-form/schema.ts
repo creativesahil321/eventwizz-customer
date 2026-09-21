@@ -32,6 +32,10 @@ import {
   isEventDateBeforeMinimum,
 } from "@/lib/min-event-date";
 import {
+  DUPLICATE_EVENT_DATE_MESSAGE,
+  duplicateEventDateIndexes,
+} from "@/lib/event-dates-sort";
+import {
   DUPLICATE_MENU_CATEGORY_MESSAGE,
   duplicateMenuCategoryIndexes,
 } from "@/lib/event-menu-categories";
@@ -854,19 +858,17 @@ export const stepThreeSchema = z
           });
         }
       }
-      const eventDates = dates.map((d) => d.event_date).filter(Boolean);
-      const seen = new Set<string>();
-      for (let i = 0; i < eventDates.length; i++) {
-        if (seen.has(eventDates[i])) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Duplicate event dates are not allowed. Each date must be unique.",
-            path: [...pathPrefix, i, "event_date"],
-          });
-          return;
-        }
-        seen.add(eventDates[i]);
+      const duplicateIndexes = duplicateEventDateIndexes(dates, {
+        skipIndex: (index) => isVendorDateCancelled(dates[index]),
+      });
+      for (const i of duplicateIndexes) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: DUPLICATE_EVENT_DATE_MESSAGE,
+          path: [...pathPrefix, i, "event_date"],
+        });
       }
+      const eventDates = dates.map((d) => d.event_date).filter(Boolean);
       for (let i = 0; i < eventDates.length - 1; i++) {
         const a = new Date(eventDates[i] + "T00:00:00").getTime();
         const b = new Date(eventDates[i + 1] + "T00:00:00").getTime();

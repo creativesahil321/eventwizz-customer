@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
+import { eventCarouselNavButtonClass } from "./event-carousel-classes";
 
 type EventListingHorizontalScrollProps = {
   children: ReactNode;
@@ -40,6 +41,7 @@ export function EventListingHorizontalScroll({
   rightButtonClassName,
   scrollAmount = 300,
 }: EventListingHorizontalScrollProps) {
+  const arrowClass = eventCarouselNavButtonClass("shrink-0");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -190,14 +192,29 @@ export function EventListingHorizontalScroll({
   } as CSSProperties;
 
   return (
-    <div className={cn("relative w-full min-w-0", className)}>
+    <div className={cn("flex w-full min-w-0 items-center gap-2 sm:gap-3", className)}>
+      {showArrows ? (
+        <button
+          type="button"
+          onClick={() => scroll("left")}
+          disabled={!canScrollLeft}
+          className={cn(
+            arrowClass,
+            leftButtonClassName,
+            !canScrollLeft && "invisible pointer-events-none",
+          )}
+          aria-label="Scroll left"
+        >
+          <ChevronLeft size={18} strokeWidth={2.5} />
+        </button>
+      ) : null}
+
       <div
         ref={scrollContainerRef}
         style={slotStyle}
         className={cn(
-          "no-scrollbar relative z-[1] flex min-w-0 cursor-grab select-none items-stretch gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain py-1 [-webkit-overflow-scrolling:touch] sm:gap-5",
+          "no-scrollbar relative z-[1] flex min-w-0 flex-1 cursor-grab select-none items-stretch gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain py-1 [-webkit-overflow-scrolling:touch] sm:gap-5",
           "snap-x snap-mandatory scroll-smooth",
-          showArrows && "px-11 sm:px-12",
           !showArrows && "justify-center",
         )}
         onMouseDown={handleMouseDown}
@@ -211,28 +228,12 @@ export function EventListingHorizontalScroll({
       {showArrows ? (
         <button
           type="button"
-          onClick={() => scroll("left")}
-          disabled={!canScrollLeft}
-          className={cn(
-            leftButtonClassName,
-            "z-20",
-            !canScrollLeft && "pointer-events-none opacity-30",
-          )}
-          aria-label="Scroll left"
-        >
-          <ChevronLeft size={18} strokeWidth={2.5} />
-        </button>
-      ) : null}
-
-      {showArrows ? (
-        <button
-          type="button"
           onClick={() => scroll("right")}
           disabled={!canScrollRight}
           className={cn(
+            arrowClass,
             rightButtonClassName,
-            "z-20",
-            !canScrollRight && "pointer-events-none opacity-30",
+            !canScrollRight && "invisible pointer-events-none",
           )}
           aria-label="Scroll right"
         >

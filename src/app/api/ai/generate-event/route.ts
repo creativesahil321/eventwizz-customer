@@ -26,6 +26,7 @@ import {
   ensureOnboardingDates,
   hasUsableOnboardingDates,
   normalizeAIDatePaymentFields,
+  uniqueAiDatesByEventDate,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import {
   AI_EVENT_MAX_ROOMS,
@@ -362,20 +363,10 @@ export async function POST(req: NextRequest) {
             deposit_due_date: isTablesOrBoth && isDepositEnabled && date.deposit_due_date ? String(date.deposit_due_date) : "",
           };
         });
-        // Sort by event_date ascending and remove duplicates
-        const seen = new Set<string>();
-        content.stepThree.dates = content.stepThree.dates
-          .sort(
-            (a, b) =>
-              new Date(a.event_date + "T00:00:00").getTime() -
-              new Date(b.event_date + "T00:00:00").getTime()
-          )
-          .filter((d) => {
-            if (!d.event_date || seen.has(d.event_date)) return false;
-            seen.add(d.event_date);
-            return true;
-          })
-          .map((d) => normalizeAIDatePaymentFields(d as AIDate) as AIEventDate);
+        // Sort by event_date ascending and keep one object per calendar day
+        content.stepThree.dates = uniqueAiDatesByEventDate(
+          content.stepThree.dates as AIDate[],
+        ).map((d) => normalizeAIDatePaymentFields(d) as AIEventDate);
 
         if (vendorHints.prefersTicketsOnly) {
           content.stepThree.dates = applyTicketsOnlyToDates(

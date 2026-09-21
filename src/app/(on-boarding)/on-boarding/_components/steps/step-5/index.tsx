@@ -6,7 +6,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { useForm, useFieldArray, Resolver, useWatch } from "react-hook-form";
+import { useForm, useFieldArray, Resolver, useWatch, useFormState } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +35,12 @@ import { CardContent, CardHeader } from "@/components/ui/card";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { DateRowErrorCue } from "@/components/date-row-error-cue";
+import { cn } from "@/lib/utils";
+import {
+  firstReactHookFormMessage,
+  getDateRowErrorNode,
+} from "@/app/(protected)/vendor/events/_lib/date-row-form-errors";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   getDefaultDate,
@@ -220,6 +226,11 @@ export default function StepFive() {
     } as StepFiveType,
     mode: "onChange",
   });
+  const { errors: dateFormErrors } = useFormState({
+    control: form.control,
+    name: "dates",
+  });
+  const datesFieldErrors = dateFormErrors.dates;
 
   // Update form when eventId changes
   useEffect(() => {
@@ -1273,34 +1284,61 @@ export default function StepFive() {
       const safeDepositType = normalizeDepositType(
         form.watch(`dates.${dateIndex}.deposit_type`),
       );
+      const rowErrorMessage = firstReactHookFormMessage(
+        getDateRowErrorNode(datesFieldErrors, dateIndex),
+      );
 
       return (
         <div
           key={dateRowId}
-          className="mb-4 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] transition-colors hover:border-white/15"
+          data-date-row-error={rowErrorMessage ? "true" : undefined}
+          className={cn(
+            "mb-4 overflow-hidden rounded-xl border bg-white/[0.02] transition-colors",
+            rowErrorMessage
+              ? "border-red-400/70 hover:border-red-400"
+              : "border-white/10 hover:border-white/15",
+          )}
         >
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5 sm:py-3.5">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenAccordions((prev) =>
-                    isOpen
-                      ? prev.filter((item) => item !== dateRowId)
-                      : [...prev, dateRowId],
-                  );
-                }}
-                className="flex min-w-0 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary,#3b82f6)]"
-              >
-                {isOpen ? (
-                  <ChevronDown className="h-5 w-5" />
-                ) : (
-                  <ChevronRight className="h-5 w-5" />
-                )}
-                <h3 className="text-base font-semibold sm:text-lg">
-                  {formatDateDisplay(dateValue)}
-                </h3>
-              </button>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenAccordions((prev) =>
+                      isOpen
+                        ? prev.filter((item) => item !== dateRowId)
+                        : [...prev, dateRowId],
+                    );
+                  }}
+                  className="flex min-w-0 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary,#3b82f6)]"
+                >
+                  {isOpen ? (
+                    <ChevronDown className="h-5 w-5 shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 shrink-0" />
+                  )}
+                  <h3
+                    className={cn(
+                      "text-base font-semibold sm:text-lg",
+                      rowErrorMessage && "text-red-200",
+                    )}
+                  >
+                    {formatDateDisplay(dateValue)}
+                  </h3>
+                </button>
+                {rowErrorMessage ? (
+                  <DateRowErrorCue message={rowErrorMessage} />
+                ) : null}
+              </div>
+              {!isOpen && rowErrorMessage ? (
+                <p
+                  role="alert"
+                  className="pl-7 text-xs font-medium leading-snug text-destructive"
+                >
+                  {rowErrorMessage}
+                </p>
+              ) : null}
             </div>
             {dateFields.length > 1 && (
               <Button
@@ -1316,8 +1354,12 @@ export default function StepFive() {
             )}
           </div>
 
-          {isOpen && (
-            <div className="space-y-5 px-4 py-5 sm:px-5">
+          <div
+            className={cn(
+              "space-y-5 px-4 py-5 sm:px-5",
+              !isOpen && "hidden",
+            )}
+          >
               <div className="grid grid-cols-1 gap-5">
                 <FormField
                   control={form.control}
@@ -1664,8 +1706,7 @@ export default function StepFive() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
+          </div>
 
           {/* Duplicate Date Button */}
           <div className="mt-3 flex justify-end border-t border-white/10 px-4 pb-1 pt-3 sm:px-5">
@@ -1697,6 +1738,7 @@ export default function StepFive() {
       createTableFields,
       createTicketFields,
       dateFields.length,
+      datesFieldErrors,
       form,
       handleFieldFocus,
       openAccordions,
@@ -1705,60 +1747,84 @@ export default function StepFive() {
     ],
   );
 
+  const applyDateValidationFeedback = useCallback((): boolean => {
+    const syncedDates = syncDatesFromFieldPaths(form.getValues("dates"));
+    const validation = stepFiveSchema.safeParse({
+      step: 5 as const,
+      event_id: eventId,
+      dates: syncedDates,
+    });
+
+    if (validation.success) {
+      form.clearErrors("dates");
+      return true;
+    }
+
+    form.clearErrors("dates");
+    validation.error.issues.forEach((issue) => {
+      if (issue.path[0] !== "dates") return;
+      form.setError(issue.path.join(".") as never, {
+        type: "manual",
+        message: issue.message,
+      });
+    });
+
+    const dateErrors: string[] = [];
+    const errorRowIds: string[] = [];
+    const FIELD_LABELS: Record<string, string> = {
+      event_date: "event date",
+      booking_type: "booking type",
+      payment_type: "payment type",
+      deposit_type: "deposit type",
+      deposit_value: "deposit amount",
+      deposit_due_date: "balance due date",
+      tickets: "ticket info",
+      tables: "table info",
+    };
+
+    validation.error.issues.forEach((issue) => {
+      if (issue.path[0] !== "dates" || typeof issue.path[1] !== "number") {
+        return;
+      }
+      const fieldKey = String(issue.path[2] ?? "general");
+      const label = FIELD_LABELS[fieldKey] ?? fieldKey.replace(/_/g, " ");
+      dateErrors.push(`Date ${issue.path[1] + 1}: ${label}`);
+      const rowId = dateFields[issue.path[1]]?.id;
+      if (rowId) errorRowIds.push(rowId);
+    });
+
+    toast.error(
+      dateErrors.length > 0
+        ? `Please fix — ${Array.from(new Set(dateErrors)).join(" | ")}`
+        : "Please complete all date entries before saving",
+    );
+
+    if (errorRowIds.length > 0) {
+      setOpenAccordions((prev) => {
+        const next = new Set(prev);
+        for (const id of errorRowIds) next.add(id);
+        return [...next];
+      });
+      requestAnimationFrame(() => {
+        document
+          .querySelector("[data-date-row-error='true']")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+
+    return false;
+  }, [dateFields, eventId, form, syncDatesFromFieldPaths]);
+
   const handleSubmit = async (applyToAllRooms = false) => {
     setLoading(true);
     try {
-      const formData = form.getValues();
-      const syncedDates = syncDatesFromFieldPaths(formData.dates);
-      const validationPayload = {
-        step: 5 as const,
-        event_id: eventId,
-        dates: syncedDates,
-      };
-
-      const validation = stepFiveSchema.safeParse(validationPayload);
-
-      if (!validation.success) {
-        form.clearErrors("dates");
-        validation.error.issues.forEach((issue) => {
-          if (issue.path[0] !== "dates") return;
-          const fieldPath = issue.path.join(".");
-          form.setError(fieldPath as never, {
-            type: "manual",
-            message: issue.message,
-          });
-        });
-
-        const dateErrors: string[] = [];
-        const FIELD_LABELS: Record<string, string> = {
-          event_date: "event date",
-          booking_type: "booking type",
-          payment_type: "payment type",
-          deposit_type: "deposit type",
-          deposit_value: "deposit amount",
-          deposit_due_date: "balance due date",
-          tickets: "ticket info",
-          tables: "table info",
-        };
-
-        validation.error.issues.forEach((issue) => {
-          if (issue.path[0] !== "dates" || typeof issue.path[1] !== "number") {
-            return;
-          }
-          const fieldKey = String(issue.path[2] ?? "general");
-          const label = FIELD_LABELS[fieldKey] ?? fieldKey.replace(/_/g, " ");
-          dateErrors.push(`Date ${issue.path[1] + 1}: ${label}`);
-        });
-
-        toast.error(
-          dateErrors.length > 0
-            ? `Please fix — ${Array.from(new Set(dateErrors)).join(" | ")}`
-            : "Please complete all date entries before saving",
-        );
-
+      if (!applyDateValidationFeedback()) {
         setLoading(false);
         return;
       }
+
+      const formData = form.getValues();
+      const syncedDates = syncDatesFromFieldPaths(formData.dates);
 
       form.clearErrors("dates");
       form.setValue("dates", syncedDates, { shouldValidate: false });
@@ -1843,6 +1909,7 @@ export default function StepFive() {
                 chipDescription="Set dates, booking type, and pricing for each slot."
                 persistenceHydrated={persistedProgressHydrated}
                 persistedStepApproved={stepFivePersistedApproved}
+                validateFullStep={applyDateValidationFeedback}
                 renderFooter={({ guided }) => (
                   <GuidedWholeStepBottomActions
                     guided={guided}

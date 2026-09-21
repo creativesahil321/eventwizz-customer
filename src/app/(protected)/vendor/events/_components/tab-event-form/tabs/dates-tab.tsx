@@ -35,6 +35,7 @@ import {
   syncStepThreeRoomsFromStepTwo,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
 import { hasSchedulableVendorDates } from "@/app/(protected)/vendor/events/_lib/vendor-dates-publish";
+import { DateRowErrorCue } from "@/components/date-row-error-cue";
 import {
   firstDateRowErrorIndex,
   firstReactHookFormMessage,
@@ -1283,6 +1284,9 @@ export default function DatesTab() {
                         Cancelled
                       </span>
                     )}
+                    {rowErrorMessage ? (
+                      <DateRowErrorCue message={rowErrorMessage} />
+                    ) : null}
                   </span>
                   {!isOpen && rowErrorMessage ? (
                     <span

@@ -445,7 +445,7 @@ function HeroMetaItem({
       <span className="inline-flex min-w-0 max-w-full items-center gap-2">
         <Icon className="h-4 w-4 shrink-0" aria-hidden />
         <span
-          className="min-w-0 max-w-[min(70vw,24rem)] truncate"
+          className="min-w-0 max-w-[min(70vw,28rem)] whitespace-normal break-words text-left leading-snug [overflow-wrap:anywhere] sm:line-clamp-2"
           title={label}
         >
           {label}
@@ -466,7 +466,7 @@ function HeroMetaItem({
       className="group/meta inline-flex min-w-0 max-w-full items-center gap-2 rounded-full px-1.5 py-0.5 text-left transition-colors hover:bg-white/15"
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
-      <span className="min-w-0 max-w-[min(70vw,24rem)] truncate" title={label}>
+      <span className="min-w-0 max-w-[min(70vw,28rem)] whitespace-normal break-words text-left leading-snug [overflow-wrap:anywhere] sm:line-clamp-2" title={label}>
         {label}
       </span>
       <Pencil className="h-3 w-3 shrink-0 opacity-70 transition-opacity group-hover/meta:opacity-100" />

@@ -123,7 +123,7 @@ export function LocationEventHeroCard({
             {placeLabel ? (
               <span className="inline-flex min-w-0 items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
-                <span className="truncate">{placeLabel}</span>
+                <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] line-clamp-2">{placeLabel}</span>
               </span>
             ) : null}
           </div>
@@ -131,7 +131,7 @@ export function LocationEventHeroCard({
         {!event.dateLabel && !event.timeLabel && placeLabel ? (
           <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
             <MapPin className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
-            <span className="truncate">{placeLabel}</span>
+            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] line-clamp-2">{placeLabel}</span>
           </div>
         ) : null}
       </div>

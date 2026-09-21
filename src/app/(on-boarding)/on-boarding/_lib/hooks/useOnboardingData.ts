@@ -7,26 +7,23 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { request } from "@/services/core/api-client";
-import { API_ENDPOINTS } from "@/services/core/endpoints";
 import {
   ApiResponse,
   OnboardingApiResponse,
 } from "@/services/vendor/onboarding/type";
-import { OnboardingFormData } from "../../_components/form-provider/schema";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocationStore } from "@/store/location.store";
 import { VenueLocation } from "@/types/api.types";
 import { recoverFromOnboardingAlreadyCompleted } from "@/lib/onboarding-completion";
+import { writeOnboardingSavedIsRoomsFlag } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
+import { buildOnboardingStepsUrl } from "../onboarding-steps-url";
 
-// Define query key for onboarding data
 export const onboardingKeys = {
   all: ["onboarding"] as const,
-  data: (isRooms: boolean | "unknown") =>
-    [...onboardingKeys.all, "data", isRooms] as const,
+  data: () => [...onboardingKeys.all, "data", "saved"] as const,
 };
 
-const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
 const ONBOARDING_DATA_CHANGED = "onboarding-data-changed";
 
 /** Prevents duplicate NextAuth csrf/session when sync effect re-runs with a stale session snapshot. */
@@ -72,14 +69,6 @@ function detachOnboardingDataChangedListener() {
   onboardingDataChangedHandler = null;
 }
 
-function readIsRoomsFlag(): boolean | undefined {
-  if (typeof window === "undefined") return undefined;
-  const raw = sessionStorage.getItem(ONBOARDING_IS_ROOMS_STORAGE_KEY);
-  if (raw === "true") return true;
-  if (raw === "false") return false;
-  return undefined;
-}
-
 function coerceIsRoomsFlag(value: unknown): boolean | undefined {
   if (value === true || value === false) return value;
   if (value === 1 || value === "1" || value === "true") return true;
@@ -87,11 +76,37 @@ function coerceIsRoomsFlag(value: unknown): boolean | undefined {
   return undefined;
 }
 
-// Function to fetch onboarding data
+async function fetchOnboardingStepsByUrl(
+  url: string,
+  headers: Record<string, string>,
+): Promise<ApiResponse | null> {
+  const response = await request<ApiResponse>({
+    url,
+    method: "GET",
+    headers,
+    returnFullResponse: true,
+  });
+
+  if (!response.status) return null;
+
+  if (!response.data) {
+    return {
+      status: true,
+      message: "Success but no data",
+      data: {} as OnboardingApiResponse,
+    };
+  }
+
+  return {
+    status: true,
+    message: response.message || "Success",
+    data: response.data as unknown as OnboardingApiResponse,
+  };
+}
+
 async function fetchOnboardingData(
   token: string,
   locationId: string,
-  isRooms?: boolean,
 ): Promise<ApiResponse | null> {
   if (!token || !locationId) {
     console.warn("Missing token or locationId for onboarding data fetch:", {
@@ -101,7 +116,6 @@ async function fetchOnboardingData(
     return null;
   }
 
-  // Additional validation to prevent null/undefined locationId
   if (
     locationId === "null" ||
     locationId === "undefined" ||
@@ -117,53 +131,30 @@ async function fetchOnboardingData(
   };
 
   try {
-    const fetchByMode = async (roomsMode: boolean) =>
-      request<ApiResponse>({
-        url: API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
-          "{location_id}",
-          locationId,
-        ).replace("{is_rooms}", roomsMode ? "true" : "false"),
-        method: "GET",
+    try {
+      const saved = await fetchOnboardingStepsByUrl(
+        buildOnboardingStepsUrl(locationId),
         headers,
-        returnFullResponse: true,
-      });
-
-    const response =
-      typeof isRooms === "boolean"
-        ? await fetchByMode(isRooms)
-        : await (() => {
-            // Unknown mode: probe rooms first, then fallback.
-            return fetchByMode(true).then((roomsRes) =>
-              roomsRes?.status ? roomsRes : fetchByMode(false),
-            );
-          })();
-
-    if (response.status) {
-      if (!response.data) {
-        return {
-          status: true,
-          message: "Success but no data",
-          data: {} as OnboardingApiResponse,
-        };
-      }
-      const data = response.data as unknown as OnboardingFormData;
-
-      return {
-        status: true,
-        message: response.message || "Success",
-        data: data as unknown as OnboardingApiResponse,
-      };
+      );
+      if (saved) return saved;
+    } catch {
+      // Saved path missing; preview URLs are last-resort compatibility only.
     }
 
-    return null;
+    const roomsPreview = await fetchOnboardingStepsByUrl(
+      buildOnboardingStepsUrl(locationId, true),
+      headers,
+    );
+    if (roomsPreview) return roomsPreview;
+    return fetchOnboardingStepsByUrl(
+      buildOnboardingStepsUrl(locationId, false),
+      headers,
+    );
   } catch (err: unknown) {
     console.error("Error fetching onboarding data:", err);
-
-    // Log additional details for debugging
     if (err && typeof err === "object" && "response" in err) {
       console.error("API Error details:", err);
     }
-
     return null;
   }
 }
@@ -173,23 +164,14 @@ export function useOnboardingData() {
   const queryClient = useQueryClient();
   const token = session?.user?.token;
   const { setLocations, setSelectedLocation } = useLocationStore();
-  const [isRoomsFlag, setIsRoomsFlag] = useState<boolean | undefined>(() =>
-    readIsRoomsFlag(),
-  );
 
-  // Get locationId from session
   const locationId = session?.user?.vendor_location_id?.toString();
 
-  // Validate locationId before making the query
   const isValidLocationId =
     locationId &&
     locationId !== "null" &&
     locationId !== "undefined" &&
     locationId !== "";
-
-  const syncIsRoomsFlagFromStorage = useCallback(() => {
-    setIsRoomsFlag(readIsRoomsFlag());
-  }, []);
 
   const {
     data: onboardingData,
@@ -198,37 +180,21 @@ export function useOnboardingData() {
     error,
     refetch,
   } = useQuery({
-    queryKey: onboardingKeys.data(isRoomsFlag ?? "unknown"),
+    queryKey: onboardingKeys.data(),
     queryFn: () =>
-      fetchOnboardingData(token as string, locationId as string, isRoomsFlag),
+      fetchOnboardingData(token as string, locationId as string),
     enabled: !!token && !!isValidLocationId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
 
-  // Sync location data from persistence API to Zustand store and session
   useEffect(() => {
     if (!onboardingData?.data) return;
 
     const payload = onboardingData.data as unknown as Record<string, unknown>;
     const persistedIsRooms = coerceIsRoomsFlag(payload.is_rooms);
-    if (
-      typeof persistedIsRooms === "boolean" &&
-      persistedIsRooms !== isRoomsFlag
-    ) {
-      // Reuse current payload under the corrected key — avoids a second GET
-      // when flipping from "unknown" → true/false after the first response.
-      queryClient.setQueryData(
-        onboardingKeys.data(persistedIsRooms),
-        onboardingData,
-      );
-      setIsRoomsFlag(persistedIsRooms);
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(
-          ONBOARDING_IS_ROOMS_STORAGE_KEY,
-          persistedIsRooms ? "true" : "false",
-        );
-      }
+    if (typeof persistedIsRooms === "boolean") {
+      writeOnboardingSavedIsRoomsFlag(persistedIsRooms);
     }
 
     const syncData = async () => {
@@ -348,7 +314,7 @@ export function useOnboardingData() {
     // Call the async function
     syncData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboardingData, isRoomsFlag]);
+  }, [onboardingData]);
 
   // Mutation for invalidating the cache after form submissions
   const invalidateCache = useMutation({
@@ -365,25 +331,6 @@ export function useOnboardingData() {
     attachOnboardingDataChangedListener(queryClient);
     return () => detachOnboardingDataChangedListener();
   }, [queryClient]);
-
-  // Keep is_rooms flag in sync when another tab/window updates storage
-  useEffect(() => {
-    window.addEventListener("storage", syncIsRoomsFlagFromStorage);
-    return () => {
-      window.removeEventListener("storage", syncIsRoomsFlagFromStorage);
-    };
-  }, [syncIsRoomsFlagFromStorage]);
-
-  // Also sync rooms flag when notify fires (listener only invalidates queries)
-  useEffect(() => {
-    const handleDataChanged = () => {
-      syncIsRoomsFlagFromStorage();
-    };
-    window.addEventListener(ONBOARDING_DATA_CHANGED, handleDataChanged);
-    return () => {
-      window.removeEventListener(ONBOARDING_DATA_CHANGED, handleDataChanged);
-    };
-  }, [syncIsRoomsFlagFromStorage]);
 
   return {
     onboardingData,

@@ -70,6 +70,9 @@ export const API_ENDPOINTS = {
     ONBOARDING: {
       STEPS: "/vendor/onboarding/store",
       CHECK_BRAND_NAME: "/vendor/onboarding/check-brand-name",
+      /** Saved event `is_rooms` — no preview override. */
+      GET_SAVED_STEPS: "/vendor/onboarding/steps/{location_id}",
+      /** Preview only: `/true` or `/false` does not commit event `is_rooms`. */
       GET_ALL_STEPS: "/vendor/onboarding/steps/{location_id}/{is_rooms}",
       PAYMENT_GATEWAYS: "/vendor/onboarding/payment-gateway-connect",
       PAYMENT_RETURN: "/vendor/onboarding/return",

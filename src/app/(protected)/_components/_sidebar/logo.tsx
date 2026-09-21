@@ -50,6 +50,7 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
               width={32}
               height={32}
               className="h-8 w-8 scale-[1.15] rounded-md object-contain"
+              chrome="light-panel"
             />
           </Link>
         ) : (
@@ -58,6 +59,7 @@ const Logo: React.FC<LogoProps> = ({ collapsed }) => {
               src={addCacheBusting(logoPath)}
               alt={brandName}
               className="h-8 w-auto"
+              chrome="light-panel"
             />
           </Link>
         )}

@@ -10,6 +10,7 @@ import {
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { sanitizeOnboardingMenusForSubmit } from "./onboarding-catering-ready";
 import { isEventDateBeforeMinimum } from "@/lib/min-event-date";
+import { normalizeEventDateKey } from "@/lib/event-dates-sort";
 import { padMinRoomNames } from "@/lib/room-name-examples";
 import {
   buildMessyVendorEnglishRules,
@@ -186,7 +187,28 @@ function parseDayNumbers(chunk: string): number[] {
 }
 
 function uniqueIsoDates(dates: string[]): string[] {
-  return Array.from(new Set(dates)).sort();
+  return Array.from(
+    new Set(dates.map((iso) => normalizeEventDateKey(iso)).filter(Boolean)),
+  ).sort();
+}
+
+/** One date object per calendar day. Keeps the first row after sorting. */
+export function uniqueAiDatesByEventDate(
+  dates: AIDate[] | undefined,
+): AIDate[] {
+  const seen = new Set<string>();
+  return [...(dates ?? [])]
+    .filter((date) => Boolean(date) && typeof date === "object")
+    .map((date) => ({
+      ...date,
+      event_date: normalizeEventDateKey(date.event_date),
+    }))
+    .sort((a, b) => a.event_date.localeCompare(b.event_date))
+    .filter((date) => {
+      if (!date.event_date || seen.has(date.event_date)) return false;
+      seen.add(date.event_date);
+      return true;
+    });
 }
 
 export function isUsableOnboardingDate(iso: string | undefined): boolean {
@@ -405,9 +427,11 @@ export function extractVendorBookingFacts(
   return {
     eventDates: uniqueDates,
     requestedDateCount:
-      requestedDateCount && requestedDateCount >= 1 && requestedDateCount <= 12
-        ? requestedDateCount
-        : undefined,
+      uniqueDates.length > 0
+        ? undefined
+        : requestedDateCount && requestedDateCount >= 1 && requestedDateCount <= 12
+          ? requestedDateCount
+          : undefined,
     tableCount:
       tableCount && tableCount >= 1 && tableCount <= 5000 ? tableCount : undefined,
     minPersons:
@@ -450,7 +474,9 @@ export function extractVendorBookingFacts(
 }
 
 export function formatVendorFactsForPrompt(facts: VendorBookingFacts): string {
-  const lines: string[] = [];
+  const lines: string[] = [
+    `- Each calendar day may appear only once in stepFive.dates (and only once inside a single room's dates array). Same dates on all rooms means copy that unique list, not repeat days.`,
+  ];
   if (facts.eventDates.length > 0) {
     lines.push(
       `- Event dates (one stepFive date object each, YYYY-MM-DD): ${facts.eventDates.join(", ")}`,
@@ -460,7 +486,7 @@ export function formatVendorFactsForPrompt(facts: VendorBookingFacts): string {
     );
   } else if (facts.requestedDateCount) {
     lines.push(
-      `- Create exactly ${facts.requestedDateCount} future event dates (no extras)`,
+      `- Create exactly ${facts.requestedDateCount} distinct future event dates (no extras, no repeated calendar days)`,
     );
   }
   if (facts.tableCount) lines.push(`- Table inventory: ${facts.tableCount} tables`);
@@ -944,7 +970,7 @@ export function buildAiOnboardingJsonSchemaBlock(stepNineMaxFaqs: number): strin
   "stepEight": {"price_start_from":"n","price_start_from_button_text":"Book Now","location":{"title":"≤40","description":"≤160"}},
   "stepNine": {"faqs":[{"question":"≤160","answer":"≤500"}]}
 }
-Rules: one stepFive date object per vendor-listed date (otherwise 2 future dates); stepNine.faqs at most ${stepNineMaxFaqs} (prefer 5-8); empty menus/packages as []; times ascending; prices must match vendor facts when given.`;
+Rules: one stepFive date object per unique calendar day (otherwise 2 distinct future dates); never repeat event_date in the same dates array; stepNine.faqs at most ${stepNineMaxFaqs} (prefer 5-8); empty menus/packages as []; times ascending; prices must match vendor facts when given.`;
 }
 
 export function buildAiOnboardingSystemPrompt(stepNineMaxFaqs: number): string {
@@ -965,19 +991,19 @@ CRITICAL RULES:
    - booking_type "tables" or "both": payment_type REQUIRED ("full" or "deposit")
    - payment_type "full": is_deposit_enabled false; leave deposit_value and deposit_due_date empty
    - payment_type "deposit": is_deposit_enabled MUST be true; deposit_type "amount" or "percentage"; deposit_value required (percentage 20-80); deposit_due_date YYYY-MM-DD strictly BEFORE event_date
-9. stepFive dates: YYYY-MM-DD, ascending, no duplicates, tomorrow or later (not today)
+9. stepFive dates: YYYY-MM-DD, strictly ascending, tomorrow or later (not today). EACH event_date may appear ONCE in a dates array — never two objects for the same calendar day (no morning/evening split rows). If the vendor wants the same dates on every room, copy that unique list into each room; do not repeat a day inside one room's array.
 10. ROOM SYSTEM (when enabled):
    - Use EXACT room names provided (spelling/casing as given)
    - Minimum ${AI_ONBOARDING_MIN_ROOMS}, maximum ${AI_ONBOARDING_MAX_ROOMS} rooms — never invent extra rooms
    - stepFive.rooms: one entry per room_name with its own dates array — NEVER omit dates, tickets, or prices for a room
-   - If vendor says same dates/data for all rooms, use IDENTICAL dates arrays for every room
+   - If vendor says same dates/data for all rooms, copy the SAME unique dates array onto every room (never repeat a calendar day inside one array)
    - If vendor assigns different dates/tickets per room, respect that per room_name
    - stepFour content is shared style; rooms differ mainly in stepFive dates (and optional per-room notes in copy)
    - Drinks (stepSeven) and menu (stepSix) can be shared across rooms unless vendor specifies per-room differences
    - When vendor asks per-room drinks, fill stepSeven.rooms with room-specific drinks
 11. stepSix menus: [] if no catering. Drinks (stepSeven) use drinks_option like catering_option: 0 = skip (empty titles, packages []); 1 = include title, description, and at least one real package. Every menu MUST have a non-empty "name" (the category, e.g. Starters, Mains) with at least one item — never output a menu block without a category name.
 12. stepFive.dates: when room system is Yes, still provide template dates in stepFive.dates AND full stepFive.rooms
-13. VENDOR FACTS OVERRIDE DEFAULTS. If Additional Info lists dates, ticket prices, table counts, per-person prices, or a deposit %, use those exact values in stepFive. One date object per listed event date. Never invent different dates or prices when the vendor already specified them.`;
+13. VENDOR FACTS OVERRIDE DEFAULTS. If Additional Info lists dates, ticket prices, table counts, per-person prices, or a deposit %, use those exact values in stepFive. One date object per listed unique event date. Never invent different dates or prices when the vendor already specified them. Never pad a date count by repeating the same day.`;
 }
 
 export function buildAiOnboardingUserPrompt(
@@ -1014,8 +1040,8 @@ export function buildAiOnboardingUserPrompt(
       ? "Prefer tables or both booking_type where appropriate."
       : "Mix tickets and tables realistically for venue type.";
   const datesHint = hints.wantsSameDatesAllRooms
-    ? "Vendor wants SAME dates on ALL rooms — duplicate the same dates array for every room in stepFive.rooms."
-    : "Rooms may have different dates unless vendor specified otherwise.";
+    ? "Vendor wants the SAME unique date list on every room — copy that array into each stepFive.rooms entry. Never repeat event_date inside one dates array."
+    : "Rooms may have different unique dates unless vendor specified otherwise. Never repeat event_date inside one dates array.";
   const drinksHint = hints.omitDrinks
     ? "Vendor does NOT want drink packages — set stepSeven.drinks_option 0, empty titles, packages [], and the same per-room. Do not invent drinks."
     : hints.drinkRoomKeys.length > 0
@@ -1139,7 +1165,7 @@ export function applyVendorBookingFactsToDates(
     facts.requestedDateCount != null ||
     pricedDateCount > 0 ||
     facts.genericPricePerPerson != null;
-  if (!hasFacts) return dates ?? [];
+  if (!hasFacts) return uniqueAiDatesByEventDate(dates);
 
   const template = (dates && dates.length > 0 ? dates[0] : defaultOnboardingDates()[0])!;
   const minP = facts.minPersons ?? 2;
@@ -1177,31 +1203,41 @@ export function applyVendorBookingFactsToDates(
     bookingType = "tickets";
   }
 
-  let resolvedDates =
+  let resolvedDates = uniqueIsoDates(
     facts.eventDates.length > 0
       ? facts.eventDates
-      : (dates ?? []).map((d) => d.event_date).filter(Boolean);
+      : (dates ?? []).map((d) => d.event_date).filter(Boolean),
+  );
 
   if (facts.requestedDateCount && facts.eventDates.length === 0) {
     resolvedDates = resolvedDates.slice(0, facts.requestedDateCount);
     if (resolvedDates.length < facts.requestedDateCount) {
       const base = new Date();
       base.setMonth(base.getMonth() + 2);
-      resolvedDates = Array.from({ length: facts.requestedDateCount }, (_, i) => {
-        const d = new Date(base);
-        d.setDate(d.getDate() + i);
-        return d.toISOString().slice(0, 10);
-      });
+      resolvedDates = uniqueIsoDates(
+        Array.from({ length: facts.requestedDateCount }, (_, i) => {
+          const d = new Date(base);
+          d.setDate(d.getDate() + i);
+          return d.toISOString().slice(0, 10);
+        }),
+      );
     }
   }
 
   if (resolvedDates.length === 0) {
-    resolvedDates = (dates ?? []).map((d) => d.event_date).filter(Boolean);
+    resolvedDates = uniqueIsoDates(
+      (dates ?? []).map((d) => d.event_date).filter(Boolean),
+    );
   }
 
-  const byDate = new Map((dates ?? []).map((d) => [d.event_date, d]));
+  const byDate = new Map<string, AIDate>();
+  for (const date of dates ?? []) {
+    const key = normalizeEventDateKey(date.event_date);
+    if (key && !byDate.has(key)) byDate.set(key, date);
+  }
 
-  return resolvedDates.map((iso) => {
+  return uniqueAiDatesByEventDate(
+    resolvedDates.map((iso) => {
     const source = byDate.get(iso) ?? template;
     const personPrice =
       facts.pricesByDate?.[iso] ??
@@ -1299,7 +1335,8 @@ export function applyVendorBookingFactsToDates(
     }
 
     return normalizeAIDatePaymentFields(draft);
-  });
+    }),
+  );
 }
 
 export function ensureOnboardingDates(
@@ -1309,7 +1346,9 @@ export function ensureOnboardingDates(
   const seed = hasUsableOnboardingDates(dates)
     ? dates!
     : defaultOnboardingDates();
-  const next = applyVendorBookingFactsToDates(seed, facts);
+  const next = uniqueAiDatesByEventDate(
+    applyVendorBookingFactsToDates(seed, facts),
+  );
   return hasUsableOnboardingDates(next) ? next : defaultOnboardingDates();
 }
 

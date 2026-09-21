@@ -645,10 +645,13 @@
   );
 }
 .onboarding-dark .bg-amber-50 {
-  background-color: rgba(251, 191, 36, 0.1);
+  background-color: rgba(251, 191, 36, 0.15);
 }
 .onboarding-dark .border-amber-200 {
-  border-color: rgba(251, 191, 36, 0.2);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+.onboarding-dark .text-amber-950 {
+  color: #fde68a;
 }
 
 .onboarding-dark .bg-blue-100 {

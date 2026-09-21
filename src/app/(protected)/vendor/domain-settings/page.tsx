@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Globe } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { pageCardClassName } from "@/app/(protected)/_components/page-header-card";
 import { Shell } from "@/components/shell";
 import { PermissionRoute } from "@/components/permission";
@@ -20,18 +20,18 @@ export default function DomainSettingsPage() {
             {/* Page header */}
             <div className={pageCardClassName("min-w-0")}>
               <div className="flex items-center gap-2.5 title-header">
-                <Globe className="w-5 h-5 text-primary shrink-0" />
+                <Building2 className="w-5 h-5 text-primary shrink-0" />
                 <h1 className="text-xl font-bold text-foreground tracking-tight">
-                  <LocationScopedTitle title="Domain Settings" />
+                  <LocationScopedTitle title="Business Settings" />
                 </h1>
               </div>
               <p className="text-sm text-muted-foreground mt-1.5">
-                Domain and verification for this venue&apos;s public site.
-                Switch location in the header to manage another venue.
+                Verify this venue&apos;s business details. Switch location in
+                the header to manage another venue.
               </p>
             </div>
 
-            {/* Domain tab content */}
+            {/* Business verification */}
             <div className={pageCardClassName("min-w-0")}>
               <DomainTab />
             </div>

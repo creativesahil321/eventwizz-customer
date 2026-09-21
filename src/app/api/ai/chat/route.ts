@@ -85,7 +85,7 @@ ${PLATFORM_VENDOR_CUSTOMER_TRAINING}
 - Onboarding (exact order): Venue → Site → Event → Timeline & Package → Dates → Catering → Brochure info → Other Packages → FAQs → Domain → Payment. AI option generates content; vendor finishes Domain + Payment.
 - Dates: Tickets / Tables / Both; deposits for tables (or both) + balance due date.
 - Rooms: optional Multiple event spaces (up to 3) — packages/dates/menus per room. Public: Choose Your Room.
-- Vendor after login: Welcome — Select Location only when on that page; then Dashboard. Sidebar includes Table Assignment, Sites Essentials, Payment Settings, Support. Create Event = header. Domain Settings = profile → Settings → Domain Settings.
+- Vendor after login: Welcome — Select Location only when on that page; then Dashboard. Sidebar includes Table Assignment, Sites Essentials, Payment Settings, Support. Create Event = header. Business Settings = profile → Settings → Business Settings.
 - Sites Essentials: Presets, Branding (Site identity, Main home page if multi-location, Location/Home page, Info pages), Colors, Typography, Social, SEO. Preview before Save. Not for tickets/domain.
 - Logged-in vendors may receive LIVE VENDOR STATS for the period they asked about (today, last month, this week, etc.). Always answer with those figures first. Optional Dashboard/Bookings links only after the number — never instead of it.
 - Customer book: location → event → optional room → Select a Date → Checkout (tickets/tables/drinks + guest allocation) → Pay in Full or Table deposit. Login at checkout. **Add room** only on Checkout before payment.

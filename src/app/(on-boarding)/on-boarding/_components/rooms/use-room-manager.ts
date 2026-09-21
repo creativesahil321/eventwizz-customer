@@ -9,8 +9,7 @@ import {
   type RoomType,
 } from "../form-provider/schema";
 import { roomService } from "@/services/vendor/onboarding/room.service";
-import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
-import { writeVendorEventIsRoomsFlag } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
+import { readOnboardingIsRoomsSessionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-event-is-rooms";
 import { roomNameExample } from "@/lib/room-name-examples";
 import { isOnboardingCateringRoomReady } from "../../_lib/onboarding-catering-ready";
 import {
@@ -18,7 +17,22 @@ import {
   resolveDrinksOptionFlag,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 
-const ONBOARDING_IS_ROOMS_STORAGE_KEY = "onboarding_is_rooms";
+/**
+ * `useRoomManager` is called from the step form, tab bar, preview, etc.
+ * Share one GET /vendor/rooms so toggling rooms does not stampede the API.
+ */
+let vendorRoomsListInFlight: ReturnType<
+  typeof roomService.listVendorRooms
+> | null = null;
+
+function listVendorRoomsShared() {
+  if (!vendorRoomsListInFlight) {
+    vendorRoomsListInFlight = roomService.listVendorRooms().finally(() => {
+      vendorRoomsListInFlight = null;
+    });
+  }
+  return vendorRoomsListInFlight;
+}
 
 /**
  * Slot in `roomSchema` that a wizard step writes into.
@@ -178,7 +192,7 @@ const blankRoom = (name: string): RoomType => ({
  *  - `currentRoomIndex` is always within `[0, rooms.length - 1]` (clamped on remove).
  */
 export function useRoomManager() {
-  const { form } = useFormContext();
+  const { form, activeStep } = useFormContext();
   const didHydrateRoomsRef = useRef(false);
   const [roomsLoading, setRoomsLoading] = useState(false);
 
@@ -192,7 +206,13 @@ export function useRoomManager() {
     [multiSpace?.rooms],
   );
 
-  const enabled = multiSpace?.enabled === true;
+  const draftEnabled = multiSpace?.enabled === true;
+  const savedIsRooms = readOnboardingIsRoomsSessionFlag();
+  /** Step 4 can draft Yes/No; steps 5–11 follow last committed `is_rooms` only. */
+  const enabled =
+    activeStep === 4 || typeof savedIsRooms !== "boolean"
+      ? draftEnabled
+      : savedIsRooms;
   const currentRoomIndex = Math.min(
     multiSpace?.currentRoomIndex ?? 0,
     Math.max(rooms.length - 1, 0),
@@ -215,8 +235,7 @@ export function useRoomManager() {
 
     didHydrateRoomsRef.current = true;
     setRoomsLoading(true);
-    void roomService
-      .listVendorRooms()
+    void listVendorRoomsShared()
       .then((res) => {
         const data = res?.data ?? [];
         if (!Array.isArray(data) || data.length === 0) return;
@@ -226,6 +245,7 @@ export function useRoomManager() {
             currentRoomIndex: 0,
             rooms: [],
           } as MultiSpaceType)) as MultiSpaceType;
+        if ((current.rooms?.length ?? 0) > 0) return;
 
         const existingRooms = current.rooms ?? [];
         const findExistingRoom = (roomId: number, roomName: string): RoomType | undefined => {
@@ -292,22 +312,6 @@ export function useRoomManager() {
     [form],
   );
 
-  const syncVendorEventRoomsFlag = useCallback(
-    (enabled: boolean) => {
-      const steps = ["stepFour", "stepThree", "stepFive", "stepSix", "stepSeven"];
-      for (const stepKey of steps) {
-        const raw = (form.getValues(stepKey as never) as { event_id?: unknown })
-          ?.event_id;
-        const eventId = Number(raw);
-        if (Number.isFinite(eventId) && eventId > 0) {
-          writeVendorEventIsRoomsFlag(eventId, enabled);
-          return;
-        }
-      }
-    },
-    [form],
-  );
-
   const setEnabled = useCallback(
     (next: boolean) => {
       const current = (form.getValues("multiSpace") ??
@@ -320,17 +324,8 @@ export function useRoomManager() {
         currentRoomIndex: next ? 0 : current.currentRoomIndex,
         rooms: current.rooms,
       });
-
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(
-          ONBOARDING_IS_ROOMS_STORAGE_KEY,
-          next ? "true" : "false",
-        );
-      }
-      syncVendorEventRoomsFlag(next);
-      void onboardingService.notifyDataChanged();
     },
-    [form, writeMultiSpace, syncVendorEventRoomsFlag],
+    [form, writeMultiSpace],
   );
 
   const setCurrentRoomIndex = useCallback(

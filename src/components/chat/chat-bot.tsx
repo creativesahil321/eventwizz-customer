@@ -22,6 +22,11 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  isChatGridAction,
+  isLongChatActionLabel,
+  shouldStackChatQuickAction,
+} from "@/lib/chat-quick-action-ui";
 import { isCustomerCheckoutPath } from "@/lib/customer-checkout-path";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { useDomainContext } from "@/hooks/useDomainContext";
@@ -238,24 +243,6 @@ type QuickAction = {
   /** If set, tapping sends this as the next user message (in-chat choice). */
   sendText?: string;
 };
-
-function isChatGridAction(action: QuickAction): boolean {
-  return (
-    action.id.startsWith("date-") ||
-    action.id.startsWith("table-") ||
-    action.id.startsWith("drink-qty-") ||
-    action.id.startsWith("ticket-")
-  );
-}
-
-function isEventPickAction(action: QuickAction): boolean {
-  return (
-    action.id.startsWith("event-pick-") ||
-    Boolean(
-      action.sendText && /^book .+\s+in\s+.+/i.test(action.sendText.trim()),
-    )
-  );
-}
 
 type Message = {
   role: "user" | "assistant";
@@ -832,6 +819,14 @@ function renderInlineSpans(
   const linkClass = isUser
     ? "underline underline-offset-2 font-medium opacity-95"
     : "underline underline-offset-2 font-medium text-slate-700 hover:text-slate-950";
+  const wrapLinkClass = (label?: string) =>
+    cn(
+      linkClass,
+      "max-w-full [overflow-wrap:break-word] [word-break:normal] [box-decoration-break:clone]",
+      isLongChatActionLabel(label) ? "inline-block align-top" : "inline",
+    );
+  const pillLinkClass =
+    "inline-flex max-w-full min-w-0 flex-wrap items-center gap-1 my-0.5 mr-1.5 rounded-md border border-slate-200/90 bg-slate-50/90 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-white hover:border-slate-300 hover:text-slate-950 transition-all cursor-pointer";
   const boldClass = isUser
     ? "font-bold opacity-100"
     : "font-bold text-slate-950";
@@ -899,16 +894,18 @@ function renderInlineSpans(
             <Link
               key={`${keyPrefix}-link-${key++}`}
               href={parsed.href}
-              className="inline-flex items-center gap-1 my-0.5 mr-1.5 rounded-md border border-slate-200/90 bg-slate-50/90 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-white hover:border-slate-300 hover:text-slate-950 transition-all cursor-pointer"
+              className={pillLinkClass}
             >
-              <span>{label || parsed.href}</span>
-              <ExternalLink className="h-2.5 w-2.5 text-slate-400" />
+              <span className="min-w-0 [overflow-wrap:break-word] [word-break:normal]">
+                {label || parsed.href}
+              </span>
+              <ExternalLink className="h-2.5 w-2.5 shrink-0 text-slate-400" />
             </Link>
           ) : (
             <Link
               key={`${keyPrefix}-link-${key++}`}
               href={parsed.href}
-              className={linkClass}
+              className={wrapLinkClass(label)}
             >
               {label || parsed.href}
             </Link>
@@ -922,10 +919,12 @@ function renderInlineSpans(
               href={parsed.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 my-0.5 mr-1.5 rounded-md border border-slate-200/90 bg-slate-50/90 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-white hover:border-slate-300 hover:text-slate-950 transition-all cursor-pointer"
+              className={pillLinkClass}
             >
-              <span>{label || parsed.href}</span>
-              <ExternalLink className="h-2.5 w-2.5 text-slate-400" />
+              <span className="min-w-0 [overflow-wrap:break-word] [word-break:normal]">
+                {label || parsed.href}
+              </span>
+              <ExternalLink className="h-2.5 w-2.5 shrink-0 text-slate-400" />
             </a>
           ) : (
             <a
@@ -933,7 +932,7 @@ function renderInlineSpans(
               href={parsed.href}
               target="_blank"
               rel="noopener noreferrer"
-              className={linkClass}
+              className={wrapLinkClass(label)}
             >
               {label || parsed.href}
             </a>
@@ -4656,11 +4655,11 @@ Is there anything else I can help you with?`,
                     const dateActionCount =
                       message.quickActions?.filter(isChatGridAction).length ??
                       0;
-                    const eventPickCount =
-                      message.quickActions?.filter(isEventPickAction).length ??
-                      0;
+                    const stackActionCount =
+                      message.quickActions?.filter(shouldStackChatQuickAction)
+                        .length ?? 0;
                     const useDateGrid = dateActionCount >= 2;
-                    const useEventList = !useDateGrid && eventPickCount >= 1;
+                    const useEventList = !useDateGrid && stackActionCount >= 1;
                     return (
                       <motion.div
                         key={`msg-${index}-${message.role}-${message.content.slice(0, 24)}`}
@@ -4704,13 +4703,13 @@ Is there anything else I can help you with?`,
                           {hasBody && (
                             <div
                               className={cn(
-                                "min-w-0 overflow-hidden text-sm leading-relaxed",
+                                "min-w-0 max-w-full text-sm leading-relaxed",
                                 message.bookingSummary && !isUser
                                   ? "p-0"
                                   : "px-3.5 py-2.5",
                                 isUser || useDateGrid || useEventList
                                   ? null
-                                  : "w-fit max-w-full",
+                                  : "w-fit",
                                 isUser
                                   ? cn("rounded-2xl rounded-br-md", chatChrome)
                                   : "rounded-2xl rounded-bl-md border border-black/6 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
@@ -4721,14 +4720,7 @@ Is there anything else I can help you with?`,
                                   summary={message.bookingSummary}
                                 />
                               ) : (
-                                <p
-                                  className="whitespace-pre-wrap break-words"
-                                  style={{
-                                    wordBreak: "break-word",
-                                    overflowWrap: "anywhere",
-                                    color: "inherit",
-                                  }}
-                                >
+                                <p className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:break-word] [word-break:normal]">
                                   {renderMessageContent(
                                     message.content,
                                     isUser,
@@ -4743,17 +4735,15 @@ Is there anything else I can help you with?`,
                               <div
                                 className={
                                   useDateGrid
-                                    ? "grid w-full grid-cols-2 gap-1.5"
-                                    : useEventList
-                                      ? "flex w-full flex-col gap-1.5"
-                                      : "flex flex-col gap-1.5"
+                                    ? "grid w-full min-w-0 grid-cols-2 gap-1.5"
+                                    : "flex w-full min-w-0 flex-col gap-1.5"
                                 }
                               >
                                 {message.quickActions.map(
                                   (action, actionIndex) => {
                                     const isDateChip = isChatGridAction(action);
-                                    const isEventChip =
-                                      isEventPickAction(action);
+                                    const stackChip =
+                                      shouldStackChatQuickAction(action);
                                     return (
                                       <motion.button
                                         key={action.id}
@@ -4780,10 +4770,10 @@ Is there anything else I can help you with?`,
                                             : undefined
                                         }
                                         className={cn(
-                                          "group rounded-2xl border px-3 py-1.5 text-left transition-colors",
+                                          "group min-w-0 rounded-2xl border px-3 py-1.5 text-left transition-colors",
                                           (isDateChip && useDateGrid) ||
-                                            (isEventChip && useEventList)
-                                            ? "min-w-0 w-full"
+                                            stackChip
+                                            ? "w-full"
                                             : "w-fit max-w-full",
                                           useDateGrid && !isDateChip
                                             ? "col-span-2"
@@ -4804,9 +4794,9 @@ Is there anything else I can help you with?`,
                                       >
                                         <span
                                           className={cn(
-                                            "block min-w-0 text-xs font-semibold leading-snug break-words",
-                                            isEventChip || isDateChip
-                                              ? "whitespace-normal"
+                                            "block min-w-0 text-xs font-semibold leading-snug",
+                                            isDateChip || stackChip
+                                              ? "whitespace-normal break-words [overflow-wrap:break-word] [word-break:normal] line-clamp-2"
                                               : "truncate leading-tight",
                                           )}
                                         >
@@ -4815,9 +4805,9 @@ Is there anything else I can help you with?`,
                                         {action.hint ? (
                                           <span
                                             className={cn(
-                                              "mt-0.5 block text-[10px] font-medium leading-tight text-slate-500 group-hover:text-white/80",
+                                              "mt-0.5 block min-w-0 text-[10px] font-medium leading-tight text-slate-500 group-hover:text-white/80",
                                               isDateChip
-                                                ? "whitespace-normal"
+                                                ? "whitespace-normal break-words [overflow-wrap:break-word] [word-break:normal]"
                                                 : "truncate",
                                             )}
                                           >

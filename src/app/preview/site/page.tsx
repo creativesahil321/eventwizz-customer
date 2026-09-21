@@ -1130,6 +1130,7 @@ export default function SitePreviewPage() {
                 locationPreviewFormValues ??
                 resolvedGlobalData
               }
+              hasMultipleLocations={hasMultipleLocations}
             />
           )}
         </div>

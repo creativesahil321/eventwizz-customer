@@ -488,18 +488,7 @@ export default function StepEight() {
                           <Button
                             variant="event-outline"
                             type="button"
-                            onClick={() => {
-                              form.setValue("drinks_option", 0);
-                              setScopedDrinksField("drinks_option", 0);
-                              form.clearErrors();
-                              void submitStepEight(
-                                {
-                                  ...form.getValues(),
-                                  drinks_option: 0,
-                                },
-                                false,
-                              );
-                            }}
+                            onClick={() => setActiveStep(9)}
                             className={guidedOnboardingSkipButtonClass}
                           >
                             Skip

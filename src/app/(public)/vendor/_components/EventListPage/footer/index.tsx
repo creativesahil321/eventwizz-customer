@@ -100,7 +100,6 @@ interface FooterSectionProps {
 
 const VISIT_LINKS: Array<{ href: string; label: string }> = [
   { href: "/", label: "All venues" },
-  { href: "/contact", label: "Contact" },
   { href: "/customer/bookings", label: "My bookings" },
 ];
 
@@ -116,7 +115,7 @@ function SocialRow({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-center gap-1.5",
+        "flex flex-wrap items-center justify-center gap-2.5",
         className,
       )}
     >
@@ -127,9 +126,9 @@ function SocialRow({
           target="_blank"
           rel="noopener noreferrer"
           aria-label={id}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-on-footer)]/65 transition-colors duration-200 hover:bg-[color:color-mix(in_srgb,var(--color-on-footer)_8%,transparent)] hover:text-[color:var(--color-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--color-on-footer)]/80 transition-colors duration-200 hover:bg-[color:color-mix(in_srgb,var(--color-on-footer)_8%,transparent)] hover:text-[color:var(--color-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)]"
         >
-          <Icon size={15} />
+          <Icon size={18} strokeWidth={1.75} />
         </Link>
       ))}
     </div>
@@ -138,9 +137,9 @@ function SocialRow({
 
 function FooterColumnHeading({ children }: { children: ReactNode }) {
   return (
-    <h6 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--color-primary)]">
+    <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--color-primary)]">
       {children}
-    </h6>
+    </h3>
   );
 }
 
@@ -267,6 +266,7 @@ function FooterBrand({
       alt={brandName}
       width={200}
       height={116}
+      chrome="footer"
     />
   );
 
@@ -532,27 +532,39 @@ export default function FooterSection({
             </nav>
           </div>
 
-          {hasEnquiries && enquiriesContact ? (
-            onEditEnquiries ? (
-              <PreviewEditRegion
-                label="contact details"
-                onEdit={onEditEnquiries}
-                className={enquiriesColumnClass}
-                hoverFrameClassName="rounded-md"
-              >
-                <FooterColumnHeading>Enquiries</FooterColumnHeading>
-                <EnquiriesLines contact={enquiriesContact} asPlainText />
-              </PreviewEditRegion>
-            ) : (
-              <div className={enquiriesColumnClass}>
-                <FooterColumnHeading>Enquiries</FooterColumnHeading>
-                <EnquiriesLines
-                  contact={enquiriesContact}
-                  asPlainText={isPreviewMode}
-                />
-              </div>
-            )
-          ) : null}
+          {onEditEnquiries ? (
+            <PreviewEditRegion
+              label="contact details"
+              onEdit={onEditEnquiries}
+              className={enquiriesColumnClass}
+              hoverFrameClassName="rounded-md"
+            >
+              <FooterColumnHeading>Enquiries</FooterColumnHeading>
+              <nav aria-label="Enquiries" className="flex flex-col gap-2">
+                <FooterTextLink href="/contact" isPreviewMode={isPreviewMode}>
+                  Contact
+                </FooterTextLink>
+                {hasEnquiries && enquiriesContact ? (
+                  <EnquiriesLines contact={enquiriesContact} asPlainText />
+                ) : null}
+              </nav>
+            </PreviewEditRegion>
+          ) : (
+            <div className={enquiriesColumnClass}>
+              <FooterColumnHeading>Enquiries</FooterColumnHeading>
+              <nav aria-label="Enquiries" className="flex flex-col gap-2">
+                <FooterTextLink href="/contact" isPreviewMode={isPreviewMode}>
+                  Contact
+                </FooterTextLink>
+                {hasEnquiries && enquiriesContact ? (
+                  <EnquiriesLines
+                    contact={enquiriesContact}
+                    asPlainText={isPreviewMode}
+                  />
+                ) : null}
+              </nav>
+            </div>
+          )}
         </div>
       </div>
 
@@ -566,11 +578,11 @@ export default function FooterSection({
         >
           {resolvedCopyright ? (
             <div
-              className="break-words text-[11px] leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
+              className="break-words text-xs leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
               dangerouslySetInnerHTML={{ __html: resolvedCopyright }}
             />
           ) : (
-            <p className="break-words text-[11px] leading-relaxed text-[var(--color-on-footer)]/70">
+            <p className="break-words text-xs leading-relaxed text-[var(--color-on-footer)]/70">
               © <span suppressHydrationWarning>{currentYear}</span> {brandName}
             </p>
           )}

@@ -26,6 +26,8 @@ type DateCardPriceFooterProps = {
    * When set, replaces the price block (sold out, view cart, set offer, etc.).
    */
   fallbackLabel?: string;
+  /** Visible “Book” (or similar) cue on a bookable date card. */
+  actionHint?: string;
   /**
    * Lovable Option B — outline icons left of the price in the gradient footer.
    */
@@ -48,6 +50,7 @@ export function DateCardPriceFooter({
   compact = false,
   className,
   fallbackLabel,
+  actionHint,
   bookingType = null,
 }: DateCardPriceFooterProps) {
   if (fallbackLabel != null && fallbackLabel !== "") {
@@ -81,14 +84,16 @@ export function DateCardPriceFooter({
     >
       <BookingTypeIcons
         bookingType={bookingType}
-        size={compact ? 11 : 13}
+        size={compact ? 13 : 16}
         className="shrink-0 text-white"
       />
       <span className="tabular-nums">{priceLabel}</span>
     </span>
   );
 
-  if (!badge) {
+  const hint = actionHint?.trim();
+
+  if (!badge && !hint) {
     return (
       <span
         className={cn(
@@ -110,16 +115,30 @@ export function DateCardPriceFooter({
         className,
       )}
     >
-      <span
-        className={cn(
-          "font-semibold uppercase tracking-[0.12em] text-white/90",
-          compact
-            ? "text-[8px] leading-none"
-            : "text-[9px] leading-none sm:text-[10px]",
-        )}
-      >
-        {badge}
-      </span>
+      {hint ? (
+        <span
+          className={cn(
+            "font-bold uppercase tracking-[0.16em] text-white",
+            compact
+              ? "text-[9px] leading-none"
+              : "text-[10px] leading-none sm:text-xs",
+          )}
+        >
+          {hint}
+        </span>
+      ) : null}
+      {badge ? (
+        <span
+          className={cn(
+            "font-semibold uppercase tracking-[0.12em] text-white/90",
+            compact
+              ? "text-[8px] leading-none"
+              : "text-[9px] leading-none sm:text-[10px]",
+          )}
+        >
+          {badge}
+        </span>
+      ) : null}
       {priceRow}
     </span>
   );

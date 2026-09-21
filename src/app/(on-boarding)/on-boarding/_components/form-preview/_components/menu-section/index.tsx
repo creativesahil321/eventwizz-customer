@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronRight } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
@@ -120,7 +119,7 @@ export default function MenuSection({
           />
         ) : null}
         {menu_background_image && !menuBgImageFailed ? (
-          <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--color-background)_55%,transparent)]" />
+          <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--color-background)_78%,#0b0b0b)]" />
         ) : null}
       </div>
 
@@ -138,7 +137,7 @@ export default function MenuSection({
             className="!text-3xl !font-black tracking-tight md:!text-4xl"
           />
           <p
-            className="mx-auto max-w-2xl overflow-hidden whitespace-normal break-words text-sm text-[var(--color-text-dimmed)] sm:text-base"
+            className="mx-auto max-w-2xl overflow-hidden whitespace-normal break-words text-sm font-medium leading-relaxed text-[var(--color-text)] sm:text-base"
             style={{
               wordBreak: "break-word",
               overflowWrap: "break-word",
@@ -169,7 +168,7 @@ export default function MenuSection({
                 >
                   <h3
                     className={cn(
-                      "break-words overflow-hidden border-b border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] pb-3 pt-1 text-lg font-semibold tracking-tight sm:text-xl",
+                      "break-words overflow-hidden pb-3 pt-1 text-lg font-semibold tracking-tight sm:text-xl",
                       isSingleMenu ? "px-2 text-center" : "pl-1 text-left",
                     )}
                     style={{
@@ -180,6 +179,13 @@ export default function MenuSection({
                   >
                     {menu.name}
                   </h3>
+                  <div
+                    className={cn(
+                      "mb-4 h-0.5 w-full rounded-full bg-[color:color-mix(in_srgb,var(--color-primary)_45%,transparent)]",
+                      isSingleMenu && "mx-auto",
+                    )}
+                    aria-hidden
+                  />
 
                   <ul className="mt-4 space-y-4">
                     {(menu.items ?? []).map((item, idx) => (
@@ -192,22 +198,14 @@ export default function MenuSection({
                       >
                         <h4
                           className={cn(
-                            "flex items-start gap-2 text-base font-semibold sm:text-lg",
+                            "text-base font-semibold sm:text-lg",
                             isSingleMenu
-                              ? "justify-center text-center"
+                              ? "text-center"
                               : "text-left",
                           )}
                         >
-                          <ChevronRight
-                            aria-hidden
-                            className="mt-1 h-4 w-4 shrink-0 text-[color:var(--color-primary)]"
-                            strokeWidth={2.75}
-                          />
                           <span
-                            className={cn(
-                              "min-w-0 break-words",
-                              isSingleMenu ? "flex-none" : "flex-1",
-                            )}
+                            className="min-w-0 break-words"
                             style={{
                               wordBreak: "break-word",
                               overflowWrap: "break-word",
@@ -223,7 +221,7 @@ export default function MenuSection({
                               "mt-0.5 w-full whitespace-normal break-words text-sm leading-relaxed text-[var(--color-text-dimmed)] sm:text-[0.95rem]",
                               isSingleMenu
                                 ? "pl-0 text-center"
-                                : "pl-6 text-left sm:pl-7",
+                                : "text-left",
                             )}
                             style={{
                               wordBreak: "break-word",

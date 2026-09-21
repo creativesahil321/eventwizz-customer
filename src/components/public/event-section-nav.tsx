@@ -198,6 +198,8 @@ type EventSectionNavProps = {
   scrollContainerRef?: RefObject<HTMLElement | null>;
   /** Extra action after jumping to the section (e.g. open the onboarding form). */
   onItemClick?: (id: string) => void;
+  /** Persistent booking CTA — jumps to this section id (usually dates). */
+  bookNowId?: string;
 };
 
 function scrollToSection(
@@ -234,6 +236,7 @@ export function EventSectionNav({
   headerOffsetPx,
   scrollContainerRef,
   onItemClick,
+  bookNowId,
 }: EventSectionNavProps) {
   const navRef = useRef<HTMLElement>(null);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -338,6 +341,25 @@ export function EventSectionNav({
 
   if (items.length === 0) return null;
 
+  const jumpToBook = () => {
+    if (!bookNowId) return;
+    setActiveId(bookNowId);
+    const preferred =
+      scrollContainerRef?.current ??
+      getNearestScrollContainer(navRef.current);
+    const liveOffset = measureLiveStickyScrollOffsetPx({
+      navEl: navRef.current,
+      fallbackHeaderOffsetPx: headerOffsetPx,
+    });
+    scrollToSection(
+      bookNowId,
+      liveOffset,
+      preferred,
+      usesEmbeddedScroll,
+    );
+    onItemClick?.(bookNowId);
+  };
+
   return (
     <nav
       ref={navRef}
@@ -345,6 +367,7 @@ export function EventSectionNav({
       className="sticky z-40 isolate border-y border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-background)]/95 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.45)] backdrop-blur-md"
       style={{ top: stickyTop, minHeight: EVENT_SECTION_NAV_HEIGHT }}
     >
+      <div className="mx-auto flex w-full max-w-7xl items-stretch">
       {/*
         Do not put justify-center on the overflow scroller — it clips the first
         tabs (About) on a 390px mobile frame. Inner w-max min-w-full centers
@@ -352,9 +375,9 @@ export function EventSectionNav({
       */}
       <div
         data-event-nav-scroller
-        className="overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="mx-auto flex w-max min-w-full min-h-[3.5rem] flex-nowrap items-stretch justify-center gap-5 px-4 sm:gap-7 sm:px-6">
+        <div className="mx-auto flex w-max min-w-full min-h-[3.5rem] flex-nowrap items-stretch justify-start gap-5 px-4 sm:gap-7 sm:px-6">
           {items.map((item) => {
             const isActive = item.id === activeId;
             return (
@@ -434,6 +457,18 @@ export function EventSectionNav({
             );
           })}
         </div>
+      </div>
+      {bookNowId ? (
+        <div className="flex shrink-0 items-center border-l border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] px-3 sm:px-4">
+          <button
+            type="button"
+            onClick={jumpToBook}
+            className="inline-flex h-8 items-center rounded-full bg-[color:var(--color-primary)] px-3 text-xs font-semibold text-[color:var(--color-primary-foreground,white)] shadow-sm transition-opacity hover:opacity-95 sm:h-9 sm:px-4 sm:text-sm"
+          >
+            Book now
+          </button>
+        </div>
+      ) : null}
       </div>
     </nav>
   );

@@ -37,6 +37,15 @@ export const LOGO_LIGHT_PIXEL_RATIO = 0.65;
 /** Min share of opaque pixels that must be low-saturation bright (white/grey marks). */
 export const LOGO_LIGHT_MONOCHROME_RATIO = 0.5;
 
+/** Average luminance below which a logo is treated as "dark" on a dark header. */
+export const LOGO_DARK_AVG_LUMINANCE = 80;
+
+/** Min share of opaque pixels that must be dark to invert a black wordmark. */
+export const LOGO_DARK_PIXEL_RATIO = 0.45;
+
+/** Min share of opaque pixels that must be low-saturation dark (black/charcoal marks). */
+export const LOGO_DARK_MONOCHROME_RATIO = 0.4;
+
 /** Default header color when none is supplied with the upload. */
 export const LOGO_DEFAULT_HEADER_BACKGROUND = "#FFFFFF";
 

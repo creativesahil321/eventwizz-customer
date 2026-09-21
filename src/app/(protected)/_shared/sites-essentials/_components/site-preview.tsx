@@ -15,12 +15,15 @@ import {
   resolveSiteEssentialsPreviewContact,
 } from "../_lib/preview-contact";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
+import { resolveVendorHasMultipleLocations } from "@/app/(public)/vendor/_components/LocationPage/_lib/search-filters";
 
 interface SitePreviewProps {
   formValues: SiteEssentialsFormValues;
   /** Onboarding preview scroll root for sticky header parity. */
   scrollContainerRef?: RefObject<HTMLElement | null>;
   previewEdit?: LocationPagePreviewEdit;
+  /** 2+ venues: "Search location events". Omit to use `formValues.locations`. */
+  hasMultipleLocations?: boolean;
 }
 
 function getPreviewUrl(value: string | File | null | undefined): string | null {
@@ -28,6 +31,13 @@ function getPreviewUrl(value: string | File | null | undefined): string | null {
   if (typeof value === "string") return value;
   if (value instanceof File) return URL.createObjectURL(value);
   return null;
+}
+
+function trimmedLocationCity(
+  city: string | null | undefined,
+): string | undefined {
+  const value = city?.trim();
+  return value || undefined;
 }
 
 function resolvePreviewCity(
@@ -38,13 +48,10 @@ function resolvePreviewCity(
   const match = locations.find(
     (loc) => typeof loc?.slug === "string" && loc.slug === locationSlug,
   );
-  if (typeof match?.city === "string" && match.city.trim()) {
-    return match.city.trim();
-  }
-  if (typeof formValues.city === "string" && formValues.city.trim()) {
-    return formValues.city.trim();
-  }
-  return undefined;
+  return (
+    trimmedLocationCity(match?.city) ??
+    trimmedLocationCity(locations[0]?.city)
+  );
 }
 
 /**
@@ -55,6 +62,7 @@ export function SitePreview({
   formValues,
   scrollContainerRef,
   previewEdit,
+  hasMultipleLocations,
 }: Readonly<SitePreviewProps>) {
   const previewStyles = siteEssentialsToPreviewRootStyle(formValues);
 
@@ -142,12 +150,13 @@ export function SitePreview({
         settings={{
           name: formValues.name,
           copyright: formValues.copyright,
-          logo: logoUrl,
+          logo: logoUrl ?? undefined,
           banner_heading_accent: formValues.banner_heading_accent,
           banner_heading_align: formValues.banner_heading_align,
           banner_heading_valign: formValues.banner_heading_valign,
           typography: formValues.typography,
-          footer_brand_description: formValues.footer_brand_description,
+          footer_brand_description:
+            formValues.footer_brand_description ?? undefined,
         }}
         headerVariant="preview"
         headerLogo={logoUrl}
@@ -168,6 +177,10 @@ export function SitePreview({
           )
         }
         previewEdit={previewEdit}
+        hasMultipleLocations={resolveVendorHasMultipleLocations(
+          formValues.locations?.length,
+          hasMultipleLocations,
+        )}
       />
     </div>
   );

@@ -195,7 +195,7 @@ CRITICAL RULES:
    - booking_type "tickets": payment_type "full", no deposit fields
    - booking_type "tables" or "both": payment_type required ("full" or "deposit")
    - deposit: is_deposit_enabled true, deposit_type amount|percentage, deposit_value (percentage 20-80), deposit_due_date BEFORE event_date
-9. stepThree.dates: YYYY-MM-DD, ascending, no duplicates, tomorrow or later (not today)
+9. stepThree.dates: YYYY-MM-DD, strictly ascending, tomorrow or later (not today). EACH event_date may appear ONCE in a dates array — never two objects for the same calendar day (no morning/evening split rows). If the vendor wants the same dates on every room, copy that unique list into each room; do not repeat a day inside one room's array.
 10. stepFour/stepFive optional when vendor says no food/drinks — if they say no catering/menus, set catering_option 0 and menus []. If they say no drinks, set drinks_option 0, empty titles, and packages []. If they want drinks, set drinks_option 1 with real packages (price > 0, quantity ≥ 1).
 11. stepSeven.faqs: max ${maxFaqs}; when vendor asks for 10+ FAQs, provide ${maxFaqs} strong relevant FAQs. If they say no FAQs, return faqs [].
 12. ROOM SYSTEM (when YES):
@@ -205,7 +205,7 @@ CRITICAL RULES:
     - stepTwo.rooms: per-room package_details when vendor specifies different packages per room
     - stepFive.rooms: per-room drink packages when vendor specifies different drinks per room
     - stepSix.rooms: per-room brochure/location description when vendor asks brochure per room
-    - If vendor says same dates/brochure/timeline for all rooms, duplicate identical arrays/objects
+    - If vendor says same dates/brochure/timeline for all rooms, copy identical unique arrays/objects (never repeat a calendar day inside one dates array)
     - If vendor assigns Room A dates Aug 20-22 and Room B dates Sep 2/6/8, put those in stepThree.rooms — NOT flat stepThree.dates only`;
 }
 
@@ -372,10 +372,10 @@ export function buildAiEventUserPrompt(params: {
         : "Use realistic booking_type per vendor text.";
 
   const datesHint = hints.wantsSameDatesAllRooms
-    ? "SAME dates on ALL rooms — duplicate identical dates[] in every stepThree.rooms entry."
+    ? "SAME unique date list on ALL rooms — copy that dates[] into every stepThree.rooms entry. Never repeat event_date inside one dates array."
     : hints.wantsPerRoomDates
-      ? "DIFFERENT dates per room — put each room's dates ONLY in stepThree.rooms; stepThree.dates can mirror first room or stay minimal."
-      : "Assign dates per vendor text; use stepThree.rooms when rooms differ.";
+      ? "DIFFERENT unique dates per room — put each room's dates ONLY in stepThree.rooms; stepThree.dates can mirror first room or stay minimal. Never repeat event_date inside one dates array."
+      : "Assign unique dates per vendor text; use stepThree.rooms when rooms differ. Never repeat event_date inside one dates array.";
 
   const menuHint = hints.omitCatering
     ? "Vendor does NOT want catering/menus — set stepFour.catering_option 0, empty menus, do not invent a menu."

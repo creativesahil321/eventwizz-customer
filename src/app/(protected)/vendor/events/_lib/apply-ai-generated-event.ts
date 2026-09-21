@@ -62,6 +62,7 @@ import type { AIDate } from "@/app/api/ai/generate-onboarding/route";
 import {
   ensureOnboardingDates,
   hasUsableOnboardingDates,
+  uniqueAiDatesByEventDate,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import { fillAiEventGeneratedDefaults } from "./fill-ai-event-content";
 import { downloadImportedEventAssets } from "./imported-event-assets";
@@ -451,9 +452,11 @@ async function applyAIGeneratedEventToBackendInner(params: {
   onProgress?.(2);
   if (!removedSections.has("stepThree")) {
     const bookingFacts = vendorIntent.bookingFacts;
-    const rawDates = hasUsableOnboardingDates(s.stepThree.dates as AIDate[])
-      ? (s.stepThree.dates as AIDate[])
-      : ensureOnboardingDates(s.stepThree.dates as AIDate[], bookingFacts);
+    const rawDates = uniqueAiDatesByEventDate(
+      hasUsableOnboardingDates(s.stepThree.dates as AIDate[])
+        ? (s.stepThree.dates as AIDate[])
+        : ensureOnboardingDates(s.stepThree.dates as AIDate[], bookingFacts),
+    );
     const perRoomDates = s.stepThree.rooms ?? [];
     const defaultRoomId =
       useRoomSystem && createdRooms[0]?.id ? createdRooms[0].id : undefined;
@@ -473,9 +476,11 @@ async function applyAIGeneratedEventToBackendInner(params: {
             perRoomDates,
             room.sourceName ?? room.name,
           );
-          const roomRawDates = hasUsableOnboardingDates(aiRoom?.dates as AIDate[])
-            ? (aiRoom!.dates as AIDate[])
-            : rawDates;
+          const roomRawDates = uniqueAiDatesByEventDate(
+            hasUsableOnboardingDates(aiRoom?.dates as AIDate[])
+              ? (aiRoom!.dates as AIDate[])
+              : rawDates,
+          );
           const roomDatesForForm = cleanVendorStepThreeDatesForForm(
             mapAiDatesToFormDates(roomRawDates, room.id) as StepThreeType["dates"],
           );

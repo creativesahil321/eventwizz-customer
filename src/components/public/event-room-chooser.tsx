@@ -3,7 +3,6 @@
 import { Check, ImageIcon } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
-import { getRoomFloatingAccent } from "@/lib/room-accent-palette";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import type { EventRoomChooserItem } from "@/lib/event-room-chooser-item";
@@ -84,7 +83,6 @@ export function EventRoomChooser({
           )}
         >
           {rooms.map((room) => {
-            const accent = getRoomFloatingAccent(room.index);
             const isDisabled = Boolean(room.disabled);
             const isActive = !isDisabled && room.index === safeIndex;
 
@@ -142,20 +140,12 @@ export function EventRoomChooser({
 
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
 
-                  <span
-                    className={cn(
-                      "absolute left-3 top-3 h-2.5 w-2.5 rounded-full ring-2 ring-white/70",
-                      isDisabled ? "bg-gray-400" : accent.dot,
-                    )}
-                    aria-hidden="true"
-                  />
-
                   {isDisabled ? (
-                    <span className="absolute right-3 top-3 inline-flex items-center rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm backdrop-blur-sm">
+                    <span className="absolute right-3 top-3 inline-flex items-center rounded-full bg-black/65 px-2.5 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
                       No dates
                     </span>
                   ) : isActive ? (
-                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[color:var(--color-primary)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--color-primary-foreground,white)] shadow-sm">
+                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[color:var(--color-primary)] px-2.5 py-1 text-xs font-semibold text-[color:var(--color-primary-foreground,white)] shadow-sm">
                       <Check className="h-3 w-3" strokeWidth={3} aria-hidden />
                       Selected
                     </span>

@@ -137,6 +137,7 @@ type LocationPageHeroSearchProps = {
   className?: string;
   /** Wire `/availability` so the date picker only enables bookable days. */
   enableAvailability?: boolean;
+  hasMultipleLocations?: boolean;
 };
 
 /** Search dock for location heroes — city is locked (no city field); bar stays bottom-fixed in HeroBanner. */
@@ -148,6 +149,7 @@ export function LocationPageHeroSearch({
   onSearch,
   className,
   enableAvailability = true,
+  hasMultipleLocations = false,
 }: LocationPageHeroSearchProps) {
   const { domain } = useDomain();
   const isPreview = useIsPreviewMode();
@@ -156,6 +158,7 @@ export function LocationPageHeroSearch({
     <LocationSearchBar
       className={className}
       hideCity
+      hasMultipleLocations={hasMultipleLocations}
       lockedCityLabel={cityLabel}
       value={filters}
       onChange={onFiltersChange}
@@ -173,8 +176,10 @@ export function LocationPageHeroSearch({
 /** Self-contained dock for previews that only need the chrome (no event lists). */
 export function LocationPageHeroSearchPreview({
   cityLabel,
+  hasMultipleLocations = false,
 }: {
   cityLabel?: string | null;
+  hasMultipleLocations?: boolean;
 }) {
   const { filters, setFilters, scrollToEvents } = useLocationPageSearch({
     locationSlug: "",
@@ -190,6 +195,7 @@ export function LocationPageHeroSearchPreview({
       onFiltersChange={setFilters}
       onSearch={scrollToEvents}
       enableAvailability={false}
+      hasMultipleLocations={hasMultipleLocations}
     />
   );
 }

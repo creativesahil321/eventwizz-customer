@@ -1,12 +1,12 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/authOptions";
 import { request } from "@/services/core/api-client";
-import { API_ENDPOINTS } from "@/services/core/endpoints";
 import {
   ApiResponse,
   OnboardingApiResponse,
 } from "@/services/vendor/onboarding/type";
 import { OnboardingFormData } from "../../_components/form-provider/schema";
+import { buildOnboardingStepsUrl } from "../onboarding-steps-url";
 
 export async function getServerOnboardingData(): Promise<ApiResponse | null> {
   const session = await getServerSession(authOptions);
@@ -23,23 +23,21 @@ export async function getServerOnboardingData(): Promise<ApiResponse | null> {
   };
 
   try {
-    const fetchByRoomMode = async (isRooms: boolean) =>
+    const fetchSteps = async (previewIsRooms?: boolean) =>
       request<ApiResponse>({
-        url: API_ENDPOINTS.VENDOR.ONBOARDING.GET_ALL_STEPS.replace(
-          "{location_id}",
-          String(locationId),
-        ).replace("{is_rooms}", isRooms ? "true" : "false"),
+        url: buildOnboardingStepsUrl(locationId, previewIsRooms),
         method: "GET",
         headers,
         returnFullResponse: true,
       });
 
-    // Probe room mode first, then fallback to non-room mode.
-    // This avoids hardcoding `/false` for venues that already use rooms.
-    const roomResponse = await fetchByRoomMode(true);
-    const response = roomResponse.status
-      ? roomResponse
-      : await fetchByRoomMode(false);
+    const savedResponse = await fetchSteps();
+    const response = savedResponse.status
+      ? savedResponse
+      : await (async () => {
+          const roomsPreview = await fetchSteps(true);
+          return roomsPreview.status ? roomsPreview : fetchSteps(false);
+        })();
 
     if (response.status) {
       if (!response.data) {

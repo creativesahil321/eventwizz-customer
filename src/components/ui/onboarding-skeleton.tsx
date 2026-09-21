@@ -40,6 +40,7 @@ export function OnboardingFormSkeleton({
             src={addCacheBusting(logoPath)}
             alt={theme?.name || "EventWizz"}
             className="h-5 md:h-6 lg:h-11 xl:h-13 w-auto object-contain max-w-[85px] md:max-w-[95px] lg:max-w-[130px] animate-pulse"
+            chrome="dark-panel"
           />
         </div>
 

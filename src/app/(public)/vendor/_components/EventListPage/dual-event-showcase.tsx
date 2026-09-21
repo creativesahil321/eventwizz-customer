@@ -5,11 +5,11 @@ import type { LocationEventCardModel } from "./location-event-card";
 import { LocationEventCard } from "./location-event-card";
 import {
   dualEventShowcaseFrameClass,
-  eventCarouselNavButtonClass,
   mobileEventRowPeekScrollItemClass,
 } from "./event-carousel-classes";
 import { EventListingHorizontalScroll } from "./event-listing-horizontal-scroll";
 import { EventSectionHeader } from "./event-section-header";
+import { PUBLIC_SECTION_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +53,7 @@ export function DualEventShowcase({
       id={sectionId}
       className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
     >
-      <div className="container mx-auto max-w-7xl px-4">
+      <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <EventSectionHeader
           sectionLabel={sectionLabel}
           sectionTitle={sectionTitle}
@@ -61,15 +61,7 @@ export function DualEventShowcase({
 
         {/* Mobile / narrow preview: peek slider */}
         <div className={cn("relative w-full", !narrowPreview && "md:hidden")}>
-          <EventListingHorizontalScroll
-            watchKey={scrollWatchKey}
-            leftButtonClassName={eventCarouselNavButtonClass(
-              "absolute left-0 top-1/2 -translate-y-1/2",
-            )}
-            rightButtonClassName={eventCarouselNavButtonClass(
-              "absolute right-0 top-1/2 -translate-y-1/2",
-            )}
-          >
+          <EventListingHorizontalScroll watchKey={scrollWatchKey}>
             {events.map((event, index) => (
               <div
                 key={`peek-${event.slug || index}`}

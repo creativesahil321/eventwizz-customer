@@ -36,6 +36,7 @@ import {
   pickReadableForeground,
   relativeLuminance,
 } from "@/lib/color-contrast";
+import { logoContrastCssProperties } from "@/lib/logo/chrome-contrast";
 import { CartConflictProvider } from "@/app/(public)/vendor/checkout/_components/cart-conflict-provider";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { EventHeroBand } from "@/components/public/event-hero-band";
@@ -425,6 +426,7 @@ export function EventPreview({
     "--color-on-footer": pickReadableForeground(footerHex),
     "--color-on-surface": pickReadableForeground(surfaceHex),
     "--color-on-background": pickReadableForeground(backgroundHex),
+    ...logoContrastCssProperties(headerHex, footerHex),
     "--color-footer-text": pickReadableForeground(footerHex),
     "--color-footer-muted": "rgba(248, 250, 252, 0.35)",
     "--font-heading": headingFont,
@@ -734,6 +736,7 @@ export function EventPreview({
             stickyTop={sectionNavStickyTop}
             headerOffsetPx={HEADER_OFFSET_PX}
             scrollContainerRef={previewContainerRef}
+            bookNowId={EVENT_SECTION_IDS.dates}
             onItemClick={
               previewEdit
                 ? (id) => {

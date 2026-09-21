@@ -76,3 +76,27 @@ export function matchVendorCityToPlace(
   });
   return contains ?? null;
 }
+
+export const MULTI_LOCATION_SEARCH_PLACEHOLDER = "Search location events";
+export const SINGLE_LOCATION_SEARCH_PLACEHOLDER = "Search events";
+export const MULTI_CITY_HOME_SEARCH_PLACEHOLDER = "Search event and category";
+
+/** True when the vendor has 2+ venues (location-page copy vs single-venue home). */
+export function resolveVendorHasMultipleLocations(
+  locationsCount: number | null | undefined,
+  explicit?: boolean,
+): boolean {
+  if (typeof explicit === "boolean") return explicit;
+  return (locationsCount ?? 0) > 1;
+}
+
+/** Hero search field copy: location pages vs brand home vs single-venue home. */
+export function locationSearchQueryPlaceholder(options: {
+  hideCity: boolean;
+  hasMultipleLocations: boolean;
+}): string {
+  if (!options.hideCity) return MULTI_CITY_HOME_SEARCH_PLACEHOLDER;
+  return options.hasMultipleLocations
+    ? MULTI_LOCATION_SEARCH_PLACEHOLDER
+    : SINGLE_LOCATION_SEARCH_PLACEHOLDER;
+}

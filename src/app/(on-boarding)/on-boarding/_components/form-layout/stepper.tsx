@@ -100,6 +100,7 @@ export default function Stepper({ activeStep }: { activeStep: number }) {
               width={32}
               height={32}
               className="h-8 w-8 scale-[1.15] rounded-md object-contain"
+              chrome="dark-panel"
             />
           </Link>
         </div>

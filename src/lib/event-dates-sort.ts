@@ -1,3 +1,6 @@
+export const DUPLICATE_EVENT_DATE_MESSAGE =
+  "Duplicate event dates are not allowed. Each date must be unique.";
+
 /** Compare YYYY-MM-DD strings; empty values sort to the end. */
 export function compareEventDateStrings(
   a: string | undefined | null,
@@ -40,4 +43,33 @@ export function hasEventDateOrderChanged<T extends { event_date?: string }>(
   return sorted.some(
     (date, index) => date.event_date !== dates[index]?.event_date,
   );
+}
+
+export function normalizeEventDateKey(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+/**
+ * Indexes of every date that shares its `event_date` with at least one other row.
+ * Empty dates are ignored. Optionally skip rows (e.g. cancelled vendor dates).
+ */
+export function duplicateEventDateIndexes(
+  dates: Array<{ event_date?: unknown } | null | undefined>,
+  options?: { skipIndex?: (index: number) => boolean },
+): number[] {
+  const byKey = new Map<string, number[]>();
+
+  dates.forEach((date, index) => {
+    if (options?.skipIndex?.(index)) return;
+    const key = normalizeEventDateKey(date?.event_date);
+    if (!key) return;
+    const list = byKey.get(key);
+    if (list) list.push(index);
+    else byKey.set(key, [index]);
+  });
+
+  return [...byKey.values()]
+    .filter((indexes) => indexes.length > 1)
+    .flat()
+    .sort((a, b) => a - b);
 }

@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileUploader } from "@/components/ui/file-uploader";
+import { MAX_VIDEO_SIZE_BYTES, MAX_VIDEO_SIZE_MB } from "@/utils/video-validator";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 import { AlertCircle } from "lucide-react";
 import { useEventCategories } from "@/services/vendor/events/query";
@@ -462,7 +463,7 @@ export default function EventNameTab() {
 
         // Validate video compatibility
         const { validateVideo } = await import("@/utils/video-validator");
-        const validation = await validateVideo(file, 10);
+        const validation = await validateVideo(file);
 
         if (!validation.isValid) {
           toast.error(validation.errors.join(". ") || "Invalid video file", {
@@ -1072,7 +1073,7 @@ export default function EventNameTab() {
                           </FormLabel>
                           <FormDescription>
                             Upload a video for your event banner (MP4 format,
-                            max 10MB)
+                            max {MAX_VIDEO_SIZE_MB}MB)
                           </FormDescription>
                           <FormControl>
                             <div className="space-y-4">
@@ -1104,7 +1105,7 @@ export default function EventNameTab() {
                                     value={bannerVideoFile}
                                     onValueChange={handleBannerVideoChange}
                                     maxFileCount={1}
-                                    maxSize={10 * 1024 * 1024} // 10MB for banner video
+                                    maxSize={MAX_VIDEO_SIZE_BYTES}
                                     disabled={bannerVideoUploading}
                                     onRemove={handleRemoveBannerVideo}
                                     accept={{

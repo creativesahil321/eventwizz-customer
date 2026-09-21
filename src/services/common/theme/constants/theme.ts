@@ -5,6 +5,7 @@ import {
   pickHeroOverlayColor,
   pickReadableForeground,
 } from "@/lib/color-contrast";
+import { logoContrastCssProperties } from "@/lib/logo/chrome-contrast";
 
 /**
  * Default theme constants used throughout the application
@@ -130,6 +131,11 @@ export function generateThemeCSS(theme: ThemeSchema | null): string {
     css += `--color-on-surface: ${pickReadableForeground(surfaceColor)};`;
     css += `--color-on-background: ${pickReadableForeground(backgroundColor)};`;
 
+    const logoFilters = logoContrastCssProperties(headerColor, footerColor);
+    for (const [name, value] of Object.entries(logoFilters)) {
+      css += `${name}: ${value};`;
+    }
+
     // Add social login button colors
     if (theme.colors.socialLogin) {
       // Google colors
@@ -180,6 +186,14 @@ export function generateThemeCSS(theme: ThemeSchema | null): string {
  * @returns CSS string with default theme variables
  */
 export function getDefaultThemeCSS(): string {
+  const logoFilters = logoContrastCssProperties(
+    defaultThemeConstants.colors.header,
+    defaultThemeConstants.colors.footer,
+  );
+  const logoFilterCss = Object.entries(logoFilters)
+    .map(([name, value]) => `  ${name}: ${value};`)
+    .join("\n");
+
   return `
 :root {
   --color-primary: ${defaultThemeConstants.colors.primary};
@@ -214,6 +228,7 @@ export function getDefaultThemeCSS(): string {
   --color-on-footer: ${pickReadableForeground(defaultThemeConstants.colors.footer)};
   --color-on-surface: ${pickReadableForeground(defaultThemeConstants.colors.surface)};
   --color-on-background: ${pickReadableForeground(defaultThemeConstants.colors.background)};
+${logoFilterCss}
   --color-socialLogin-google: ${
     defaultThemeConstants.colors.socialLogin?.google || "#DB4437"
   };

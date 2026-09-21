@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from "react";
-import { ChevronDown, CreditCard, Globe, LogOut, Settings, User as UserIcon } from "lucide-react";
+import { Building2, ChevronDown, CreditCard, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -160,8 +160,8 @@ const UserDropdown = memo(() => {
                       className="cursor-pointer"
                       onClick={() => router.push("/vendor/domain-settings")}
                     >
-                      <Globe size={15} className="mr-2 text-muted-foreground" />
-                      Domain Settings
+                      <Building2 size={15} className="mr-2 text-muted-foreground" />
+                      Business Settings
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
