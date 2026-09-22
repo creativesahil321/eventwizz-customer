@@ -38,7 +38,11 @@ import {
   uniqueAiDatesByEventDate,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import { normalizeDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
-import { isEventDateBeforeMinimum } from "@/lib/min-event-date";
+import {
+  normalizeScheduleClock,
+  sortScheduleRows,
+} from "@/lib/schedule-clock";
+import { advanceEventDateToMinimum } from "@/lib/min-event-date";
 
 export interface AIOnboardingInput {
   venueName: string;
@@ -313,18 +317,12 @@ export async function POST(req: NextRequest) {
           160,
         );
         if (Array.isArray(content.stepFour.event_schedular)) {
-          content.stepFour.event_schedular = content.stepFour.event_schedular
-            .map((s) => ({
+          content.stepFour.event_schedular = sortScheduleRows(
+            content.stepFour.event_schedular.map((s) => ({
               title: truncate(s.title, 40),
-              time: /^([01]\d|2[0-3]):([0-5]\d)$/.test(s.time)
-                ? s.time
-                : "12:00",
-            }))
-            .sort((a, b) => {
-              const [ha, ma] = a.time.split(":").map(Number);
-              const [hb, mb] = b.time.split(":").map(Number);
-              return ha * 60 + ma - (hb * 60 + mb);
-            });
+              time: normalizeScheduleClock(s.time),
+            })),
+          );
           if (content.stepFour.event_schedular.length === 0) {
             content.stepFour.event_schedular = [
               { title: "Doors Open", time: "19:00" },
@@ -349,10 +347,9 @@ export async function POST(req: NextRequest) {
           const fallbackDate = futureDate.toISOString().split("T")[0];
 
           const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date.event_date || "");
-          const eventDate =
-            isValidDate && !isEventDateBeforeMinimum(date.event_date, now)
-              ? date.event_date
-              : fallbackDate;
+          const eventDate = isValidDate
+            ? advanceEventDateToMinimum(date.event_date, now)
+            : fallbackDate;
 
           const validBookingTypes = ["tickets", "tables", "both"];
           let bookingType = validBookingTypes.includes(date.booking_type)

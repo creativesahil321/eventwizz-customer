@@ -44,7 +44,7 @@ export function PreviewMobileMenuPortal({
       />
       <div
         className={cn(
-          "absolute top-0 left-0 z-[1] flex h-full max-h-full w-[70%] max-w-xs flex-col shadow-2xl",
+          "absolute top-0 left-0 z-[1] flex h-auto max-h-full w-[70%] max-w-xs flex-col overflow-hidden shadow-2xl",
           pinToFrame
             ? "bg-[color:var(--color-surface,#ffffff)] text-[color:var(--color-text,#0f172a)]"
             : "bg-[color:var(--color-header)] text-[var(--color-on-header)]",

@@ -47,10 +47,7 @@ import {
   packageDetailLabel,
   packageDetailPlaceholder,
 } from "@/lib/event-form-limits";
-import {
-  EVENT_GALLERY_MIN_IMAGES_WHEN_USED,
-  EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
-} from "@/lib/event-gallery-count";
+import { EVENT_GALLERY_MIN_IMAGES_WHEN_USED } from "@/lib/event-gallery-count";
 import { useEventData } from "../../../_lib/hooks/useEventData";
 import {
   notifyVendorEventRoomSystemChanged,
@@ -1880,15 +1877,6 @@ export default function PackageTab() {
                           cropConfig={EVENT_GALLERY_IMAGE_CROP}
                         />
                       )}
-
-                      {field.value &&
-                        field.value.length > 0 &&
-                        field.value.length <
-                          EVENT_GALLERY_MIN_IMAGES_WHEN_USED && (
-                          <p className="text-red-500 text-sm font-medium mt-2">
-                            {EVENT_GALLERY_PARTIAL_COUNT_MESSAGE}
-                          </p>
-                        )}
 
                       {field.value &&
                         field.value.length >= EVENT_GALLERY_MAX_IMAGES && (

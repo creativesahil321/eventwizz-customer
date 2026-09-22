@@ -1,3 +1,8 @@
+import {
+  formatPublicClock24h,
+  sortScheduleRows,
+} from "@/lib/schedule-clock";
+
 export type EventHeroBreadcrumb = {
   label: string;
   href?: string;
@@ -72,39 +77,16 @@ export function formatEventHeroDateRange(
   return `${firstLabel} - ${lastLabel}`;
 }
 
-function formatHeroClock(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-
-  const twentyFour = trimmed.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (twentyFour) {
-    const hours = Number.parseInt(twentyFour[1], 10);
-    const minutes = twentyFour[2];
-    const suffix = hours >= 12 ? "pm" : "am";
-    const hour12 = hours % 12 || 12;
-    return minutes === "00"
-      ? `${hour12}:00${suffix}`
-      : `${hour12}:${minutes}${suffix}`;
-  }
-
-  const ampm = trimmed.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])$/);
-  if (ampm) {
-    const hour = Number.parseInt(ampm[1], 10);
-    const minutes = ampm[2];
-    const suffix = ampm[3].toLowerCase();
-    return minutes === "00" ? `${hour}:00${suffix}` : `${hour}:${minutes}${suffix}`;
-  }
-
-  return trimmed;
-}
-
-/** First and last schedule times → `7:00pm - 1:00am`. */
+/** First and last public clocks → `19:00 - 00:00` (overnight-aware). */
 export function formatEventHeroTimeRange(
   times: Array<string | null | undefined>,
 ): string | null {
-  const clocks = times
-    .map((value) => (value ? formatHeroClock(value) : null))
-    .filter((value): value is string => Boolean(value));
+  const clocks = sortScheduleRows(
+    times
+      .map((value) => formatPublicClock24h(value))
+      .filter((value): value is string => Boolean(value))
+      .map((time) => ({ time })),
+  ).map((row) => row.time);
   if (clocks.length === 0) return null;
   if (clocks.length === 1) return clocks[0];
   const last = clocks[clocks.length - 1];

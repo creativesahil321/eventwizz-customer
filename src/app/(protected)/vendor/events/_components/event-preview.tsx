@@ -676,6 +676,7 @@ export function EventPreview({
           headerDownloads={headerDownloads}
           scrollContainerRef={previewContainerRef}
           hideHeaderPhone
+          hideBrowseEvents
           compactGuestAuth
           overlayHero
           headerColor={headerHex}
@@ -795,7 +796,7 @@ export function EventPreview({
         {showTimeline ? (
           <div id={EVENT_SECTION_IDS.schedule} className={sectionAnchorClass}>
             <RoomContentTransition roomKey={roomContentKey}>
-              <PreviewEditWrap label="Timeline" onEdit={previewEdit?.onEditSchedule}>
+              <PreviewEditWrap label="Timeline" onEdit={previewEdit?.onEditSchedule} skipButtons>
                 <Timeline
                   eventSchedular={timelineRows}
                   eventSchedularTitle={slices.event_schedular_title || ""}
@@ -855,7 +856,7 @@ export function EventPreview({
 
         {showGallery ? (
           <div id={EVENT_SECTION_IDS.gallery} className={sectionAnchorClass}>
-            <PreviewEditWrap label="Gallery" onEdit={previewEdit?.onEditGallery}>
+            <PreviewEditWrap label="Gallery" onEdit={previewEdit?.onEditGallery} skipButtons>
               <EventGallery
                 gallery={galleryImages}
                 galleryTitle={siteEssentials?.event_gallery_title || undefined}
@@ -868,7 +869,7 @@ export function EventPreview({
         {showMenu && (
           <div id={EVENT_SECTION_IDS.menu} className={sectionAnchorClass}>
             <RoomContentTransition roomKey={`${roomContentKey}:${menuOrderKey}`}>
-              <PreviewEditWrap label="Menu" onEdit={previewEdit?.onEditMenu}>
+              <PreviewEditWrap label="Menu" onEdit={previewEdit?.onEditMenu} skipButtons>
                 <LazyMenuSection
                   key={menuOrderKey}
                   menu_title={activeMenu?.menu_title || ""}
@@ -890,7 +891,7 @@ export function EventPreview({
         {showDrinks && (
           <div id={EVENT_SECTION_IDS.drinks} className={sectionAnchorClass}>
             <RoomContentTransition roomKey={roomContentKey}>
-              <PreviewEditWrap label="Drinks" onEdit={previewEdit?.onEditDrinks}>
+              <PreviewEditWrap label="Drinks" onEdit={previewEdit?.onEditDrinks} skipButtons>
                 <LazyDrinkSection
                   title={activeDrinks?.drink_title || ""}
                   description={activeDrinks?.drink_description || ""}
@@ -920,7 +921,7 @@ export function EventPreview({
 
         {showFaqs && (
           <div id={EVENT_SECTION_IDS.faqs} className={sectionAnchorClass}>
-            <PreviewEditWrap label="FAQs" onEdit={previewEdit?.onEditFaqs}>
+            <PreviewEditWrap label="FAQs" onEdit={previewEdit?.onEditFaqs} skipButtons>
               <LazyFaqSection
                 faqs={faqs}
                 headingEmphasis={headingEmphasisForHero}

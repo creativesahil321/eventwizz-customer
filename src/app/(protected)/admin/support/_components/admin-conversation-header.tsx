@@ -11,6 +11,7 @@ import {
   VenueBadge,
 } from "./support-badges";
 import CloseTicketDialog from "./close-ticket-dialog";
+import TransferTicketDialog from "./transfer-ticket-dialog";
 import type {
   AdminSupportConversation,
   SupportAssignee,
@@ -49,6 +50,7 @@ export default function AdminConversationHeader({
   canEscalate = false,
 }: AdminConversationHeaderProps) {
   const [closeOpen, setCloseOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const isClosed = isClosedTicketStatus(status);
   const canAssign = canManage && !isClosed && !assignee;
@@ -129,6 +131,8 @@ export default function AdminConversationHeader({
                 variant="outline"
                 size="sm"
                 className="h-8 shrink-0 rounded-full border-slate-300 bg-white px-2.5 text-slate-900 hover:bg-slate-50 sm:px-3"
+                onClick={() => setTransferOpen(true)}
+                disabled={isClosed}
               >
                 <ArrowLeftRight className="size-4 shrink-0" />
                 <span className="hidden truncate sm:inline">Transfer</span>
@@ -157,6 +161,17 @@ export default function AdminConversationHeader({
         source={conversation.source}
         onClosed={handleClosed}
       />
+      {canTransfer ? (
+        <TransferTicketDialog
+          open={transferOpen}
+          onOpenChange={setTransferOpen}
+          ticketRef={conversation.ref}
+          venueName={conversation.venue.name}
+          onTransferred={(result) => {
+            onStatusChange(result.status);
+          }}
+        />
+      ) : null}
     </>
   );
 }

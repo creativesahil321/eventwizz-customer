@@ -18,6 +18,17 @@ function dateEnding(isoDates: string[], monthDay: string) {
   return isoDates.find((iso) => iso.endsWith(monthDay));
 }
 
+function listedUnitPrice(date: {
+  tickets?: Array<{ price?: string }>;
+  tables?: Array<{ price?: string; min_persons?: string }>;
+}): string | undefined {
+  if (date.tickets?.[0]?.price) return date.tickets[0].price;
+  const table = date.tables?.[0];
+  if (!table?.price) return undefined;
+  const covers = Number(table.min_persons) || 2;
+  return String(Number(table.price) / covers);
+}
+
 test("messy xmas prompt extracts Dec 25 and 27 only, not the 26th price label", () => {
   const facts = extractVendorBookingFacts(MESSY_XMAS_VENDOR_PROMPT);
   assert.equal(facts.eventDates.length, 2);
@@ -199,4 +210,63 @@ test("listed event dates win over a requested date count", () => {
   );
   assert.equal(facts.requestedDateCount, undefined);
   assert.deepEqual(facts.eventDates, ["2026-12-18", "2026-12-19"]);
+});
+
+const AUDIT_XMAS_NOTES = "25th Dec (£50) and 27th Dec (£90)";
+
+test("audit notes keep 25 Dec at £50 and 27 Dec at £90", () => {
+  const facts = extractVendorBookingFacts(AUDIT_XMAS_NOTES);
+  assert.ok(dateEnding(facts.eventDates, "-12-25"), "expected 25 Dec");
+  assert.ok(dateEnding(facts.eventDates, "-12-27"), "expected 27 Dec");
+  const d25 = dateEnding(facts.eventDates, "-12-25")!;
+  const d27 = dateEnding(facts.eventDates, "-12-27")!;
+  assert.equal(facts.pricesByDate?.[d25], 50);
+  assert.equal(facts.pricesByDate?.[d27], 90);
+  assert.ok(
+    facts.eventDates.every((iso) => !iso.startsWith("2025-")),
+    `past year leaked: ${facts.eventDates.join(",")}`,
+  );
+});
+
+test("ensureOnboardingDates puts 25 Dec / £50 back when AI only returned 27 Dec", () => {
+  const facts = extractVendorBookingFacts(AUDIT_XMAS_NOTES);
+  const dates = ensureOnboardingDates(
+    [
+      {
+        event_date: dateEnding(facts.eventDates, "-12-27")!,
+        booking_type: "tables",
+        tickets: [],
+        tables: [
+          {
+            min_persons: "2",
+            max_persons: "6",
+            price: "180",
+            total_tables: "10",
+          },
+        ],
+      },
+    ],
+    facts,
+  );
+  assert.equal(dates.length, 2, `dates: ${dates.map((d) => d.event_date).join(",")}`);
+  const d25 = dates.find((d) => d.event_date.endsWith("-12-25"));
+  const d27 = dates.find((d) => d.event_date.endsWith("-12-27"));
+  assert.ok(d25, "25 Dec must not be dropped");
+  assert.ok(d27, "27 Dec must stay");
+  assert.equal(listedUnitPrice(d25!), "50");
+  assert.equal(listedUnitPrice(d27!), "90");
+});
+
+test("past 25 Dec 2025 is rolled to next year instead of dropped", () => {
+  const facts = extractVendorBookingFacts(
+    "christmas party 25 Dec 2025 (£50) and 27 Dec 2026 (£90)",
+  );
+  const dates = ensureOnboardingDates(undefined, facts);
+  const d25 = dates.find((d) => d.event_date.endsWith("-12-25"));
+  const d27 = dates.find((d) => d.event_date.endsWith("-12-27"));
+  assert.ok(d25, "25 Dec must survive a past year");
+  assert.ok(d27, "27 Dec must stay");
+  assert.ok(!d25!.event_date.startsWith("2025-"), d25!.event_date);
+  assert.equal(listedUnitPrice(d25!), "50");
+  assert.equal(listedUnitPrice(d27!), "90");
 });

@@ -6,7 +6,7 @@
  * Messages:  GET /admin/support-tickets/{ticketKey}/messages
  * Pin:       POST /admin/support-tickets/pin/{ticketKey}
  * Assign:    POST /admin/support-tickets/assign/{ticketKey}
- * Assign:    POST /admin/support-tickets/assign/{ticketKey}
+ * Escalate:  POST /admin/support-tickets/escalate/{ticketKey}
  * Close:     POST /admin/support-tickets/close/{ticketKey}
  * Store msg: POST /admin/support-tickets/{ticketKey}/messages/store
  */
@@ -218,6 +218,28 @@ export interface AssignAdminSupportTicketResponse {
   status: boolean;
   message: string;
   data?: AssignAdminSupportTicketData;
+  errors?: string[] | Record<string, string[]>;
+}
+
+/* ─── Escalate / transfer to vendor ─── */
+
+/** Response for POST /admin/support-tickets/escalate/{ticketKey} */
+export interface EscalateAdminSupportTicketData {
+  ticket_key?: string;
+  queue_owner?: string;
+  category?: string;
+  status?: AdminSupportTicketStatus;
+  status_label?: string;
+  can_reply?: boolean;
+  can_escalate?: boolean;
+  can_manage?: boolean;
+  [key: string]: unknown;
+}
+
+export interface EscalateAdminSupportTicketResponse {
+  status: boolean;
+  message: string;
+  data?: EscalateAdminSupportTicketData;
   errors?: string[] | Record<string, string[]>;
 }
 

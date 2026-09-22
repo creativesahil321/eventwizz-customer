@@ -374,7 +374,9 @@ function ConversationDetail({
 
   const composerDisabledMessage = isClosedTicketStatus(status)
     ? "This ticket is closed."
-    : "Replies are disabled for this ticket.";
+    : status === "waiting_general_support"
+      ? "This ticket was transferred to the venue."
+      : "Replies are disabled for this ticket.";
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden 2xl:flex-row">

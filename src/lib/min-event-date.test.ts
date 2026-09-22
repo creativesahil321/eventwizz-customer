@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   EVENT_DATE_MIN_MESSAGE,
+  advanceEventDateToMinimum,
   getMinEventDateString,
   getTodayLocalDateString,
   isEventDateBeforeMinimum,
@@ -32,4 +33,11 @@ test("invalid ISO dates are not treated as too soon", () => {
 
 test("EVENT_DATE_MIN_MESSAGE tells vendors to pick tomorrow or later", () => {
   assert.match(EVENT_DATE_MIN_MESSAGE, /tomorrow/i);
+});
+
+test("past 25 Dec rolls to the next bookable 25 Dec, not a different day", () => {
+  const now = noonOn(2026, 8, 22);
+  assert.equal(advanceEventDateToMinimum("2025-12-25", now), "2026-12-25");
+  assert.equal(advanceEventDateToMinimum("2026-12-27", now), "2026-12-27");
+  assert.equal(advanceEventDateToMinimum("not-a-date", now), "not-a-date");
 });

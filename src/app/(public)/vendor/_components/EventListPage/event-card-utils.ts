@@ -8,6 +8,7 @@ import {
   resolveLocationCardBookingOption,
   type PublicBookingType,
 } from "@/components/public/booking-type-icons";
+import { formatPublicClock24h, sortScheduleRows } from "@/lib/schedule-clock";
 
 const CLOCK_RE =
   /(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)(?:\s*[-–]\s*(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?))?/;
@@ -39,25 +40,7 @@ function firstNonEmpty(
 }
 
 function formatClock(raw: string): string | null {
-  const t = raw.trim();
-  if (!t) return null;
-
-  const twentyFour = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (twentyFour) {
-    return `${twentyFour[1].padStart(2, "0")}:${twentyFour[2]}`;
-  }
-
-  const ampm = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])$/);
-  if (ampm) {
-    let hours = Number.parseInt(ampm[1], 10);
-    const minutes = ampm[2];
-    const isPm = ampm[3].toLowerCase() === "pm";
-    if (isPm && hours < 12) hours += 12;
-    if (!isPm && hours === 12) hours = 0;
-    return `${String(hours).padStart(2, "0")}:${minutes}`;
-  }
-
-  return t;
+  return formatPublicClock24h(raw);
 }
 
 function timeFromDateLike(raw: string): string | null {
@@ -138,7 +121,12 @@ export function getEventCardTimeLabel(event: EventCardTimeSource): string | null
     ) ?? "",
   );
   const end = formatClock(firstNonEmpty(event.end_time) ?? "");
-  if (start && end) return `${start} – ${end}`;
+  if (start && end) {
+    const ordered = sortScheduleRows([{ time: start }, { time: end }]).map(
+      (row) => row.time,
+    );
+    return `${ordered[0]} – ${ordered[ordered.length - 1]}`;
+  }
   if (start) return start;
 
   const dateRaw = firstNonEmpty(

@@ -36,7 +36,7 @@ export default function ExperienceSection({
   const descriptionHtml =
     aboutDescription ||
     vendorTheme?.about_description ||
-    `${venueName} has a varied and lively social events calendar. Our professionally produced events include sell-out Lipstick, Powder & Paint Nights, (perfect fun-packed evenings for the last night of freedom), fantastic bottomless brunches in addition to traditional annual dining events such as Mothers & Fathers Day, Christmas & New Year's Eve.`;
+    `<p>${venueName} hosts a calendar of social events. Check upcoming dates below, or get in touch to find out more.</p>`;
 
   return (
     <section

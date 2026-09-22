@@ -16,6 +16,14 @@ import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
+import {
+  formatPublicClock24h,
+  nowScheduleMinutes,
+  OVERNIGHT_END_MINUTES,
+  scheduleHasOvernightEnd,
+  scheduleSortMinutes,
+  sortScheduleRows,
+} from "@/lib/schedule-clock";
 
 type EventScheduler = {
   id?: string;
@@ -47,52 +55,8 @@ type ScheduleStatus = "completed" | "current" | "upcoming";
 
 const CARD_MIN_WIDTH = 210;
 
-function formatTime(time: string): string {
-  if (!time || time === "TBD") return "TBD";
-  if (
-    time.toLowerCase().includes("am") ||
-    time.toLowerCase().includes("pm")
-  ) {
-    return time.replace(/\s*(am|pm)\s*/i, (_, p) => ` ${p.toUpperCase()}`);
-  }
-
-  try {
-    const [hours, minutes] = time.split(":").map(Number);
-    if (Number.isNaN(hours)) return time;
-    const period = hours >= 12 ? "PM" : "AM";
-    const hour12 = hours % 12 || 12;
-    const mins = Number.isNaN(minutes)
-      ? "00"
-      : minutes.toString().padStart(2, "0");
-    return `${hour12}:${mins} ${period}`;
-  } catch {
-    return time;
-  }
-}
-
-function parseTimeToMinutes(time: string): number | null {
-  const trimmed = time.trim();
-  if (!trimmed || trimmed === "TBD") return null;
-
-  const twelveHour = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
-  if (twelveHour) {
-    let hours = Number(twelveHour[1]);
-    const minutes = Number(twelveHour[2] ?? "0");
-    const period = twelveHour[3].toLowerCase();
-    if (period === "pm" && hours !== 12) hours += 12;
-    if (period === "am" && hours === 12) hours = 0;
-    return hours * 60 + minutes;
-  }
-
-  const twentyFour = trimmed.match(/^(\d{1,2}):(\d{2})$/);
-  if (twentyFour) {
-    const hours = Number(twentyFour[1]);
-    const minutes = Number(twentyFour[2]);
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-    return hours * 60 + minutes;
-  }
-
-  return null;
+function formatTime(time: string): string | null {
+  return formatPublicClock24h(time);
 }
 
 function getScheduleIcon(title: string, index: number, total: number): LucideIcon {
@@ -172,6 +136,8 @@ function startOfDayTs(date: Date): number {
  */
 function resolveEventDayPhase(
   eventDates: Array<string | null | undefined> | undefined,
+  schedules: EventScheduler[] = [],
+  now: Date = new Date(),
 ): EventDayPhase {
   if (!eventDates || eventDates.length === 0) return "unknown";
 
@@ -188,11 +154,22 @@ function resolveEventDayPhase(
 
   if (dayTimestamps.length === 0) return "unknown";
 
-  const today = startOfDayTs(new Date());
+  const today = startOfDayTs(now);
   if (dayTimestamps.includes(today)) return "during";
+
+  const lastDay = Math.max(...dayTimestamps);
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  if (
+    today === lastDay + oneDayMs &&
+    scheduleHasOvernightEnd(schedules.map((row) => row.time)) &&
+    now.getHours() * 60 + now.getMinutes() < OVERNIGHT_END_MINUTES
+  ) {
+    return "during";
+  }
+
   // Past the last occurrence → the schedule has fully happened. Otherwise the
   // next occurrence is still upcoming (covers multi-date events with gaps).
-  return today > Math.max(...dayTimestamps) ? "after" : "before";
+  return today > lastDay ? "after" : "before";
 }
 
 type ScheduleProgress = {
@@ -220,12 +197,17 @@ function resolveScheduleProgress(
   }
 
   // On the event day (or preview with no date): track the current slot by time.
-  const minutesList = schedules.map((s) => parseTimeToMinutes(s.time));
+  const times = schedules.map((s) => s.time);
+  const overnight = scheduleHasOvernightEnd(times);
+  const minutesList = schedules.map((s) => {
+    const minutes = scheduleSortMinutes(s.time, overnight);
+    return Number.isFinite(minutes) ? minutes : null;
+  });
   if (minutesList.some((m) => m === null)) {
     return { currentIndex: -1, useLiveProgress: false, allCompleted: false };
   }
 
-  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const nowMinutes = nowScheduleMinutes(overnight);
   const first = minutesList[0]!;
   const last = minutesList[minutesList.length - 1]!;
 
@@ -1025,17 +1007,19 @@ export default function Timeline({
       ? eventSchedular
       : [];
 
-    return safeEventSchedular
-      .map((item) => ({
-        ...item,
-        title: item.title.trim(),
-        time: item.time.trim(),
-      }))
-      .filter((item) => item.title || item.time);
+    return sortScheduleRows(
+      safeEventSchedular
+        .map((item) => ({
+          ...item,
+          title: item.title.trim(),
+          time: item.time.trim(),
+        }))
+        .filter((item) => item.title || item.time),
+    );
   }, [eventSchedular]);
 
   const { currentIndex, useLiveProgress, allCompleted } = useMemo(() => {
-    const phase = resolveEventDayPhase(eventDates);
+    const phase = resolveEventDayPhase(eventDates, displaySchedules);
     return resolveScheduleProgress(displaySchedules, phase);
   }, [displaySchedules, eventDates]);
 
@@ -1273,6 +1257,7 @@ export default function Timeline({
                   );
                   const isCurrent = status === "current";
                   const isCompleted = status === "completed";
+                  const clock = formatTime(item.time);
                   const isFirst = index === 0;
                   const isLast = index === displaySchedules.length - 1;
 
@@ -1339,14 +1324,13 @@ export default function Timeline({
                           <Icon size={18} strokeWidth={isCurrent ? 2.25 : 1.85} />
                         </div>
 
-                        <div className="tl-card__time-row">
-                          <time
-                            dateTime={item.time}
-                            className="tl-card__time"
-                          >
-                            {formatTime(item.time)}
-                          </time>
-                        </div>
+                        {clock ? (
+                          <div className="tl-card__time-row">
+                            <time dateTime={clock} className="tl-card__time">
+                              {clock}
+                            </time>
+                          </div>
+                        ) : null}
 
                         <h3
                           className={`tl-card__title ${

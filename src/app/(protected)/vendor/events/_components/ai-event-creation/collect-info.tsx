@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { motion } from "framer-motion";
 import { Sparkles, ArrowRight, Loader2, PenTool, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,7 +48,13 @@ import {
 import {
   AI_EVENT_ADDITIONAL_DETAILS_HINT,
   AI_EVENT_ADDITIONAL_DETAILS_PLACEHOLDER,
+  AI_EVENT_MAX_ROOMS,
+  AI_EVENT_MIN_ROOMS,
 } from "../../_lib/ai-event-vendor-intent";
+import {
+  aiEventCollectInfoSchema,
+  type AiEventCollectInfoForm,
+} from "../../_lib/ai-event-collect-schema";
 import {
   padMinRoomNames,
   roomNamePlaceholder,
@@ -69,87 +74,7 @@ const EventLocationMap = dynamic(
   },
 );
 
-const AI_EVENT_MIN_ROOMS = 2;
-const AI_EVENT_MAX_ROOMS = 3;
-
-const collectInfoSchema = z
-  .object({
-    eventName: z
-      .string()
-      .min(2, "Event name must be at least 2 characters")
-      .max(40, "Event name must be 40 characters or fewer"),
-    eventType: z.string().min(1, "Please select an event type"),
-    eventCategoryId: z.string().min(1, "Please select a category"),
-    venueAddress: z
-      .string()
-      .trim()
-      .min(
-        5,
-        "Enter the full address or location where this event takes place",
-      ),
-    latitude: z.number().optional(),
-    longitude: z.number().optional(),
-    eventDescription: z
-      .string()
-      .max(2000, "Description must be 2000 characters or fewer")
-      .optional(),
-    guestCount: z.string().optional(),
-    priceRange: z.string().optional(),
-    hasRoomSystem: z.enum(["yes", "no"]),
-    /** `select` when vendor already has venue rooms — pick from catalog (+ create 3rd if under cap). */
-    roomInputMode: z.enum(["select", "edit"]).optional(),
-    selectedRoomIds: z.array(z.number()).optional(),
-    rooms: z.array(
-      z.object({
-        id: z.number().optional(),
-        name: z
-          .string()
-          .trim()
-          .min(1, "Room name is required")
-          .max(40, "Room name max 40 characters"),
-      }),
-    ),
-  })
-  .superRefine((data, ctx) => {
-    if (data.hasRoomSystem !== "yes") return;
-
-    if (data.roomInputMode === "select") {
-      const count = data.selectedRoomIds?.length ?? 0;
-      if (count < AI_EVENT_MIN_ROOMS) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Select at least ${AI_EVENT_MIN_ROOMS} rooms for this event`,
-          path: ["selectedRoomIds"],
-        });
-      }
-      if (count > AI_EVENT_MAX_ROOMS) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `You can select a maximum of ${AI_EVENT_MAX_ROOMS} rooms`,
-          path: ["selectedRoomIds"],
-        });
-      }
-      return;
-    }
-
-    const count = data.rooms.length;
-    if (count < AI_EVENT_MIN_ROOMS) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least 2 rooms are required",
-        path: ["rooms"],
-      });
-    }
-    if (count > AI_EVENT_MAX_ROOMS) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "You can add a maximum of 3 rooms",
-        path: ["rooms"],
-      });
-    }
-  });
-
-type CollectInfoForm = z.infer<typeof collectInfoSchema>;
+type CollectInfoForm = AiEventCollectInfoForm;
 
 interface AICollectInfoProps {
   onSubmit: (input: AIEventInput, categoryId: number) => void;
@@ -212,7 +137,7 @@ export default function AIEventCollectInfo({
   const vendorRoomsRef = useRef<VendorRoomOption[]>([]);
 
   const form = useForm<CollectInfoForm>({
-    resolver: zodResolver(collectInfoSchema),
+    resolver: zodResolver(aiEventCollectInfoSchema),
     defaultValues: {
       eventName: initialData?.eventName || "",
       eventType: initialData?.eventType || "",
@@ -248,7 +173,8 @@ export default function AIEventCollectInfo({
     isTaken: eventNameTaken,
   } = useEventNameAvailability(eventNameValue);
 
-  const { fields: roomFields, append: appendRoom } = useFieldArray({
+  const { fields: roomFields, append: appendRoom, replace: replaceRooms } =
+    useFieldArray({
     control: form.control,
     name: "rooms",
   });
@@ -340,8 +266,10 @@ export default function AIEventCollectInfo({
       setRoomsLoading(false);
       setVendorRooms([]);
       vendorRoomsRef.current = [];
-      form.setValue("roomInputMode", "edit");
-      form.setValue("selectedRoomIds", []);
+      form.setValue("roomInputMode", "edit", { shouldValidate: false });
+      form.setValue("selectedRoomIds", [], { shouldValidate: false });
+      replaceRooms([]);
+      form.clearErrors(["rooms", "selectedRoomIds"]);
       return;
     }
 
@@ -353,10 +281,7 @@ export default function AIEventCollectInfo({
       vendorRoomsRef.current = [];
       form.setValue("roomInputMode", "edit");
       form.setValue("selectedRoomIds", []);
-      form.setValue("rooms", [{ name: "" }, { name: "" }], {
-        shouldValidate: false,
-        shouldDirty: true,
-      });
+      replaceRooms([{ name: "" }, { name: "" }]);
     };
 
     void roomService
@@ -407,7 +332,7 @@ export default function AIEventCollectInfo({
     return () => {
       cancelled = true;
     };
-  }, [form, hasRoomSystem]);
+  }, [form, hasRoomSystem, replaceRooms]);
 
   const handleFormSubmit = (data: CollectInfoForm) => {
     if (eventNameTaken || eventNameChecking) return;

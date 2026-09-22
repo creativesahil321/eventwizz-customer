@@ -91,7 +91,7 @@ export function formatDate(
     return "";
   }
 
-  return new Intl.DateTimeFormat("en-US", options).format(date);
+  return new Intl.DateTimeFormat("en-GB", options).format(date);
 }
 
 export function formatBytes(

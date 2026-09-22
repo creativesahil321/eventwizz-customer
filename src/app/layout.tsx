@@ -128,7 +128,7 @@ export default async function RootLayout({
 
   return (
     <html
-      lang="en"
+      lang="en-GB"
       suppressHydrationWarning={true}
       className={fontInter.variable}
       data-heading-emphasis={normalizeHeadingEmphasis(

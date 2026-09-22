@@ -1215,6 +1215,7 @@ export default function FormPreview() {
               field="event_schedular"
               label="Schedule"
               onEdit={jumpToEditor}
+              skipButtons
             >
               <Suspense fallback={<SectionLoader />}>
                 <RoomContentTransition roomKey={roomContentKey}>
@@ -1303,6 +1304,7 @@ export default function FormPreview() {
               field="dates"
               label="Dates"
               onEdit={jumpToEditor}
+              skipButtons
             >
               <Suspense fallback={<SectionLoader />}>
                 <RoomContentTransition roomKey={roomContentKey}>
@@ -1313,6 +1315,9 @@ export default function FormPreview() {
                     eventImage={datesEventImage}
                     roomId={activePreviewRoomScope.roomId}
                     roomIndex={activePreviewRoomScope.roomIndex}
+                    headingEmphasis={
+                      tryHeroPreviewProps?.headingEmphasis ?? undefined
+                    }
                   />
                 </RoomContentTransition>
               </Suspense>
@@ -1337,6 +1342,7 @@ export default function FormPreview() {
               field="gallery"
               label="Gallery"
               onEdit={jumpToEditor}
+              skipButtons
             >
               <Suspense fallback={<SectionLoader />}>
                 <EventGallery gallery={galleryPreviewItems} />
@@ -1357,6 +1363,7 @@ export default function FormPreview() {
               field="menu_title"
               label="Menu"
               onEdit={jumpToEditor}
+              skipButtons
             >
               <Suspense fallback={<SectionLoader />}>
                 <MenuSection
@@ -1388,6 +1395,7 @@ export default function FormPreview() {
               field="drink_title"
               label="Drinks"
               onEdit={jumpToEditor}
+              skipButtons
             >
               <Suspense fallback={<SectionLoader />}>
                 <DrinkSection
@@ -1455,6 +1463,7 @@ export default function FormPreview() {
               field="question"
               label="FAQs"
               onEdit={jumpToEditor}
+              skipButtons
             >
               <Suspense fallback={<SectionLoader />}>
                 <FaqSection

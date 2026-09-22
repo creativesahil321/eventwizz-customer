@@ -35,7 +35,6 @@ import { reconcileLocalCartWithApi } from "@/lib/utils/cart-sync-helper";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
-import { addCacheBusting } from "@/lib/image-utils";
 import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
 import { SiteHeading } from "@/components/public/site-heading";
@@ -163,23 +162,23 @@ function getDateCardContainerClass(
 ): string {
   const base = cn(
     "flex-shrink-0 overflow-hidden rounded-2xl border p-0 text-center transition-all duration-300",
-    "bg-black/25 backdrop-blur-sm shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]",
+    "bg-[#14141c] text-white shadow-[0_12px_28px_-16px_rgba(0,0,0,0.45)]",
     narrowPreview ? "w-[85px]" : "w-[85px] sm:w-[100px] md:w-[120px]",
   );
 
   if (visual.isSoldOut) {
-    return `${base} border-red-500/70 cursor-not-allowed bg-slate-900/50 opacity-85 shadow-[0_0_20px_rgba(239,68,68,0.35)]`;
+    return `${base} border-red-500/70 cursor-not-allowed bg-[#1a1214] opacity-85`;
   }
   if (visual.isSelecting) {
-    return `${base} border-[var(--color-primary)] ring-2 ring-white/30 shadow-[0_0_22px_rgba(255,255,255,0.15)] cursor-wait bg-black/35`;
+    return `${base} border-[var(--color-primary)] ring-2 ring-white/25 cursor-wait`;
   }
   if (visual.isOtherBusy) {
-    return `${base} border-[color:color-mix(in_srgb,var(--color-primary)_35%,transparent)] opacity-45 cursor-not-allowed`;
+    return `${base} border-white/15 opacity-45 cursor-not-allowed`;
   }
   if (visual.isInCart) {
-    return `${base} border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/45 bg-black/30 cursor-pointer shadow-[0_0_24px_var(--color-primary)]/35`;
+    return `${base} border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/45 cursor-pointer`;
   }
-  return `${base} border-[color:color-mix(in_srgb,var(--color-primary)_55%,transparent)] cursor-pointer hover:border-[var(--color-primary)] hover:bg-black/35 hover:shadow-[0_0_28px_rgba(60,70,147,0.55)]`;
+  return `${base} border-white/12 cursor-pointer hover:border-[var(--color-primary)] hover:shadow-[0_16px_36px_-18px_rgba(0,0,0,0.5)]`;
 }
 
 function dateCardAriaLabel(
@@ -438,14 +437,14 @@ function AlreadyBookedLogin({
   return (
     <p
       className={cn(
-        "relative z-10 text-center text-sm text-white/70",
+        "relative z-10 text-center text-sm text-[var(--color-text-dimmed)]",
         className,
       )}
     >
       Already booked?{" "}
       <button
         type="button"
-        className="font-medium text-white underline decoration-white/45 underline-offset-4 hover:decoration-white"
+        className="font-medium text-[var(--color-text)] underline decoration-[color:color-mix(in_srgb,var(--color-text)_35%,transparent)] underline-offset-4 hover:decoration-[var(--color-primary)]"
         onClick={onLogin}
       >
         Log in
@@ -523,8 +522,6 @@ export default function DatesSection({
   const [isClient, setIsClient] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [selectingDateKey, setSelectingDateKey] = useState<string | null>(null);
-  const [datesBackgroundImageFailed, setDatesBackgroundImageFailed] =
-    useState(false);
   // Professional API-only approach - no conflict modal needed
   const itemsPerRow = 5; // Number of items to display per row
   const datesPerPage = itemsPerRow * 2; // Total dates visible per page (2 rows)
@@ -538,18 +535,17 @@ export default function DatesSection({
     ? "p-2"
     : "p-2 sm:p-3";
   const dateCardDayClass = narrowPreview
-    ? "mb-0.5 text-xs"
-    : "mb-0.5 text-xs sm:mb-1 sm:text-sm";
+    ? "mb-0.5 text-xs text-white/70"
+    : "mb-0.5 text-xs text-white/70 sm:mb-1 sm:text-sm";
   const dateCardNumberClass = narrowPreview
-    ? "py-1 text-3xl font-bold"
-    : "py-1 text-3xl font-bold sm:text-4xl md:text-5xl";
+    ? "py-1 text-3xl font-bold text-white"
+    : "py-1 text-3xl font-bold text-white sm:text-4xl md:text-5xl";
   const dateCardMonthClass = narrowPreview
-    ? "text-xs"
-    : "text-xs sm:text-sm";
+    ? "text-xs text-white/70"
+    : "text-xs text-white/70 sm:text-sm";
   const sectionClass = cn(
-    "relative w-full overflow-hidden rounded-3xl text-white transition-all duration-200",
-    "bg-gradient-to-br from-[color:color-mix(in_srgb,var(--color-primary)_30%,#0a0014)] via-[color:color-mix(in_srgb,var(--color-primary)_15%,#0a0014)] to-[#0a0014]",
-    narrowPreview ? "py-12" : "py-12 sm:py-16",
+    "relative w-full bg-transparent text-[var(--color-text)]",
+    narrowPreview ? "py-4" : "py-4 sm:py-6",
   );
   const headingClass = cn(
     "mb-0 !block !w-full !font-black",
@@ -1077,12 +1073,12 @@ export default function DatesSection({
           <SiteHeading
             level={2}
             title={heading}
-            variant="onDark"
+            variant="onSurface"
             align="center"
             className={headingClass}
             emphasis={headingEmphasis as HeadingEmphasis | undefined}
           />
-          <p className="text-sm text-white/70">
+          <p className="text-sm text-[var(--color-text-dimmed)]">
             Add dates in the form to preview them here.
           </p>
         </div>
@@ -1105,11 +1101,11 @@ export default function DatesSection({
   const canGoRight = needsPagination && currentPage < maxPages;
 
   const dateArrowClass = cn(
-    "rounded-full bg-[#21223a] shadow-[0_0_10px_rgba(33,34,58,0.7)]",
+    "rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] bg-[var(--color-surface)] shadow-sm",
     narrowPreview ? "p-1" : "p-1 sm:p-2",
   );
   const dateArrowIconClass = cn(
-    "text-[#8f96c3]",
+    "text-[var(--color-text)]",
     narrowPreview ? "h-7 w-7" : "h-7 w-7 sm:h-10 sm:w-10",
   );
 
@@ -1123,7 +1119,7 @@ export default function DatesSection({
           <SiteHeading
             level={2}
             title={heading}
-            variant="onDark"
+            variant="onSurface"
             align="center"
             className={headingClass}
             emphasis={headingEmphasis as HeadingEmphasis | undefined}
@@ -1131,7 +1127,7 @@ export default function DatesSection({
           <p
             data-book-now-hint
             hidden
-            className="mt-1 max-w-md text-sm font-medium text-white/90"
+            className="mt-1 max-w-md text-sm font-medium text-[var(--color-text-dimmed)]"
             role="status"
           >
             Choose a date below to continue booking
@@ -1153,7 +1149,7 @@ export default function DatesSection({
                 className={cn(
                   dateArrowClass,
                   canGoLeft
-                    ? "cursor-pointer hover:bg-[#2a2b4a]"
+                    ? "cursor-pointer hover:bg-[color:color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))]"
                     : "cursor-not-allowed opacity-30",
                 )}
               >
@@ -1190,7 +1186,7 @@ export default function DatesSection({
                 className={cn(
                   dateArrowClass,
                   canGoRight
-                    ? "cursor-pointer hover:bg-[#2a2b4a]"
+                    ? "cursor-pointer hover:bg-[color:color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))]"
                     : "cursor-not-allowed opacity-30",
                 )}
               >
@@ -1215,27 +1211,14 @@ export default function DatesSection({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
     >
-      <div className="absolute inset-0 z-0">
-        {!datesBackgroundImageFailed ? (
-          <img
-            src={addCacheBusting("/assets/images/events/event-date-banner.jpg")}
-            alt=""
-            aria-hidden
-            onError={() => setDatesBackgroundImageFailed(true)}
-            className="absolute inset-0 h-full w-full object-cover rounded-3xl opacity-40"
-          />
-        ) : null}
-        <div className="absolute inset-0 bg-black/35" aria-hidden />
-      </div>
-
       <div className={headerWrapClass}>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+        <p className="text-sm font-semibold tracking-wide text-[color:var(--color-primary)] sm:text-base">
           {sectionLabel}
         </p>
         <SiteHeading
           level={2}
           title={heading}
-          variant="onDark"
+          variant="onSurface"
           align="center"
           className={headingClass}
           emphasis={headingEmphasis as HeadingEmphasis | undefined}
@@ -1243,7 +1226,7 @@ export default function DatesSection({
         <p
           data-book-now-hint
           hidden
-          className="mt-1 max-w-md text-sm font-medium text-white/90"
+          className="mt-1 max-w-md text-sm font-medium text-[var(--color-text-dimmed)]"
           role="status"
         >
           Choose a date below to continue booking
@@ -1268,7 +1251,7 @@ export default function DatesSection({
               className={cn(
                 dateArrowClass,
                 canGoLeft
-                  ? "cursor-pointer hover:bg-[#2a2b4a]"
+                  ? "cursor-pointer hover:bg-[color:color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))]"
                   : "cursor-not-allowed opacity-30",
               )}
             >
@@ -1309,7 +1292,7 @@ export default function DatesSection({
               className={cn(
                 dateArrowClass,
                 canGoRight
-                  ? "cursor-pointer hover:bg-[#2a2b4a]"
+                  ? "cursor-pointer hover:bg-[color:color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))]"
                   : "cursor-not-allowed opacity-30",
               )}
             >

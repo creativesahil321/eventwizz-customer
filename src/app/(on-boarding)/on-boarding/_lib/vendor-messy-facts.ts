@@ -33,6 +33,9 @@ const CURRENCY_TOKEN =
 
 const PP_TOKEN = "(?:pp|per head|per person|a head|/person|/head|each)";
 
+const MONTH_NAME_RE =
+  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+
 export function normalizeRoomKey(value: string): string {
   return String(value ?? "")
     .toLowerCase()
@@ -128,6 +131,15 @@ function extractDayLinkedPrices(text: string): Array<{ day: number; price: numbe
     `(?:actually|wait|sorry|change).{0,40}?(\\d{1,2})(?:st|nd|rd|th)?.{0,24}?(\\d+(?:\\.\\d+)?)`,
     "gi",
   );
+  /** `25th Dec (£50)` / `25 Dec £90` — month required so `2 rooms £50` does not match. */
+  const dayMonthCurrency = new RegExp(
+    `\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${MONTH_NAME_RE})(?:\\s*,?\\s*20\\d{2})?\\s*[\\(\\[,:]?\\s*${CURRENCY_TOKEN}\\s*(\\d+(?:\\.\\d+)?)`,
+    "gi",
+  );
+  const ordinalParenCurrency = new RegExp(
+    `\\b(\\d{1,2})(?:st|nd|rd|th)\\s*\\(\\s*${CURRENCY_TOKEN}\\s*(\\d+(?:\\.\\d+)?)\\s*\\)`,
+    "gi",
+  );
 
   for (const match of text.matchAll(priceFor)) {
     setDayPrice(byDay, Number(match[1]), Number(match[2]));
@@ -157,6 +169,12 @@ function extractDayLinkedPrices(text: string): Array<{ day: number; price: numbe
     setDayPrice(byDay, Number(match[2]), Number(match[1]));
   }
   for (const match of text.matchAll(actually)) {
+    setDayPrice(byDay, Number(match[1]), Number(match[2]));
+  }
+  for (const match of text.matchAll(dayMonthCurrency)) {
+    setDayPrice(byDay, Number(match[1]), Number(match[2]));
+  }
+  for (const match of text.matchAll(ordinalParenCurrency)) {
     setDayPrice(byDay, Number(match[1]), Number(match[2]));
   }
 

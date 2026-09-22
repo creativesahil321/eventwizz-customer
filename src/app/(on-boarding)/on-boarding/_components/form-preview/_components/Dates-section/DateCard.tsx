@@ -52,7 +52,7 @@ export const DateCard = ({
       aria-label={ariaLabel}
       disabled={soldOut}
       className={cn(
-        "cursor-pointer overflow-hidden rounded-2xl border border-[color:color-mix(in_srgb,var(--color-primary)_55%,transparent)] bg-black/25 text-center shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] backdrop-blur-sm transition-all duration-300 hover:border-[var(--color-primary)] hover:bg-black/35 hover:shadow-[0_0_28px_rgba(60,70,147,0.55)] flex-shrink-0",
+        "cursor-pointer overflow-hidden rounded-2xl border border-white/12 bg-[#14141c] text-white text-center shadow-[0_12px_28px_-16px_rgba(0,0,0,0.45)] transition-all duration-300 hover:border-[var(--color-primary)] hover:shadow-[0_16px_36px_-18px_rgba(0,0,0,0.5)] flex-shrink-0",
         soldOut && "cursor-not-allowed opacity-60 hover:shadow-[0_0_15px_rgba(60,70,147,0.25)]",
         narrowPreview
           ? "w-[85px]"
@@ -77,8 +77,8 @@ export const DateCard = ({
         <p
           className={
             narrowPreview
-              ? "mb-0.5 text-xs"
-              : "mb-0.5 text-xs sm:mb-1 sm:text-sm"
+              ? "mb-0.5 text-xs text-white/70"
+              : "mb-0.5 text-xs text-white/70 sm:mb-1 sm:text-sm"
           }
         >
           {dateInfo.day}
@@ -86,13 +86,17 @@ export const DateCard = ({
         <p
           className={
             narrowPreview
-              ? "py-1 text-3xl font-bold"
-              : "py-1 text-3xl font-bold sm:text-4xl md:text-5xl"
+              ? "py-1 text-3xl font-bold text-white"
+              : "py-1 text-3xl font-bold text-white sm:text-4xl md:text-5xl"
           }
         >
           {dateInfo.date}
         </p>
-        <p className={narrowPreview ? "text-xs" : "text-xs sm:text-sm"}>
+        <p
+          className={
+            narrowPreview ? "text-xs text-white/70" : "text-xs text-white/70 sm:text-sm"
+          }
+        >
           {dateInfo.month}
         </p>
       </div>

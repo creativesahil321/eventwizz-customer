@@ -46,7 +46,7 @@ export function formatBlogDate(isoDate: string): string {
 export function formatBlogDateLong(isoDate: string): string {
   const date = parseBlogDate(isoDate);
   if (!date) return isoDate || "";
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("en-GB", {
     month: "long",
     day: "numeric",
     year: "numeric",

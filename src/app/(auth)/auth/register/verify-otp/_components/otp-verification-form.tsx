@@ -10,12 +10,22 @@ import { Paragraph, Small } from "@/components/ui/typography";
 import { getCookie, setCookie } from "cookies-next";
 import { useDomainStore } from "@/store/domain.store";
 
+const OTP_EXPIRY_SECONDS = 10 * 60;
+const OTP_RESEND_SECONDS = 60;
+
+function formatOtpCountdown(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function OTPVerificationForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState<string>("");
   const [otp, setOtp] = useState<string[]>(["", "", "", ""]);
-  const [timer, setTimer] = useState(60);
+  const [expirySeconds, setExpirySeconds] = useState(OTP_EXPIRY_SECONDS);
+  const [resendSeconds, setResendSeconds] = useState(OTP_RESEND_SECONDS);
   const inputRefs = [
     useState<HTMLInputElement | null>(null),
     useState<HTMLInputElement | null>(null),
@@ -23,15 +33,13 @@ export function OTPVerificationForm() {
     useState<HTMLInputElement | null>(null),
   ];
 
-  // Countdown timer for OTP expiration
   useEffect(() => {
-    if (timer > 0) {
-      const interval = setInterval(() => {
-        setTimer((prevTimer) => prevTimer - 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [timer]);
+    const interval = setInterval(() => {
+      setExpirySeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      setResendSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // OTP already verified — keep user on create-password (blocks Back)
@@ -154,8 +162,7 @@ export function OTPVerificationForm() {
   };
 
   const handleResendOTP = async () => {
-    // Don't allow resend if timer is active or loading
-    if (timer > 0 || loading) {
+    if (resendSeconds > 0 || loading) {
       return;
     }
 
@@ -178,7 +185,8 @@ export function OTPVerificationForm() {
         email,
         domain: domainValue || undefined,
       });
-      setTimer(60); // Reset timer to 60 seconds
+      setExpirySeconds(OTP_EXPIRY_SECONDS);
+      setResendSeconds(OTP_RESEND_SECONDS);
       setOtp(["", "", "", ""]);
       inputRefs[0][0]?.focus();
     } catch (error) {
@@ -234,8 +242,8 @@ export function OTPVerificationForm() {
         </div>
 
         <Small className="text-muted-foreground mt-2">
-          {timer > 0
-            ? `Code expires in ${timer}s`
+          {expirySeconds > 0
+            ? `Code expires in ${formatOtpCountdown(expirySeconds)}`
             : "Code expired — please resend"}
         </Small>
 
@@ -243,14 +251,14 @@ export function OTPVerificationForm() {
           Didn&apos;t receive the code?{" "}
           <button
             onClick={handleResendOTP}
-            disabled={timer > 0 || loading}
+            disabled={resendSeconds > 0 || loading}
             className={cn(
               "text-[var(--color-primary)] font-medium hover:underline cursor-pointer focus:outline-none bg-transparent border-none p-0",
-              (timer > 0 || loading) && "opacity-50 cursor-not-allowed"
+              (resendSeconds > 0 || loading) && "opacity-50 cursor-not-allowed"
             )}
             type="button"
           >
-            Resend
+            {resendSeconds > 0 ? `Resend in ${resendSeconds}s` : "Resend"}
           </button>
         </Paragraph>
       </div>

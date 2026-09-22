@@ -9,6 +9,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type { DashboardDateFilter } from "@/app/(protected)/admin/support/_lib/types";
+import { normalizeSupportStatus } from "@/app/(protected)/admin/support/_lib/utils";
 import {
   adminSupportService,
   toAdminSupportDashboardParams,
@@ -25,6 +26,8 @@ import type {
   AssignAdminSupportTicketResponse,
   CloseAdminSupportTicketPayload,
   CloseAdminSupportTicketResponse,
+  EscalateAdminSupportTicketData,
+  EscalateAdminSupportTicketResponse,
   MarkAdminSupportMessagesReadResponse,
   PinAdminSupportTicketPayload,
   PinAdminSupportTicketResponse,
@@ -198,6 +201,51 @@ function setTicketAssigneeInCaches(
   patchMessagesCaches(queryClient, ticketKey, (page) => ({
     ...page,
     assignee: nextAssignee,
+  }));
+}
+
+function applyEscalateToCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  ticketKey: string,
+  data: EscalateAdminSupportTicketData | undefined
+) {
+  const nextStatus = data?.status
+    ? normalizeSupportStatus(data.status)
+    : undefined;
+  const statusLabel = data?.status_label?.trim();
+  const canReply = data?.can_reply ?? false;
+  const canEscalate = data?.can_escalate ?? false;
+
+  queryClient.setQueriesData<AdminSupportTicketsResponse>(
+    { queryKey: adminSupportKeys.lists() },
+    (current) => {
+      if (!current?.data || !nextStatus) return current;
+      return {
+        ...current,
+        data: current.data.map((ticket) =>
+          ticket.ticket_key === ticketKey
+            ? {
+                ...ticket,
+                status: nextStatus,
+                status_label: statusLabel || ticket.status_label,
+              }
+            : ticket
+        ),
+      };
+    }
+  );
+
+  patchMessagesCaches(queryClient, ticketKey, (page) => ({
+    ...page,
+    can_reply: canReply,
+    can_escalate: canEscalate,
+    ticket: page.ticket
+      ? {
+          ...page.ticket,
+          ...(nextStatus ? { status: nextStatus } : {}),
+          ...(statusLabel ? { status_label: statusLabel } : {}),
+        }
+      : page.ticket,
   }));
 }
 
@@ -446,6 +494,20 @@ export function useAssignAdminSupportTicket() {
       });
       void queryClient.invalidateQueries({
         queryKey: [...adminSupportKeys.all, "messages", payload.ticketKey],
+      });
+    },
+  });
+}
+
+export function useEscalateAdminSupportTicket() {
+  const queryClient = useQueryClient();
+
+  return useMutation<EscalateAdminSupportTicketResponse, Error, string>({
+    mutationFn: (ticketKey) => adminSupportService.escalateTicket(ticketKey),
+    onSuccess: (response, ticketKey) => {
+      applyEscalateToCaches(queryClient, ticketKey, response.data);
+      void queryClient.invalidateQueries({
+        queryKey: adminSupportKeys.all,
       });
     },
   });

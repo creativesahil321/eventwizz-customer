@@ -36,3 +36,27 @@ export function isEventDateBeforeMinimum(
   const minTime = new Date(`${getMinEventDateString(now)}T00:00:00`).getTime();
   return eventTime < minTime;
 }
+
+/**
+ * Keep the calendar day (25 Dec stays 25 Dec) and roll the year forward
+ * until the date is bookable. Never replace it with an unrelated fallback.
+ */
+export function advanceEventDateToMinimum(
+  isoDate: string,
+  now: Date = new Date(),
+): string {
+  if (!ISO_DATE_RE.test(isoDate)) return isoDate;
+  const month = Number(isoDate.slice(5, 7));
+  const day = Number(isoDate.slice(8, 10));
+  let year = Number(isoDate.slice(0, 4));
+  let candidate = isoDate;
+  while (isEventDateBeforeMinimum(candidate, now) && year < 2100) {
+    year += 1;
+    const probe = new Date(Date.UTC(year, month - 1, day));
+    if (probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) {
+      continue;
+    }
+    candidate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  return candidate;
+}

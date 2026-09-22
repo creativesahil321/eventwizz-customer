@@ -417,6 +417,7 @@ export const API_ENDPOINTS = {
         "/admin/support-tickets/{ticketKey}/messages/read",
       PIN: "/admin/support-tickets/pin/{ticketKey}",
       ASSIGN: "/admin/support-tickets/assign/{ticketKey}",
+      ESCALATE: "/admin/support-tickets/escalate/{ticketKey}",
       CLOSE: "/admin/support-tickets/close/{ticketKey}",
       STORE_MESSAGE:
         "/admin/support-tickets/{ticketKey}/messages/store",

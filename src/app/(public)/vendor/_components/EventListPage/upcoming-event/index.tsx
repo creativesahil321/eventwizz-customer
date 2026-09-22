@@ -18,7 +18,7 @@ const eventImages = [
 
 import { EventComponentProps } from "../event-types";
 import { useIsPreviewMode } from "@/contexts/preview-context";
-import { resolveCurrencySymbol } from "@/lib/currency-format";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import {
   eventListingManyScrollItemClass,
   mobileEventRowPeekScrollItemClass,
@@ -42,7 +42,7 @@ export default function UpcomingEvents({
   const narrowPreview = usePreviewMobileLayout();
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
-  const currencySym = resolveCurrencySymbol(vendorTheme?.currency_symbol);
+  const currencySym = useCurrencySymbol();
 
   const sectionTitleText =
     sectionTitle || vendorTheme?.event_title_2 || "Upcoming Events";

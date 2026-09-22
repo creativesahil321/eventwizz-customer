@@ -41,6 +41,9 @@ export function OnboardingPreviewHeader({
         previewBackButtonOffset={false}
         scrollContainerRef={scrollContainerRef}
         headerDownloads={headerDownloads}
+        hideHeaderPhone
+        hideBrowseEvents
+        compactGuestAuth
         overlayHero
         onEditLogo={onEditLogo}
       />

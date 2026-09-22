@@ -67,10 +67,7 @@ export default function AboutEventSec({
             </p>
             <SiteHeading
               level={2}
-              title={
-                (about_event_heading || "Lipstick, Powder & Paint").trim() ||
-                "\u00a0"
-              }
+              title={about_event_heading?.trim() || "\u00a0"}
               accentHint={aboutHeadingAccentHint}
               emphasis={headingEmphasis ?? undefined}
               variant="onSurface"

@@ -16,7 +16,7 @@ const eventImages = [
 ];
 
 import { EventComponentProps } from "../event-types";
-import { resolveCurrencySymbol } from "@/lib/currency-format";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import {
   eventListingManyScrollItemClass,
   mobileEventRowPeekScrollItemClass,
@@ -37,7 +37,7 @@ export default function PopularEvents({
   const [pendingEventSlug, setPendingEventSlug] = useState<string | null>(null);
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
-  const currencySym = resolveCurrencySymbol(vendorTheme?.currency_symbol);
+  const currencySym = useCurrencySymbol();
   const narrowPreview = usePreviewMobileLayout();
 
   const sectionTitleText =

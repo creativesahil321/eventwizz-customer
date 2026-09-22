@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { format, isValid, parseISO } from "date-fns";
@@ -8,8 +8,7 @@ import { CalendarDays, Loader2, MapPin, SearchX } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { SiteHeading } from "@/components/public/site-heading";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ServerContext } from "@/lib/server-context";
-import { resolveCurrencySymbol } from "@/lib/currency-format";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { cn } from "@/lib/utils";
 import { PUBLIC_FILTER_RESULTS_MOTION } from "@/lib/public-rhythm";
 import { savePendingBooking } from "@/lib/booking/pending-booking";
@@ -17,7 +16,6 @@ import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 import { CUSTOMER_CHECKOUT_PATH } from "@/lib/customer-checkout-path";
 import { useStoreEventBooking } from "@/services/customer/cart/query";
 import type { CartRequest } from "@/services/customer/cart/type";
-import type { ThemeSchema } from "@/types/theme.types";
 import type {
   PublicSearchData,
   PublicSearchMeta,
@@ -119,10 +117,7 @@ export function PublicSearchResults({
   const { data: session, status } = useSession();
   const { mutateAsync: storeEventBooking, isPending: isStoringBooking } =
     useStoreEventBooking();
-  const { theme } = useContext(ServerContext);
-  const currencySym = resolveCurrencySymbol(
-    (theme as ThemeSchema | null)?.currency_symbol,
-  );
+  const currencySym = useCurrencySymbol();
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
 

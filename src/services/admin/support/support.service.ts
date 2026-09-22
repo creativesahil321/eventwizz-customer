@@ -30,6 +30,7 @@ import type {
   AssignAdminSupportTicketResponse,
   CloseAdminSupportTicketPayload,
   CloseAdminSupportTicketResponse,
+  EscalateAdminSupportTicketResponse,
   MarkAdminSupportMessagesReadResponse,
   PinAdminSupportTicketPayload,
   PinAdminSupportTicketResponse,
@@ -245,6 +246,24 @@ export const adminSupportService = {
     return api.post<AssignAdminSupportTicketResponse>(
       endpoint,
       { staff_id: payload.staff_id },
+      {
+        returnFullResponse: true,
+        suppressSuccessToast: true,
+      }
+    );
+  },
+
+  escalateTicket: async (
+    ticketKey: string
+  ): Promise<EscalateAdminSupportTicketResponse> => {
+    const endpoint = API_ENDPOINTS.ADMIN.SUPPORT_TICKETS.ESCALATE.replace(
+      "{ticketKey}",
+      encodeURIComponent(ticketKey)
+    );
+
+    return api.post<EscalateAdminSupportTicketResponse>(
+      endpoint,
+      undefined,
       {
         returnFullResponse: true,
         suppressSuccessToast: true,

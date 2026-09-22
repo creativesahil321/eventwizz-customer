@@ -1439,7 +1439,7 @@ export default function CommonHeader({
           </div>
 
           <nav
-            className="flex flex-1 flex-col overflow-y-auto px-4 pb-8 font-sans"
+            className="flex flex-col overflow-y-auto px-4 pb-8 font-sans"
             aria-label="Main navigation"
           >
             <div className="flex flex-col divide-y divide-current/15">

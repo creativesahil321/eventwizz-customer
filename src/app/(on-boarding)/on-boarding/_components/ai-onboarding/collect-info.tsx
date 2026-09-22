@@ -546,8 +546,6 @@ export default function AICollectInfo({
           fields: [
             "name",
             "formatted_address",
-            "formatted_phone_number",
-            "international_phone_number",
             "website",
             "url",
             "business_status",
@@ -568,13 +566,6 @@ export default function AICollectInfo({
             {
               shouldValidate: true,
             },
-          );
-          form.setValue(
-            "contactNumber",
-            place.international_phone_number ??
-              place.formatted_phone_number ??
-              "",
-            { shouldValidate: true },
           );
           form.setValue("address", place.formatted_address ?? "", {
             shouldValidate: true,
@@ -624,7 +615,6 @@ export default function AICollectInfo({
     form.setValue("selectedPlaceId", "");
     form.setValue("address", "");
     form.setValue("city", "");
-    form.setValue("contactNumber", "");
     form.setValue("latitude", undefined, { shouldValidate: false });
     form.setValue("longitude", undefined, { shouldValidate: false });
     setSearchQuery("");
@@ -704,6 +694,14 @@ export default function AICollectInfo({
 
   const hasRoomSystem = form.watch("has_room_system");
   const roomNameFields = form.watch("room_names");
+
+  useEffect(() => {
+    if (!draftReady) return;
+    if (hasRoomSystem === true) return;
+    if (roomNames.fields.length > 0) {
+      roomNames.replace([]);
+    }
+  }, [draftReady, hasRoomSystem, roomNames]);
   const addressValue = form.watch("address");
   const cityValue = form.watch("city");
   const latitudeValue = form.watch("latitude");
@@ -1163,7 +1161,7 @@ export default function AICollectInfo({
                             shouldValidate: true,
                           });
                         }}
-                        onResolved={({ address, city, phone, latitude, longitude }) => {
+                        onResolved={({ address, city, latitude, longitude }) => {
                           form.setValue("address", address, {
                             shouldValidate: true,
                             shouldDirty: true,
@@ -1172,12 +1170,6 @@ export default function AICollectInfo({
                             city || cityFromFormattedAddress(address);
                           if (nextCity) {
                             form.setValue("city", nextCity, {
-                              shouldValidate: true,
-                              shouldDirty: true,
-                            });
-                          }
-                          if (phone) {
-                            form.setValue("contactNumber", phone, {
                               shouldValidate: true,
                               shouldDirty: true,
                             });

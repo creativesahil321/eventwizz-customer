@@ -20,7 +20,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="en">
+    <html lang="en-GB">
       <body
         className="bg-[var(--color-background,#e8f4f6)]"
         style={{ fontFamily: globalErrorFontStack }}

@@ -196,6 +196,9 @@ export function useAiCollectDraft({
       roomNamesStashRef.current = next.stash;
       form.setValue("has_room_system", enabled, { shouldValidate: true });
       form.setValue("room_names", next.roomNames, { shouldValidate: true });
+      if (!enabled) {
+        form.clearErrors("room_names");
+      }
       persistDraft(true);
     },
     [form, persistDraft],

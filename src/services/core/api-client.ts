@@ -19,6 +19,7 @@ import {
   isOnboardingAlreadyCompletedMessage,
   recoverFromOnboardingAlreadyCompleted,
 } from "@/lib/onboarding-completion";
+import { humanizeApiToastMessage } from "@/lib/api-toast-message";
 // Browser environment check
 const isBrowser = typeof window !== "undefined";
 
@@ -454,7 +455,9 @@ apiClient.interceptors.response.use(
       }
 
       // For other status:false responses, show error toast
-      safeToast.error(response.data.message || "Something went wrong");
+      safeToast.error(
+        humanizeApiToastMessage(response.data.message || "Something went wrong"),
+      );
       return Promise.reject(response.data);
     }
 
@@ -481,7 +484,7 @@ apiClient.interceptors.response.use(
       subscribeResult !== "already_subscribed" &&
       subscribeResult !== "confirmation_pending"
     ) {
-      safeToast.success(response.data.message);
+      safeToast.success(humanizeApiToastMessage(response.data.message));
     }
 
     return response;

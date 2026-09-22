@@ -1,12 +1,10 @@
 "use client";
 
-import { useContext, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { SearchX } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
-import { ServerContext } from "@/lib/server-context";
-import { resolveCurrencySymbol } from "@/lib/currency-format";
-import type { ThemeSchema } from "@/types/theme.types";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import type { Event } from "@/services/common/events/type";
 import type { LocationSearchFilters } from "./_lib/search-filters";
 import { toLocationEventCardModel } from "../EventListPage/event-card-utils";
@@ -44,10 +42,7 @@ export function LocationEventSearchResults({
   onClear,
 }: LocationEventSearchResultsProps) {
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
-  const { theme } = useContext(ServerContext);
-  const currencySym = resolveCurrencySymbol(
-    (theme as ThemeSchema | null)?.currency_symbol,
-  );
+  const currencySym = useCurrencySymbol();
 
   const cards = useMemo(
     () =>

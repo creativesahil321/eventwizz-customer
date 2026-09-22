@@ -9,7 +9,10 @@ import {
   resolveAiDrinksEnabled,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { sanitizeOnboardingMenusForSubmit } from "./onboarding-catering-ready";
-import { isEventDateBeforeMinimum } from "@/lib/min-event-date";
+import {
+  advanceEventDateToMinimum,
+  isEventDateBeforeMinimum,
+} from "@/lib/min-event-date";
 import { normalizeEventDateKey } from "@/lib/event-dates-sort";
 import { padMinRoomNames } from "@/lib/room-name-examples";
 import {
@@ -172,12 +175,21 @@ function toIsoDate(year: number, monthIndex: number, day: number): string | null
 }
 
 function resolveFutureYear(monthIndex: number, day: number, explicitYear?: number): number {
-  if (explicitYear && explicitYear >= 2024 && explicitYear <= 2100) return explicitYear;
   const now = new Date();
-  const year = now.getFullYear();
-  const candidate = new Date(year, monthIndex, day);
-  const today = new Date(year, now.getMonth(), now.getDate());
-  return candidate <= today ? year + 1 : year;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const bumpUntilBookable = (startYear: number): number => {
+    let year = startYear;
+    let candidate = new Date(year, monthIndex, day);
+    while (candidate <= today && year < 2100) {
+      year += 1;
+      candidate = new Date(year, monthIndex, day);
+    }
+    return year;
+  };
+  if (explicitYear && explicitYear >= 2024 && explicitYear <= 2100) {
+    return bumpUntilBookable(explicitYear);
+  }
+  return bumpUntilBookable(now.getFullYear());
 }
 
 function parseDayNumbers(chunk: string): number[] {
@@ -188,7 +200,13 @@ function parseDayNumbers(chunk: string): number[] {
 
 function uniqueIsoDates(dates: string[]): string[] {
   return Array.from(
-    new Set(dates.map((iso) => normalizeEventDateKey(iso)).filter(Boolean)),
+    new Set(
+      dates
+        .map((iso) =>
+          advanceEventDateToMinimum(normalizeEventDateKey(iso)),
+        )
+        .filter((iso) => /^\d{4}-\d{2}-\d{2}$/.test(iso)),
+    ),
   ).sort();
 }
 

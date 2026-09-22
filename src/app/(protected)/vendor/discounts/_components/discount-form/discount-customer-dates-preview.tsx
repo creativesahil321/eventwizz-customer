@@ -10,6 +10,7 @@ import {
   type DateCardOffer,
 } from "@/components/public/date-card-offer";
 import { DateCardPriceFooter } from "@/components/public/date-card-price-footer";
+import { useCurrencySymbol } from "@/hooks/use-currency-format";
 import { unnamedRoomLabel } from "@/lib/room-name-examples";
 
 export type DiscountDatePreviewItem = {
@@ -59,7 +60,8 @@ function dateParts(iso: string): {
 }
 
 /**
- * Customer-side style preview: room tabs + dark “Select a Date” cards.
+ * Customer-side style preview: room tabs + the same Select a Date cards
+ * as the live event page (cream band, dark ticket tiles).
  * Clicking Set offer opens that date’s editor in the form above.
  */
 export function DiscountCustomerDatesPreview({
@@ -69,6 +71,7 @@ export function DiscountCustomerDatesPreview({
   onSetOffer,
   rooms,
 }: DiscountCustomerDatesPreviewProps) {
+  const currencySymbol = useCurrencySymbol();
   const roomTabs = useMemo(() => {
     const present = new Map<number, string>();
     for (const item of items) {
@@ -172,37 +175,28 @@ export function DiscountCustomerDatesPreview({
         <div
           className={cn(
             "relative px-4 py-8 sm:px-6 sm:py-10",
-            "bg-[#12121f] text-white",
+            "bg-[var(--color-background)] text-[var(--color-text)]",
           )}
         >
-          <div
-            className="pointer-events-none absolute inset-0 opacity-40"
-            style={{
-              background:
-                "radial-gradient(ellipse 70% 55% at 50% 40%, color-mix(in srgb, var(--color-primary) 45%, transparent), transparent 70%)",
-            }}
-            aria-hidden
-          />
-
           <div className="relative z-[1] text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
               Book your places now
             </p>
             <h5
-              className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
+              className="mt-2 text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-3xl"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Select a Date
             </h5>
             {hasRoomTabs && activeRoomId != null ? (
-              <p className="mt-1.5 text-xs text-white/60">
+              <p className="mt-1.5 text-xs text-[var(--color-text-dimmed)]">
                 {roomTabs.find((r) => r.roomId === activeRoomId)?.label}
               </p>
             ) : null}
           </div>
 
           {visibleItems.length === 0 ? (
-            <p className="relative z-[1] mt-8 text-center text-sm text-white/50">
+            <p className="relative z-[1] mt-8 text-center text-sm text-[var(--color-text-dimmed)]">
               No dates for this room.
             </p>
           ) : (
@@ -232,15 +226,14 @@ export function DiscountCustomerDatesPreview({
                       onClick={() => onSetOffer?.(item)}
                       className={cn(
                         "flex w-[5.75rem] flex-col overflow-hidden rounded-2xl border text-center transition-all sm:w-[6.5rem]",
-                        "border-[color:color-mix(in_srgb,var(--color-primary)_55%,transparent)]",
-                        "bg-transparent text-white",
-                        "shadow-[0_0_15px_rgba(60,70,147,0.25)]",
+                        "border-white/12 bg-[#14141c] text-white",
+                        "shadow-[0_12px_28px_-16px_rgba(0,0,0,0.45)]",
                         interactive &&
-                          "hover:border-[var(--color-primary)] hover:bg-[color:color-mix(in_srgb,var(--color-primary)_12%,transparent)] hover:shadow-[0_0_25px_rgba(60,70,147,0.45)]",
+                          "hover:border-[var(--color-primary)] hover:shadow-[0_16px_36px_-18px_rgba(0,0,0,0.5)]",
                         interactive && "cursor-pointer active:scale-[0.98]",
                         !interactive && "cursor-default",
                         isSelected
-                          ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/70 shadow-[0_0_22px_rgba(60,70,147,0.45)]"
+                          ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/45"
                           : showBadgeOnPage &&
                               "ring-1 ring-[var(--color-primary)]/50",
                       )}
@@ -255,13 +248,13 @@ export function DiscountCustomerDatesPreview({
                       <div className="px-2 py-3 sm:py-3.5">
                         {parts ? (
                           <>
-                            <p className="text-[10px] font-medium text-white/80 sm:text-xs">
+                            <p className="text-[10px] font-medium text-white/70 sm:text-xs">
                               {parts.weekday}
                             </p>
-                            <p className="py-1 text-3xl font-bold tabular-nums leading-none sm:text-4xl">
+                            <p className="py-1 text-3xl font-bold tabular-nums leading-none text-white sm:text-4xl">
                               {parts.day}
                             </p>
-                            <p className="text-[10px] text-white/75 sm:text-xs">
+                            <p className="text-[10px] text-white/70 sm:text-xs">
                               {parts.month}
                             </p>
                           </>
@@ -272,14 +265,14 @@ export function DiscountCustomerDatesPreview({
                       <div className="bg-gradient-to-b from-[var(--color-primary)] to-[#232a61]">
                         {needsOfferPrompt ? (
                           <DateCardPriceFooter
-                            currencySymbol="£"
+                            currencySymbol={currencySymbol}
                             listPrice={listPrice}
                             fallbackLabel="Set offer"
                             compact
                           />
                         ) : (
                           <DateCardPriceFooter
-                            currencySymbol="£"
+                            currencySymbol={currencySymbol}
                             listPrice={listPrice}
                             offerLabel={
                               showBadgeOnPage ? item.badge : undefined
