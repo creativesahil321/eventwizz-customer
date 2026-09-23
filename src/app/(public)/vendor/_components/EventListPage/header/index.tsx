@@ -228,7 +228,7 @@ export default function HeadersSec({
 
         {/* Mobile Menu Panel */}
         <div
-          className={`md:hidden fixed top-0 left-0 w-[70%] max-w-xs h-screen bg-white dark:bg-gray-900 bg-[color:var(--color-surface)] text-[var(--color-on-surface)] z-50 transform transition-transform duration-300 ease-in-out ${
+          className={`md:hidden fixed inset-0 flex h-full w-full flex-col bg-white dark:bg-gray-900 bg-[color:var(--color-surface)] text-[var(--color-on-surface)] z-50 transform transition-transform duration-300 ease-in-out ${
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -239,7 +239,7 @@ export default function HeadersSec({
             </button>
           </div>
 
-          <div className="p-4 space-y-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
             <Link
               href={headerData.browseEvent.link}
               className="block py-2 text-[var(--color-on-surface)] hover:opacity-90 hover:underline hover:decoration-2 hover:underline-offset-2 hover:decoration-[color:var(--color-primary)]"

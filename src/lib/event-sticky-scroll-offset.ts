@@ -3,6 +3,28 @@ import {
   EVENT_SECTION_NAV_HEIGHT_PX,
 } from "@/components/public/event-section-nav";
 
+/** Live measured CommonHeader height. Fallback matches the desktop bar. */
+export const EVENT_HEADER_OFFSET_CSS_VAR = "--event-header-offset";
+export const EVENT_HEADER_OFFSET_FALLBACK = "4.5rem";
+export const EVENT_HEADER_OFFSET = `var(${EVENT_HEADER_OFFSET_CSS_VAR}, ${EVENT_HEADER_OFFSET_FALLBACK})`;
+
+/** Write the visible header height onto the preview frame (or the document). */
+export function publishEventHeaderOffsetPx(
+  fromEl: HTMLElement | null,
+  heightPx: number,
+): void {
+  if (heightPx <= 0) return;
+  const frame = fromEl?.closest<HTMLElement>("[data-preview-device]");
+  const root =
+    frame ??
+    (typeof document !== "undefined" ? document.documentElement : null);
+  if (!root) return;
+  root.style.setProperty(
+    EVENT_HEADER_OFFSET_CSS_VAR,
+    `${Math.round(heightPx)}px`,
+  );
+}
+
 /** Breathing room below sticky chrome so section headings stay visible. */
 export const EVENT_SECTION_SCROLL_GAP_PX = 24;
 

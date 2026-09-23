@@ -67,6 +67,7 @@ import {
   lockPreviewMenuHostScroll,
   resolvePreviewMobileMenuHost,
 } from "@/lib/preview-device";
+import { publishEventHeaderOffsetPx } from "@/lib/event-sticky-scroll-offset";
 import { PreviewMobileMenuPortal } from "@/components/preview/preview-mobile-menu-portal";
 import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
 import { GuestAccountMenu } from "@/components/shared/guest-account-menu";
@@ -661,21 +662,6 @@ export default function CommonHeader({
   const overlayHeroBar = overlayHero && !solidBar;
   const overlayInScrollPanel = overlayHeroBar && usesEmbeddedScrollPanel;
 
-  // sticky + h-0 is ignored by layout (the bar grows to its content and pushes
-  // the hero down). Measure the real chrome and pull the next sibling up.
-  useLayoutEffect(() => {
-    if (!overlayInScrollPanel) return;
-    const el = overlayBarInnerRef.current;
-    if (!el) return;
-    const sync = () => {
-      const next = Math.round(el.getBoundingClientRect().height);
-      if (next > 0) setOverlayPullPx(next);
-    };
-    sync();
-    const observer = new ResizeObserver(sync);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [overlayInScrollPanel, topBanner]);
   const usesStickyHeader =
     !overlayHeroBar &&
     (variant === "preview" || usesEmbeddedScrollPanel);
@@ -726,6 +712,25 @@ export default function CommonHeader({
     : usePreviewContainerQueries
       ? previewDesktopHeaderHidden
       : "xl:hidden";
+
+  // sticky + h-0 is ignored by layout (the bar grows to its content and pushes
+  // the hero down). Measure the real chrome, pull the next sibling up, and
+  // publish the height so section nav / room bars sit flush (hamburger is
+  // shorter than the 4.5rem desktop fallback).
+  useLayoutEffect(() => {
+    const el = overlayBarInnerRef.current ?? headerRootRef.current;
+    if (!el) return;
+    const sync = () => {
+      const next = Math.round(el.getBoundingClientRect().height);
+      if (next <= 0) return;
+      if (overlayInScrollPanel) setOverlayPullPx(next);
+      publishEventHeaderOffsetPx(el, next);
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [overlayInScrollPanel, topBanner, isPreviewNarrow]);
 
   /** Icon-first until there is room for labels beside a wordmark logo. */
   const desktopActionLabelClass = usePreviewContainerQueries
@@ -1439,7 +1444,7 @@ export default function CommonHeader({
           </div>
 
           <nav
-            className="flex flex-col overflow-y-auto px-4 pb-8 font-sans"
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-8 font-sans"
             aria-label="Main navigation"
           >
             <div className="flex flex-col divide-y divide-current/15">

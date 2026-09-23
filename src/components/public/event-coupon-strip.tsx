@@ -3,16 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Clock, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EVENT_HEADER_OFFSET } from "@/lib/event-sticky-scroll-offset";
 
 /** Matches strip min-height — keep in sync with layout classes. */
 export const EVENT_COUPON_STRIP_HEIGHT = "4.5rem";
 export const EVENT_COUPON_STRIP_HEIGHT_PX = 72;
 
 /**
- * Site header (`4.5rem`) + coupon strip — use for sticky bars under both.
+ * Site header + coupon strip — use for sticky bars under both.
  * Keep aligned with `PUBLIC_EVENT_HEADER_OFFSET` in event-room-selector.
  */
-export const PUBLIC_EVENT_HEADER_WITH_COUPON_OFFSET = "9rem";
+export const PUBLIC_EVENT_HEADER_WITH_COUPON_OFFSET = `calc(${EVENT_HEADER_OFFSET} + ${EVENT_COUPON_STRIP_HEIGHT})`;
 
 export type EventCouponStripProps = {
   code?: string;

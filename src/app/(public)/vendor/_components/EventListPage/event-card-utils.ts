@@ -8,7 +8,7 @@ import {
   resolveLocationCardBookingOption,
   type PublicBookingType,
 } from "@/components/public/booking-type-icons";
-import { formatPublicClock24h, sortScheduleRows } from "@/lib/schedule-clock";
+import { formatPublicClock12h, sortScheduleRows } from "@/lib/schedule-clock";
 
 const CLOCK_RE =
   /(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)(?:\s*[-–]\s*(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?))?/;
@@ -40,7 +40,7 @@ function firstNonEmpty(
 }
 
 function formatClock(raw: string): string | null {
-  return formatPublicClock24h(raw);
+  return formatPublicClock12h(raw);
 }
 
 function timeFromDateLike(raw: string): string | null {

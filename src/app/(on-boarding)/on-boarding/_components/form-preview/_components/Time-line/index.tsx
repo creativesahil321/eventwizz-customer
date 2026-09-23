@@ -17,7 +17,7 @@ import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import {
-  formatPublicClock24h,
+  formatPublicClock12h,
   nowScheduleMinutes,
   OVERNIGHT_END_MINUTES,
   scheduleHasOvernightEnd,
@@ -56,7 +56,7 @@ type ScheduleStatus = "completed" | "current" | "upcoming";
 const CARD_MIN_WIDTH = 210;
 
 function formatTime(time: string): string | null {
-  return formatPublicClock24h(time);
+  return formatPublicClock12h(time);
 }
 
 function getScheduleIcon(title: string, index: number, total: number): LucideIcon {

@@ -109,14 +109,57 @@ export function resolvePreviewMobileMenuHost(
   return typeof document !== "undefined" ? document.body : null;
 }
 
+/** Visible pane of a scrolling preview frame, in the host's scroll coordinates. */
+export function readPreviewScrollportBox(host: HTMLElement): {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+} {
+  return {
+    top: host.scrollTop,
+    left: host.scrollLeft,
+    width: host.clientWidth,
+    height: host.clientHeight,
+  };
+}
+
+/** On-screen box of the device frame — use for a `position: fixed` overlay. */
+export function readPreviewFrameViewport(host: HTMLElement): {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  borderRadius: string;
+} {
+  const rect = host.getBoundingClientRect();
+  return {
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+    borderRadius:
+      typeof getComputedStyle === "undefined"
+        ? ""
+        : getComputedStyle(host).borderRadius,
+  };
+}
+
 /** Lock scroll on the preview frame only — never `document.body` (that clips the onboarding approve bar). */
 export function lockPreviewMenuHostScroll(host: HTMLElement): () => void {
   if (typeof document !== "undefined" && host === document.body) {
     return () => undefined;
   }
   const previousOverflowY = host.style.overflowY;
+  const scrollTop = host.scrollTop;
+  const scrollLeft = host.scrollLeft;
   host.style.overflowY = "hidden";
+  // Some engines reset scrollTop when overflow becomes hidden — keep the pane.
+  host.scrollTop = scrollTop;
+  host.scrollLeft = scrollLeft;
   return () => {
     host.style.overflowY = previousOverflowY;
+    host.scrollTop = scrollTop;
+    host.scrollLeft = scrollLeft;
   };
 }

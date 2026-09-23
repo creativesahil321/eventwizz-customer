@@ -4,9 +4,10 @@ import { cn } from "@/lib/utils";
 import { FloatingRoomBar } from "@/components/rooms/floating-room-bar";
 import type { PublicEventRoomRef } from "@/lib/resolve-public-event-room-slices";
 import { unnamedRoomLabel } from "@/lib/room-name-examples";
+import { EVENT_HEADER_OFFSET } from "@/lib/event-sticky-scroll-offset";
 
 /** Sticky site header height — room bar sits just below CommonHeader. */
-export const PUBLIC_EVENT_HEADER_OFFSET = "4.5rem";
+export const PUBLIC_EVENT_HEADER_OFFSET = EVENT_HEADER_OFFSET;
 
 type EventRoomSelectorProps = {
   rooms: PublicEventRoomRef[];

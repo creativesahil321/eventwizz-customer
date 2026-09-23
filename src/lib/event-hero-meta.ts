@@ -1,4 +1,5 @@
 import {
+  formatPublicClock12h,
   formatPublicClock24h,
   sortScheduleRows,
 } from "@/lib/schedule-clock";
@@ -77,7 +78,7 @@ export function formatEventHeroDateRange(
   return `${firstLabel} - ${lastLabel}`;
 }
 
-/** First and last public clocks → `19:00 - 00:00` (overnight-aware). */
+/** First and last public clocks → `7:00 PM - 12:00 AM` (overnight-aware). */
 export function formatEventHeroTimeRange(
   times: Array<string | null | undefined>,
 ): string | null {
@@ -86,7 +87,9 @@ export function formatEventHeroTimeRange(
       .map((value) => formatPublicClock24h(value))
       .filter((value): value is string => Boolean(value))
       .map((time) => ({ time })),
-  ).map((row) => row.time);
+  )
+    .map((row) => formatPublicClock12h(row.time))
+    .filter((value): value is string => Boolean(value));
   if (clocks.length === 0) return null;
   if (clocks.length === 1) return clocks[0];
   const last = clocks[clocks.length - 1];

@@ -85,7 +85,7 @@ export default function LocationSelectionHeader({
       ? previewDesktopHeaderHidden
       : "xl:hidden";
   const mobileMenuVisibility = isPreviewNarrow
-    ? "block"
+    ? "flex"
     : deviceFramesEnabled
       ? previewDesktopHeaderHidden
       : "xl:hidden";
@@ -381,7 +381,7 @@ export default function LocationSelectionHeader({
             </button>
           </div>
           <nav
-            className="flex flex-col overflow-y-auto px-4 py-4"
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4"
             aria-label="Main navigation"
           >
             <div className="flex flex-col gap-2">

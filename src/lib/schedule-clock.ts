@@ -4,7 +4,7 @@ export const OVERNIGHT_END_MINUTES = 6 * 60;
 const HHMM = /^(\d{1,2}):(\d{2})(?::\d{2})?$/;
 const AMPM = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])$/;
 
-/** Public clocks stay 24-hour (`19:00`). Invalid / empty input is omitted. */
+/** Normalize any clock string to `HH:mm` for sort / storage. */
 export function formatPublicClock24h(
   raw: string | null | undefined,
 ): string | null {
@@ -31,6 +31,18 @@ export function formatPublicClock24h(
   }
 
   return null;
+}
+
+/** Public schedule clocks match the 12-hour editor (`6:00 PM`). */
+export function formatPublicClock12h(
+  raw: string | null | undefined,
+): string | null {
+  const hhmm = formatPublicClock24h(raw);
+  if (!hhmm) return null;
+  const [hours, minutes] = hhmm.split(":").map(Number);
+  const suffix = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 || 12;
+  return `${hour12}:${String(minutes).padStart(2, "0")} ${suffix}`;
 }
 
 export function clockToMinutes(hhmm: string): number | null {
