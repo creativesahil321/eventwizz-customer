@@ -46,13 +46,13 @@ export default function LocationSelectionHeader({
   // DB `media_updated_at` (via theme context) — stable SSR/client, busts same-path logo.
   const { mediaVersion } = useTheme();
   const logoSrc = logo ? addCacheBusting(logo, mediaVersion) : "";
-  /** Guest CTAs only in framed onboarding — `/preview/site` mirrors live auth. */
-  const forceGuestAuthChrome = isPreviewMode && deviceFramesEnabled;
+  /** Guest Account menu in every preview — match the public customer header. */
+  const forceGuestAuthChrome = isPreviewMode;
   /**
-   * Framed onboarding scrolls inside the device panel — sticky keeps the header
-   * inside the tablet/mobile frame. Live + full-page preview stay viewport-fixed.
+   * Preview keeps the header in document flow so it sits under the reserved
+   * editor bar (Back / Try theme). Live stays viewport-fixed.
    */
-  const usesStickyHeader = forceGuestAuthChrome;
+  const usesStickyHeader = isPreviewMode;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [menuHost, setMenuHost] = useState<HTMLElement | null>(null);
   const headerRootRef = useRef<HTMLElement>(null);

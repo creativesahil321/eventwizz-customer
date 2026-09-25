@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { PermissionMenu } from "@/components/permission/permission-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDomainStore } from "@/store/domain.store";
+import { PROTECTED_SIDEBAR_CLASS } from "../protected-shell";
 
 type SidebarProps = {
   menus: MenuItemProps[];
@@ -44,7 +45,8 @@ const Sidebar: React.FC<SidebarProps> = memo(({ menus }) => {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       className={cn(
-        "fixed z-50 h-full start-0 hidden overflow-hidden border-r border-[var(--color-border)] bg-white shadow-[2px_0_8px_-2px_rgba(0,0,0,0.06)] transition-all duration-300 ease-in-out lg:block",
+        "fixed z-50 h-full start-0 overflow-hidden border-r border-[var(--color-border)] bg-white shadow-[2px_0_8px_-2px_rgba(0,0,0,0.06)] transition-all duration-300 ease-in-out",
+        PROTECTED_SIDEBAR_CLASS,
         collapsed ? "w-[60px]" : "w-[264px]"
       )}
     >

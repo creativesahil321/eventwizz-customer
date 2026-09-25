@@ -191,8 +191,8 @@ export function resolvePageContext(
 }
 
 /**
- * Hide the floating assistant on onboarding and `/preview/*` review screens.
- * Those surfaces already have their own chrome; the widget overlaps the frame.
+ * Hide the floating assistant on onboarding, `/preview/*` review screens,
+ * and support workspaces (the inbox already is a chat).
  */
 export function isChatBotHiddenOnPath(
   pathname: string | null | undefined,
@@ -202,7 +202,10 @@ export function isChatBotHiddenOnPath(
     path.startsWith("/on-boarding") ||
     path.startsWith("/onboarding") ||
     path === "/preview" ||
-    path.startsWith("/preview/")
+    path.startsWith("/preview/") ||
+    path.startsWith("/customer/support") ||
+    path.startsWith("/vendor/support") ||
+    path.startsWith("/admin/support")
   );
 }
 

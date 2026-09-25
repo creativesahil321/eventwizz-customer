@@ -11,7 +11,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { AlignLeft } from "lucide-react";
+import { Menu } from "lucide-react";
+import { PROTECTED_HAMBURGER_CLASS } from "../../../protected-shell";
 import MobileMenuItem from "./mobile-menu-item";
 import { useSession } from "next-auth/react";
 import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
@@ -47,9 +48,14 @@ const MobileSidebar: React.FC<MobileSidebarProps> = memo(({ menus = [] }) => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="md:hidden">
-          <AlignLeft className="h-5 w-5" />
-          <span className="sr-only">Toggle Menu</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={PROTECTED_HAMBURGER_CLASS}
+          aria-label="Open menu"
+        >
+          <Menu className="size-6" />
+          <span className="sr-only">Open menu</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[300px] p-0 dark:border-r-1">

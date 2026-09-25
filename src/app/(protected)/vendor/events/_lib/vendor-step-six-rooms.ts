@@ -48,10 +48,34 @@ export function resolveDrinksOptionFlag(payload: {
 }
 
 /**
- * Persist/save drinks as Yes only when the vendor opted in AND there is at
- * least one real package. AI drafts that set `drinks_option: 1` with empty
- * packages still resolve to No so Laravel validation is not tripped.
+ * Drink add-ons the backend will accept. Complimentary / missing prices
+ * (`price: 0`) are not sellable packages — do not invent a price.
  */
+export function persistableAiDrinkPackages(
+  raw: unknown,
+): Array<{
+  title: string;
+  description: string;
+  price: number;
+  available_quantity: number;
+}> {
+  return normalizeVendorDrinkPackages(raw)
+    .filter((pkg) => {
+      const price = Number(pkg.price);
+      return String(pkg.title ?? "").trim() !== "" && Number.isFinite(price) && price > 0;
+    })
+    .map((pkg) => {
+      const qty = Number(pkg.available_quantity);
+      return {
+        title: pkg.title,
+        description: pkg.description || pkg.title,
+        price: Math.round(Number(pkg.price)),
+        available_quantity:
+          Number.isFinite(qty) && qty >= 1 ? Math.round(qty) : 100,
+      };
+    });
+}
+
 export function resolveAiDrinksEnabled(
   payload: {
     drinks_option?: unknown;
@@ -63,7 +87,7 @@ export function resolveAiDrinksEnabled(
 ): 0 | 1 {
   if (options?.forceOff) return 0;
   if (resolveDrinksOptionFlag(payload) !== 1) return 0;
-  return normalizeVendorDrinkPackages(payload.packages).length > 0 ? 1 : 0;
+  return persistableAiDrinkPackages(payload.packages).length > 0 ? 1 : 0;
 }
 
 export function emptyVendorDrinkPackage(): VendorStepSixDrinkPackage {

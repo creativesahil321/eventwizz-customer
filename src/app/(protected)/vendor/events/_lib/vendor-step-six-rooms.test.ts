@@ -179,4 +179,19 @@ test("resolveAiDrinksEnabled requires real packages even if the flag is Yes", ()
     ),
     0,
   );
+  assert.equal(
+    resolveAiDrinksEnabled({
+      drinks_option: 1,
+      drink_title: "Conference Drinks",
+      packages: [
+        {
+          title: "Tea & Coffee",
+          description: "Complimentary tea and coffee",
+          price: 0,
+          available_quantity: 100,
+        },
+      ],
+    }),
+    0,
+  );
 });

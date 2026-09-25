@@ -16,7 +16,10 @@ import {
   resolveRoomMenuFields,
 } from "./ai-event-vendor-intent";
 import { normalizeVendorStepFourMenus } from "./vendor-step-four-rooms";
-import { resolveAiDrinksEnabled } from "./vendor-step-six-rooms";
+import {
+  persistableAiDrinkPackages,
+  resolveAiDrinksEnabled,
+} from "./vendor-step-six-rooms";
 
 function str(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value.trim() : fallback;
@@ -242,15 +245,16 @@ export function fillAiEventGeneratedDefaults(
     }),
   );
   const hasDrinkPackages =
-    (src.stepFive?.packages ?? []).some((p) => str(p.title)) ||
-    (src.stepFive?.rooms ?? []).some((room) =>
-      (room.packages ?? []).some((p) => str(p.title)),
+    persistableAiDrinkPackages(src.stepFive?.packages).length > 0 ||
+    (src.stepFive?.rooms ?? []).some(
+      (room) => persistableAiDrinkPackages(room.packages).length > 0,
     ) ||
     catalogDrinkPackages.length > 0;
-  const resolvedDrinkPackages =
+  const resolvedDrinkPackages = persistableAiDrinkPackages(
     (src.stepFive?.packages ?? []).some((p) => str(p.title))
       ? (src.stepFive?.packages ?? [])
-      : catalogDrinkPackages;
+      : catalogDrinkPackages,
+  );
   const stepFive =
     vendorHints.omitDrinks || !hasDrinkPackages
       ? {

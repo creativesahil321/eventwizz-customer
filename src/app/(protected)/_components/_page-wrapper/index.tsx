@@ -7,6 +7,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import { usePermissionStore } from "@/store/permission.store";
 import { logout } from "@/lib/auth/logout";
+import {
+  isSupportConversationPath,
+  isSupportWorkspacePath,
+} from "@/app/(protected)/_shared/support/support-workspace";
+import { protectedSidebarOffsetClass } from "../protected-shell";
 
 /**
  * Page wrapper component that:
@@ -27,6 +32,8 @@ export default function PageWrapper({
   const pathname = usePathname();
   const isCustomer = account_type === "customer";
   const isDoorScan = pathname?.startsWith("/vendor/door-scan");
+  const isSupport = isSupportWorkspacePath(pathname);
+  const isSupportThread = isSupportConversationPath(pathname);
 
   // Security validation that runs on every protected page
   useEffect(() => {
@@ -65,10 +72,20 @@ export default function PageWrapper({
     <main
       className={cn(
         "flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-default-100 dark:bg-background transition-all duration-300",
-        collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
+        protectedSidebarOffsetClass(collapsed),
       )}
     >
-      <div className="min-w-0 px-3 pt-4 pb-32 text-black sm:pt-5 md:pb-6">
+      <div
+        className={cn(
+          "min-w-0 text-black",
+          isSupport
+            ? cn(
+                "px-3 pt-4 pb-4 sm:pt-5 md:pb-6",
+                isSupportThread && "max-xl:px-0 max-xl:pt-0 max-xl:pb-0",
+              )
+            : "px-3 pt-4 pb-32 sm:pt-5 md:pb-6",
+        )}
+      >
         {children}
       </div>
     </main>

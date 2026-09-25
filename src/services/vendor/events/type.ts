@@ -434,6 +434,10 @@ export interface EventOverviewDateEntry {
   category: string;
   submittedOn: string;
   soldOut: boolean;
+  /** Present when this date belongs to a room-system event. */
+  room_id?: number | null;
+  /** Display name for the room; null when the date has no room. */
+  room_name?: string | null;
   tables: EventOverviewTableConfig[];
   totalTables: number;
   tablesBooked: number;

@@ -124,6 +124,9 @@ const BRANDING_SCOPE_VALUES: BrandingScopeTab[] = [
   "info-pages",
 ];
 
+const BRANDING_SCOPE_TRIGGER_CLASS =
+  "h-11 w-full flex-none justify-start rounded-md border-l-2 border-transparent px-3 text-sm font-medium shadow-none data-[state=active]:border-[var(--color-primary)] data-[state=active]:bg-[var(--color-primary)]/10 data-[state=active]:text-[var(--color-primary)] data-[state=active]:shadow-none";
+
 function isBrandingScopeTab(value: string | null): value is BrandingScopeTab {
   return (
     value !== null &&
@@ -612,92 +615,83 @@ export function BrandingTab({
   }, [landingPageVideoFiles]);
 
   return (
-    <div className="min-w-0 space-y-4 sm:space-y-6">
-      <Alert className="border-slate-200 bg-slate-50 text-slate-800">
-        <Info className="h-4 w-4" />
-        <AlertDescription className="text-sm leading-relaxed">
-          {isAdmin ? (
-            <>
-              Edit your marketing site here. <strong>Site identity</strong>{" "}
-              (logo, favicon, copyright, footer description) applies everywhere;{" "}
-              <strong>Home page</strong> controls each section of your public
-              home.
-            </>
-          ) : hasMultipleLocations ? (
-            <>
-              Use the tabs below to edit each part of your public site.{" "}
-              <strong>Site identity</strong> applies everywhere;{" "}
-              <strong>Main home page</strong> is shown before guests pick a
-              location; <strong>Location page</strong> is unique to the venue
-              selected in the header.
-            </>
-          ) : (
-            <>
-              You have a single location — your public home page is edited under{" "}
-              <strong>Home page</strong>. <strong>Site identity</strong> (logo,
-              favicon, copyright, footer description) applies everywhere.
-            </>
-          )}
-        </AlertDescription>
-      </Alert>
-
-      <Tabs
-        value={brandingScope}
-        onValueChange={handleBrandingScopeChange}
-        className="min-w-0"
-      >
-        <div className="w-full min-w-0 overflow-x-auto no-scrollbar">
-          <TabsList className="inline-flex h-auto w-max min-w-full gap-1 rounded-lg bg-muted/60 p-1">
-            <TabsTrigger
-              value="site-identity"
-              className="relative flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
-            >
-              Site identity
-              {subtabsWithErrors.siteIdentity && (
-                <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                </span>
-              )}
-            </TabsTrigger>
-            {hasMultipleLocations ? (
-              <TabsTrigger
-                value="main-home"
-                className="relative flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
-              >
-                Main home page
-                {subtabsWithErrors.mainHome && (
-                  <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                  </span>
-                )}
-              </TabsTrigger>
+    <Tabs
+      value={brandingScope}
+      onValueChange={handleBrandingScopeChange}
+      className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:gap-8"
+    >
+      <TabsList className="flex h-auto w-full shrink-0 flex-col items-stretch justify-start gap-0.5 rounded-none border-b border-border bg-transparent p-0 pb-3 sm:sticky sm:top-4 sm:w-48 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-5">
+        <TabsTrigger
+          value="site-identity"
+          className={BRANDING_SCOPE_TRIGGER_CLASS}
+        >
+          Site identity
+          {subtabsWithErrors.siteIdentity ? (
+            <span className="ml-auto size-2 shrink-0 rounded-full bg-red-500" />
+          ) : null}
+        </TabsTrigger>
+        {hasMultipleLocations ? (
+          <TabsTrigger
+            value="main-home"
+            className={BRANDING_SCOPE_TRIGGER_CLASS}
+          >
+            Main home page
+            {subtabsWithErrors.mainHome ? (
+              <span className="ml-auto size-2 shrink-0 rounded-full bg-red-500" />
             ) : null}
-            <TabsTrigger
-              value="location-page"
-              className="relative flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
-            >
-              {hasMultipleLocations ? "Location page" : "Home page"}
-              {subtabsWithErrors.locationPage && (
-                <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="info-pages"
-              className="relative flex-none shrink-0 whitespace-nowrap px-3 text-xs data-[state=active]:bg-[var(--color-primary)] data-[state=active]:text-white sm:px-4 sm:text-sm"
-            >
-              Info pages
-              {subtabsWithErrors.infoPages && (
-                <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
-        </div>
+          </TabsTrigger>
+        ) : null}
+        <TabsTrigger
+          value="location-page"
+          className={BRANDING_SCOPE_TRIGGER_CLASS}
+        >
+          {hasMultipleLocations ? "Location page" : "Home page"}
+          {subtabsWithErrors.locationPage ? (
+            <span className="ml-auto size-2 shrink-0 rounded-full bg-red-500" />
+          ) : null}
+        </TabsTrigger>
+        <TabsTrigger
+          value="info-pages"
+          className={BRANDING_SCOPE_TRIGGER_CLASS}
+        >
+          Info pages
+          {subtabsWithErrors.infoPages ? (
+            <span className="ml-auto size-2 shrink-0 rounded-full bg-red-500" />
+          ) : null}
+        </TabsTrigger>
+      </TabsList>
 
-        <TabsContent value="site-identity" className="mt-4 min-w-0 space-y-4 sm:mt-6 sm:space-y-6">
+      <div className="min-w-0 flex-1 space-y-4 sm:space-y-6">
+        <Alert className="border-slate-200 bg-slate-50 text-slate-800">
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-sm leading-relaxed">
+            {isAdmin ? (
+              <>
+                Edit your marketing site here. <strong>Site identity</strong>{" "}
+                (logo, favicon, copyright, footer description) applies
+                everywhere; <strong>Home page</strong> controls each section of
+                your public home.
+              </>
+            ) : hasMultipleLocations ? (
+              <>
+                Use the menu on the left to edit each part of your public site.{" "}
+                <strong>Site identity</strong> applies everywhere;{" "}
+                <strong>Main home page</strong> is shown before guests pick a
+                location; <strong>Location page</strong> is unique to the venue
+                selected in the header.
+              </>
+            ) : (
+              <>
+                You have a single location — your public home page is edited
+                under <strong>Home page</strong>.{" "}
+                <strong>Site identity</strong> (logo, favicon, copyright, footer
+                description) applies everywhere.
+              </>
+            )}
+          </AlertDescription>
+        </Alert>
+
+        <TabsContent value="site-identity" className="mt-0 min-w-0 space-y-4 sm:space-y-6">
       <div className="min-w-0 space-y-4 rounded-lg border-2 border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:space-y-6 sm:p-6">
         <div className="space-y-2">
           <SectionTitle
@@ -937,14 +931,14 @@ export function BrandingTab({
         </TabsContent>
 
         {hasMultipleLocations ? (
-          <TabsContent value="main-home" className="mt-4 min-w-0 sm:mt-6">
+          <TabsContent value="main-home" className="mt-0 min-w-0">
             <MainLandingPageSection
               serverMainLandingCoverImage={serverMainLandingCoverImage}
             />
           </TabsContent>
         ) : null}
 
-        <TabsContent value="location-page" className="mt-4 min-w-0 sm:mt-6">
+        <TabsContent value="location-page" className="mt-0 min-w-0">
           {isAdmin ? (
             <AdminHomePageSection />
           ) : (
@@ -1415,10 +1409,10 @@ export function BrandingTab({
           )}
         </TabsContent>
 
-        <TabsContent value="info-pages" className="mt-4 min-w-0 sm:mt-6">
+        <TabsContent value="info-pages" className="mt-0 min-w-0">
           <InfoPagesTab />
         </TabsContent>
-      </Tabs>
-    </div>
+      </div>
+    </Tabs>
   );
 }

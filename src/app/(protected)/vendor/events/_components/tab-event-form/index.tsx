@@ -55,7 +55,6 @@ import { EventPreview } from "../event-preview";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { useEventData } from "../../_lib/hooks/useEventData";
-import { useEventPreviewNavigation } from "../../_lib/use-event-preview-navigation";
 import {
   getVendorPublishCopy,
   resolveVendorEventLifecycle,
@@ -68,6 +67,7 @@ import {
 import type { EventDetailData } from "@/services/vendor/events/type";
 import type { EventSchemaType } from "./schema";
 import { useParams } from "next/navigation";
+import { useEventPreviewNavigation } from "../../_lib/use-event-preview-navigation";
 import {
   capEventRoomList,
   EVENT_ROOM_MAX_COUNT,
@@ -177,35 +177,6 @@ function eventStatusBadgeClass(status?: string | null): string {
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
-function VendorEventPreviewButton({
-  canPreview,
-  disabled,
-  onPreview,
-}: {
-  canPreview: boolean;
-  disabled: boolean;
-  onPreview: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="event-outline"
-      size="sm"
-      className="flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs sm:text-sm"
-      disabled={!canPreview || disabled}
-      onClick={onPreview}
-      title={
-        canPreview
-          ? "Preview how this event will look to customers"
-          : "Save the Event name step to enable preview"
-      }
-    >
-      <Eye size={14} />
-      Preview
-    </Button>
-  );
-}
-
 function VendorEventDiscardButton({
   visible,
   disabled,
@@ -224,11 +195,41 @@ function VendorEventDiscardButton({
       className="flex h-8 shrink-0 items-center gap-1.5 border-slate-300 bg-white px-2.5 text-xs text-slate-900 hover:bg-slate-50 sm:text-sm"
       disabled={disabled}
       onClick={onClick}
-      title="Revert all unsaved edits on this event"
+      title={
+        disabled
+          ? "No unsaved changes to discard"
+          : "Revert all unsaved edits on this event"
+      }
     >
       <RotateCcw size={14} />
       <span className="hidden sm:inline">Discard changes</span>
       <span className="sm:hidden">Discard</span>
+    </Button>
+  );
+}
+
+function VendorEventPreviewButton({
+  visible,
+  disabled,
+  onClick,
+}: {
+  visible: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <Button
+      type="button"
+      variant="event-primary"
+      size="sm"
+      className="flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs sm:text-sm"
+      disabled={disabled}
+      onClick={onClick}
+      title="Open a live preview of this event"
+    >
+      <Eye size={14} />
+      Preview
     </Button>
   );
 }
@@ -381,8 +382,8 @@ export default function TabEventForm() {
     discardUnsavedEventEdits,
   } = useEventFormContext();
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
-  const [previewSyncTick, setPreviewSyncTick] = useState(0);
   const { openEventPreview, canPreview } = useEventPreviewNavigation();
+  const [previewSyncTick, setPreviewSyncTick] = useState(0);
   const previewSiteEssentials = useEventPreviewSiteEssentials();
 
   useEffect(() => {
@@ -1044,16 +1045,6 @@ export default function TabEventForm() {
                     >
                       {formatEventStatusLabel(eventStatus)}
                     </Badge>
-                    <VendorEventDiscardButton
-                      visible={hasUnsavedEventEdits}
-                      disabled={finalizeBusy || isDiscarding}
-                      onClick={() => setDiscardDialogOpen(true)}
-                    />
-                    <VendorEventPreviewButton
-                      canPreview={canPreview}
-                      disabled={finalizeBusy || isDiscarding}
-                      onPreview={openEventPreview}
-                    />
                   </div>
                 </div>
               </div>
@@ -1300,16 +1291,6 @@ export default function TabEventForm() {
                           {Math.min(displayedStep, 8)}/8
                         </div>
                       ) : null}
-                      <VendorEventDiscardButton
-                        visible={hasUnsavedEventEdits}
-                        disabled={finalizeBusy || isDiscarding}
-                        onClick={() => setDiscardDialogOpen(true)}
-                      />
-                      <VendorEventPreviewButton
-                        canPreview={canPreview}
-                        disabled={finalizeBusy || isDiscarding}
-                        onPreview={openEventPreview}
-                      />
                       {isPublishTab ? (
                         <Button
                           type="submit"
@@ -1348,13 +1329,18 @@ export default function TabEventForm() {
           </Tabs>
         </RHFFormProvider>
       </div>
-      {hasUnsavedEventEdits ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-end px-4 sm:bottom-6 sm:px-6">
-          <div className="pointer-events-auto shadow-lg">
+      {hasUnsavedEventEdits || canPreview ? (
+        <div className="pointer-events-none fixed bottom-4 right-[5.75rem] z-[60] sm:right-[6.75rem] md:bottom-[5.25rem]">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-lg bg-white p-1 shadow-lg ring-1 ring-slate-200/80">
             <VendorEventDiscardButton
-              visible
-              disabled={finalizeBusy || isDiscarding}
+              visible={!readOnly && canPreview}
+              disabled={finalizeBusy || isDiscarding || !hasUnsavedEventEdits}
               onClick={() => setDiscardDialogOpen(true)}
+            />
+            <VendorEventPreviewButton
+              visible={canPreview}
+              disabled={finalizeBusy || isDiscarding}
+              onClick={openEventPreview}
             />
           </div>
         </div>

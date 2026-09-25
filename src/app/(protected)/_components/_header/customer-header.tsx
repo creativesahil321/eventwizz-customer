@@ -26,6 +26,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import {
+  PROTECTED_DESKTOP_TOGGLE_CLASS,
+  protectedSidebarOffsetClass,
+} from "../protected-shell";
 import { addCacheBusting } from "@/lib/image-utils";
 import { logout } from "@/lib/auth/logout";
 import { getModKeyLabel } from "@/app/(protected)/_shared/support/mod-key";
@@ -317,17 +321,15 @@ export default function CustomerHeader({ menus = [] }: CustomerHeaderProps) {
     <header
       className={cn(
         "sticky top-0 z-40 flex-none border-b border-slate-200 bg-white px-2 py-2.5 shadow-sm transition-all duration-300 sm:px-4 md:px-6",
-        collapsed ? "lg:ml-[60px]" : "lg:ml-[264px]",
+        protectedSidebarOffsetClass(collapsed),
       )}
     >
-      <div className="flex items-center justify-between gap-2 sm:gap-3">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2 lg:flex-none">
-          <div className="shrink-0 lg:hidden">
-            <MobileSidebar menus={menus} />
-          </div>
-          <div className="hidden shrink-0 lg:block">
-            <LayoutToggle />
-          </div>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <MobileSidebar menus={menus} />
+        <div className={PROTECTED_DESKTOP_TOGGLE_CLASS}>
+          <LayoutToggle />
+        </div>
+        <div className="min-w-0 flex-1">
           <CustomerHeaderSearch />
         </div>
 

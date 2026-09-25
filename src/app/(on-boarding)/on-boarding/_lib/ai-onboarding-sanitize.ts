@@ -984,11 +984,11 @@ export function buildAiOnboardingJsonSchemaBlock(stepNineMaxFaqs: number): strin
     "rooms":[{"room_name":"exact name","dates":[{"event_date":"YYYY-MM-DD","booking_type":"tickets|tables|both","tickets":[{"title":"≤25","description":"≤160","total_capacity":"n","price":"n"}],"tables":[{"min_persons":"n","max_persons":"n","price":"n","total_tables":"n"}],"payment_type":"full|deposit"}]}]
   },
   "stepSix": {"menu_title":"≤40","menu_description":"≤160","menus":[{"name":"≤40","items":[{"title":"≤40","description":"≤160"}]}]},
-  "stepSeven": {"drinks_option":"0|1 (1 = include drinks with packages; 0 = skip)","drink_title":"≤40","drink_description":"≤160","packages":[{"title":"≤25","description":"≤160","price":0,"available_quantity":0}],"rooms":[{"room_name":"exact","drinks_option":"0|1","drink_title":"s","drink_description":"s","packages":[]}]},
+  "stepSeven": {"drinks_option":"0|1 (1 = include drinks with packages; 0 = skip)","drink_title":"≤40","drink_description":"≤160","packages":[{"title":"≤25","description":"≤160","price":">0","available_quantity":">=1"}],"rooms":[{"room_name":"exact","drinks_option":"0|1","drink_title":"s","drink_description":"s","packages":[]}]},
   "stepEight": {"price_start_from":"n","price_start_from_button_text":"Book Now","location":{"title":"≤40","description":"≤160"}},
   "stepNine": {"faqs":[{"question":"≤160","answer":"≤500"}]}
 }
-Rules: one stepFive date object per unique calendar day (otherwise 2 distinct future dates); never repeat event_date in the same dates array; stepNine.faqs at most ${stepNineMaxFaqs} (prefer 5-8); empty menus/packages as []; times ascending; prices must match vendor facts when given.`;
+Rules: one stepFive date object per unique calendar day (otherwise 2 distinct future dates); never repeat event_date in the same dates array; stepNine.faqs at most ${stepNineMaxFaqs} (prefer 5-8); empty menus/packages as []; times ascending; prices must match vendor facts when given. Complimentary/included drinks are not packages — never emit price 0.`;
 }
 
 export function buildAiOnboardingSystemPrompt(stepNineMaxFaqs: number): string {
@@ -1068,7 +1068,7 @@ export function buildAiOnboardingUserPrompt(
       ? "Vendor wants SECOND room non-alcohol drinks — set drinks_option 1, keep room 2 packages non-alcoholic, and use stepSeven.rooms."
       : hints.wantsRoomSpecificDrinks
         ? "Vendor wants different drinks by room — use stepSeven.rooms with drinks_option 1 (or 0 for a room with no bar)."
-        : "Include drinks: set stepSeven.drinks_option 1 with title, description, and at least one real package unless the vendor said no drinks.";
+        : "Include drinks: set stepSeven.drinks_option 1 with title, description, and at least one real package (price > 0) unless the vendor said no drinks. Do not add complimentary/included drinks as price 0 packages.";
   const cateringHint = hints.omitCatering
     ? "Vendor does NOT want catering/menus — set stepSix.menus to []."
     : "stepSix menus: fill a realistic menu unless vendor said no catering.";

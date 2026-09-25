@@ -12,6 +12,7 @@ import {
 } from "@/lib/event-form-limits";
 import {
   EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+  countEventGalleryItems,
   isEventGalleryCountValid,
 } from "@/lib/event-gallery-count";
 import {
@@ -336,14 +337,16 @@ export const stepFourSchema = z
       .array(
         z.union([
           z.instanceof(File),
+          z.string().min(1),
           z.object({
-            id: z.number(),
-            url: z.string().url(),
+            id: z.coerce.number().optional(),
+            url: z.string().min(1),
+            preview: z.string().optional(),
           }),
         ])
       )
       .optional()
-      .refine((items) => isEventGalleryCountValid(items?.length ?? 0), {
+      .refine((items) => isEventGalleryCountValid(countEventGalleryItems(items)), {
         message: EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
       }),
   })
@@ -1471,11 +1474,16 @@ const roomPackageSchema = z.object({
     .array(
       z.union([
         z.instanceof(File),
-        z.object({ id: z.number(), url: z.string().url() }),
+        z.string().min(1),
+        z.object({
+          id: z.coerce.number().optional(),
+          url: z.string().min(1),
+          preview: z.string().optional(),
+        }),
       ]),
     )
     .optional()
-    .refine((items) => isEventGalleryCountValid(items?.length ?? 0), {
+    .refine((items) => isEventGalleryCountValid(countEventGalleryItems(items)), {
       message: EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
     }),
 });

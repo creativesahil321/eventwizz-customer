@@ -42,6 +42,11 @@ import {
 import type { SupportConversation, SupportStatus } from "../_lib/types";
 import { cn } from "@/lib/utils";
 import { resolveSupportUnreadCount } from "@/app/(protected)/_shared/support/support-unread-count";
+import {
+  SUPPORT_INBOX_FRAME_CLASS,
+  SUPPORT_INBOX_HEIGHT_LIST_CLASS,
+  SUPPORT_INBOX_HEIGHT_THREAD_CLASS,
+} from "@/app/(protected)/_shared/support/support-workspace";
 
 const CHAT_MESSAGES_PER_PAGE = 30;
 
@@ -310,7 +315,7 @@ function ConversationDetail({
         Back to inbox
       </Link>
       <div className="min-w-0 shrink-0 border-b border-slate-200 bg-white px-3 py-1.5 sm:px-5 sm:py-2">
-        <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-sm font-bold text-foreground">
@@ -472,8 +477,20 @@ export default function SupportInbox({ selectedId }: SupportInboxProps) {
   const showDetail = Boolean(selectedId);
 
   return (
-    <div className="-mx-4 -mb-4 min-w-0 overflow-x-hidden rounded-b-lg border-t border-[var(--color-border)] sm:-mx-6 sm:-mb-6">
-      <div className="flex h-[calc(100dvh-8rem)] min-h-[500px] min-w-0 flex-col overflow-hidden xl:flex-row xl:divide-x xl:divide-slate-200">
+    <div
+      className={cn(
+        "min-w-0 overflow-x-hidden",
+        showDetail
+          ? cn(SUPPORT_INBOX_HEIGHT_THREAD_CLASS, "xl:-mx-6 xl:-mb-6 xl:rounded-b-lg xl:border-t xl:border-[var(--color-border)]")
+          : "-mx-4 -mb-4 rounded-b-lg border-t border-[var(--color-border)] sm:-mx-6 sm:-mb-6",
+      )}
+    >
+      <div
+        className={cn(
+          SUPPORT_INBOX_FRAME_CLASS,
+          showDetail ? "h-full" : SUPPORT_INBOX_HEIGHT_LIST_CLASS,
+        )}
+      >
         <div
           className={cn(
             "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white xl:w-[320px] xl:max-w-[320px] xl:shrink-0",
@@ -481,8 +498,8 @@ export default function SupportInbox({ selectedId }: SupportInboxProps) {
           )}
         >
           <div className="min-w-0 space-y-2.5 border-b border-slate-200 p-3 sm:p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Inbox className="size-4 text-[var(--color-primary)]" />
                 <h2 className="text-sm font-semibold text-foreground">Inbox</h2>
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-100 px-1.5 text-[11px] font-semibold text-muted-foreground">

@@ -56,6 +56,11 @@ import {
   type AdminSupportTicketsParams,
 } from "@/services/admin/support";
 import { cn } from "@/lib/utils";
+import {
+  SUPPORT_INBOX_FRAME_CLASS,
+  SUPPORT_INBOX_HEIGHT_LIST_CLASS,
+  SUPPORT_INBOX_HEIGHT_THREAD_CLASS,
+} from "@/app/(protected)/_shared/support/support-workspace";
 import { resolveSupportUnreadCount } from "@/app/(protected)/_shared/support/support-unread-count";
 
 const CHAT_MESSAGES_PER_PAGE = 30;
@@ -591,8 +596,20 @@ export default function AdminSupportInbox({
   const showDetail = Boolean(selectedId);
 
   return (
-    <div className="-mx-4 -mb-4 min-w-0 rounded-b-lg border-t border-[var(--color-border)] sm:-mx-6 sm:-mb-6">
-      <div className="flex h-[calc(100dvh-8rem)] min-h-[500px] min-w-0 flex-col overflow-hidden xl:flex-row xl:divide-x xl:divide-slate-200">
+    <div
+      className={cn(
+        "min-w-0 overflow-x-hidden",
+        showDetail
+          ? cn(SUPPORT_INBOX_HEIGHT_THREAD_CLASS, "xl:-mx-6 xl:-mb-6 xl:rounded-b-lg xl:border-t xl:border-[var(--color-border)]")
+          : "-mx-4 -mb-4 rounded-b-lg border-t border-[var(--color-border)] sm:-mx-6 sm:-mb-6",
+      )}
+    >
+      <div
+        className={cn(
+          SUPPORT_INBOX_FRAME_CLASS,
+          showDetail ? "h-full" : SUPPORT_INBOX_HEIGHT_LIST_CLASS,
+        )}
+      >
         <div
           className={cn(
             "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white xl:w-[320px] xl:max-w-[320px] xl:shrink-0",

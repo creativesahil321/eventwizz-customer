@@ -6,7 +6,7 @@ import {
   isBannerHeadingValign,
 } from "@/lib/banner-heading-align";
 import {
-  normalizeSiteEssentialsEvents,
+  mergeSiteEssentialsListingEvents,
   normalizeSiteEssentialsGallery,
 } from "./site-essentials-preview-events";
 
@@ -295,15 +295,13 @@ export function mergeSiteEssentialsPreviewWithApi(
       api.cover_video,
     ) as SiteEssentialsFormValues["cover_video"],
     slug: resolvedSlug,
-    latest_events: (
-      normalizeSiteEssentialsEvents(formData.latest_events).length > 0
-        ? normalizeSiteEssentialsEvents(formData.latest_events)
-        : normalizeSiteEssentialsEvents(api.latest_events)
+    latest_events: mergeSiteEssentialsListingEvents(
+      formData.latest_events,
+      api.latest_events,
     ) as unknown as SiteEssentialsFormValues["latest_events"],
-    upcoming_events: (
-      normalizeSiteEssentialsEvents(formData.upcoming_events).length > 0
-        ? normalizeSiteEssentialsEvents(formData.upcoming_events)
-        : normalizeSiteEssentialsEvents(api.upcoming_events)
+    upcoming_events: mergeSiteEssentialsListingEvents(
+      formData.upcoming_events,
+      api.upcoming_events,
     ) as unknown as SiteEssentialsFormValues["upcoming_events"],
     event_gallery:
       normalizeSiteEssentialsGallery(formData.event_gallery).length > 0

@@ -1,4 +1,5 @@
 import { ThemeSchema } from "@/types/theme.types";
+import { normalizeThemeTypography } from "@/lib/normalize-theme-payload";
 import {
   getAnchorColor,
   normalizeHex,
@@ -66,6 +67,8 @@ export function generateThemeCSS(theme: ThemeSchema | null): string {
   if (!theme || !theme.colors) {
     return ""; // No theme, no CSS
   }
+
+  const normalized = normalizeThemeTypography(theme);
 
   let css = ":root {";
 
@@ -162,20 +165,14 @@ export function generateThemeCSS(theme: ThemeSchema | null): string {
     }
   }
 
-  // Add typography variables if available
-  if (theme.typography?.fontFamily) {
-    if (theme.typography.fontFamily.heading) {
-      css += `--font-heading: ${theme.typography.fontFamily.heading};`;
-    } else if (defaultThemeConstants.typography.fontFamily.heading) {
-      css += `--font-heading: ${defaultThemeConstants.typography.fontFamily.heading};`;
-    }
-
-    if (theme.typography.fontFamily.body) {
-      css += `--font-body: ${theme.typography.fontFamily.body};`;
-    } else if (defaultThemeConstants.typography.fontFamily.body) {
-      css += `--font-body: ${defaultThemeConstants.typography.fontFamily.body};`;
-    }
-  }
+  const headingFont =
+    normalized.typography?.fontFamily?.heading ||
+    defaultThemeConstants.typography.fontFamily.heading;
+  const bodyFont =
+    normalized.typography?.fontFamily?.body ||
+    defaultThemeConstants.typography.fontFamily.body;
+  css += `--font-heading: ${headingFont};`;
+  css += `--font-body: ${bodyFont};`;
 
   css += "}";
   return css;

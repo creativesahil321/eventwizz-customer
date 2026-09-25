@@ -156,7 +156,9 @@ export default function PublishTab() {
   useEffect(() => {
     const subscription = form.watch((value) => {
       if (value) {
-        globalForm.setValue("stepEight", value as StepEightType);
+        globalForm.setValue("stepEight", value as StepEightType, {
+          shouldDirty: true,
+        });
       }
     });
 

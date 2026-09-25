@@ -37,7 +37,10 @@ import {
   sanitizeVendorDescription,
   uniqueAiDatesByEventDate,
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
-import { normalizeDrinksOptionFlag } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import {
+  normalizeDrinksOptionFlag,
+  persistableAiDrinkPackages,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import {
   normalizeScheduleClock,
   sortScheduleRows,
@@ -505,27 +508,34 @@ export async function POST(req: NextRequest) {
       }
 
       if (content.stepSeven) {
-        const rawPackages = content.stepSeven.packages;
-        content.stepSeven.packages = Array.isArray(rawPackages) && rawPackages.length > 0
-          ? rawPackages.map((p) => ({
-            title: truncate(p.title, DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS),
-            description: truncate(p.description, RICH_DESCRIPTION_MAX_CHARS),
-            price: Math.max(
-              1,
-              Math.min(
-                DRINK_PACKAGE_PRICE_MAX,
-                Math.round(Number(p.price) || 50)
-              )
+        const sanitizeDrinkPackages = (raw: unknown) =>
+          persistableAiDrinkPackages(
+            Array.isArray(raw)
+              ? raw.map((p) => ({
+                  title: truncate(
+                    String(p?.title ?? ""),
+                    DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+                  ),
+                  description: truncate(
+                    String(p?.description ?? ""),
+                    RICH_DESCRIPTION_MAX_CHARS,
+                  ),
+                  price: p?.price,
+                  available_quantity: p?.available_quantity,
+                }))
+              : [],
+          ).map((p) => ({
+            ...p,
+            price: Math.min(DRINK_PACKAGE_PRICE_MAX, p.price),
+            available_quantity: Math.min(
+              DRINK_PACKAGE_QTY_MAX,
+              p.available_quantity,
             ),
-            available_quantity: Math.max(
-              1,
-              Math.min(
-                DRINK_PACKAGE_QTY_MAX,
-                Math.round(Number(p.available_quantity) || 100)
-              )
-            ),
-          }))
-          : [];
+          }));
+
+        content.stepSeven.packages = sanitizeDrinkPackages(
+          content.stepSeven.packages,
+        );
 
         const skipDrinks =
           vendorHints.omitDrinks ||
@@ -568,26 +578,7 @@ export async function POST(req: NextRequest) {
                 ),
                 160,
               ),
-              packages: Array.isArray(room.packages)
-                ? room.packages.map((p) => ({
-                    title: truncate(p.title, DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS),
-                    description: truncate(p.description, RICH_DESCRIPTION_MAX_CHARS),
-                    price: Math.max(
-                      1,
-                      Math.min(
-                        DRINK_PACKAGE_PRICE_MAX,
-                        Math.round(Number(p.price) || 50),
-                      ),
-                    ),
-                    available_quantity: Math.max(
-                      1,
-                      Math.min(
-                        DRINK_PACKAGE_QTY_MAX,
-                        Math.round(Number(p.available_quantity) || 100),
-                      ),
-                    ),
-                  }))
-                : [],
+              packages: sanitizeDrinkPackages(room.packages),
             }))
             .filter((room) => room.room_name.length > 0);
 

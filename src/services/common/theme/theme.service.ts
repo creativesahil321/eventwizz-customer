@@ -1,7 +1,7 @@
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { ThemeSchema } from "@/types/theme.types";
 import { env } from "@/env";
-import { flattenInfoPages } from "@/lib/flatten-info-pages";
+import { normalizeThemePayload } from "@/lib/normalize-theme-payload";
 import { useAuthStore } from "@/store/auth.store";
 import { ApiResponse, ServiceResponse } from "./type";
 
@@ -97,7 +97,7 @@ export const themeService = {
       return {
         isSuccess: true,
         message: "Theme settings fetched successfully",
-        data: flattenInfoPages(data.data),
+        data: normalizeThemePayload(data.data),
       };
     } catch (error) {
       // Type error in a more specific way

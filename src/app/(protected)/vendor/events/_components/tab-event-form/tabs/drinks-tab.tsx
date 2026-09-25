@@ -295,7 +295,9 @@ export default function DrinksTab() {
     if (isRoomsEnabled) return;
     const subscription = form.watch((value) => {
       if (value) {
-        globalForm.setValue("stepSix", value as StepSixType);
+        globalForm.setValue("stepSix", value as StepSixType, {
+          shouldDirty: true,
+        });
       }
     });
 

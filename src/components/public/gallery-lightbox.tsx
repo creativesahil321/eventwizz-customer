@@ -54,6 +54,11 @@ export function GalleryLightbox({
     if (!open) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onOpenChange(false);
+        return;
+      }
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         goPrev();
@@ -65,7 +70,7 @@ export function GalleryLightbox({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, goPrev, goNext]);
+  }, [open, goPrev, goNext, onOpenChange]);
 
   if (count === 0) return null;
 
@@ -76,14 +81,15 @@ export function GalleryLightbox({
           <button
             type="button"
             aria-label="Close gallery backdrop"
-            className="fixed inset-0 z-[60] bg-black/80 animate-in fade-in-0 duration-200"
+            className="fixed inset-0 z-[300] bg-black/80 animate-in fade-in-0 duration-200"
           />
         </DialogClose>
 
         <DialogPrimitive.Content
           aria-labelledby={titleId}
           className={cn(
-            "fixed inset-0 z-[61] flex h-[100dvh] w-screen max-w-none flex-col gap-0 border-0 bg-transparent p-0 shadow-none outline-none",
+            // Above `/preview/event` review chrome (z-100) and hamburger (z-200).
+            "fixed inset-0 z-[301] flex h-[100dvh] w-screen max-w-none flex-col gap-0 border-0 bg-transparent p-0 shadow-none outline-none",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-200",
           )}
         >
@@ -92,7 +98,7 @@ export function GalleryLightbox({
           </DialogTitle>
 
           <div className="relative flex h-full w-full flex-col bg-black/95">
-            <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-6">
+            <header className="relative z-20 flex shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-6">
               <p className="text-sm font-medium text-white/80">
                 {safeIndex + 1} / {count}
               </p>
@@ -100,13 +106,20 @@ export function GalleryLightbox({
                 type="button"
                 onClick={() => onOpenChange(false)}
                 aria-label="Close gallery"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
               >
                 <X className="h-5 w-5" />
               </button>
             </header>
 
-            <div className="relative flex min-h-0 flex-1 items-center justify-center px-3 sm:px-20">
+            <div
+              className="relative flex min-h-0 flex-1 items-center justify-center px-3 sm:px-20"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  onOpenChange(false);
+                }
+              }}
+            >
               {count > 1 ? (
                 <>
                   <button

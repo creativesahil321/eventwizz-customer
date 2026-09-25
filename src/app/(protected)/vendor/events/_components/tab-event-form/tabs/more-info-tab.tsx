@@ -301,10 +301,14 @@ export default function MoreInfoTab() {
   useEffect(() => {
     const subscription = form.watch((value) => {
       if (value) {
-        globalForm.setValue("stepFive", {
-          ...globalForm.getValues().stepFive,
-          ...value,
-        } as StepFiveType);
+        globalForm.setValue(
+          "stepFive",
+          {
+            ...globalForm.getValues().stepFive,
+            ...value,
+          } as StepFiveType,
+          { shouldDirty: true },
+        );
       }
     });
 

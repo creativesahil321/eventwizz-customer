@@ -8,6 +8,7 @@ import { VendorGlobalAlerts } from "@/app/(protected)/vendor/_components/vendor-
 import { useSession } from "next-auth/react";
 import { useDomainStore } from "@/store/domain.store";
 import { cn } from "@/lib/utils";
+import { protectedSidebarOffsetClass } from "./protected-shell";
 
 interface ConditionalHeaderProps {
   menus?: MenuItemProps[];
@@ -28,7 +29,7 @@ export default function ConditionalHeader({ menus }: ConditionalHeaderProps) {
     <div
       className={cn(
         "sticky top-0 z-40 min-w-0 transition-all duration-300",
-        collapsed ? "xl:ml-[60px]" : "xl:ml-[264px]",
+        protectedSidebarOffsetClass(collapsed),
       )}
     >
       {isVendor ? <VendorGlobalAlerts /> : null}

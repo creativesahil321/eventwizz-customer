@@ -196,7 +196,7 @@ CRITICAL RULES:
    - booking_type "tables" or "both": payment_type required ("full" or "deposit")
    - deposit: is_deposit_enabled true, deposit_type amount|percentage, deposit_value (percentage 20-80), deposit_due_date BEFORE event_date
 9. stepThree.dates: YYYY-MM-DD, strictly ascending, tomorrow or later (not today). EACH event_date may appear ONCE in a dates array — never two objects for the same calendar day (no morning/evening split rows). If the vendor wants the same dates on every room, copy that unique list into each room; do not repeat a day inside one room's array.
-10. stepFour/stepFive optional when vendor says no food/drinks — if they say no catering/menus, set catering_option 0 and menus []. If they say no drinks, set drinks_option 0, empty titles, and packages []. If they want drinks, set drinks_option 1 with real packages (price > 0, quantity ≥ 1).
+10. stepFour/stepFive optional when vendor says no food/drinks — if they say no catering/menus, set catering_option 0 and menus []. If they say no drinks, set drinks_option 0, empty titles, and packages []. If they want drinks, set drinks_option 1 with real packages (price > 0, quantity ≥ 1). Complimentary / included tea and coffee are NOT sellable packages — never emit price 0.
 11. stepSeven.faqs: max ${maxFaqs}; when vendor asks for 10+ FAQs, provide ${maxFaqs} strong relevant FAQs. If they say no FAQs, return faqs [].
 12. ROOM SYSTEM (when YES):
     - Use EXACT room names provided (${AI_EVENT_MIN_ROOMS}-${AI_EVENT_MAX_ROOMS} rooms)
@@ -391,7 +391,7 @@ export function buildAiEventUserPrompt(params: {
       ? "DIFFERENT drink packages per room — use stepFive.rooms with drinks_option 1 and room-specific packages (e.g. whisky/beverages in one room, soft drinks only in another). A room with no bar uses drinks_option 0 and packages []."
       : hints.wantsSecondRoomNonAlcoholDrinks
         ? "Second room: drinks_option 1 with non-alcoholic packages only in stepFive.rooms."
-        : "Include drinks: set stepFive.drinks_option 1 with title, description, and at least one real package unless the vendor said no drinks.";
+        : "Include drinks: set stepFive.drinks_option 1 with title, description, and at least one real package (price > 0) unless the vendor said no drinks. Do not add complimentary/included drinks as price 0 packages.";
 
   const packagesHint = hints.wantsPerRoomPackages
     ? "DIFFERENT package features per room — use stepTwo.rooms with distinct package_details (e.g. drink packages vs exclusive packages)."

@@ -10,11 +10,11 @@
 @layer utilities {
   /* Same mechanism as `SiteHeading` inline style — overrides base h1–h6 body stack */
   .font-heading {
-    font-family: var(--font-heading);
+    font-family: var(--font-heading, var(--font-inter), sans-serif);
   }
 
   .font-body {
-    font-family: var(--font-body);
+    font-family: var(--font-body, var(--font-inter), sans-serif);
   }
 
   /* Hide scrollbar but keep functionality */
@@ -130,10 +130,6 @@
   --color-text: #212121;
   --color-text-dimmed: rgba(0, 0, 0, 0.6);
 
-  /* Default typography */
-  --font-heading: "Roboto Slab", serif;
-  --font-body: "Open Sans", sans-serif;
-
   /* UI framework variables */
   --icon-box: oklch(0.709, 0.01, 56.259);
   --default-body: var(--bg-body);
@@ -191,7 +187,7 @@
   body {
     background: var(--color-background);
     color: var(--color-text);
-    font-family: var(--font-body);
+    font-family: var(--font-body, var(--font-inter), sans-serif);
   }
 
   /* Same for sections using bg-[var(--color-background)] (solid or gradient from theme) */
@@ -207,7 +203,7 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-body);
+    font-family: var(--font-body, var(--font-inter), sans-serif);
   }
 
   /* Consistent pointer on interactive controls (raw <button>, inputs, Radix triggers). */

@@ -38,7 +38,10 @@ import {
   parseVendorDescriptionHints,
   uniqueAiDatesByEventDate,
 } from "./ai-onboarding-sanitize";
-import { resolveAiDrinksEnabled } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import {
+  persistableAiDrinkPackages,
+  resolveAiDrinksEnabled,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import {
   EVENT_GALLERY_MAX_IMAGES,
   resolveEventSchedulerItems,
@@ -949,9 +952,7 @@ async function applyAIGeneratedOnboardingContentInner({
 
   // --- Step 8: Drinks ---
   setStep(7);
-  const drinkPackages = Array.isArray(drinksSource.packages)
-    ? drinksSource.packages
-    : [];
+  const drinkPackages = persistableAiDrinkPackages(drinksSource.packages);
   const drinksEnabled = resolveAiDrinksEnabled(
     {
       drinks_option: drinksSource.drinks_option,
@@ -976,10 +977,11 @@ async function applyAIGeneratedOnboardingContentInner({
   const roomDrinksByName = useRoomSystem
       ? new Map(
           (drinksSource.rooms ?? []).map((room) => {
-            const roomPackages =
+            const roomPackages = persistableAiDrinkPackages(
               Array.isArray(room.packages) && room.packages.length > 0
                 ? room.packages
-                : stepEightData.packages;
+                : stepEightData.packages,
+            );
             const roomEnabled = resolveAiDrinksEnabled(
               {
                 drinks_option: room.drinks_option,

@@ -181,7 +181,7 @@ export function EventPreview({
   previewBackButtonOffset,
   previewEdit,
 }: EventPreviewProps) {
-  const { format: formatMoney } = useCurrencyFormat();
+  const { formatCompact: formatPriceUnit } = useCurrencyFormat();
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const chooserRef = useRef<HTMLDivElement>(null);
   const bookingRef = useRef<HTMLDivElement>(null);
@@ -574,7 +574,7 @@ export function EventPreview({
     time: heroTimeLabel,
     location: eventLocationLabel || null,
     fromPrice: brochureAmount,
-    formatPrice: formatMoney,
+    formatPrice: formatPriceUnit,
   });
 
   const showGallery = (galleryImages?.length ?? 0) > 0;
@@ -624,6 +624,7 @@ export function EventPreview({
     <CartConflictProvider>
       <div
         ref={previewContainerRef}
+        data-preview-theme-root=""
         className={`event-detail-page @container/preview relative min-w-0 ${
           embedInShell
             ? "h-full max-h-full overflow-y-auto scroll-smooth no-scrollbar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -668,11 +669,6 @@ export function EventPreview({
           logo={siteEssentials?.logo || data.logo || null}
           variant="preview"
           previewBackButtonOffset={offsetBrowseForBackButton}
-          className={
-            embedInShell && !offsetBrowseForBackButton
-              ? "px-3 sm:px-4 md:px-6"
-              : ""
-          }
           headerDownloads={headerDownloads}
           scrollContainerRef={previewContainerRef}
           hideHeaderPhone

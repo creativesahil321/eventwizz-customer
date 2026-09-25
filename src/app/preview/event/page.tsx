@@ -531,7 +531,7 @@ function EventPreviewPageContent() {
             siteEssentials={siteEssentials}
             locationSlug={previewLocationSlug}
             embedInShell
-            previewBackButtonOffset
+            previewBackButtonOffset={false}
           />
         </div>
 

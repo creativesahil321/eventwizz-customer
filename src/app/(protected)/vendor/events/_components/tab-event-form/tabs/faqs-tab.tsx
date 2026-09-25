@@ -79,7 +79,9 @@ export default function FaqsTab() {
   useEffect(() => {
     const subscription = form.watch((value) => {
       if (value) {
-        globalForm.setValue("stepSeven", value as StepSevenType);
+        globalForm.setValue("stepSeven", value as StepSevenType, {
+          shouldDirty: true,
+        });
       }
     });
 

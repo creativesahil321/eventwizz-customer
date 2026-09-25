@@ -3,7 +3,7 @@ import { ThemeSchema } from "@/types/theme.types";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import { env } from "@/env";
 import { headers } from "next/headers";
-import { flattenInfoPages } from "@/lib/flatten-info-pages";
+import { normalizeThemePayload } from "@/lib/normalize-theme-payload";
 import {
   generateThemeCSS,
   getDefaultThemeCSS,
@@ -124,7 +124,7 @@ export async function fetchServerTheme(
       return null;
     }
 
-    return flattenInfoPages(data.data) as ThemeSchema;
+    return normalizeThemePayload(data.data) as ThemeSchema;
   } catch {
     return null;
   } finally {

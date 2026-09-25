@@ -256,7 +256,7 @@ export default function EventOverviewClient({
   };
 
   // Server handles both status filtering and date filtering, so we just sort the data
-  // Sort tables by date (newest first)
+  // Sort by date, then room name so same-day rooms stay grouped.
   const sortedTables = [...tableData].sort(
     (
       a: EventOverviewResponse["data"][0],
@@ -264,7 +264,11 @@ export default function EventOverviewClient({
     ) => {
       const dateA = new Date(a.eventDate.split("-").reverse().join("-"));
       const dateB = new Date(b.eventDate.split("-").reverse().join("-"));
-      return dateA.getTime() - dateB.getTime();
+      const dateDiff = dateA.getTime() - dateB.getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return (a.room_name ?? "").localeCompare(b.room_name ?? "", undefined, {
+        sensitivity: "base",
+      });
     },
   );
 
@@ -488,6 +492,11 @@ export default function EventOverviewClient({
                             <p className="font-bold text-base">
                               {table.eventDate}
                             </p>
+                            {table.room_name?.trim() ? (
+                              <p className="text-sm text-muted-foreground">
+                                {table.room_name.trim()}
+                              </p>
+                            ) : null}
                             {table.soldOut && (
                               <Badge variant="destructive" className="text-xs">
                                 Sold Out

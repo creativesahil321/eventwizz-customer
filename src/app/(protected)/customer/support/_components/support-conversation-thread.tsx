@@ -13,6 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
+  SUPPORT_COMPOSER_BAR_CLASS,
+  SUPPORT_SEND_BUTTON_CLASS,
+} from "@/app/(protected)/_shared/support/support-workspace";
+import {
   MAX_SUPPORT_ATTACHMENTS,
   SUPPORT_ATTACHMENT_ACCEPT,
   SUPPORT_IMAGE_ATTACHMENT_ACCEPT,
@@ -304,7 +308,7 @@ export default function SupportConversationThread({
         ))}
       </SupportMessageScroller>
 
-      <div className="shrink-0 border-t border-slate-200 bg-white p-2 sm:p-2.5">
+      <div className={SUPPORT_COMPOSER_BAR_CLASS}>
         {isComposerDisabled ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -422,7 +426,7 @@ export default function SupportConversationThread({
                   size="sm"
                   disabled={!canSend}
                   onClick={() => void handleSend()}
-                  className="h-8 rounded-full px-5"
+                  className={SUPPORT_SEND_BUTTON_CLASS}
                 >
                   <Send className="size-4" />
                   {isSending ? "Sending…" : "Send reply"}

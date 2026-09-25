@@ -1,7 +1,7 @@
 import { api } from "@/services/core/api-client";
 import { SiteEssentials, SiteEssentialsResponse } from "./type";
 import { getEndpointsByRole } from "@/lib/utils/api-endpoints";
-import { flattenInfoPages } from "@/lib/flatten-info-pages";
+import { normalizeThemePayload } from "@/lib/normalize-theme-payload";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 
 /**
@@ -44,7 +44,7 @@ export const getSiteEssentials = async (
       returnFullResponse: true,
       params: Object.keys(params).length > 0 ? params : undefined,
     });
-    return flattenInfoPages(response.data);
+    return normalizeThemePayload(response.data);
   } catch (error) {
     console.error("Error fetching site essentials:", error);
     throw error;
@@ -66,7 +66,7 @@ export const resetSiteEssentialsThemeToDefault = async (): Promise<SiteEssential
         returnFullResponse: true,
       },
     );
-    return flattenInfoPages(response.data);
+    return normalizeThemePayload(response.data);
   } catch (error) {
     console.error("Error resetting site essentials theme:", error);
     throw error;
@@ -110,7 +110,7 @@ export const updateSiteEssentials = async (
           },
         },
       );
-      return flattenInfoPages(response.data);
+      return normalizeThemePayload(response.data);
     } else {
       // Strip unsaved blob/data URLs — they are not valid server media paths
       const sanitized = Object.fromEntries(
@@ -126,7 +126,7 @@ export const updateSiteEssentials = async (
         sanitized as unknown as SiteEssentialsFormValues,
         { returnFullResponse: true },
       );
-      return flattenInfoPages(response.data);
+      return normalizeThemePayload(response.data);
     }
   } catch (error) {
     console.error("Error updating site essentials:", error);
@@ -203,7 +203,7 @@ export const applySiteEssentialsThemePreset = async (
       { theme_preset_id: themePresetId },
       { returnFullResponse: true },
     );
-    return flattenInfoPages(response.data);
+    return normalizeThemePayload(response.data);
   } catch (error) {
     console.error("Error applying site essentials theme preset:", error);
     throw error;

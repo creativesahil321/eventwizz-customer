@@ -46,7 +46,10 @@ import {
   type AIEventRoomPackage,
 } from "@/app/(protected)/vendor/events/_lib/ai-event-vendor-intent";
 import { fillAiEventGeneratedDefaults } from "@/app/(protected)/vendor/events/_lib/fill-ai-event-content";
-import { resolveAiDrinksEnabled } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
+import {
+  persistableAiDrinkPackages,
+  resolveAiDrinksEnabled,
+} from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
 import { advanceEventDateToMinimum } from "@/lib/min-event-date";
 
 export interface AIEventInput {
@@ -512,27 +515,35 @@ export async function POST(req: NextRequest) {
           content.stepFive.drink_description,
           DRINK_SECTION_DESCRIPTION_MAX_CHARS
         );
-        const rawPkgs = content.stepFive.packages;
-        content.stepFive.packages = Array.isArray(rawPkgs) && rawPkgs.length > 0
-          ? rawPkgs.map((p) => ({
-            title: truncate(p.title, DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS),
-            description: truncate(p.description, RICH_DESCRIPTION_MAX_CHARS),
-            price: Math.max(
-              1,
-              Math.min(
-                DRINK_PACKAGE_PRICE_MAX,
-                Math.round(Number(p.price) || 50)
-              )
-            ),
-            available_quantity: Math.max(
-              1,
-              Math.min(
-                DRINK_PACKAGE_QTY_MAX,
-                Math.round(Number(p.available_quantity) || 100)
-              )
-            ),
-          }))
-          : [];
+        const sanitizeDrinkPackages = (raw: unknown) =>
+          persistableAiDrinkPackages(
+            Array.isArray(raw)
+              ? raw.map((p) => ({
+                  title: truncate(
+                    String(p?.title ?? ""),
+                    DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
+                  ),
+                  description: truncate(
+                    String(p?.description ?? ""),
+                    RICH_DESCRIPTION_MAX_CHARS,
+                  ),
+                  price: p?.price,
+                  available_quantity: p?.available_quantity,
+                }))
+              : [],
+          ).map((p) => ({
+            ...p,
+            price: Math.min(DRINK_PACKAGE_PRICE_MAX, p.price),
+            available_quantity: Math.min(DRINK_PACKAGE_QTY_MAX, p.available_quantity),
+          }));
+
+        content.stepFive.packages = sanitizeDrinkPackages(content.stepFive.packages);
+        if (Array.isArray(content.stepFive.rooms)) {
+          content.stepFive.rooms = content.stepFive.rooms.map((room) => ({
+            ...room,
+            packages: sanitizeDrinkPackages(room.packages),
+          }));
+        }
         const drinksEnabled = resolveAiDrinksEnabled(content.stepFive);
         content.stepFive.drinks_option = drinksEnabled;
         if (drinksEnabled !== 1) {

@@ -66,7 +66,10 @@ import {
 } from "@/app/(on-boarding)/on-boarding/_lib/ai-onboarding-sanitize";
 import { fillAiEventGeneratedDefaults } from "./fill-ai-event-content";
 import { downloadImportedEventAssets } from "./imported-event-assets";
-import { resolveAiDrinksEnabled } from "./vendor-step-six-rooms";
+import {
+  persistableAiDrinkPackages,
+  resolveAiDrinksEnabled,
+} from "./vendor-step-six-rooms";
 
 export const AI_EVENT_APPLY_STEPS = [
   { label: "Event details, location and schedule", icon: "📅" },
@@ -759,14 +762,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
   await sleep(300);
 
   onProgress?.(5);
-  const mappedDrinkPackages = (drinksSource.packages ?? [])
-    .filter((p) => String(p.title ?? "").trim() !== "")
-    .map((p) => ({
-      title: p.title || "",
-      description: p.description || "",
-      price: p.price ?? 0,
-      available_quantity: p.available_quantity ?? 0,
-    }));
+  const mappedDrinkPackages = persistableAiDrinkPackages(drinksSource.packages);
   const perRoomDrinks = s.stepFive?.rooms ?? drinksSource.rooms ?? [];
   const mapRoomPackages = (
     packages:
@@ -777,15 +773,7 @@ async function applyAIGeneratedEventToBackendInner(params: {
           available_quantity?: number;
         }>
       | undefined,
-  ) =>
-    (packages ?? [])
-      .filter((p) => String(p.title ?? "").trim() !== "")
-      .map((p) => ({
-        title: p.title || "",
-        description: p.description || "",
-        price: p.price ?? 0,
-        available_quantity: p.available_quantity ?? 0,
-      }));
+  ) => persistableAiDrinkPackages(packages);
   const drinksEnabled = resolveAiDrinksEnabled(
     {
       drinks_option: drinksSource.drinks_option,

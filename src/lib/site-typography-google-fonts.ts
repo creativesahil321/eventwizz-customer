@@ -1,4 +1,5 @@
 import type { ThemeSchema } from "@/types/theme.types";
+import { normalizeThemeTypography } from "@/lib/normalize-theme-payload";
 
 /**
  * Google Fonts offered as presets in Site Essentials typography.
@@ -208,11 +209,12 @@ export function siteEssentialsGoogleFontsStylesheetHref(
 export function googleFontsHrefFromTheme(
   theme: ThemeSchema | null | undefined
 ): string | null {
-  const heading = theme?.typography?.fontFamily?.heading;
-  const body = theme?.typography?.fontFamily?.body;
+  const normalized = theme ? normalizeThemeTypography(theme) : theme;
+  const heading = normalized?.typography?.fontFamily?.heading;
+  const body = normalized?.typography?.fontFamily?.body;
   const fromStacks = collectSiteEssentialsGoogleFamilies(heading, body);
   const fromLegacyCustomUrls = collectGoogleFamiliesFromThemeCustomUrls(
-    theme?.typography?.customFontStylesheetUrls,
+    normalized?.typography?.customFontStylesheetUrls,
   );
   const families = filterAllowlistedGoogleFontFamilies([
     ...fromStacks,

@@ -228,10 +228,9 @@ interface CommonHeaderProps {
   className?: string;
   hasBackgroundImage?: boolean; // New prop to indicate if there's a background image
   /**
-   * When variant is `preview`, inset desktop chrome at `2xl+` so floating
-   * `/preview/event` controls (Back to Editor, Publish) do not sit under
-   * header pills. Below `2xl` those controls use a reserved bar instead.
-   * Set false for embedded previews (e.g. admin event approval).
+   * Extra inset for desktop header pills when editor controls float over the
+   * hero. Full-page `/preview/event` and `/preview/site` use a reserved bar
+   * instead — keep this false there.
    */
   previewBackButtonOffset?: boolean;
   /** Event PDFs (brochure / FAQ): one icon + dropdown so the bar stays compact */
@@ -301,14 +300,15 @@ export default function CommonHeader({
   const isPreviewPath = useIsPreviewMode();
   const deviceFramesEnabled = usePreviewDeviceFramesEnabled();
   /**
-   * Guest-facing chrome only inside framed onboarding previews.
-   * Full-page `/preview/site` and `/preview/event` mirror live auth (Dashboard
-   * when the vendor is signed in) so review matches the live site.
+   * Preview must match the public customer site: Account menu, not vendor
+   * Dashboard. `/preview/site` and `/preview/event` are reviewed against the
+   * live guest header.
    */
   const isPreviewChrome =
     variant === "onboarding" ||
-    (deviceFramesEnabled &&
-      (variant === "preview" || isPreviewFromProvider || isPreviewPath));
+    variant === "preview" ||
+    isPreviewFromProvider ||
+    isPreviewPath;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [menuHost, setMenuHost] = useState<HTMLElement | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -682,20 +682,13 @@ export default function CommonHeader({
         ? ""
         : "dark:bg-[color:var(--color-header)]";
   /**
-   * Only use `@container/preview` when a device frame (or embedded scroll panel)
-   * actually provides that container. Full-page `/preview/site` has no frame —
-   * container queries never match and the header stuck on hamburger / tiny logo.
-   *
-   * Tablet/Mobile device mode: force hamburger chrome via the preview store.
-   * Live + full-width preview: normal viewport breakpoints.
+   * Container-query header chrome is only for framed onboarding. Full-page
+   * `/preview/site` and `/preview/event` must use the same `xl` / `2xl`
+   * viewport rules as the live customer site — otherwise preview shows
+   * Dashboard/Account labels (and hides the hamburger) at the wrong width.
    */
   const isPreviewNarrow = usePreviewNarrowLayout();
-  const usePreviewContainerQueries =
-    deviceFramesEnabled ||
-    (usesEmbeddedScrollPanel &&
-      (variant === "preview" ||
-        variant === "onboarding" ||
-        overlayHero));
+  const usePreviewContainerQueries = deviceFramesEnabled;
 
   /**
    * Full header from viewport `xl` (1280px) / container `@7xl` (1280px).

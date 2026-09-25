@@ -104,7 +104,7 @@ const collectFormErrorMessages = (errors: FieldErrors): string[] => {
     });
   };
   walk(errors);
-  return messages;
+  return [...new Set(messages)];
 };
 
 const getFirstErrorFieldPath = (

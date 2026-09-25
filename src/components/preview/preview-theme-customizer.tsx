@@ -302,6 +302,11 @@ type PreviewThemeCustomizerProps = {
   onDiscardChanges?: () => void;
   /** Gates the Discard control (typically `previewRequiresSave`). */
   showDiscardChanges?: boolean;
+  /**
+   * `peek` — floating edge tab (legacy).
+   * `toolbar` — sits in the reserved preview chrome bar, like event Back/Save.
+   */
+  triggerVariant?: "peek" | "toolbar";
 };
 
 function groupLabelForColors(key: ThemePresetGroupKey): string {
@@ -350,6 +355,7 @@ export function PreviewThemeCustomizer({
   importSlot,
   onDiscardChanges,
   showDiscardChanges = false,
+  triggerVariant = "peek",
 }: PreviewThemeCustomizerProps) {
   const canPersistSiteEssentials = usePermission("update-site-essential");
   const catalogQuery = useThemePresetsCatalogQuery();
@@ -580,39 +586,56 @@ export function PreviewThemeCustomizer({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => handleOpenChange(true)}
-        aria-label="Open Try theme panel"
-        aria-expanded={open}
-        aria-controls="preview-theme-customizer-sheet"
-        className={cn(
-          "group fixed right-0 top-1/2 z-[70] flex -translate-y-1/2 items-center gap-0",
-          "rounded-l-xl border border-r-0 border-slate-200 bg-white py-2.5 pl-3 pr-2.5",
-          "text-sm font-semibold text-slate-800 shadow-md",
-          // Collapsed: icon-only peek. Expanded on hover/focus: slide in + show label.
-          "translate-x-[calc(100%-2.75rem)] transition-[transform,box-shadow,background-color,padding] duration-300 ease-out",
-          "hover:translate-x-0 hover:bg-slate-50 hover:pl-4 hover:shadow-lg",
-          "focus-visible:translate-x-0 focus-visible:pl-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
-          "motion-reduce:translate-x-0 motion-reduce:pl-4",
-          open && "pointer-events-none opacity-0",
-        )}
-      >
-        <span
+      {triggerVariant === "toolbar" ? (
+        <Button
+          type="button"
+          variant="event-primary"
+          size="sm"
+          onClick={() => handleOpenChange(true)}
+          aria-label="Open Try theme panel"
+          aria-expanded={open}
+          aria-controls="preview-theme-customizer-sheet"
+          className="pointer-events-auto relative z-[1] shrink-0 shadow-md ring-1 ring-black/10"
+        >
+          <Palette className="mr-2 h-4 w-4" />
+          <span className="sm:hidden">Theme</span>
+          <span className="hidden sm:inline">Try theme</span>
+        </Button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => handleOpenChange(true)}
+          aria-label="Open Try theme panel"
+          aria-expanded={open}
+          aria-controls="preview-theme-customizer-sheet"
           className={cn(
-            "max-w-0 overflow-hidden whitespace-nowrap text-xs leading-none opacity-0 transition-[max-width,opacity,margin] duration-300 ease-out sm:text-sm",
-            "group-hover:mr-2.5 group-hover:max-w-[6.5rem] group-hover:opacity-100",
-            "group-focus-visible:mr-2.5 group-focus-visible:max-w-[6.5rem] group-focus-visible:opacity-100",
-            "motion-reduce:mr-2.5 motion-reduce:max-w-[6.5rem] motion-reduce:opacity-100",
+            "group fixed right-0 top-1/2 z-[70] flex -translate-y-1/2 items-center gap-0",
+            "rounded-l-xl border border-r-0 border-slate-200 bg-white py-2.5 pl-3 pr-2.5",
+            "text-sm font-semibold text-slate-800 shadow-md",
+            // Collapsed: icon-only peek. Expanded on hover/focus: slide in + show label.
+            "translate-x-[calc(100%-2.75rem)] transition-[transform,box-shadow,background-color,padding] duration-300 ease-out",
+            "hover:translate-x-0 hover:bg-slate-50 hover:pl-4 hover:shadow-lg",
+            "focus-visible:translate-x-0 focus-visible:pl-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
+            "motion-reduce:translate-x-0 motion-reduce:pl-4",
+            open && "pointer-events-none opacity-0",
           )}
         >
-          Try theme
-        </span>
-        <Palette
-          className="h-5 w-5 shrink-0 text-slate-700 transition-transform duration-300 ease-out group-hover:scale-110 motion-reduce:group-hover:scale-100"
-          aria-hidden
-        />
-      </button>
+          <span
+            className={cn(
+              "max-w-0 overflow-hidden whitespace-nowrap text-xs leading-none opacity-0 transition-[max-width,opacity,margin] duration-300 ease-out sm:text-sm",
+              "group-hover:mr-2.5 group-hover:max-w-[6.5rem] group-hover:opacity-100",
+              "group-focus-visible:mr-2.5 group-focus-visible:max-w-[6.5rem] group-focus-visible:opacity-100",
+              "motion-reduce:mr-2.5 motion-reduce:max-w-[6.5rem] motion-reduce:opacity-100",
+            )}
+          >
+            Try theme
+          </span>
+          <Palette
+            className="h-5 w-5 shrink-0 text-slate-700 transition-transform duration-300 ease-out group-hover:scale-110 motion-reduce:group-hover:scale-100"
+            aria-hidden
+          />
+        </button>
+      )}
 
       {/* modal={false}: avoid Radix RemoveScroll / body lock so the preview page stays scrollable */}
       <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>

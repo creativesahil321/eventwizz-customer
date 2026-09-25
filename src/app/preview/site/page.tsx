@@ -48,6 +48,7 @@ import { useSwitchLocation } from "@/app/(protected)/vendor/venue-locations/_lib
 import { useVendorLocationsList } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { resolveDefaultVenueLocation } from "@/lib/auth/session-location";
 import { cn } from "@/lib/utils";
+import { PREVIEW_REVIEW_TOP_CHROME_BAR_CLASSNAME } from "@/app/preview/event/event-preview-review-chrome";
 
 /** Theme fields that count as a real preview edit (not browse/normalize noise). */
 function previewThemeSliceChanged(
@@ -124,6 +125,11 @@ export default function SitePreviewPage() {
    * Discard changes restores here so an unwanted import can be undone safely.
    */
   const sessionBaselineRef = useRef<SiteEssentialsFormValues | null>(null);
+  /** Scroll root under the reserved editor bar — keeps the guest header in-panel. */
+  const siteScrollRef = useRef<HTMLDivElement>(null);
+  const scrollPreviewToTop = () => {
+    siteScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
   /** `previewRequiresSave` at the moment the baseline was captured. */
   const baselineRequiresSaveRef = useRef(false);
   /**
@@ -697,7 +703,7 @@ export default function SitePreviewPage() {
         previewScope: "location",
         currentLocationIndex: index,
       });
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollPreviewToTop();
       return true;
     },
     [locationList, mainPageApproved],
@@ -741,7 +747,7 @@ export default function SitePreviewPage() {
       const nextSlug = locationList[safeLocationIndex + 1]?.slug;
       prefetchLocationPreview(nextSlug);
       setCurrentLocationIndex(safeLocationIndex + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollPreviewToTop();
     }
   };
 
@@ -750,7 +756,7 @@ export default function SitePreviewPage() {
       const prevSlug = locationList[safeLocationIndex - 1]?.slug;
       prefetchLocationPreview(prevSlug);
       setCurrentLocationIndex(safeLocationIndex - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollPreviewToTop();
     }
   };
 
@@ -789,7 +795,7 @@ export default function SitePreviewPage() {
         // Don't leave the user stuck — jump to the first page still needing approval.
         if (hasMultipleLocations && !mainPageApproved) {
           setReviewStep("main");
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          scrollPreviewToTop();
           toast({
             title: "Review Main home first",
             description:
@@ -805,7 +811,7 @@ export default function SitePreviewPage() {
           const pending = locationList[pendingIndex];
           setReviewStep("location");
           setCurrentLocationIndex(pendingIndex);
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          scrollPreviewToTop();
           toast({
             title: `Review ${pending.city}`,
             description:
@@ -1013,14 +1019,14 @@ export default function SitePreviewPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 text-black">
-        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b bg-white px-4 py-3 shadow-sm">
+        <div className={PREVIEW_REVIEW_TOP_CHROME_BAR_CLASSNAME}>
           <Button variant="event-primary" onClick={handleGoBack} size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Editor
           </Button>
-          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-8 w-28" />
         </div>
-        <div className="pt-16 pb-28">
+        <div className="pb-28">
           <Skeleton className="mx-auto aspect-[21/9] max-w-7xl" />
         </div>
       </div>
@@ -1089,25 +1095,81 @@ export default function SitePreviewPage() {
         hasMultipleLocations ? prefetchLocationPreview : undefined
       }
     >
-      <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-[var(--color-background)]">
-        {/* Top/bottom chrome overlays the site — clearance lives on the footer (footer bg)
-            so we never leave a light gap under a dark footer. */}
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex items-start px-4 pt-4 sm:px-6">
+      <div className="relative flex h-[100dvh] max-h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-[var(--color-background)]">
+        <div
+          data-site-preview-chrome=""
+          className={PREVIEW_REVIEW_TOP_CHROME_BAR_CLASSNAME}
+        >
           <Button
             variant="event-primary"
             onClick={handleGoBack}
             size="sm"
             disabled={isExiting || isSaving}
-            className="pointer-events-auto shadow-md ring-1 ring-black/10"
+            className="pointer-events-auto relative z-[1] shrink-0 shadow-md ring-1 ring-black/10"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Editor
+            <span className="sm:hidden">Back</span>
+            <span className="hidden sm:inline">Back to Editor</span>
           </Button>
+          <div className="pointer-events-auto relative z-[1] flex min-w-0 shrink-0 items-center justify-end gap-2">
+            {previewValuesForCustomizer && !isExiting ? (
+              <PreviewThemeCustomizer
+                values={previewValuesForCustomizer}
+                onValuesChange={handlePreviewValuesChange}
+                brandName={resolvedGlobalData.name?.trim() || "Site preview"}
+                onSaveTheme={handleSaveTheme}
+                isSavingTheme={isSaving || isApplyingPreset}
+                showHeroLayoutControls={effectiveReviewStep === "location"}
+                triggerVariant="toolbar"
+                importSlot={
+                  session?.user?.account_type !== "admin" ? (
+                    <PreviewImportWebsiteControl
+                      values={previewValuesForCustomizer}
+                      onValuesChange={handleImportApplied}
+                      locationLabel={
+                        (effectiveReviewStep === "location"
+                          ? currentLocation?.city
+                          : undefined) ??
+                        defaultVenueLocation?.city ??
+                        defaultVenueLocation?.name
+                      }
+                      disabled={isSaving || isExiting}
+                    />
+                  ) : undefined
+                }
+                showDiscardChanges={hasSessionEdits}
+                onDiscardChanges={handleDiscardPreviewChanges}
+                sheetDescription={
+                  hasSessionEdits
+                    ? "Adjust colours or fonts. Don’t like an import or theme try? Use Discard changes."
+                    : previewRequiresSave
+                      ? "Adjust colours or fonts. Approve each location page, then save."
+                      : "Adjust colours or fonts. Editing will enable Approve & save."
+                }
+                footerSlot={
+                  <RestoreDefaultThemeControl
+                    presetCacheUserKey={
+                      session?.user?.email?.trim() ||
+                      (session?.user as { id?: string })?.id ||
+                      "anonymous"
+                    }
+                    getValues={() =>
+                      previewValuesForCustomizer ?? resolvedGlobalData
+                    }
+                    onApplied={(next) => {
+                      handlePreviewValuesChange(next);
+                    }}
+                  />
+                }
+              />
+            ) : null}
+          </div>
         </div>
 
         <div
-            className={cn(
-              "min-h-screen w-full min-w-0 transition-opacity duration-200 ease-out",
+          ref={siteScrollRef}
+          className={cn(
+            "min-h-0 w-full min-w-0 flex-1 overflow-y-auto transition-opacity duration-200 ease-out",
             isLocationSwapPending && "opacity-80",
           )}
         >
@@ -1131,6 +1193,7 @@ export default function SitePreviewPage() {
                 resolvedGlobalData
               }
               hasMultipleLocations={hasMultipleLocations}
+              scrollContainerRef={siteScrollRef}
             />
           )}
         </div>
@@ -1149,57 +1212,6 @@ export default function SitePreviewPage() {
             </div>
           </div>
         )}
-
-        {previewValuesForCustomizer && !isExiting ? (
-          <PreviewThemeCustomizer
-            values={previewValuesForCustomizer}
-            onValuesChange={handlePreviewValuesChange}
-            brandName={resolvedGlobalData.name?.trim() || "Site preview"}
-            onSaveTheme={handleSaveTheme}
-            isSavingTheme={isSaving || isApplyingPreset}
-            showHeroLayoutControls={effectiveReviewStep === "location"}
-            importSlot={
-              session?.user?.account_type !== "admin" ? (
-                <PreviewImportWebsiteControl
-                  values={previewValuesForCustomizer}
-                  onValuesChange={handleImportApplied}
-                  locationLabel={
-                    (effectiveReviewStep === "location"
-                      ? currentLocation?.city
-                      : undefined) ??
-                    defaultVenueLocation?.city ??
-                    defaultVenueLocation?.name
-                  }
-                  disabled={isSaving || isExiting}
-                />
-              ) : undefined
-            }
-            showDiscardChanges={hasSessionEdits}
-            onDiscardChanges={handleDiscardPreviewChanges}
-            sheetDescription={
-              hasSessionEdits
-                ? "Adjust colours or fonts. Don’t like an import or theme try? Use Discard changes."
-                : previewRequiresSave
-                  ? "Adjust colours or fonts. Approve each location page, then save."
-                  : "Adjust colours or fonts. Editing will enable Approve & save."
-            }
-            footerSlot={
-              <RestoreDefaultThemeControl
-                presetCacheUserKey={
-                  session?.user?.email?.trim() ||
-                  (session?.user as { id?: string })?.id ||
-                  "anonymous"
-                }
-                getValues={() =>
-                  previewValuesForCustomizer ?? resolvedGlobalData
-                }
-                onApplied={(next) => {
-                  handlePreviewValuesChange(next);
-                }}
-              />
-            }
-          />
-        ) : null}
 
         <SitePreviewReviewChrome
           hasMultipleLocations={hasMultipleLocations}
@@ -1237,7 +1249,7 @@ export default function SitePreviewPage() {
                 currentLocationIndex: step.locationIndex,
               });
             }
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            scrollPreviewToTop();
           }}
           onBackToMain={
             hasMultipleLocations
@@ -1246,7 +1258,7 @@ export default function SitePreviewPage() {
                     reviewStep: "main",
                     previewScope: "main",
                   });
-                  window.scrollTo({ top: 0, behavior: "smooth" });
+                  scrollPreviewToTop();
                 }
               : undefined
           }

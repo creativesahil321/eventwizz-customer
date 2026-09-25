@@ -1,6 +1,7 @@
 /** Shared normalizers for vendor event step 2 (package tab + hydration mappers). */
 
 import { createDefaultPackageDetailRow } from "@/lib/event-form-limits";
+import { coerceGalleryImageId } from "@/lib/event-gallery-count";
 
 /** API often returns `""` for unset media; Zod `.url()` rejects empty strings. */
 export function normalizePersistedMediaUrl(
@@ -14,21 +15,26 @@ export function normalizePersistedMediaUrl(
 
 export function normalizeGalleryEntries(
   raw: unknown,
-): Array<File | { id: number; url: string }> {
+): Array<File | { id: number; url: string } | string> {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((item): item is File | { id: number; url: string } => {
-    if (item instanceof File) return true;
-    if (!item || typeof item !== "object") return false;
-    const id = (item as { id?: unknown }).id;
-    const url = String((item as { url?: unknown }).url ?? "").trim();
-    if (typeof id !== "number" || !url) return false;
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
+  const entries: Array<File | { id: number; url: string } | string> = [];
+  for (const item of raw) {
+    if (typeof File !== "undefined" && item instanceof File) {
+      entries.push(item);
+      continue;
     }
-  });
+    if (typeof item === "string" && item.trim()) {
+      entries.push(item.trim());
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+    const record = item as { id?: unknown; url?: unknown; preview?: unknown };
+    const url = String(record.url ?? record.preview ?? "").trim();
+    if (!url) continue;
+    const id = coerceGalleryImageId(record.id);
+    entries.push(id !== undefined ? { id, url } : url);
+  }
+  return entries;
 }
 
 export function normalizePackageDetails(

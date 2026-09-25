@@ -16,6 +16,8 @@ import {
 } from "@/lib/event-form-limits";
 import {
   EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+  countEventGalleryItems,
+  isDisplayableGalleryItem,
   isEventGalleryCountValid,
 } from "@/lib/event-gallery-count";
 import {
@@ -86,28 +88,18 @@ const persistedMediaSchema = z.preprocess(
 
 const galleryEntrySchema = z.union([
   z.instanceof(File),
-  z.object({ id: z.number(), url: z.string().url() }),
+  z.string().min(1),
+  z.object({
+    id: z.coerce.number().optional(),
+    url: z.string().min(1),
+    preview: z.string().optional(),
+  }),
 ]);
 
 const gallerySchema = z.preprocess((val) => {
   if (!Array.isArray(val)) return [];
-  return val.filter((item) => {
-    if (item instanceof File) return true;
-    if (!item || typeof item !== "object") return false;
-    const id = (item as { id?: unknown }).id;
-    const url = String((item as { url?: unknown }).url ?? "").trim();
-    if (typeof id !== "number" || !url) return false;
-    try {
-      z.string().url().parse(url);
-      return true;
-    } catch {
-      return false;
-    }
-  });
-}, z.array(galleryEntrySchema).optional().refine(
-  (items) => isEventGalleryCountValid(items?.length ?? 0),
-  { message: EVENT_GALLERY_PARTIAL_COUNT_MESSAGE },
-));
+  return val.filter(isDisplayableGalleryItem);
+}, z.array(galleryEntrySchema).optional());
 
 //=== Step 1 ===//
 export const stepOneSchema = z
@@ -302,6 +294,15 @@ export const stepTwoSchema = z
 
   })
   .superRefine((data, ctx) => {
+    const addGalleryIssue = (path: Array<string | number>, items: unknown) => {
+      if (isEventGalleryCountValid(countEventGalleryItems(items))) return;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: EVENT_GALLERY_PARTIAL_COUNT_MESSAGE,
+        path,
+      });
+    };
+
     if (data.is_rooms === 1) {
       const roomsCount = Array.isArray(data.rooms) ? data.rooms.length : 0;
       if (roomsCount < EVENT_ROOM_MIN_COUNT) {
@@ -318,7 +319,13 @@ export const stepTwoSchema = z
           path: ["rooms"],
         });
       }
+      (data.rooms ?? []).forEach((room, index) => {
+        addGalleryIssue(["rooms", index, "gallery"], room.gallery);
+      });
+      return;
     }
+
+    addGalleryIssue(["gallery"], data.gallery);
   })
   .refine(
     (data) => {

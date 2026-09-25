@@ -19,7 +19,8 @@ export function useEventPreviewNavigation() {
     ? params?.eventID[0]
     : params?.eventID;
   const eventIdFromForm = Number(form.getValues().stepOne?.event_id) || 0;
-  const eventId = eventIdFromForm > 0 ? eventIdFromForm : Number(eventIdFromUrl) || 0;
+  const eventId =
+    eventIdFromForm > 0 ? eventIdFromForm : Number(eventIdFromUrl) || 0;
 
   const openEventPreview = useCallback(() => {
     if (!eventId || eventId <= 0) {
@@ -38,8 +39,6 @@ export function useEventPreviewNavigation() {
       void clearVendorEventPreviewDraft(eventId);
     }
 
-    // Must open synchronously on click — `await` before window.open() makes browsers
-    // treat the new tab as a popup and block it.
     const opened = openEventPreviewTab(eventId, isRoomsEnabled);
     if (!opened) {
       toast.error("Could not open preview in a new tab.", {

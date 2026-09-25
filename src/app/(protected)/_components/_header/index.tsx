@@ -28,6 +28,7 @@ import {
 import { useSession } from "next-auth/react";
 import { useLocationsQuery } from "@/app/(protected)/vendor/venue-locations/_lib/queries";
 import { useProfileData } from "@/app/(protected)/_shared/profile/_lib";
+import { PROTECTED_DESKTOP_TOGGLE_CLASS } from "../protected-shell";
 
 interface HeaderProps {
   menus?: MenuItemProps[];
@@ -64,10 +65,8 @@ const Header: React.FC<HeaderProps> = memo(({ menus }) => {
   return (
     <header className={headerClass}>
       <div className="flex shrink-0 items-center gap-1.5">
-        <div className="md:hidden">
-          <MobileSidebar menus={menus} />
-        </div>
-        <div className="hidden md:block">
+        <MobileSidebar menus={menus} />
+        <div className={PROTECTED_DESKTOP_TOGGLE_CLASS}>
           <LayoutToggle />
         </div>
         <UniversalSearch />
