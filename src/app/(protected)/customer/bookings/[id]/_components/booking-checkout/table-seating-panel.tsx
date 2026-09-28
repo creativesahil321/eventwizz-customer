@@ -461,7 +461,9 @@ export function TableSeatingPanel({
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold text-foreground">
-                    Minimum {minPersons}, Maximum {maxPersons}
+                    {minPersons === maxPersons
+                      ? `Table for ${maxPersons} guests`
+                      : `Table for ${minPersons}–${maxPersons} guests`}
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     {tableQuantity} table{tableQuantity === 1 ? "" : "s"} ·{" "}

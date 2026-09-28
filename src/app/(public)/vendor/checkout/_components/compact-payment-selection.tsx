@@ -105,11 +105,11 @@ export default function CompactPaymentSelection({
             >
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-blue-600" />
+                  <Clock className="h-4 w-4 text-[color:var(--checkout-brand-accent)]" />
                   <span className="font-medium">Pay Deposit</span>
                   <Badge
                     variant="outline"
-                    className="text-xs border-blue-200 text-blue-700"
+                    className="text-xs border-[color:color-mix(in_srgb,var(--checkout-brand-accent)_30%,white)] text-[color:var(--checkout-brand-accent)]"
                   >
                     Flexible
                   </Badge>
@@ -129,8 +129,8 @@ export default function CompactPaymentSelection({
 
         {/* Balance Due Date */}
         {selectedPaymentType === "deposit" && balanceDueDate && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-            <div className="flex items-center gap-2 text-xs text-blue-700">
+          <div className="bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)] border border-[color:color-mix(in_srgb,var(--checkout-brand-accent)_30%,white)] rounded-lg p-2">
+            <div className="flex items-center gap-2 text-xs text-[color:var(--checkout-brand-accent)]">
               <Calendar className="h-3 w-3" />
               <span>Balance due: {formatDate(balanceDueDate)}</span>
             </div>

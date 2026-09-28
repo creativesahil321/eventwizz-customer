@@ -533,10 +533,12 @@ export default function DateAccordion({
         <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:items-center sm:gap-3">
           <div
             className={cn(
-              "mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg sm:mt-0",
+              "mt-0.5 h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg sm:mt-0",
+              // Inside a room card on phones the icon cost ~46px and forced the
+              // date to wrap ("Oct 12, / 2026") — the room card already frames it.
               embedded
-                ? roomTone.calendarIcon
-                : "bg-emerald-50 text-emerald-700",
+                ? cn("hidden sm:flex", roomTone.calendarIcon)
+                : "flex bg-emerald-50 text-emerald-700",
             )}
           >
             <Calendar className="h-4 w-4" strokeWidth={2.25} />
@@ -548,13 +550,15 @@ export default function DateAccordion({
               onClick={onToggle}
               aria-expanded={isExpanded}
             >
-              <h3 className="text-[15px] font-bold leading-snug text-[color:var(--checkout-brand-primary)] sm:text-base">
+              <h3 className="whitespace-nowrap text-[15px] font-bold leading-snug text-[color:var(--checkout-brand-primary)] sm:text-base">
                 <span className="hidden sm:inline">{formatDate(date)}</span>
                 <span className="sm:hidden">{formatDateMobile(date)}</span>
               </h3>
               <p
                 className={cn(
-                  "mt-0.5 line-clamp-2 text-[12px] font-medium leading-relaxed sm:line-clamp-1 sm:text-xs",
+                  // Phones: show the full "Room · 3 tickets · 1 table · 3 guests"
+                  // line (was clipped to "… 3…"); one line from sm up.
+                  "mt-0.5 text-[12px] font-medium leading-relaxed sm:line-clamp-1 sm:text-xs",
                   isDateEmpty
                     ? "text-amber-700"
                     : "text-[color:var(--checkout-muted-foreground)]",
@@ -879,7 +883,7 @@ export default function DateAccordion({
                     : "Add special requests"}
                 </span>
                 {specialRequest && (
-                  <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
+                  <span className="text-xs bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)] text-[color:var(--checkout-brand-accent)] px-1.5 py-0.5 rounded-full font-medium">
                     Added
                   </span>
                 )}
@@ -898,7 +902,7 @@ export default function DateAccordion({
                       updateSpecialRequest(eventSlug, date, e.target.value)
                     }
                     placeholder="Tell us about any special requirements... (e.g., dietary needs, accessibility, seating preferences)"
-                    className="min-h-[80px] text-sm bg-white text-gray-900 caret-gray-900 placeholder:text-gray-500 border-gray-200 rounded-lg resize-none focus:ring-blue-500 focus:border-blue-500"
+                    className="min-h-[80px] text-sm bg-white text-gray-900 caret-gray-900 placeholder:text-gray-500 border-gray-200 rounded-lg resize-none focus:ring-[color:var(--checkout-brand-accent)] focus:border-[color:var(--checkout-brand-accent)]"
                     maxLength={500}
                   />
                   <div className="flex justify-between items-center mt-2">

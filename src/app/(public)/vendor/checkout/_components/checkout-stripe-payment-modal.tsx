@@ -45,47 +45,81 @@ import "../checkout-theme.css";
 // Shared appearance / UI helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Stripe renders inside its own iframe: page CSS variables (`var(--font-inter)`)
+ * and `oklch()` colours do not resolve there, so the card form fell back to a
+ * serif system font. Pass concrete values — the vendor's brand colour is read
+ * from the page once, as `rgb()`, when the form mounts.
+ */
+const STRIPE_FONTS = [
+  {
+    cssSrc:
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+  },
+];
+
+const STRIPE_TEXT = "#0f172a";
+const STRIPE_TEXT_MUTED = "#64748b";
+const STRIPE_BORDER = "#e2e8f0";
+const STRIPE_SURFACE_MUTED = "#f1f5f9";
+
+function readVendorPrimaryRgb(fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue("--color-primary")
+    .trim();
+  if (!raw) return fallback;
+  // Normalise any CSS colour (hex, oklch, named…) to rgb() via the browser.
+  const probe = document.createElement("span");
+  probe.style.color = raw;
+  document.body.appendChild(probe);
+  const rgb = getComputedStyle(probe).color;
+  probe.remove();
+  return rgb.startsWith("rgb") ? rgb : fallback;
+}
+
 function buildStripeAppearance() {
+  const accent = readVendorPrimaryRgb(STRIPE_TEXT);
   return {
     theme: "stripe" as const,
     labels: "above" as const,
     variables: {
-      colorPrimary: "oklch(0.208 0.042 265.755)",
+      colorPrimary: accent,
       colorBackground: "#ffffff",
-      colorText: "oklch(0.208 0.042 265.755)",
-      colorTextSecondary: "oklch(0.554 0.046 257.417)",
-      colorTextPlaceholder: "oklch(0.554 0.046 257.417)",
+      colorText: STRIPE_TEXT,
+      colorTextSecondary: STRIPE_TEXT_MUTED,
+      colorTextPlaceholder: STRIPE_TEXT_MUTED,
       colorDanger: "#dc2626",
       fontFamily:
-        "var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif",
+        "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
       fontSizeBase: "15px",
       spacingUnit: "4px",
       borderRadius: "12px",
-      focusBoxShadow: "0 0 0 3px oklch(0.546 0.215 262.881 / 0.25)",
-      tabIconSelectedColor: "oklch(0.208 0.042 265.755)",
+      focusBoxShadow: `0 0 0 3px color-mix(in srgb, ${accent} 25%, transparent)`,
+      tabIconSelectedColor: accent,
     },
     rules: {
       ".Tab": {
-        border: "1px solid oklch(0.929 0.013 255.508)",
+        border: `1px solid ${STRIPE_BORDER}`,
         boxShadow: "none",
       },
       ".Tab:hover": {
-        backgroundColor: "oklch(0.968 0.007 247.896)",
+        backgroundColor: STRIPE_SURFACE_MUTED,
       },
       ".Tab--selected": {
-        border: "2px solid oklch(0.208 0.042 265.755)",
-        boxShadow: "0 1px 2px oklch(0.208 0.042 265.755 / 0.08)",
+        border: `2px solid ${accent}`,
+        boxShadow: "none",
       },
       ".AccordionItem": {
-        border: "1px solid oklch(0.929 0.013 255.508)",
+        border: `1px solid ${STRIPE_BORDER}`,
         boxShadow: "none",
       },
       ".Input": {
-        border: "1px solid oklch(0.929 0.013 255.508)",
+        border: `1px solid ${STRIPE_BORDER}`,
         boxShadow: "none",
       },
       ".Input:focus": {
-        border: "1px solid oklch(0.546 0.215 262.881)",
+        border: `1px solid ${accent}`,
       },
     },
   };
@@ -642,6 +676,7 @@ export default function CheckoutStripePaymentModal({
     return {
       clientSecret: session.clientSecret,
       appearance: buildStripeAppearance(),
+      fonts: STRIPE_FONTS,
       loader: "auto",
     };
   }, [session?.clientSecret, isCheckoutSession]);
@@ -652,6 +687,7 @@ export default function CheckoutStripePaymentModal({
       if (!session?.clientSecret || !isCheckoutSession) return null;
       return {
         appearance: buildStripeAppearance(),
+        fonts: STRIPE_FONTS,
         loader: "auto",
       };
     }, [session?.clientSecret, isCheckoutSession]);

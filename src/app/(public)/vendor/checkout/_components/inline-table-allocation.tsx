@@ -242,7 +242,9 @@ export default function InlineTableAllocation({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <div className="min-w-0">
             <p className="text-sm font-bold leading-tight text-[color:var(--checkout-foreground)]">
-              Minimum {minPersons}, Maximum {maxPersons}
+              {minPersons === maxPersons
+                      ? `Table for ${maxPersons} guests`
+                      : `Table for ${minPersons}–${maxPersons} guests`}
             </p>
             <p className="mt-0.5 text-[11px] text-[color:var(--checkout-muted-foreground)]">
               {table.quantity} table{table.quantity !== 1 ? "s" : ""} ·{" "}
@@ -264,7 +266,7 @@ export default function InlineTableAllocation({
             className={cn(
               "h-full rounded-full transition-all duration-300",
               validation.isValid
-                ? "bg-emerald-500"
+                ? "bg-[color:var(--checkout-cta)]"
                 : validation.totalAllocated > seatingTarget
                   ? "bg-red-500"
                   : "bg-[color:var(--checkout-brand-accent)]",
@@ -310,7 +312,7 @@ export default function InlineTableAllocation({
               onClick={handleConfirmSeating}
               disabled={isSavingSeating}
               className={cn(
-                "flex h-10 w-full items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50",
+                "flex h-10 w-full items-center justify-center rounded-lg bg-[color:var(--checkout-cta)] px-4 text-sm font-semibold text-[color:var(--checkout-cta-foreground)] transition-colors hover:bg-[color:var(--checkout-cta)] disabled:opacity-50",
                 showConfirmHint ? "mt-2" : "mt-3",
               )}
             >

@@ -1,5 +1,6 @@
 "use client";
 
+import { PaymentHelpContact } from "@/components/public/payment-help-contact";
 import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
@@ -541,18 +542,7 @@ function PaymentSuccessContent() {
           transition={{ delay: 1 }}
           className="text-center"
         >
-          <p className="text-sm text-gray-600">
-            Need help? Contact our support team at{" "}
-            <a
-              href="mailto:support@eventwizz.com"
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              support@eventwizz.com
-            </a>
-          </p>
-          <p className="text-xs text-gray-500 mt-2">
-            Our team is available 24/7 to assist you
-          </p>
+          <PaymentHelpContact />
         </motion.div>
       </div>
     </div>

@@ -37,8 +37,8 @@ function CategoryDivider({
   tone: "ticket" | "package" | "table";
 }) {
   const pillClass = {
-    ticket: "bg-blue-50 text-blue-700",
-    package: "bg-violet-50 text-violet-700",
+    ticket: "bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)] text-[color:var(--checkout-brand-accent)]",
+    package: "bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)] text-[color:var(--checkout-brand-accent)]",
     table: "bg-amber-50 text-amber-700",
   }[tone];
 

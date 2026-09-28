@@ -322,10 +322,10 @@ export default function GuestAllocationModal({
                 <motion.div
                   className={`h-full rounded-full transition-colors duration-300 ${
                     validation.isValid
-                      ? "bg-emerald-500"
+                      ? "bg-[color:var(--checkout-cta)]"
                       : validation.totalAllocated > totalGuests
                         ? "bg-red-500"
-                        : "bg-blue-500"
+                        : "bg-[color:var(--checkout-cta)]"
                   }`}
                   initial={{ width: 0 }}
                   animate={{ width: `${progressPercent}%` }}
@@ -399,7 +399,7 @@ export default function GuestAllocationModal({
           <button
             onClick={handleAutoArrange}
             disabled={isAutoArranging}
-            className="flex items-center gap-1.5 px-3.5 h-8 rounded-lg bg-blue-600 text-white text-xs font-medium transition-all hover:bg-blue-700 active:scale-[0.97] disabled:opacity-60 shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 h-8 rounded-lg bg-[color:var(--checkout-cta)] text-[color:var(--checkout-cta-foreground)] text-xs font-medium transition-all hover:bg-[color:var(--checkout-cta)] active:scale-[0.97] disabled:opacity-60 shadow-sm"
           >
             {isAutoArranging ? (
               <>
@@ -652,7 +652,7 @@ export default function GuestAllocationModal({
                 disabled={!validation.isValid}
                 className={`rounded-xl h-9 px-4 sm:px-5 text-sm font-semibold transition-all duration-200 flex-1 sm:flex-initial ${
                   validation.isValid
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-200 active:scale-[0.97]"
+                    ? "bg-[color:var(--checkout-cta)] text-[color:var(--checkout-cta-foreground)] hover:bg-[color:var(--checkout-cta)] shadow-sm shadow-emerald-200 active:scale-[0.97]"
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 }`}
               >

@@ -1,7 +1,7 @@
 "use client";
 
 import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
-import { SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
+import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
 import {
   useState,
@@ -1064,7 +1064,7 @@ export default function DatesSection({
     return (
       <section className={cn(sectionClass, "px-4 py-10")}>
         <div className={headerWrapClass}>
-          <p className="text-sm font-semibold tracking-wide text-[color:var(--color-primary)] sm:text-base">
+          <p className={SECTION_EYEBROW_CLASS}>
             {sectionLabel}
           </p>
           <SiteHeading
@@ -1110,7 +1110,7 @@ export default function DatesSection({
     return (
       <section className={sectionClass}>
         <div className={headerWrapClass}>
-          <p className="text-sm font-semibold tracking-wide text-[color:var(--color-primary)] sm:text-base">
+          <p className={SECTION_EYEBROW_CLASS}>
             {sectionLabel}
           </p>
           <SiteHeading
@@ -1209,7 +1209,7 @@ export default function DatesSection({
       transition={{ duration: 0.2 }}
     >
       <div className={headerWrapClass}>
-        <p className="text-sm font-semibold tracking-wide text-[color:var(--color-primary)] sm:text-base">
+        <p className={SECTION_EYEBROW_CLASS}>
           {sectionLabel}
         </p>
         <SiteHeading

@@ -4412,10 +4412,12 @@ Is there anything else I can help you with?`,
             exit={motionSafe ? { opacity: 0, scale: 0.85, y: 12 } : undefined}
             transition={{ type: "spring", stiffness: 420, damping: 24 }}
             className={cn(
-              "fixed right-4 z-[80] sm:right-6",
+              "fixed z-[80]",
+              // Checkout phones: a slim edge tab in the page gutter — the round
+              // 56px bubble sat over the "Add" / "Confirm seating" buttons.
               isVendorCheckout
-                ? "bottom-[calc(var(--checkout-mobile-chrome-height,9rem)+0.75rem)] lg:bottom-8"
-                : "bottom-20 sm:bottom-8",
+                ? "right-0 bottom-[calc(var(--checkout-mobile-chrome-height,9rem)+0.75rem)] lg:right-6 lg:bottom-8"
+                : "right-4 bottom-20 sm:right-6 sm:bottom-8",
             )}
             style={isVendorCheckout ? undefined : previewReviewChromeLiftStyle}
           >
@@ -4429,14 +4431,18 @@ Is there anything else I can help you with?`,
               whileHover={motionSafe ? { scale: 1.06 } : undefined}
               whileTap={motionSafe ? { scale: 0.96 } : undefined}
               className={cn(
-                "relative h-14 w-14 rounded-full p-0",
+                "relative p-0",
+                isVendorCheckout
+                  ? "h-10 w-10 rounded-l-2xl rounded-r-none lg:h-14 lg:w-14 lg:rounded-full"
+                  : "h-14 w-14 rounded-full",
                 "shadow-[0_8px_28px_rgba(15,23,42,0.18)]",
                 "ring-2 ring-white/90",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
               )}
             >
-              {/* Attention rings — draw the eye to the support bot */}
-              {motionSafe && (
+              {/* Attention rings — draw the eye to the support bot (not during
+                  checkout, where it competes with the payment flow). */}
+              {motionSafe && !isVendorCheckout && (
                 <>
                   <span
                     aria-hidden
@@ -4477,7 +4483,8 @@ Is there anything else I can help you with?`,
                 setIsDismissed(true);
               }}
               className={cn(
-                "absolute -right-1.5 -top-1.5 z-30",
+                "absolute -top-1.5 z-30",
+                isVendorCheckout ? "-left-1.5 lg:left-auto lg:-right-1.5" : "-right-1.5",
                 "flex h-5 w-5 items-center justify-center rounded-full shadow-sm",
                 chatChrome,
                 "ring-2 ring-white",

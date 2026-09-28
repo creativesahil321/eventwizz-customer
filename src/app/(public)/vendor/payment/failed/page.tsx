@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  PaymentHelpContact,
+  usePaymentSupportContact,
+} from "@/components/public/payment-help-contact";
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -29,6 +33,7 @@ interface PaymentFailureData {
 }
 
 function PaymentFailedContent() {
+  const supportContact = usePaymentSupportContact();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -83,7 +88,7 @@ function PaymentFailedContent() {
         failureData?.error_message || "N/A"
       }\n\nPlease assist me.\n\nThank you.`
     );
-    window.location.href = `mailto:support@eventwizz.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:${supportContact.email}?subject=${subject}&body=${body}`;
   };
 
   const handleViewCart = () => {
@@ -372,31 +377,9 @@ function PaymentFailedContent() {
               Need Immediate Help?
             </h4>
             <p className="text-sm text-gray-600 mb-3">
-              Our support team is here to help you complete your booking
+              Contact the venue and they can help you complete your booking.
             </p>
-            <div className="space-y-2">
-              <p className="text-sm">
-                <span className="font-medium text-gray-700">Email:</span>{" "}
-                <a
-                  href="mailto:support@eventwizz.com"
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  support@eventwizz.com
-                </a>
-              </p>
-              <p className="text-sm">
-                <span className="font-medium text-gray-700">Phone:</span>{" "}
-                <a
-                  href="tel:+441234567890"
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  +44 123 456 7890
-                </a>
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                Available 24/7 • Response within 1 hour
-              </p>
-            </div>
+            <PaymentHelpContact variant="list" />
           </div>
         </motion.div>
 

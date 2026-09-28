@@ -731,7 +731,7 @@ export default function CartManager({}: CartManagerProps) {
         {chatEventHref ? (
           <Button
             asChild
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
+            className="bg-[color:var(--checkout-cta)] hover:bg-[color:var(--checkout-cta)] text-[color:var(--checkout-cta-foreground)] rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
           >
             <Link href={chatEventHref}>Choose dates</Link>
           </Button>
@@ -744,7 +744,7 @@ export default function CartManager({}: CartManagerProps) {
                 window.location.href = "/";
               }
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
+            className="bg-[color:var(--checkout-cta)] hover:bg-[color:var(--checkout-cta)] text-[color:var(--checkout-cta-foreground)] rounded-xl px-6 h-10 text-sm font-medium shadow-sm"
           >
             Browse Events
           </Button>
@@ -988,7 +988,7 @@ export default function CartManager({}: CartManagerProps) {
     showAddRoom && eventDetailsUrl ? (
       <Link
         href={eventDetailsUrl}
-        className="inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-dashed border-[color:var(--checkout-brand-accent)]/35 px-3 py-2 text-xs font-semibold text-[color:var(--checkout-brand-accent)] transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-blue-50/50"
+        className="inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-dashed border-[color:var(--checkout-brand-accent)]/35 px-3 py-2 text-xs font-semibold text-[color:var(--checkout-brand-accent)] transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)]"
       >
         <Plus className="h-3.5 w-3.5" />
         Add room
@@ -1021,7 +1021,9 @@ export default function CartManager({}: CartManagerProps) {
           addRoomUrl={eventDetailsUrl ?? undefined}
         />
 
-        <div className="space-y-3 rounded-2xl border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/40 p-2.5 sm:p-3">
+        {/* Phones: no extra card around the dates (card-in-card squeezed the
+            date header); the room tabs above already group them. */}
+        <div className="space-y-3 sm:rounded-2xl sm:border sm:border-[color:var(--checkout-border)] sm:bg-[color:var(--checkout-muted)]/40 sm:p-3">
           {dateSections}
         </div>
       </div>

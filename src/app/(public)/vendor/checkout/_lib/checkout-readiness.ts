@@ -68,10 +68,12 @@ function formatDateReadinessPart(counts: CheckoutDateCounts): string {
   if (needsItems === 0) {
     return `${total} date${total !== 1 ? "s" : ""} ready`;
   }
+  // Plain language for the booking header + mobile total bar
+  // (was "1 date need items" / "1 date ready · 1 need items").
   if (ready === 0) {
-    return `${total} date${total !== 1 ? "s" : ""} need items`;
+    return total === 1 ? "No items added yet" : `${total} dates · no items yet`;
   }
-  return `${ready} date${ready !== 1 ? "s" : ""} ready · ${needsItems} need${needsItems !== 1 ? "s" : ""} items`;
+  return `${ready} of ${total} dates ready`;
 }
 
 export function formatCheckoutBookingMetaLine(params: {

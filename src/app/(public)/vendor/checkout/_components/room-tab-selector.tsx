@@ -114,7 +114,7 @@ export default function RoomTabSelector({
               "flex min-h-14 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed",
               "border-[color:var(--checkout-brand-accent)]/40 px-3.5 py-3",
               "text-sm font-semibold text-[color:var(--checkout-brand-accent)]",
-              "transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-blue-50/50",
+              "transition-colors hover:border-[color:var(--checkout-brand-accent)] hover:bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)]",
             )}
           >
             <Plus className="h-4 w-4" aria-hidden />

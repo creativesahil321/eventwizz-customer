@@ -97,7 +97,7 @@ const checkoutPayButtonClass = (disabled: boolean) =>
     "rounded-xl font-bold shadow-lg transition-all duration-200 disabled:opacity-100",
     disabled
       ? "cursor-not-allowed border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)] text-[color:var(--checkout-muted-foreground)] hover:bg-[color:var(--checkout-muted)] hover:text-[color:var(--checkout-muted-foreground)]"
-      : "bg-[color:var(--checkout-brand-primary)] text-white shadow-[color:var(--checkout-brand-primary)]/20 hover:!bg-[color:var(--checkout-brand-primary)] hover:!text-white hover:brightness-110 active:scale-[0.98]",
+      : "bg-[color:var(--checkout-cta)] text-[color:var(--checkout-cta-foreground)] shadow-[color:var(--checkout-cta)]/20 hover:!bg-[color:var(--checkout-cta)] hover:!text-[color:var(--checkout-cta-foreground)] hover:brightness-110 active:scale-[0.98]",
   );
 
 type BookingSummaryProps = Record<string, never>;

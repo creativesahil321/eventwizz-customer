@@ -19,10 +19,10 @@ const PAYMENT_GATEWAYS = {
     description: "Credit or debit card",
     icon: CreditCard,
     processingTime: "Instant",
-    brandColor: "from-indigo-500 to-blue-600",
-    bgSelected: "bg-indigo-50 border-indigo-300",
-    textColor: "text-indigo-700",
-    iconBg: "bg-indigo-100",
+    brandColor: "from-[color:var(--checkout-cta)] to-[color:var(--checkout-cta)]",
+    bgSelected: "bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)] border-[color:color-mix(in_srgb,var(--checkout-brand-accent)_30%,white)]",
+    textColor: "text-[color:var(--checkout-brand-accent)]",
+    iconBg: "bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_12%,white)]",
   },
   paypal: {
     id: "paypal",
@@ -30,10 +30,10 @@ const PAYMENT_GATEWAYS = {
     description: "Pay with your PayPal account",
     icon: Smartphone,
     processingTime: "Instant",
-    brandColor: "from-blue-500 to-blue-600",
-    bgSelected: "bg-blue-50 border-blue-300",
-    textColor: "text-blue-700",
-    iconBg: "bg-blue-100",
+    brandColor: "from-[color:var(--checkout-cta)] to-[color:var(--checkout-cta)]",
+    bgSelected: "bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)] border-[color:color-mix(in_srgb,var(--checkout-brand-accent)_30%,white)]",
+    textColor: "text-[color:var(--checkout-brand-accent)]",
+    iconBg: "bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_12%,white)]",
   },
   truelayer: {
     id: "truelayer",
@@ -192,17 +192,14 @@ export default function PaymentGatewaySelector({
         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
           Payment Method
         </h4>
-        {showError && (
-          <span className="text-xs text-red-600 font-medium animate-pulse">
-            Select one ↓
-          </span>
-        )}
       </div>
-      
+
+      {/* The customer tapped Pay as instructed — prompt, don't scold: no red /
+          pulsing / amber warning styling for a normal next step. */}
       {showError && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-medium text-amber-900">
+        <p className="text-sm font-medium text-[color:var(--checkout-brand-accent)]">
           {formatCheckoutGatewayContinuePrompt(availableGateways)}
-        </div>
+        </p>
       )}
 
       {/* Show all gateway options when no selection or expanded */}
@@ -219,7 +216,7 @@ export default function PaymentGatewaySelector({
                   isSelected
                     ? `${gateway.bgSelected} shadow-sm`
                     : showError
-                    ? "border-red-200 bg-red-50/50 hover:bg-red-50"
+                    ? "border-[color:color-mix(in_srgb,var(--checkout-brand-accent)_40%,white)] bg-white hover:bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_6%,white)]"
                     : "border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300"
                 } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
                 onClick={() => {

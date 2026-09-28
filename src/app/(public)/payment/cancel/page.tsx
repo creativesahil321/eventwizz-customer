@@ -1,5 +1,6 @@
 "use client";
 
+import { PaymentHelpContact } from "@/components/public/payment-help-contact";
 import React, { useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -181,31 +182,9 @@ function PaymentCancelledContent() {
               Need Help Completing Your Booking?
             </h4>
             <p className="text-sm text-gray-600 mb-3">
-              Our support team is available to assist you
+              Your selections are saved — contact the venue if you need a hand.
             </p>
-            <div className="space-y-2">
-              <p className="text-sm">
-                <span className="font-medium text-gray-700">Email:</span>{" "}
-                <a
-                  href="mailto:support@eventwizz.com"
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  support@eventwizz.com
-                </a>
-              </p>
-              <p className="text-sm">
-                <span className="font-medium text-gray-700">Phone:</span>{" "}
-                <a
-                  href="tel:+441234567890"
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  +44 123 456 7890
-                </a>
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                Available 24/7 • Quick Response
-              </p>
-            </div>
+            <PaymentHelpContact variant="list" />
           </div>
         </motion.div>
 

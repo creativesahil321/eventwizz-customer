@@ -19,6 +19,7 @@ import {
   ThemeSchema,
 } from "@/types/theme.types";
 import { Toaster } from "@/components/ui/sonner";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useThemeQuery, themeKeys } from "@/hooks/use-theme-query";
 import { generateThemeCSS } from "@/services/common/theme/constants/theme";
 import { syncDocumentGoogleFontLinkForTheme } from "@/lib/site-typography-google-fonts";
@@ -402,6 +403,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     }
   }, [initialTheme, queryClient]);
 
+  // Phones: toasts at the top. Bottom toasts covered the sticky checkout /
+  // "Book now" bars (e.g. "Seating confirmed" sat over the Pay button).
+  const isPhone = useMediaQuery("(max-width: 767px)");
+
   // Provide theme context to children
   return (
     <ThemeContext.Provider
@@ -416,6 +421,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
       <Toaster
         closeButton
         richColors
+        position={isPhone ? "top-center" : "bottom-right"}
         style={
           {
             "--normal-bg": "var(--color-surface, white)",

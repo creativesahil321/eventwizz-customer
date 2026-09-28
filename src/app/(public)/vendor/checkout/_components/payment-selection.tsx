@@ -68,7 +68,7 @@ export default function PaymentSelection({
     <Card className="w-full">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <CreditCard className="h-5 w-5 text-blue-600" />
+          <CreditCard className="h-5 w-5 text-[color:var(--checkout-brand-accent)]" />
           Payment Options
         </CardTitle>
       </CardHeader>
@@ -128,13 +128,13 @@ export default function PaymentSelection({
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <Clock className="h-4 w-4 text-blue-600" />
+                    <Clock className="h-4 w-4 text-[color:var(--checkout-brand-accent)]" />
                     <span className="font-medium text-gray-900">
                       Pay Deposit
                     </span>
                     <Badge
                       variant="outline"
-                      className="text-xs border-blue-200 text-blue-700"
+                      className="text-xs border-[color:color-mix(in_srgb,var(--checkout-brand-accent)_30%,white)] text-[color:var(--checkout-brand-accent)]"
                     >
                       Flexible
                     </Badge>
@@ -146,7 +146,7 @@ export default function PaymentSelection({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">Deposit amount:</span>
-                      <span className="font-semibold text-blue-700">
+                      <span className="font-semibold text-[color:var(--checkout-brand-accent)]">
                         {formatCurrency(depositAmount)}
                       </span>
                     </div>
@@ -195,7 +195,7 @@ export default function PaymentSelection({
                   ? "Amount to pay:"
                   : "Deposit amount:"}
               </span>
-              <span className="text-lg font-semibold text-blue-600">
+              <span className="text-lg font-semibold text-[color:var(--checkout-brand-accent)]">
                 {formatCurrency(
                   selectedPaymentType === "full" ? totalAmount : depositAmount
                 )}
@@ -217,15 +217,15 @@ export default function PaymentSelection({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2, delay: 0.1 }}
-            className="bg-blue-50 border border-blue-200 rounded-lg p-3"
+            className="bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_7%,white)] border border-[color:color-mix(in_srgb,var(--checkout-brand-accent)_30%,white)] rounded-lg p-3"
           >
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <AlertCircle className="h-4 w-4 text-[color:var(--checkout-brand-accent)] mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <p className="font-medium text-blue-900 mb-1">
+                <p className="font-medium text-[color:var(--checkout-brand-accent)] mb-1">
                   Important Notice
                 </p>
-                <p className="text-blue-700">
+                <p className="text-[color:var(--checkout-brand-accent)]">
                   Your balance of {formatCurrency(balanceAmount)} must be paid
                   by <strong>{formatDate(balanceDueDate)}</strong>. Failure to
                   pay by this date may result in cancellation of your booking.

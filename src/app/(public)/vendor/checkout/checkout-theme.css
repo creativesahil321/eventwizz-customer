@@ -1,4 +1,7 @@
-/* Lovable checkout design tokens — scoped to checkout page */
+/* Checkout design tokens — scoped to checkout page.
+   Brand tokens follow the vendor theme (--color-primary / --font-body) so the
+   checkout reads as the same site as the event page, not a generic template.
+   Status colours (red / amber / emerald) stay semantic. */
 .checkout-page {
   --checkout-radius: 0.75rem;
   --checkout-header-offset: 4.75rem;
@@ -14,23 +17,25 @@
       var(--checkout-mobile-seating-extra)
   );
   overflow-x: hidden;
-  --checkout-background: oklch(0.984 0.003 247.858);
+  --checkout-background: var(--color-background, oklch(0.984 0.003 247.858));
   --checkout-foreground: oklch(0.208 0.042 265.755);
   --checkout-card: oklch(1 0 0);
   --checkout-muted: oklch(0.968 0.007 247.896);
   --checkout-muted-foreground: oklch(0.554 0.046 257.417);
   --checkout-border: oklch(0.929 0.013 255.508);
   --checkout-brand-primary: oklch(0.208 0.042 265.755);
-  --checkout-brand-accent: oklch(0.546 0.215 262.881);
+  --checkout-brand-accent: var(--color-primary, oklch(0.546 0.215 262.881));
+  --checkout-cta: var(--color-primary, oklch(0.208 0.042 265.755));
+  --checkout-cta-foreground: var(--color-primary-foreground, #ffffff);
   --checkout-surface-muted: oklch(0.978 0.005 247);
   --checkout-success: oklch(0.696 0.17 162.48);
-  --checkout-ticket: oklch(0.546 0.215 262.881);
-  --checkout-table: oklch(0.705 0.17 55.934);
-  --checkout-package: oklch(0.541 0.198 303.9);
+  --checkout-ticket: var(--checkout-brand-accent);
+  --checkout-table: var(--checkout-brand-accent);
+  --checkout-package: var(--checkout-brand-accent);
 
   background-color: var(--checkout-background);
   color: var(--checkout-foreground);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-body, var(--font-inter)), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Extra bottom inset when the mobile pending-payment countdown strip is visible */
@@ -64,22 +69,24 @@
 /* Stripe payment modal — portaled outside .checkout-page, needs same tokens */
 .checkout-stripe-modal {
   --checkout-radius: 0.75rem;
-  --checkout-background: oklch(0.984 0.003 247.858);
+  --checkout-background: var(--color-background, oklch(0.984 0.003 247.858));
   --checkout-foreground: oklch(0.208 0.042 265.755);
   --checkout-card: oklch(1 0 0);
   --checkout-muted: oklch(0.968 0.007 247.896);
   --checkout-muted-foreground: oklch(0.554 0.046 257.417);
   --checkout-border: oklch(0.929 0.013 255.508);
   --checkout-brand-primary: oklch(0.208 0.042 265.755);
-  --checkout-brand-accent: oklch(0.546 0.215 262.881);
+  --checkout-brand-accent: var(--color-primary, oklch(0.546 0.215 262.881));
+  --checkout-cta: var(--color-primary, oklch(0.208 0.042 265.755));
+  --checkout-cta-foreground: var(--color-primary-foreground, #ffffff);
 
   background-color: var(--checkout-card);
   color: var(--checkout-foreground);
 }
 
 .checkout-stripe-modal .checkout-stripe-pay-btn {
-  background-color: var(--checkout-brand-primary) !important;
-  color: #ffffff !important;
+  background-color: var(--checkout-cta) !important;
+  color: var(--checkout-cta-foreground) !important;
 }
 
 .checkout-stripe-modal .checkout-stripe-pay-btn:hover:not(:disabled) {

@@ -137,6 +137,32 @@ export default function EventDetailClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- eventData read intentionally once per slug/mode/roomId
   }, [eventSlug, roomPreviewMode, roomIdParam]);
 
+  // Deep links such as checkout "Add Dates" (`…#booking`) arrive before the
+  // sections render, so the browser's own hash jump lands at the top of the
+  // page. Scroll once the target exists (sections carry the sticky scroll-mt).
+  useEffect(() => {
+    const targetId = decodeURIComponent(window.location.hash.slice(1));
+    if (!targetId) return;
+    let cancelled = false;
+    let frame = 0;
+    let attempts = 0;
+    const tryScroll = () => {
+      if (cancelled) return;
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
+      if (attempts++ < 60) frame = window.requestAnimationFrame(tryScroll);
+    };
+    const timer = window.setTimeout(tryScroll, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      window.cancelAnimationFrame(frame);
+    };
+  }, [eventSlug]);
+
   const slices = useMemo(
     () => resolvePublicEventActiveSlices(eventData, currentRoomIndex),
     [eventData, currentRoomIndex],
