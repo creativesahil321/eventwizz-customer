@@ -258,7 +258,7 @@ export default function LocationGrid({
                       // aren't clipped by overflow-hidden + tight display fonts.
                       "line-clamp-2 text-[15px] font-semibold leading-normal tracking-tight text-[var(--color-text)]",
                       !narrowPreview &&
-                        "md:mb-2 md:text-[1.85rem] md:font-normal md:leading-[1.2] md:text-white md:[font-family:var(--font-heading,inherit)]",
+                        "md:mb-2 md:text-2xl md:font-semibold md:leading-[1.2] md:text-white md:[font-family:var(--font-heading,inherit)]",
                     )}
                   >
                     {locationName}
