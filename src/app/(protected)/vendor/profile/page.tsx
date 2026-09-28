@@ -267,18 +267,6 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <FormLabel htmlFor="username" className="block mb-2">
-                    Username
-                  </FormLabel>
-                  <Input
-                    id="username"
-                    value={profileData?._key || user?.name || ""}
-                    className="bg-gray-50 h-11 w-full"
-                    disabled
-                  />
-                </div>
-
-                <div>
                   <FormLabel htmlFor="email" className="block mb-2">
                     Email
                   </FormLabel>

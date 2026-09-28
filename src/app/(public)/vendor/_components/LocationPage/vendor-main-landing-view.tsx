@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import {
   useEffect,
   useMemo,
@@ -29,6 +30,7 @@ import FooterSection, {
   type FooterSocialLinksOverride,
 } from "../EventListPage/footer";
 import { SiteHeading } from "@/components/public/site-heading";
+import { HeadingEmphasisOverrideProvider } from "@/components/public/heading-emphasis-override";
 import {
   normalizeHeadingEmphasis,
   type HeadingEmphasis,
@@ -288,6 +290,7 @@ export function VendorMainLandingView({
   }, [vendorCities]);
 
   return (
+    <HeadingEmphasisOverrideProvider value={resolvedHeadingEmphasis}>
     <div
       {...(style ? { "data-preview-theme-root": "" } : {})}
       style={style}
@@ -453,9 +456,9 @@ export function VendorMainLandingView({
             >
               <span
                 className={cn(
-                  "mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--color-primary)]",
-                  !isPreviewNarrow &&
-                    "sm:mb-2.5 sm:text-xs sm:tracking-[0.2em]",
+                  "mb-1 block",
+                  SECTION_EYEBROW_CLASS,
+                  !isPreviewNarrow && "sm:mb-2.5",
                 )}
               >
                 Explore cities
@@ -466,16 +469,12 @@ export function VendorMainLandingView({
                 title={locationsListTitle}
                 emphasis={resolvedHeadingEmphasis}
                 variant="onSurface"
-                className={cn(
-                  "mb-1 !text-xl !font-black !leading-snug tracking-tight",
-                  !isPreviewNarrow &&
-                    "sm:mb-2.5 sm:!text-4xl sm:!leading-tight",
-                )}
+                className={cn("mb-1", !isPreviewNarrow && "sm:mb-2.5")}
               />
               <p
                 className={cn(
-                  "mx-auto max-w-xl px-1 text-xs leading-snug text-[var(--color-text-dimmed)]",
-                  !isPreviewNarrow && "sm:text-base sm:leading-relaxed",
+                  "mx-auto max-w-xl px-1",
+                  SECTION_SUBTITLE_CLASS,
                 )}
               >
                 {locationsListSubtitle}
@@ -640,5 +639,6 @@ export function VendorMainLandingView({
         onEditEnquiries={onEditEnquiries}
       />
     </div>
+    </HeadingEmphasisOverrideProvider>
   );
 }

@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  BANNER_SUB_HEADING_MAX_CHARS,
+  clampHeroHeading,
+  truncateAtWordBoundary,
+} from "@/lib/hero-copy-limits";
 import { tryModelsWithFallback, AI_JSON_MAX_TOKENS, type FallbackResult } from "../lib/utils";
 import { AI_JSON_COMPLETION, extractJsonObject } from "../lib/extract-json";
 import {
@@ -7,10 +12,6 @@ import {
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
-import {
-  BANNER_HEADING_MAX_WORDS,
-  truncateToMaxWords,
-} from "@/lib/word-count";
 import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
 import {
   DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
@@ -258,16 +259,15 @@ export async function POST(req: NextRequest) {
         "stepTwo",
       ]);
 
+      // Word-boundary cuts: the model overshoots limits and hard slices left
+      // half-words ("…fine dining, and a mid") in the live hero.
       const truncate = (str: string, max: number) =>
-        str && str.length > max ? str.substring(0, max) : str || "";
+        truncateAtWordBoundary(str || "", max);
 
       // Enforce character limits
       if (content.stepTwo) {
-        content.stepTwo.banner_heading = truncateToMaxWords(
-          content.stepTwo.banner_heading,
-          BANNER_HEADING_MAX_WORDS,
-        );
-        content.stepTwo.banner_sub_heading = truncate(content.stepTwo.banner_sub_heading, 80);
+        content.stepTwo.banner_heading = clampHeroHeading(content.stepTwo.banner_heading);
+        content.stepTwo.banner_sub_heading = truncate(content.stepTwo.banner_sub_heading, BANNER_SUB_HEADING_MAX_CHARS);
         content.stepTwo.about_title = truncate(content.stepTwo.about_title, 40);
         content.stepTwo.about_description = truncate(content.stepTwo.about_description, 340);
         content.stepTwo.footer_brand_description = clipFooterBrandDescription(
@@ -277,11 +277,8 @@ export async function POST(req: NextRequest) {
 
       if (content.stepThree) {
         content.stepThree.event_name = truncate(content.stepThree.event_name, 40);
-        content.stepThree.event_banner_heading = truncateToMaxWords(
-          content.stepThree.event_banner_heading,
-          BANNER_HEADING_MAX_WORDS,
-        );
-        content.stepThree.event_banner_sub_heading = truncate(content.stepThree.event_banner_sub_heading, 80);
+        content.stepThree.event_banner_heading = clampHeroHeading(content.stepThree.event_banner_heading);
+        content.stepThree.event_banner_sub_heading = truncate(content.stepThree.event_banner_sub_heading, BANNER_SUB_HEADING_MAX_CHARS);
         content.stepThree.about_event_heading = truncate(content.stepThree.about_event_heading, 50);
         content.stepThree.about_event_sub_heading = truncate(content.stepThree.about_event_sub_heading, 80);
         content.stepThree.about_event_description = truncate(content.stepThree.about_event_description, 340);

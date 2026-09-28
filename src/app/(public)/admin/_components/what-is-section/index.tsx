@@ -15,7 +15,6 @@ export default function WhatIsSection({
             title={content.title}
             variant="onSurface"
             align="center"
-            className="!text-3xl !font-bold md:!text-4xl"
           />
         </div>
         <div

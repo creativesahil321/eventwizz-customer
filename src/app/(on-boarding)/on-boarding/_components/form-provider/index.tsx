@@ -18,7 +18,6 @@ import { defaultValues } from "./defaultValues";
 import { toast } from "sonner";
 import { onboardingService } from "@/services/vendor/onboarding/onboarding.service";
 import { useSession } from "next-auth/react";
-import { OnboardingFormSkeleton } from "@/components/ui/onboarding-skeleton";
 import { ApiResponse } from "@/services/vendor/onboarding/type";
 import type { ThemeSchema } from "@/types/theme.types";
 import {
@@ -111,7 +110,6 @@ function parseLastCompletedStepFromPayload(
 export function FormProvider({
   children,
   serverData,
-  mode,
   onBackToMode,
 }: {
   children: ReactNode;
@@ -449,28 +447,10 @@ export function FormProvider({
     ],
   );
 
-  // Determine the layout type for the skeleton based on the active step
-  const getSkeletonLayout = () => {
-    const splitLayoutSteps = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
-    const centeredSteps = new Set([6, 11, 10, 12]);
-
-    if (splitLayoutSteps.has(activeStep)) {
-      return "split";
-    } else if (centeredSteps.has(activeStep)) {
-      return "centered";
-    } else {
-      return "full";
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <OnboardingFormSkeleton
-        layout={mode === "ai" ? "ai" : getSkeletonLayout()}
-      />
-    );
-  }
-
+  // `isLoading` only guards re-entry. Never swap the tree for a full-page
+  // skeleton here: steps call `save()` right after navigating, and unmounting
+  // would flash the whole screen and remount the live preview. Steps show
+  // their own button spinners while their API calls run.
   return (
     <FormContext.Provider value={contextValue}>{children}</FormContext.Provider>
   );

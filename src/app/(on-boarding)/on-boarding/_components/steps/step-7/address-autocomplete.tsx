@@ -4,8 +4,11 @@ import React, { useState, useEffect, useRef, forwardRef } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 import { Input } from "@/components/ui/input";
 import { FieldClearButton } from "@/components/ui/field-clear-button";
+import { cityFromFormattedAddress } from "@/lib/city-from-formatted-address";
 import { cn } from "@/lib/utils";
 import { env } from "@/env";
+
+export { cityFromFormattedAddress } from "@/lib/city-from-formatted-address";
 
 interface Suggestion {
   description: string;
@@ -27,33 +30,6 @@ export function cityFromGoogleAddressComponents(
     pick("administrative_area_level_1") ||
     null
   );
-}
-
-/** Fallback when Places omits locality (common on UK street addresses). */
-const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/gi;
-const US_ZIP = /\b\d{5}(?:-\d{4})?\b/g;
-
-export function cityFromFormattedAddress(
-  address: string | null | undefined,
-): string | null {
-  if (!address?.trim()) return null;
-  const parts = address
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (parts.length < 2) return null;
-
-  const withoutCountry = parts.slice(0, -1);
-  for (let i = withoutCountry.length - 1; i >= 0; i--) {
-    const city = withoutCountry[i]
-      .replace(UK_POSTCODE, "")
-      .replace(US_ZIP, "")
-      .trim()
-      .replace(/^[-,]+|[-,]+$/g, "")
-      .trim();
-    if (city.length >= 2 && !/^\d+$/.test(city)) return city;
-  }
-  return null;
 }
 
 export function cityFromGooglePlace(place: {

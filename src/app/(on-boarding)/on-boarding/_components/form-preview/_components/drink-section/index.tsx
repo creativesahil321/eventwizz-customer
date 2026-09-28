@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { useState, useEffect } from "react";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
 import { useHydration } from "@/hooks/useHydration";
@@ -9,6 +10,20 @@ import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
 import { cn } from "@/lib/utils";
 import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
+import {
+  previewFullWidthUntilMd,
+  previewHideUntilMd,
+  previewPhoneGap3,
+  previewPhoneMt4,
+  previewPhoneP5,
+  previewPhoneSpaceY3,
+  previewPhoneSpaceY4,
+  previewPhoneTextBase,
+  previewPhoneTextLg,
+  previewPhoneTextSm,
+  previewPhoneTextXs,
+  previewStackUntilMd,
+} from "@/lib/preview-container-layout";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { clampCheckoutQuantity } from "@/app/(public)/vendor/checkout/_lib/checkout-availability";
 
@@ -142,19 +157,18 @@ export default function DrinkSection({
   return (
     <section className={cn("w-full overflow-hidden bg-[var(--color-background)] px-4 text-[var(--color-text)]", PUBLIC_SECTION_PY_CLASS)}>
       <section className="mx-auto w-full max-w-5xl text-center">
-        <div className="space-y-3 px-2">
+        <div className={cn("space-y-3 px-2", previewPhoneSpaceY3)}>
           <SiteHeading
             level={2}
             title={title || "Drinks & extras"}
             emphasis={headingEmphasis as HeadingEmphasis}
             variant="onSurface"
             align="center"
-            className="!text-3xl !font-black tracking-tight md:!text-4xl"
           />
           <p
             className={cn(
-              "mx-auto max-w-full overflow-hidden whitespace-normal break-words text-sm text-[var(--color-text-dimmed)]",
-              !narrowPreview && "sm:text-base",
+              "mx-auto max-w-full overflow-hidden whitespace-normal break-words",
+              SECTION_SUBTITLE_CLASS,
             )}
             style={{
               wordBreak: "break-word",
@@ -182,6 +196,8 @@ export default function DrinkSection({
           className={cn(
             "mt-4 flex w-full flex-col space-y-4 text-left",
             !narrowPreview && "sm:mt-6 sm:space-y-6",
+            previewPhoneMt4,
+            previewPhoneSpaceY4,
           )}
         >
           {showMore &&
@@ -201,12 +217,13 @@ export default function DrinkSection({
                 <section
                   key={idx}
                   className={cn(
-                    "w-full min-w-0 rounded-lg border border-[var(--color-surface)]/10 bg-[var(--color-surface)] p-4 text-left text-[var(--color-text)]",
-                    // Mobile / Tablet framed preview: stacked card (no viewport `sm:` leak).
-                    // Desktop live + desktop preview: details | price row.
-                    narrowPreview
-                      ? "flex flex-col items-start justify-between gap-3"
-                      : "flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4 sm:p-6",
+                    "flex w-full min-w-0 flex-col items-start justify-between gap-3 rounded-xl bg-[var(--color-surface)] p-5 text-left text-[var(--color-text)] shadow-[0_10px_28px_-16px_rgba(0,0,0,0.28)] ring-1 ring-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)]",
+                    // Live desktop: details | price. Phone + 390px frame stay stacked cards.
+                    !narrowPreview &&
+                      "sm:flex-row sm:items-center sm:gap-4 sm:p-6",
+                    previewStackUntilMd,
+                    previewPhoneP5,
+                    previewPhoneGap3,
                     isSoldOut && "opacity-70",
                   )}
                 >
@@ -215,6 +232,7 @@ export default function DrinkSection({
                       className={cn(
                         "mb-1 w-full break-words text-left text-base font-semibold",
                         !narrowPreview && "sm:mb-2 sm:text-lg md:text-xl",
+                        previewPhoneTextBase,
                       )}
                     >
                       {singlePackage.title}
@@ -223,6 +241,7 @@ export default function DrinkSection({
                       className={cn(
                         "prose prose-sm max-w-full w-full min-w-0 overflow-hidden text-left text-xs leading-relaxed break-words text-[var(--color-text-dimmed)] prose-p:my-1 prose-headings:text-left",
                         !narrowPreview && "sm:text-sm md:text-base",
+                        previewPhoneTextXs,
                       )}
                       style={{
                         wordBreak: "break-word",
@@ -235,24 +254,26 @@ export default function DrinkSection({
                     />
                   </article>
 
-                  {!narrowPreview ? (
-                    <div className="mx-4 hidden flex-1 border-t border-dashed border-[var(--color-text)]/20 sm:block" />
-                  ) : null}
+                  <div
+                    className={cn(
+                      "mx-4 hidden flex-1 border-t border-dashed border-[var(--color-text)]/20 sm:block",
+                      previewHideUntilMd,
+                    )}
+                  />
 
                   <article
                     className={cn(
-                      "flex w-full shrink-0 flex-col gap-3",
-                      // Mobile (live + framed preview): left-align price with copy, full-width CTA.
-                      // Desktop: price + controls sit in a right-hand row.
-                      narrowPreview
-                        ? "mt-2 items-stretch"
-                        : "mt-2 items-stretch sm:mt-0 sm:w-auto sm:items-end sm:flex-row sm:gap-4",
+                      "mt-2 flex w-full shrink-0 flex-col items-stretch gap-3",
+                      !narrowPreview &&
+                        "sm:mt-0 sm:w-auto sm:flex-row sm:items-end sm:gap-4",
+                      previewStackUntilMd,
                     )}
                   >
                     <p
                       className={cn(
                         "flex items-center justify-start space-x-1 text-left text-lg font-semibold whitespace-nowrap",
                         !narrowPreview && "sm:text-xl md:text-2xl",
+                        previewPhoneTextLg,
                       )}
                     >
                       <span>{formatMoney(singlePackage.price)}</span>
@@ -266,6 +287,8 @@ export default function DrinkSection({
                         className={cn(
                           "w-full px-4 py-2 text-sm",
                           !narrowPreview && "sm:w-auto sm:px-6 sm:text-base",
+                          previewFullWidthUntilMd,
+                          previewPhoneTextSm,
                         )}
                       >
                         Sold Out
@@ -278,6 +301,8 @@ export default function DrinkSection({
                         className={cn(
                           "w-full px-4 py-2 text-sm",
                           !narrowPreview && "sm:w-auto sm:px-6 sm:text-base",
+                          previewFullWidthUntilMd,
+                          previewPhoneTextSm,
                         )}
                       >
                         Add to Cart
@@ -287,6 +312,7 @@ export default function DrinkSection({
                         className={cn(
                           "flex w-full items-center justify-between overflow-hidden rounded-lg border border-[var(--color-text)]/20",
                           !narrowPreview && "sm:w-auto sm:justify-center",
+                          previewFullWidthUntilMd,
                         )}
                       >
                         <button

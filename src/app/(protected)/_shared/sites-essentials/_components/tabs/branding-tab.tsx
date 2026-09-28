@@ -1,5 +1,6 @@
 "use client";
 
+import { BANNER_HEADING_MAX_CHARS } from "@/lib/hero-copy-limits";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFormContext, useWatch } from "react-hook-form";
@@ -998,6 +999,7 @@ export function BrandingTab({
                     <FormLabel>Location page heading</FormLabel>
                     <FormControl>
                       <Input
+                        maxLength={BANNER_HEADING_MAX_CHARS}
                         placeholder="EventWizz Events"
                         disabled={readOnly}
                         {...field}

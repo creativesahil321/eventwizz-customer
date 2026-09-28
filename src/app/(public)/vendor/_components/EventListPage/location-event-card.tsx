@@ -140,11 +140,11 @@ export function LocationEventCard({
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col p-4 md:p-5">
+      <div className="flex flex-1 flex-col p-4 md:p-5 @max-md/preview:!p-4">
         <h3
           className={cn(
             PUBLIC_CARD_TITLE_CLASS,
-            "text-left text-sm text-[var(--color-text)] transition-colors duration-300 group-hover:text-[color:var(--color-primary)] md:text-[15px]",
+            "text-left text-sm text-[var(--color-text)] transition-colors duration-300 group-hover:text-[color:var(--color-primary)] md:text-[15px] @max-md/preview:!text-sm",
           )}
           style={{ fontFamily: "var(--font-heading)" }}
         >

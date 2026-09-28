@@ -388,6 +388,17 @@ export default function ProfilePage() {
                   )}
                 />
 
+                <div>
+                  <FormLabel htmlFor="email">Email</FormLabel>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={profileData?.email || user?.email || ""}
+                    className="mt-2 h-11 w-full bg-gray-50"
+                    disabled
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
                   name="company_registered_office"
@@ -429,41 +440,6 @@ export default function ProfilePage() {
               </div>
             </form>
           </Form>
-        </div>
-      </section>
-
-      <section className="relative w-full">
-        <div className={pageCardClassName("relative w-full min-w-0")}>
-          <header className="mb-6 w-full">
-            <h2 className="text-2xl font-bold title-header">Account</h2>
-          </header>
-
-          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-            <div>
-              <label htmlFor="username" className="mb-2 block font-medium">
-                User name
-              </label>
-              <Input
-                id="username"
-                value={profileData?._key || user?.name || ""}
-                className="h-11 w-full bg-gray-50"
-                disabled
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="mb-2 block font-medium">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={profileData?.email || user?.email || ""}
-                className="h-11 w-full bg-gray-50"
-                disabled
-              />
-            </div>
-          </div>
         </div>
       </section>
 

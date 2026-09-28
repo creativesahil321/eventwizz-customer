@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  BANNER_SUB_HEADING_MAX_CHARS,
+  clampHeroHeading,
+  truncateAtWordBoundary,
+} from "@/lib/hero-copy-limits";
 import { padMinRoomNames } from "@/lib/room-name-examples";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import { tryModelsWithFallback, AI_JSON_MAX_TOKENS, type FallbackResult } from "../lib/utils";
@@ -8,10 +13,6 @@ import {
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
-import {
-  BANNER_HEADING_MAX_WORDS,
-  truncateToMaxWords,
-} from "@/lib/word-count";
 import {
   DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
   DRINK_PACKAGE_PRICE_MAX,
@@ -261,16 +262,14 @@ export async function POST(req: NextRequest) {
       const content = extractJsonObject<AIEventGeneratedContent>(rawContent, [
         "stepOne",
       ]);
+      // Word-boundary cuts so hero copy never ends in a half-word.
       const truncate = (str: string, max: number) =>
-        str && str.length > max ? str.substring(0, max) : str || "";
+        truncateAtWordBoundary(str || "", max);
 
       if (content.stepOne) {
         content.stepOne.event_name = truncate(content.stepOne.event_name, 40);
-        content.stepOne.event_banner_heading = truncateToMaxWords(
-          content.stepOne.event_banner_heading,
-          BANNER_HEADING_MAX_WORDS,
-        );
-        content.stepOne.event_banner_sub_heading = truncate(content.stepOne.event_banner_sub_heading, 80);
+        content.stepOne.event_banner_heading = clampHeroHeading(content.stepOne.event_banner_heading);
+        content.stepOne.event_banner_sub_heading = truncate(content.stepOne.event_banner_sub_heading, BANNER_SUB_HEADING_MAX_CHARS);
         content.stepOne.about_event_heading = truncate(content.stepOne.about_event_heading, 50);
         content.stepOne.about_event_sub_heading = truncate(content.stepOne.about_event_sub_heading, 80);
         content.stepOne.about_event_description = truncate(content.stepOne.about_event_description, 340);

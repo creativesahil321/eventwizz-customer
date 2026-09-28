@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  BANNER_HEADING_MAX_CHARS,
+  BANNER_SUB_HEADING_MAX_CHARS,
+} from "@/lib/hero-copy-limits";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -856,6 +860,7 @@ export default function StepThree() {
                           </FormLabel>
                           <FormControl>
                             <Input
+                              maxLength={BANNER_HEADING_MAX_CHARS}
                               className="h-11 bg-white/5 border-white/10"
                               placeholder="Enter a banner heading (max 30 words)"
                               {...field}
@@ -900,7 +905,7 @@ export default function StepThree() {
                     name="event_banner_sub_heading"
                     render={({ field }) => {
                       const currentLength = field.value?.length || 0;
-                      const maxLength = 80;
+                      const maxLength = BANNER_SUB_HEADING_MAX_CHARS;
                       return (
                         <FormItem>
                           <FormLabel className="text-sm font-medium">

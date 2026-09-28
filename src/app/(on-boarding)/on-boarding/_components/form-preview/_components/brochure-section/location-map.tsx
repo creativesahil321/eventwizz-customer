@@ -11,16 +11,20 @@ import {
 } from "@/lib/event-location";
 import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
 import { cn } from "@/lib/utils";
+import { previewPhoneMinHMap } from "@/lib/preview-container-layout";
 
-/** Height for the Google Map canvas only — not the collapsed “EVENT LOCATION” card. */
-const MAP_CANVAS_MIN_HEIGHT_CLASS = "min-h-[280px] sm:min-h-[360px]";
+/** Same canvas height as the live event map — including the no-pin placeholder. */
+const MAP_CANVAS_MIN_HEIGHT_CLASS = cn(
+  "min-h-[280px] sm:min-h-[360px]",
+  previewPhoneMinHMap,
+);
 
 interface LocationMapProps {
   address?: string;
   latitude?: number | string | null;
   longitude?: number | string | null;
   className?: string;
-  /** Public event pages: show the map immediately. Onboarding preview: false so the map lazy-loads after "Get directions". */
+  /** Public event pages and onboarding Mobile preview: mount the map immediately. */
   showMapImmediately?: boolean;
 }
 
@@ -483,20 +487,26 @@ export default function LocationMap({
       {/* Map Container */}
       <div className="relative">
         {!mapLoaded ? (
-          <div className="flex w-full items-center justify-center overflow-hidden rounded-md bg-[var(--color-primary)] px-4 py-8">
-            <div className="text-center">
-              <MapPin className="text-[var(--color-primary-foreground)] mx-auto " size={24} />
-              <h2 className="text-base sm:text-lg font-bold py-2 sm:py-3 uppercase text-[var(--color-primary-foreground)]">
-                EVENT LOCATION
-              </h2>
+          <div
+            className={cn(
+              "flex w-full items-center justify-center overflow-hidden rounded-md px-4 py-10",
+              "bg-[color:color-mix(in_srgb,var(--color-text)_7%,var(--color-background))]",
+              MAP_CANVAS_MIN_HEIGHT_CLASS,
+            )}
+          >
+            <div className="max-w-sm text-center">
+              <MapPin
+                className="mx-auto text-[var(--color-primary)]"
+                size={28}
+              />
               <p
-                className="max-w-full break-words px-2 pb-2 text-sm leading-relaxed text-[var(--color-primary-foreground)] [overflow-wrap:anywhere]"
+                className="mt-3 max-w-full break-words px-2 text-sm leading-relaxed text-[var(--color-text)] [overflow-wrap:anywhere]"
                 title={displayAddress || undefined}
               >
-                {displayAddress || "Add an event address to enable directions"}
+                {displayAddress ||
+                  "Add an event address to show the map and directions"}
               </p>
-
-              <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+              <div className="mt-4 flex flex-col items-center gap-2">
                 {displayAddress ? (
                   <Button
                     variant="event-outline"
@@ -507,14 +517,15 @@ export default function LocationMap({
                     Get directions
                   </Button>
                 ) : null}
-                <Button
-                  variant="event-outline"
-                  type="button"
-                  onClick={() => setMapLoaded(true)}
-                  disabled={!hasMapCoordinates}
-                >
-                  {hasMapCoordinates ? "View map" : "Map unavailable"}
-                </Button>
+                {hasMapCoordinates ? (
+                  <Button
+                    variant="event-primary"
+                    type="button"
+                    onClick={() => setMapLoaded(true)}
+                  >
+                    View map
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -540,9 +551,9 @@ export default function LocationMap({
 
         {/* Error / no-map fallback — always surface address + directions when we have one */}
         {mapLoaded && error && (
-          <div className="absolute inset-0 bg-[var(--color-primary)] flex items-center justify-center rounded-md p-4">
-            <div className="flex w-full max-w-md flex-col items-center gap-3 text-center text-[var(--color-primary-foreground)]">
-              <MapPin className="h-8 w-8 shrink-0" aria-hidden />
+          <div className="absolute inset-0 flex items-center justify-center rounded-md bg-[color:color-mix(in_srgb,var(--color-text)_7%,var(--color-background))] p-4">
+            <div className="flex w-full max-w-md flex-col items-center gap-3 text-center text-[var(--color-text)]">
+              <MapPin className="h-8 w-8 shrink-0 text-[var(--color-primary)]" aria-hidden />
               <div className="space-y-1">
                 <p className="text-sm font-semibold">
                   {fallbackDirectionsTarget
@@ -550,25 +561,27 @@ export default function LocationMap({
                     : "Event location is not available yet"}
                 </p>
                 {error !== "Event location is not available yet." ? (
-                  <p className="text-xs opacity-90">{error}</p>
+                  <p className="text-xs text-[var(--color-text-dimmed)]">
+                    {error}
+                  </p>
                 ) : null}
               </div>
 
               {fallbackDirectionsTarget ? (
                 <>
-                  <div className="w-full rounded-md bg-black/20 px-3 py-2.5 text-left">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">
+                  <div className="w-full rounded-md bg-[var(--color-surface)] px-3 py-2.5 text-left ring-1 ring-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-text-dimmed)]">
                       Event location
                     </p>
                     <p className="mt-1 break-words text-sm font-medium leading-relaxed [overflow-wrap:anywhere]">
                       {fallbackDirectionsTarget}
                     </p>
                   </div>
-                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+                  <div className="flex w-full flex-col gap-2">
                     <Button
                       type="button"
                       variant="event-outline"
-                      className="w-full sm:w-auto"
+                      className="w-full"
                       onClick={() =>
                         openDirections(
                           fallbackDirectionsTarget,
@@ -583,7 +596,7 @@ export default function LocationMap({
                     <Button
                       type="button"
                       variant="event-outline"
-                      className="w-full sm:w-auto"
+                      className="w-full"
                       onClick={() =>
                         window.open(
                           buildMapsDirectionsUrl(fallbackDirectionsTarget),
@@ -598,7 +611,7 @@ export default function LocationMap({
                   </div>
                 </>
               ) : (
-                <p className="text-xs opacity-90">
+                <p className="text-xs text-[var(--color-text-dimmed)]">
                   Add an event address so guests can find this venue.
                 </p>
               )}
@@ -668,13 +681,10 @@ export default function LocationMap({
 
         {/* Map Pin Icon Overlay (when no address) */}
         {mapLoaded && !currentLocation && !isLoading && !error && (
-          <div className="absolute inset-0 bg-[var(--color-primary)] flex items-center justify-center rounded-md text-[var(--color-primary-foreground)]">
+          <div className="absolute inset-0 flex items-center justify-center rounded-md bg-[color:color-mix(in_srgb,var(--color-text)_7%,var(--color-background))] text-[var(--color-text)]">
             <div className="flex flex-col items-center gap-2 px-4 text-center">
-              <MapPin className="h-8 w-8" />
-              <p className="text-sm font-medium text-[var(--color-primary-foreground)]">
-                EVENT LOCATION
-              </p>
-              <p className="max-w-full break-words text-center text-xs text-[var(--color-primary-foreground)] [overflow-wrap:anywhere]">
+              <MapPin className="h-8 w-8 text-[var(--color-primary)]" />
+              <p className="max-w-full break-words text-center text-sm [overflow-wrap:anywhere]">
                 {displayAddress ||
                   "Enter your event address in the form to display here"}
               </p>

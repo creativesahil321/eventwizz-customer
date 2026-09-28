@@ -6,6 +6,7 @@ import { heroHeadingAlignClass } from "@/lib/banner-heading-align";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import { usePreviewNarrowLayout } from "@/hooks/use-preview-narrow-layout";
 import { usePreviewDeviceStore } from "@/store/preview-device.store";
+import { useHeadingEmphasisOverride } from "@/components/public/heading-emphasis-override";
 import {
   normalizeHeadingEmphasis,
   splitBannerHeading,
@@ -44,26 +45,34 @@ export type SiteHeadingProps = {
   className?: string;
 };
 
+/**
+ * The public-site type scale. Sections pass no size / weight / leading classes —
+ * every heading of a level renders identically across location, event, home
+ * and onboarding preview.
+ *
+ * 1 hero:    heroes pass the fluid `hero*HeadingTypeClass` (max 44px, bold)
+ * 2 section: 28px → 36px, bold
+ * 3 card:    20px → 24px, semibold
+ */
 const levelClass: Record<SiteHeadingLevel, string> = {
-  1: "text-4xl font-semibold tracking-tight md:text-6xl lg:text-7xl",
-  2: "text-3xl font-semibold tracking-tight md:text-4xl",
-  3: "text-2xl font-semibold tracking-tight md:text-3xl",
+  1: "text-4xl font-bold tracking-tight md:text-5xl",
+  2: "text-[1.75rem] font-bold !leading-[1.15] tracking-tight md:text-4xl",
+  3: "text-xl font-semibold !leading-snug tracking-tight md:text-2xl",
 };
 
 /** Phone / tablet device frames — sizes match a real handset, not the desktop window.
  * Each size is repeated at sm/md/lg/xl as literals so Tailwind emits them and they
- * beat consumer `md:!text-5xl` while the preview sits in a wide monitor. */
+ * win while the preview sits in a wide monitor. Same scale as `levelClass`. */
 const compactLevelClass = {
   mobile: {
-    1: "font-semibold tracking-tight !text-[1.65rem] !leading-[1.22] sm:!text-[1.65rem] sm:!leading-[1.22] md:!text-[1.65rem] md:!leading-[1.22] lg:!text-[1.65rem] lg:!leading-[1.22] xl:!text-[1.65rem] xl:!leading-[1.22]",
-    // Live phone h2 is `text-3xl` — do not shrink About / section titles to xl.
-    2: "tracking-tight !text-3xl !leading-[1.08] sm:!text-3xl sm:!leading-[1.08] md:!text-3xl md:!leading-[1.08] lg:!text-3xl lg:!leading-[1.08] xl:!text-3xl xl:!leading-[1.08]",
-    3: "tracking-tight !text-2xl !leading-snug sm:!text-2xl sm:!leading-snug md:!text-2xl md:!leading-snug lg:!text-2xl lg:!leading-snug xl:!text-2xl xl:!leading-snug",
+    1: "font-bold tracking-tight !text-[1.65rem] !leading-[1.22] sm:!text-[1.65rem] sm:!leading-[1.22] md:!text-[1.65rem] md:!leading-[1.22] lg:!text-[1.65rem] lg:!leading-[1.22] xl:!text-[1.65rem] xl:!leading-[1.22]",
+    2: "font-bold tracking-tight !text-[1.75rem] !leading-[1.15] sm:!text-[1.75rem] sm:!leading-[1.15] md:!text-[1.75rem] md:!leading-[1.15] lg:!text-[1.75rem] lg:!leading-[1.15] xl:!text-[1.75rem] xl:!leading-[1.15]",
+    3: "font-semibold tracking-tight !text-xl !leading-snug sm:!text-xl sm:!leading-snug md:!text-xl md:!leading-snug lg:!text-xl lg:!leading-snug xl:!text-xl xl:!leading-snug",
   },
   tablet: {
-    1: "font-semibold tracking-tight !text-[2.15rem] !leading-[1.18] sm:!text-[2.15rem] sm:!leading-[1.18] md:!text-[2.15rem] md:!leading-[1.18] lg:!text-[2.15rem] lg:!leading-[1.18] xl:!text-[2.15rem] xl:!leading-[1.18]",
-    2: "tracking-tight !text-4xl !leading-[1.08] sm:!text-4xl sm:!leading-[1.08] md:!text-4xl md:!leading-[1.08] lg:!text-4xl lg:!leading-[1.08] xl:!text-4xl xl:!leading-[1.08]",
-    3: "tracking-tight !text-3xl !leading-snug sm:!text-3xl sm:!leading-snug md:!text-3xl md:!leading-snug lg:!text-3xl lg:!leading-snug xl:!text-3xl xl:!leading-snug",
+    1: "font-bold tracking-tight !text-[2.15rem] !leading-[1.18] sm:!text-[2.15rem] sm:!leading-[1.18] md:!text-[2.15rem] md:!leading-[1.18] lg:!text-[2.15rem] lg:!leading-[1.18] xl:!text-[2.15rem] xl:!leading-[1.18]",
+    2: "font-bold tracking-tight !text-[2rem] !leading-[1.15] sm:!text-[2rem] sm:!leading-[1.15] md:!text-[2rem] md:!leading-[1.15] lg:!text-[2rem] lg:!leading-[1.15] xl:!text-[2rem] xl:!leading-[1.15]",
+    3: "font-semibold tracking-tight !text-[1.375rem] !leading-snug sm:!text-[1.375rem] sm:!leading-snug md:!text-[1.375rem] md:!leading-snug lg:!text-[1.375rem] lg:!leading-snug xl:!text-[1.375rem] xl:!leading-snug",
   },
 } as const satisfies Record<
   "mobile" | "tablet",
@@ -96,10 +105,11 @@ export function SiteHeading({
   className,
 }: SiteHeadingProps) {
   const { theme } = useTheme();
+  const emphasisOverride = useHeadingEmphasisOverride();
   const narrowPreview = usePreviewNarrowLayout();
   const previewDevice = usePreviewDeviceStore((s) => s.device);
   const emphasis = normalizeHeadingEmphasis(
-    emphasisProp ?? theme?.typography?.headingEmphasis,
+    emphasisProp ?? emphasisOverride ?? theme?.typography?.headingEmphasis,
   );
   const compactType =
     narrowPreview && previewDevice !== "desktop"

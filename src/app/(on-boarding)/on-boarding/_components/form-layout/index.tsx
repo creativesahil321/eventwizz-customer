@@ -35,18 +35,33 @@ function StepTransition({
   );
 }
 
-// Lazy load step components
-const StepOne = lazy(() => import("../steps/step-1"));
-const StepTwo = lazy(() => import("../steps/step-2"));
-const StepThree = lazy(() => import("../steps/step-3"));
-const StepFour = lazy(() => import("../steps/step-4"));
-const StepFive = lazy(() => import("../steps/step-5"));
-const StepSix = lazy(() => import("../steps/step-6"));
-const StepSeven = lazy(() => import("../steps/step-7"));
-const StepEight = lazy(() => import("../steps/step-8"));
-const StepNine = lazy(() => import("../steps/step-9"));
-const StepTen = lazy(() => import("../steps/step-10"));
-const StepEleven = lazy(() => import("../steps/step-11"));
+// Lazy load step components. Loaders are kept so the next step's chunk can be
+// prefetched while the vendor fills in the current one.
+const stepLoaders = {
+  1: () => import("../steps/step-1"),
+  2: () => import("../steps/step-2"),
+  3: () => import("../steps/step-3"),
+  4: () => import("../steps/step-4"),
+  5: () => import("../steps/step-5"),
+  6: () => import("../steps/step-6"),
+  7: () => import("../steps/step-7"),
+  8: () => import("../steps/step-8"),
+  9: () => import("../steps/step-9"),
+  10: () => import("../steps/step-10"),
+  11: () => import("../steps/step-11"),
+} as const;
+
+const StepOne = lazy(stepLoaders[1]);
+const StepTwo = lazy(stepLoaders[2]);
+const StepThree = lazy(stepLoaders[3]);
+const StepFour = lazy(stepLoaders[4]);
+const StepFive = lazy(stepLoaders[5]);
+const StepSix = lazy(stepLoaders[6]);
+const StepSeven = lazy(stepLoaders[7]);
+const StepEight = lazy(stepLoaders[8]);
+const StepNine = lazy(stepLoaders[9]);
+const StepTen = lazy(stepLoaders[10]);
+const StepEleven = lazy(stepLoaders[11]);
 
 const StepLoader = () => (
   <div className="w-full max-w-md animate-fadeIn">
@@ -286,28 +301,34 @@ const FormLayoutProvider = ({
   defaultSidebarCollapsed?: boolean;
 }) => {
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const isMediumScreen = useMediaQuery("(max-width: 1280px)");
 
   const { activeStep } = useFormContext();
   const StepComponent =
     stepComponents[activeStep as keyof typeof stepComponents];
 
+  // Warm the next step's chunk once the browser is idle so "Continue" swaps
+  // the form panel instantly instead of showing the step skeleton.
+  useEffect(() => {
+    const load = stepLoaders[(activeStep + 1) as keyof typeof stepLoaders];
+    if (!load) return;
+    const prefetch = () => void load().catch(() => {});
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(prefetch, { timeout: 3000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(prefetch, 1500);
+    return () => window.clearTimeout(timer);
+  }, [activeStep]);
+
   const renderedStep = useMemo(() => {
     if (!StepComponent) return <div>Unknown step</div>;
 
-    if (isMediumScreen && splitLayoutSteps.has(activeStep)) {
-      return (
-        <SplitLayout
-          key={`split-${activeStep}`}
-          step={StepComponent as React.ComponentType}
-          defaultCollapsed={defaultSidebarCollapsed}
-        />
-      );
-    }
-
+    // One stable key for every split step: the stepper and live preview stay
+    // mounted (scroll, panel state, room selector) and only the form panel
+    // swaps via StepTransition.
     return splitLayoutSteps.has(activeStep) ? (
       <SplitLayout
-        key={`split-${activeStep}`}
+        key="split"
         step={StepComponent as React.ComponentType}
         defaultCollapsed={defaultSidebarCollapsed}
       />
@@ -319,7 +340,7 @@ const FormLayoutProvider = ({
         centered={centeredSteps.has(activeStep)}
       />
     );
-  }, [activeStep, StepComponent, isMediumScreen, defaultSidebarCollapsed]);
+  }, [activeStep, StepComponent, defaultSidebarCollapsed]);
 
   if (isMobile) {
     return (

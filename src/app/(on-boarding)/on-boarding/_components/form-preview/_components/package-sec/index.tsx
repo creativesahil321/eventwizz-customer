@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import type { ReactNode } from "react";
 import { Check, ImageIcon } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -141,7 +142,7 @@ export default function PackageSection({
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col justify-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            <p className={cn("mb-3", SECTION_EYEBROW_CLASS)}>
               Packages
             </p>
             <SiteHeading
@@ -150,7 +151,7 @@ export default function PackageSection({
               accentHint={resolvePackageAccentHint(heading, headingAccentHint)}
               emphasis={headingEmphasis ?? undefined}
               variant="onSurface"
-              className="max-w-3xl min-w-0 !font-black !text-2xl !leading-[1.02] break-words [overflow-wrap:anywhere] md:!text-3xl lg:!text-4xl"
+              className="max-w-3xl min-w-0 break-words [overflow-wrap:anywhere]"
             />
             {subTrim ? (
               <p className="mt-2 max-w-full min-w-0 break-words text-base font-semibold leading-snug text-[var(--color-text)] [overflow-wrap:anywhere] md:text-lg">

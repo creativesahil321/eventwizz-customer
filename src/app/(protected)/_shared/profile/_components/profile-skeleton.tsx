@@ -42,6 +42,12 @@ export function ProfileSkeleton() {
                 <Skeleton className="h-11 w-full" />
               </div>
 
+              {/* Email */}
+              <div>
+                <Skeleton className="h-5 w-16 mb-2" />
+                <Skeleton className="h-11 w-full" />
+              </div>
+
               {/* Address */}
               <div>
                 <Skeleton className="h-5 w-20 mb-2" />
@@ -64,29 +70,6 @@ export function ProfileSkeleton() {
             {/* Save Button */}
             <div className="flex justify-end">
               <Skeleton className="h-10 w-32" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Account Section Skeleton */}
-      <section className="w-full relative">
-        <div className="w-full relative bg-background p-6 rounded-md shadow-sm">
-          <header className="w-full mb-6">
-            <Skeleton className="h-8 w-32" />
-          </header>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-            {/* Username */}
-            <div>
-              <Skeleton className="h-5 w-24 mb-2" />
-              <Skeleton className="h-11 w-full" />
-            </div>
-
-            {/* Email */}
-            <div>
-              <Skeleton className="h-5 w-16 mb-2" />
-              <Skeleton className="h-11 w-full" />
             </div>
           </div>
         </div>

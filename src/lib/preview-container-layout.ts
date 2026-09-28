@@ -81,6 +81,9 @@ export const previewGridCols1UntilSm = "@max-sm/preview:!grid-cols-1";
 
 export const previewHideUntilSm = "@max-sm/preview:!hidden";
 
+/** Hide desktop-only chrome inside a phone preview frame (390px > `@sm`). */
+export const previewHideUntilMd = "@max-md/preview:!hidden";
+
 /** Undo viewport `lg:` chrome (1024px) inside tablet/phone frames. */
 export const previewUndoLgSplit =
   "@max-5xl/preview:!grid-cols-1 @max-5xl/preview:!gap-8";
@@ -88,10 +91,26 @@ export const previewUndoLgSplit =
 export const previewUndoLgRule =
   "@max-5xl/preview:!border-l-0 @max-5xl/preview:!pl-0 @max-5xl/preview:!pr-0";
 
-/** Live phone type: keep `sm:`/`md:` from enlarging copy in a 390px frame. */
+/** Live phone type + rhythm: keep `sm:`/`md:` from enlarging a 390px frame. */
 export const previewPhoneText3xl = "@max-md/preview:!text-3xl";
+export const previewPhoneTextBase = "@max-md/preview:!text-base";
+export const previewPhoneTextLg = "@max-md/preview:!text-lg";
+export const previewPhoneTextSm = "@max-md/preview:!text-sm";
+export const previewPhoneTextXs = "@max-md/preview:!text-xs";
+export const previewPhonePx3 = "@max-md/preview:!px-3";
 export const previewPhonePx4 = "@max-md/preview:!px-4";
+export const previewPhonePy8 = "@max-md/preview:!py-8";
 export const previewPhonePy12 = "@max-md/preview:!py-12";
+export const previewPhonePy16 = "@max-md/preview:!py-16";
+export const previewPhoneP5 = "@max-md/preview:!p-5";
+export const previewPhoneMt4 = "@max-md/preview:!mt-4";
+export const previewPhoneMb8 = "@max-md/preview:!mb-8";
+export const previewPhoneMb10 = "@max-md/preview:!mb-10";
+export const previewPhoneSpaceY3 = "@max-md/preview:!space-y-3";
+export const previewPhoneSpaceY4 = "@max-md/preview:!space-y-4";
+export const previewPhoneGap3 = "@max-md/preview:!gap-3";
+export const previewPhoneGap8 = "@max-md/preview:!gap-8";
+export const previewPhoneMinHMap = "@max-md/preview:!min-h-[280px]";
 
 /**
  * LocationSearchBar on live is `flex-col` below `sm`. Preview frames sit in a

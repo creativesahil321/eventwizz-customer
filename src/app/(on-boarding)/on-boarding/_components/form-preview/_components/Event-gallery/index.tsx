@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { GalleryLightbox } from "@/components/public/gallery-lightbox";
 import { SiteHeading } from "@/components/public/site-heading";
@@ -99,7 +100,17 @@ function GalleryImageTile({
   title: string;
   onOpen: () => void;
 }) {
+  const imgRef = useRef<HTMLImageElement>(null);
   const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const el = imgRef.current;
+    // Cached images often skip `onLoad`; `h-full` inside aspect-ratio also
+    // resolves to 0 height unless the img is absolutely filled.
+    if (el?.complete && el.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, [src]);
 
   return (
     <button
@@ -115,7 +126,7 @@ function GalleryImageTile({
         aria-hidden
         className={cn(
           "absolute inset-0 h-full w-full rounded-none",
-          loaded && "opacity-0",
+          loaded && "pointer-events-none opacity-0",
           PUBLIC_MOTION_DURATION_SHORT,
           PUBLIC_MOTION_EASE,
           "transition-opacity motion-reduce:transition-none",
@@ -123,10 +134,11 @@ function GalleryImageTile({
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        ref={imgRef}
         src={addCacheBusting(src)}
         alt={`${title} image ${index + 1}`}
         className={cn(
-          "h-full w-full object-cover",
+          "absolute inset-0 h-full w-full object-cover",
           PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS,
           PUBLIC_MOTION_DURATION_SHORT,
           PUBLIC_MOTION_EASE,
@@ -134,9 +146,10 @@ function GalleryImageTile({
           loaded ? "opacity-100" : "opacity-0",
         )}
         decoding="async"
-        fetchPriority={index < 2 ? "high" : "low"}
-        loading={index < 2 ? "eager" : "lazy"}
+        fetchPriority={index < 4 ? "high" : "low"}
+        loading={index < 4 ? "eager" : "lazy"}
         onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
       />
       <span
         className={cn(
@@ -197,8 +210,8 @@ export default function EventGallery({
   return (
     <section className={cn("w-full bg-[color:var(--color-background)] px-4", PUBLIC_SECTION_PY_CLASS)}>
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 space-y-3 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+        <div className="mb-8 space-y-3 text-center @max-md/preview:!mb-8 @max-md/preview:!space-y-3">
+          <p className={SECTION_EYEBROW_CLASS}>
             Gallery
           </p>
           <SiteHeading
@@ -207,9 +220,8 @@ export default function EventGallery({
             emphasis={headingEmphasis as HeadingEmphasis}
             variant="onSurface"
             align="center"
-            className="!text-3xl !font-black tracking-tight md:!text-4xl"
           />
-          <p className="text-sm text-[var(--color-text-dimmed)]">
+          <p className={SECTION_SUBTITLE_CLASS}>
             Tap an image to view the full gallery
           </p>
         </div>

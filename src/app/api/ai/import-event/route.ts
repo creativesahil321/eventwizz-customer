@@ -2,7 +2,13 @@ import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { authOptions } from "@/lib/auth/authOptions";
 import { assertSafeLogoUrl } from "@/lib/logo/fetch-logo-from-url";
-import { BANNER_HEADING_MAX_WORDS, truncateToMaxWords } from "@/lib/word-count";
+import {
+  BANNER_HEADING_MAX_CHARS,
+  BANNER_HEADING_MAX_WORDS,
+  BANNER_SUB_HEADING_MAX_CHARS,
+  clampHeroHeading,
+  truncateAtWordBoundary,
+} from "@/lib/hero-copy-limits";
 import { resolveAiRuntimeConfig } from "../lib/provider-config";
 import {
   AI_JSON_COMPLETION,
@@ -53,11 +59,7 @@ function importErrorResponse(
 
 function stringValue(value: unknown, max = 500): string {
   return typeof value === "string"
-    ? value
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, max)
+    ? truncateAtWordBoundary(value.replace(/<[^>]*>/g, " "), max)
     : "";
 }
 
@@ -254,7 +256,7 @@ Rules:
 - Use empty strings and empty arrays when a fact is absent. Never invent dates, prices, capacity, rooms, menus, FAQs, or contact details.
 - Extract menu sections/items, package features, schedule rows, ticket tiers, table tiers, and room-specific data only when explicitly present.
 - Dates must be unambiguous ISO dates; otherwise leave them empty.
-- Keep event_name <= 40 chars, banner heading <= ${BANNER_HEADING_MAX_WORDS} words, banner subheading <= 80 chars, About description <= 340 chars.
+- Keep event_name <= 40 chars, banner heading <= ${BANNER_HEADING_MAX_WORDS} words and ${BANNER_HEADING_MAX_CHARS} chars, banner subheading <= ${BANNER_SUB_HEADING_MAX_CHARS} chars, About description <= 340 chars.
 - Keep menus to 8 categories with 20 items each, packages to 12, dates to 20, and FAQs to 8.
 - Drinks use drinks_option like catering_option: 1 only when the source has drink packages; otherwise 0 with empty titles and packages [].
 - Do not return HTML tags in any field.`;
@@ -374,13 +376,10 @@ function normalizeContent(
     fillAiEventGeneratedDefaults(raw, input),
   ) as AIEventGeneratedContent;
   filled.stepOne.event_name = stringValue(filled.stepOne.event_name, 40);
-  filled.stepOne.event_banner_heading = truncateToMaxWords(
-    stringValue(filled.stepOne.event_banner_heading),
-    BANNER_HEADING_MAX_WORDS,
-  );
+  filled.stepOne.event_banner_heading = clampHeroHeading(stringValue(filled.stepOne.event_banner_heading));
   filled.stepOne.event_banner_sub_heading = stringValue(
     filled.stepOne.event_banner_sub_heading,
-    80,
+    BANNER_SUB_HEADING_MAX_CHARS,
   );
   filled.stepOne.about_event_heading = stringValue(
     filled.stepOne.about_event_heading,

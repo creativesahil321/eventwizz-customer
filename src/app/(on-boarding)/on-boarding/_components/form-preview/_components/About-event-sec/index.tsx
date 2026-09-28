@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -7,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import {
   previewPhonePx4,
-  previewPhoneText3xl,
   previewUndoLgSplit,
 } from "@/lib/preview-container-layout";
 import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
@@ -62,7 +62,7 @@ export default function AboutEventSec({
       >
         <div className="min-w-0 text-left">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            <p className={SECTION_EYEBROW_CLASS}>
               {about_event_sub_heading || "About the Event"}
             </p>
             <SiteHeading
@@ -72,11 +72,7 @@ export default function AboutEventSec({
               emphasis={headingEmphasis ?? undefined}
               variant="onSurface"
               align={ABOUT_SECTION_ALIGN}
-              className={cn(
-                "!mt-3 !text-3xl !font-black !tracking-tight !leading-[1.12] sm:!text-4xl md:!text-5xl",
-                previewPhoneText3xl,
-                "@md/preview:@max-5xl/preview:!text-4xl",
-              )}
+              className="!mt-3"
             />
           </div>
           <div

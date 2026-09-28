@@ -52,6 +52,7 @@ import { buildEventHeaderDownloadLinks } from "@/lib/event-header-downloads";
 import { EVENT_BOOKING_SECTION_CLASSNAME } from "@/lib/event-booking-section-layout";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
+  buildEventHeroBreadcrumbs,
   labelsFromEventHeroSlices,
   readEventCategoryLabel,
 } from "@/lib/event-hero-meta";
@@ -411,19 +412,15 @@ export default function EventDetailClient({
             bannerVideo={eventData.event_banner_video || null}
             cacheBustImage
             imageAlt={eventData.event_name || "Event banner"}
-            breadcrumbs={[
-              { label: "Home", href: "/" },
-              {
-                label: parentLocationLabel,
-                href: `/${locationSlug}`,
-              },
-              {
-                label:
-                  eventData.event_name?.trim() ||
-                  eventData.event_banner_heading?.trim() ||
-                  "Event",
-              },
-            ]}
+            breadcrumbs={buildEventHeroBreadcrumbs({
+              eventLabel:
+                eventData.event_name?.trim() ||
+                eventData.event_banner_heading?.trim() ||
+                "Event",
+              locationLabel: parentLocationLabel,
+              homeHref: "/",
+              locationHref: `/${locationSlug}`,
+            })}
             categoryLabel={heroCategoryLabel}
             meta={{
               date: heroDateLabel,

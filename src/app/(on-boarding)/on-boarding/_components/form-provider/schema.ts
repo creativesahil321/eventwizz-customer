@@ -1,5 +1,9 @@
 import * as z from "zod";
 import {
+  BANNER_HEADING_MAX_CHARS,
+  BANNER_SUB_HEADING_MAX_CHARS,
+} from "@/lib/hero-copy-limits";
+import {
   DRINK_PACKAGE_ITEM_TITLE_MAX_CHARS,
   DRINK_PACKAGE_PRICE_MAX,
   DRINK_PACKAGE_QTY_MAX,
@@ -181,7 +185,10 @@ export const stepTwoSchema = z.object({
   banner_heading: z
     .string()
     .min(1, "Banner heading is required")
-    .max(500, "Banner heading is too long")
+    .max(
+      BANNER_HEADING_MAX_CHARS,
+      `Banner heading must not exceed ${BANNER_HEADING_MAX_CHARS} characters`,
+    )
     .refine(
       (s) => countWords(s) <= BANNER_HEADING_MAX_WORDS,
       `Banner heading must not exceed ${BANNER_HEADING_MAX_WORDS} words`
@@ -189,7 +196,10 @@ export const stepTwoSchema = z.object({
   banner_sub_heading: z
     .string()
     .min(1, "Sub heading is required")
-    .max(80, "Sub heading must not exceed 80 characters"),
+    .max(
+      BANNER_SUB_HEADING_MAX_CHARS,
+      `Banner subheading must not exceed ${BANNER_SUB_HEADING_MAX_CHARS} characters`,
+    ),
   about_title: z
     .string()
     .min(1, "Title is required")
@@ -223,7 +233,10 @@ export const stepThreeSchema = z.object({
   event_banner_heading: z
     .string()
     .min(1, "Banner heading is required")
-    .max(500, "Banner heading is too long")
+    .max(
+      BANNER_HEADING_MAX_CHARS,
+      `Banner heading must not exceed ${BANNER_HEADING_MAX_CHARS} characters`,
+    )
     .refine(
       (s) => countWords(s) <= BANNER_HEADING_MAX_WORDS,
       `Banner heading must not exceed ${BANNER_HEADING_MAX_WORDS} words`,
@@ -231,7 +244,10 @@ export const stepThreeSchema = z.object({
   event_banner_sub_heading: z
     .string()
     .min(1, "Banner sub heading is required")
-    .max(80, "Banner sub heading must not exceed 80 characters"),
+    .max(
+      BANNER_SUB_HEADING_MAX_CHARS,
+      `Banner subheading must not exceed ${BANNER_SUB_HEADING_MAX_CHARS} characters`,
+    ),
   about_event_heading: z
     .string()
     .min(1, "About event heading is required")

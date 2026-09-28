@@ -71,7 +71,7 @@ export function LocationEventSearchResults({
               title={buildSummary(filters)}
               variant="onSurface"
               align="left"
-              className="!text-[1.25rem] !font-black !leading-tight break-words sm:!text-3xl"
+              className="break-words"
             />
             <p className="mt-0.5 text-xs text-[var(--color-text-dimmed)] sm:mt-1 sm:text-sm">
               {count === 0

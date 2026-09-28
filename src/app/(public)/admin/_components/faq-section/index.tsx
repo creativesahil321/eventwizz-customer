@@ -21,7 +21,7 @@ export default function FAQSection() {
             title={faq.title}
             variant="onSurface"
             align="center"
-            className="mb-1.5 !text-xl !font-bold md:!text-2xl"
+            className="mb-1.5"
           />
           <p className="text-sm text-[color:var(--color-text-dimmed)]">
             {faq.subtitle}

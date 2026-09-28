@@ -80,7 +80,7 @@ export default function LocationGrid({
             level={3}
             title="No locations yet"
             variant="onSurface"
-            className="mb-2 !text-2xl !font-semibold tracking-tight"
+            className="mb-2"
           />
           <p className="text-[var(--color-text-dimmed)]">
             There are no locations available at the moment. Check back

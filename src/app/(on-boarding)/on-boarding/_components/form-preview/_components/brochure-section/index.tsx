@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import LocationMap from "./location-map";
 import { cn } from "@/lib/utils";
 import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
@@ -44,10 +45,10 @@ export default function BrochureSection({
   };
 
   return (
-    <section className="bg-[color:var(--color-background)] px-4 py-16">
+    <section className="bg-[color:var(--color-background)] px-4 py-16 @max-md/preview:!py-16">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 space-y-3 text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+        <div className="mb-8 space-y-3 text-center @max-md/preview:!mb-8 @max-md/preview:!space-y-3">
+          <p className={SECTION_EYEBROW_CLASS}>
             Location
           </p>
           <SiteHeading
@@ -56,7 +57,7 @@ export default function BrochureSection({
             variant="onSurface"
             align="center"
             emphasis={headingEmphasis as HeadingEmphasis | undefined}
-            className="mx-auto !max-w-4xl !text-3xl !font-black tracking-tight md:!text-4xl"
+            className="mx-auto !max-w-4xl"
           />
         </div>
         <section

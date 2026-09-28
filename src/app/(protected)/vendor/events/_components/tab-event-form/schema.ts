@@ -1,4 +1,8 @@
 import * as z from "zod";
+import {
+  BANNER_HEADING_MAX_CHARS,
+  BANNER_SUB_HEADING_MAX_CHARS,
+} from "@/lib/hero-copy-limits";
 import { coerceApiBoolean } from "@/lib/coerce-api-boolean";
 import { STEP_NINE_MAX_FAQS } from "@/app/(on-boarding)/on-boarding/_components/form-provider/schema";
 import {
@@ -121,7 +125,10 @@ export const stepOneSchema = z
     event_banner_heading: z
       .string()
       .min(1, "Banner heading is required")
-      .max(500, "Banner heading is too long")
+      .max(
+      BANNER_HEADING_MAX_CHARS,
+      `Banner heading must not exceed ${BANNER_HEADING_MAX_CHARS} characters`,
+    )
       .refine(
         (s) => countWords(s) <= BANNER_HEADING_MAX_WORDS,
         `Banner heading must not exceed ${BANNER_HEADING_MAX_WORDS} words`,
@@ -129,7 +136,10 @@ export const stepOneSchema = z
     event_banner_sub_heading: z
       .string()
       .min(1, "Banner subheading is required")
-      .max(80, "Banner subheading must not exceed 80 characters"),
+      .max(
+      BANNER_SUB_HEADING_MAX_CHARS,
+      `Banner subheading must not exceed ${BANNER_SUB_HEADING_MAX_CHARS} characters`,
+    ),
     about_event_heading: z
       .string()
       .min(1, "About event heading is required")

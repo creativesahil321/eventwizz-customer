@@ -421,7 +421,7 @@ export function PublicSearchResults({
               title={resultsHeading(meta)}
               variant="onSurface"
               align="left"
-              className="!text-[1.25rem] !font-black !leading-tight break-words sm:!text-3xl"
+              className="break-words"
             />
             {isLoading && !settledEmpty ? (
               <Skeleton className="mt-1 h-4 w-48 sm:w-64" />

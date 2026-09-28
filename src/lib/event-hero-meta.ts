@@ -1,3 +1,4 @@
+import { eventBreadcrumbCityLabel } from "@/lib/slug-short-label";
 import {
   formatPublicClock12h,
   formatPublicClock24h,
@@ -8,6 +9,52 @@ export type EventHeroBreadcrumb = {
   label: string;
   href?: string;
 };
+
+/**
+ * Event cover trail — always shown (live, vendor preview, onboarding).
+ * Live pages pass hrefs; editor previews omit them so crumbs stay non-clickable.
+ */
+export function buildEventHeroBreadcrumbs(options: {
+  eventLabel: string;
+  locationLabel?: string | null;
+  homeHref?: string | null;
+  locationHref?: string | null;
+}): EventHeroBreadcrumb[] {
+  const eventLabel = options.eventLabel.trim() || "Event";
+  const locationLabel = eventBreadcrumbCityLabel({
+    city: options.locationLabel,
+  });
+  return [
+    { label: "Home", href: options.homeHref?.trim() || undefined },
+    ...(locationLabel
+      ? [
+          {
+            label: locationLabel,
+            href: options.locationHref?.trim() || undefined,
+          },
+        ]
+      : []),
+    { label: eventLabel },
+  ];
+}
+
+/**
+ * Location cover trail — only when the vendor has 2+ venues.
+ * Single-venue home has no breadcrumb.
+ */
+export function buildLocationPageBreadcrumbs(options: {
+  isMultiLocation: boolean;
+  locationLabel: string;
+  homeHref?: string | null;
+}): EventHeroBreadcrumb[] | null {
+  if (!options.isMultiLocation) return null;
+  const locationLabel = options.locationLabel.trim();
+  if (!locationLabel) return null;
+  return [
+    { label: "Home", href: options.homeHref?.trim() || undefined },
+    { label: locationLabel },
+  ];
+}
 
 export type EventHeroMeta = {
   date?: string | null;

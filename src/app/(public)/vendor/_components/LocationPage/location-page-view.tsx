@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from "react";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
+import { HeadingEmphasisOverrideProvider } from "@/components/public/heading-emphasis-override";
 import {
   normalizeBannerHeadingAlign,
   normalizeBannerHeadingValign,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/resolve-venue-contact";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
 import { locationDisplayName } from "@/lib/slug-short-label";
+import { buildLocationPageBreadcrumbs } from "@/lib/event-hero-meta";
 import { ServerContext } from "@/lib/server-context";
 import {
   useIsPreviewMode,
@@ -211,6 +213,15 @@ export function LocationPageView({
     listedLocationCount,
     hasMultipleLocations,
   );
+  const locationBreadcrumbs = useMemo(
+    () =>
+      buildLocationPageBreadcrumbs({
+        isMultiLocation: isMultiLocationVendor,
+        locationLabel: cityLabel,
+        homeHref: isPreviewMode ? null : "/",
+      }),
+    [cityLabel, isMultiLocationVendor, isPreviewMode],
+  );
 
   const searchBar = (
     <LocationPageHeroSearch
@@ -231,6 +242,7 @@ export function LocationPageView({
     <ExperienceSection
       aboutTitle={locationData.about_title}
       aboutDescription={locationData.about_description}
+      headingEmphasis={headingEmphasis}
     />
   );
   const aboutNode = previewEdit?.onEditAbout ? (
@@ -270,7 +282,7 @@ export function LocationPageView({
   );
 
   return (
-    <>
+    <HeadingEmphasisOverrideProvider value={headingEmphasis}>
       <CommonHeader
         variant={headerVariant}
         locationSlug={locationSlug}
@@ -309,9 +321,9 @@ export function LocationPageView({
             locationData.banner_heading_valign ??
               settings?.banner_heading_valign,
           )}
-          eyebrow={headingEyebrow}
+          breadcrumbs={locationBreadcrumbs}
+          eyebrow={locationBreadcrumbs ? null : headingEyebrow}
           heroContact={{
-            address: heroContact.address,
             email: heroContact.email,
             phone: heroContact.phone,
           }}
@@ -386,6 +398,6 @@ export function LocationPageView({
       <SubscribeSection emphasis={headingEmphasis} />
 
       {footerNode}
-    </>
+    </HeadingEmphasisOverrideProvider>
   );
 }

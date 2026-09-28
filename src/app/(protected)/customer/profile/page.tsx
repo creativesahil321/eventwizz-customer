@@ -326,6 +326,19 @@ export default function ProfilePage() {
                     </p>
                   )}
                 </div>
+
+                <div>
+                  <FormLabel htmlFor="email" className="block mb-2 text-black">
+                    Email
+                  </FormLabel>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={profileData?.email || user?.email || ""}
+                    className="bg-gray-50 h-11 w-full"
+                    disabled
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end">
@@ -339,50 +352,6 @@ export default function ProfilePage() {
               </div>
             </form>
           </Form>
-        </div>
-      </section>
-
-      {/* Account Section - Read-only display of username and email */}
-      <section className="relative w-full">
-        <div className={pageCardClassName()}>
-          <header className="mb-6 w-full">
-            <h2 className="text-2xl font-bold text-black title-header">
-              Account
-            </h2>
-          </header>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-            <div>
-              <label
-                htmlFor="username"
-                className="block mb-2 font-medium text-black"
-              >
-                Username
-              </label>
-              <Input
-                id="username"
-                value={profileData?._key || user?.name || ""}
-                className="bg-gray-50 h-11 w-full"
-                disabled
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="email"
-                className="block mb-2 font-medium text-black "
-              >
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={profileData?.email || user?.email || ""}
-                className="bg-gray-50 h-11 w-full"
-                disabled
-              />
-            </div>
-          </div>
         </div>
       </section>
 

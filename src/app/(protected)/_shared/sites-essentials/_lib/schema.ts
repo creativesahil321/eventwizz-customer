@@ -6,8 +6,15 @@ import {
 import { FOOTER_BRAND_DESCRIPTION_MAX_CHARS } from "@/lib/footer-brand-description";
 import { plainTextCharCount } from "@/lib/plain-text-length";
 
-/** Hero subline; was 80 — too short for full sentences (often cut mid-word in CMS). */
-export const BANNER_SUB_HEADING_MAX_CHARS = 220;
+/** Hero heading / subline limits are shared with onboarding, events and AI. */
+export {
+  BANNER_HEADING_MAX_CHARS,
+  BANNER_SUB_HEADING_MAX_CHARS,
+} from "@/lib/hero-copy-limits";
+import {
+  BANNER_HEADING_MAX_CHARS,
+  BANNER_SUB_HEADING_MAX_CHARS,
+} from "@/lib/hero-copy-limits";
 /**
  * Copyright/disclaimer is a rich-text (HTML) field, so the limit is on the
  * stored HTML string — generous enough for a short legal paragraph plus the
@@ -272,7 +279,10 @@ export const siteEssentialsFormSchema = z.object({
   // Website content fields with updated names
   banner_heading: z
     .string()
-    .max(500, "Banner heading is too long")
+    .max(
+      BANNER_HEADING_MAX_CHARS,
+      `Banner heading must not exceed ${BANNER_HEADING_MAX_CHARS} characters`,
+    )
     .nullable()
     .optional()
     .refine(
@@ -354,7 +364,10 @@ export const siteEssentialsFormSchema = z.object({
   main_landing_cover_image: z.any().optional(),
   main_landing_banner_heading: z
     .string()
-    .max(500, "Main landing heading is too long")
+    .max(
+      BANNER_HEADING_MAX_CHARS,
+      `Main landing heading must not exceed ${BANNER_HEADING_MAX_CHARS} characters`,
+    )
     .nullable()
     .optional()
     .refine(

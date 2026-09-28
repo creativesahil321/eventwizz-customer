@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import { toLocationEventCardModel } from "../event-card-utils";
 import { LocationEventCard } from "../location-event-card";
 import { useMemo, useContext, useState } from "react";
@@ -84,7 +85,7 @@ export default function UpcomingEvents({
                 level={3}
                 title="Exciting Events Coming Soon"
                 variant="onSurface"
-                className="!text-2xl md:!text-3xl !font-semibold mb-6"
+                className="mb-6"
               />
               <p className="text-lg text-[var(--color-text-dimmed)] leading-relaxed">
                 We&apos;re preparing something amazing for you. Stay tuned for
@@ -196,14 +197,13 @@ export default function UpcomingEvents({
       >
         <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
           <div className="mb-8 w-full text-left space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            <p className={SECTION_EYEBROW_CLASS}>
               Upcoming Events
             </p>
             <SiteHeading
               level={2}
               title={sectionTitleText}
               variant="onSurface"
-              className="!text-3xl !font-black tracking-tight md:!text-4xl"
             />
           </div>
 

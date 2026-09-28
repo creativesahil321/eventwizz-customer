@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { Check, ImageIcon } from "lucide-react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
@@ -58,7 +59,7 @@ export function EventRoomChooser({
     >
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-8 text-center md:mb-10">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+          <p className={cn("mb-3", SECTION_EYEBROW_CLASS)}>
             Book your space
           </p>
           <SiteHeading
@@ -68,9 +69,8 @@ export function EventRoomChooser({
             emphasis={headingEmphasis ?? undefined}
             variant="onSurface"
             align="center"
-            className="!text-3xl !font-black !leading-[1.1] md:!text-4xl"
           />
-          <p className="mx-auto mt-3 max-w-xl text-sm text-[var(--color-text-dimmed)] md:text-base">
+          <p className={cn("mx-auto mt-3 max-w-xl", SECTION_SUBTITLE_CLASS)}>
             Select a space to see its packages, menus and available dates.
           </p>
         </div>

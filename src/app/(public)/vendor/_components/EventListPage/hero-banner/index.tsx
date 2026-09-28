@@ -9,7 +9,6 @@ import { ThemeSchema } from "@/types/theme.types";
 import { SiteHeading } from "@/components/public/site-heading";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
-import { buildMapsDirectionsUrl } from "@/lib/resolve-venue-contact";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import {
   usePreviewDeviceFramesEnabled,
@@ -42,6 +41,8 @@ import {
   shouldIgnorePreviewEditClick,
 } from "@/components/preview/preview-edit-hint";
 import { previewFlexOnlyUntilMd } from "@/lib/preview-container-layout";
+import { PublicHeroBreadcrumbs } from "@/components/public/public-hero-breadcrumbs";
+import type { EventHeroBreadcrumb } from "@/lib/event-hero-meta";
 // Default fallback media
 // const FALLBACK_VIDEO_URL =
 //   "https://www.bestpartiesever.com/wp-content/uploads/2025/03/Website-video-combined-edit-online-video-cutter.com-1.mp4";
@@ -86,11 +87,12 @@ interface HeroBannerProps {
    * Keep the same instance so the search input does not remount mid-keystroke.
    */
   collapsed?: boolean;
+  /** Home / location trail — multi-venue location pages only. */
+  breadcrumbs?: EventHeroBreadcrumb[] | null;
   /** Small-caps city / region above the title — never the brand/site name. */
   eyebrow?: string | null;
-  /** Address, email, and phone under the description (location covers). */
+  /** Email and phone under the description. Street address stays in the footer. */
   heroContact?: {
-    address?: string | null;
     email?: string | null;
     phone?: string | null;
   } | null;
@@ -112,6 +114,7 @@ export default function HeroBanner({
   bannerHeadingValign: bannerHeadingValignProp,
   heroFooter,
   collapsed = false,
+  breadcrumbs,
   eyebrow,
   heroContact,
   onEditCover,
@@ -185,9 +188,7 @@ export default function HeroBanner({
       : vendorTheme?.banner_heading_valign,
   );
   const hasContact = Boolean(
-    heroContact?.address?.trim() ||
-    heroContact?.email?.trim() ||
-    heroContact?.phone?.trim(),
+    heroContact?.email?.trim() || heroContact?.phone?.trim(),
   );
   /**
    * Keep the search dock independent from hero copy placement. This prevents
@@ -302,6 +303,12 @@ export default function HeroBanner({
             "min-h-0 max-h-full",
           )}
         >
+          <PublicHeroBreadcrumbs
+            crumbs={breadcrumbs}
+            align={previewAlign}
+            centerOnNarrow={isPreviewMobile}
+          />
+
           {eyebrow?.trim() &&
           eyebrow.trim().toLowerCase() !==
             bannerHeading.trim().toLowerCase() ? (
@@ -340,7 +347,7 @@ export default function HeroBanner({
               align={previewAlign}
               alignFromMd={!isPreviewMobile}
               className={cn(
-                "font-black tracking-tight",
+                "font-bold tracking-tight",
                 heroBannerHeadingTypeClass,
                 previewAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
               )}
@@ -434,10 +441,9 @@ function HeroBannerContactMeta({
   /** When stacked, keep email + phone on one row (desktop/tablet preview). */
   linksInline?: boolean;
 }) {
-  const address = contact?.address?.trim() || null;
   const email = contact?.email?.trim() || null;
   const phone = contact?.phone?.trim() || null;
-  if (!address && !email && !phone) return null;
+  if (!email && !phone) return null;
 
   return (
     <div
@@ -447,15 +453,6 @@ function HeroBannerContactMeta({
           "!flex !w-fit !max-w-xl !flex-col !items-center !justify-center !gap-2 sm:!max-w-2xl",
       )}
     >
-      {address ? (
-        <HeroContactLine
-          href={buildMapsDirectionsUrl(address)}
-          external
-          icon={MapPin}
-          label={address}
-          block
-        />
-      ) : null}
       {email || phone ? (
         <div
           className={cn(

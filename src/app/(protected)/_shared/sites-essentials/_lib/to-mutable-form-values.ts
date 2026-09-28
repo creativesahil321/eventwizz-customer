@@ -50,7 +50,9 @@ export function normalizeSiteEssentialsTypography(
   return {
     fontFamily: { heading, body },
     customFontStylesheetUrls,
-    headingEmphasis: normalizeHeadingEmphasis(record.headingEmphasis),
+    headingEmphasis: normalizeHeadingEmphasis(
+      record.headingEmphasis ?? record.heading_emphasis,
+    ),
   };
 }
 

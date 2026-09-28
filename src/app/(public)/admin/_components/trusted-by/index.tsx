@@ -80,7 +80,7 @@ export default function TrustedBy({
           title={content.title}
           variant="onSurface"
           align="center"
-          className="mb-3 !text-3xl !font-bold md:!text-4xl"
+          className="mb-3"
         />
         <p className="text-[color:var(--color-text-dimmed)] mb-10 max-w-lg mx-auto">
           {content.subtitle}

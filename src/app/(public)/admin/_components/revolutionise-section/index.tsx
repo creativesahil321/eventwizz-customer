@@ -87,7 +87,7 @@ export default function RevolutioniseSection({
                 level={2}
                 title={content.title}
                 variant="onSurface"
-                className="mb-6 !text-3xl !font-bold md:!text-4xl"
+                className="mb-6"
               />
               <div
                 className="space-y-4 text-[color:var(--color-text-dimmed)] leading-relaxed mb-8 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_a]:underline"

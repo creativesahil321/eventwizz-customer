@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { useState, useEffect } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
 import { SiteHeading } from "@/components/public/site-heading";
@@ -124,8 +125,8 @@ export default function MenuSection({
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl text-[var(--color-text)]">
-        <div className="mb-10 w-full space-y-3 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+        <div className="mb-10 w-full space-y-3 text-center @max-md/preview:!mb-10 @max-md/preview:!space-y-3">
+          <p className={SECTION_EYEBROW_CLASS}>
             Menu
           </p>
           <SiteHeading
@@ -134,10 +135,9 @@ export default function MenuSection({
             emphasis={headingEmphasis}
             variant="onSurface"
             align="center"
-            className="!text-3xl !font-black tracking-tight md:!text-4xl"
           />
           <p
-            className="mx-auto max-w-2xl overflow-hidden whitespace-normal break-words text-sm font-medium leading-relaxed text-[var(--color-text)] sm:text-base"
+            className={cn("mx-auto max-w-2xl overflow-hidden whitespace-normal break-words", SECTION_SUBTITLE_CLASS)}
             style={{
               wordBreak: "break-word",
               overflowWrap: "break-word",
@@ -152,7 +152,7 @@ export default function MenuSection({
           <div className={menuGridShellClass(count)}>
             <div
               className={cn(
-                "grid items-start gap-8 md:gap-8 lg:gap-10",
+                "grid items-start gap-8 md:gap-8 lg:gap-10 @max-md/preview:!gap-8",
                 menuGridClass(count),
               )}
             >
@@ -168,7 +168,7 @@ export default function MenuSection({
                 >
                   <h3
                     className={cn(
-                      "break-words overflow-hidden pb-3 pt-1 text-lg font-semibold tracking-tight sm:text-xl",
+                      "break-words overflow-hidden pb-3 pt-1 text-lg font-semibold tracking-tight sm:text-xl @max-md/preview:!pb-3 @max-md/preview:!pt-1 @max-md/preview:!text-lg",
                       isSingleMenu ? "px-2 text-center" : "pl-1 text-left",
                     )}
                     style={{
@@ -187,7 +187,7 @@ export default function MenuSection({
                     aria-hidden
                   />
 
-                  <ul className="mt-4 space-y-4">
+                  <ul className="mt-4 space-y-4 @max-md/preview:!mt-4 @max-md/preview:!space-y-4">
                     {(menu.items ?? []).map((item, idx) => (
                       <li
                         className={cn(
@@ -198,7 +198,7 @@ export default function MenuSection({
                       >
                         <h4
                           className={cn(
-                            "text-base font-semibold sm:text-lg",
+                            "text-base font-semibold sm:text-lg @max-md/preview:!text-base",
                             isSingleMenu
                               ? "text-center"
                               : "text-left",
@@ -218,7 +218,7 @@ export default function MenuSection({
                         {item.description?.trim() ? (
                           <div
                             className={cn(
-                              "mt-0.5 w-full whitespace-normal break-words text-sm leading-relaxed text-[var(--color-text-dimmed)] sm:text-[0.95rem]",
+                              "mt-0.5 w-full whitespace-normal break-words text-sm leading-relaxed text-[var(--color-text-dimmed)] sm:text-[0.95rem] @max-md/preview:!text-sm",
                               isSingleMenu
                                 ? "pl-0 text-center"
                                 : "text-left",

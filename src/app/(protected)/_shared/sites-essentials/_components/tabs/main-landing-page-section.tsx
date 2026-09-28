@@ -1,5 +1,6 @@
 "use client";
 
+import { BANNER_HEADING_MAX_CHARS } from "@/lib/hero-copy-limits";
 import { useEffect, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { Home } from "lucide-react";
@@ -149,6 +150,7 @@ export function MainLandingPageSection({
                   <FormLabel>Main page heading</FormLabel>
                   <FormControl>
                     <Input
+                      maxLength={BANNER_HEADING_MAX_CHARS}
                       placeholder="Find Events Near You"
                       disabled={readOnly}
                       {...field}

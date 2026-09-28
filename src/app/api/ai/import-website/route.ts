@@ -3,10 +3,12 @@ import { resolveAiRuntimeConfig } from "../lib/provider-config";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { assertSafeLogoUrl } from "@/lib/logo/fetch-logo-from-url";
 import {
+  BANNER_HEADING_MAX_CHARS,
   BANNER_HEADING_MAX_WORDS,
-  truncateToMaxWords,
-} from "@/lib/word-count";
-import { BANNER_SUB_HEADING_MAX_CHARS } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
+  BANNER_SUB_HEADING_MAX_CHARS,
+  clampHeroHeading,
+  truncateAtWordBoundary,
+} from "@/lib/hero-copy-limits";
 import { clipFooterBrandDescription } from "@/lib/footer-brand-description";
 import {
   SITE_ESSENTIALS_GOOGLE_FONT_NAMES,
@@ -31,7 +33,7 @@ const MAX_HTML_BYTES = 3_000_000; // 3 MB of HTML is plenty for extraction.
 function truncate(value: string | undefined, max: number): string {
   if (!value) return "";
   const trimmed = value.trim();
-  return trimmed.length > max ? trimmed.slice(0, max).trim() : trimmed;
+  return truncateAtWordBoundary(trimmed, max);
 }
 
 const BROWSER_UA =
@@ -227,7 +229,7 @@ ${
 Return ONLY a valid JSON object (no markdown, no commentary) with EXACTLY this shape:
 {
   "name": "string (business/brand name, max 50 chars)",
-  "banner_heading": "string (hero headline, max ${BANNER_HEADING_MAX_WORDS} words)",
+  "banner_heading": "string (hero headline, max ${BANNER_HEADING_MAX_WORDS} words / ${BANNER_HEADING_MAX_CHARS} chars)",
   "banner_sub_heading": "string (hero tagline, max ${BANNER_SUB_HEADING_MAX_CHARS} chars)",
   "about_title": "string (about section title, max 40 chars)",
   "about_description": "string (plain text, no HTML, max 340 chars)",
@@ -262,10 +264,7 @@ function sanitizeContent(raw: Partial<WebsiteImportContent>): WebsiteImportConte
   const seo = raw.seo ?? { title: "", description: "", keywords: "" };
   return {
     name: truncate(raw.name, 50),
-    banner_heading: truncateToMaxWords(
-      raw.banner_heading ?? "",
-      BANNER_HEADING_MAX_WORDS,
-    ),
+    banner_heading: clampHeroHeading(raw.banner_heading ?? ""),
     banner_sub_heading: truncate(raw.banner_sub_heading, BANNER_SUB_HEADING_MAX_CHARS),
     about_title: truncate(raw.about_title, 40),
     about_description: truncate(raw.about_description, 340),

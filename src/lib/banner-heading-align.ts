@@ -244,22 +244,26 @@ export function vendorHomeTrustRowClass(align: BannerHeadingAlign): string {
  */
 export const heroHeadingMeasureClass = "@container/hero min-w-0 w-full";
 
+/**
+ * Wrap + line caps: 2 lines on phones (real or preview frame), 3 elsewhere, so a
+ * legacy long heading (pre 12-word limit) can never push the hero out of shape.
+ */
 const heroHeadingWrapClass =
-  "min-w-0 max-w-full text-pretty break-words [overflow-wrap:anywhere] [word-break:break-word] max-md:line-clamp-2 max-md:!leading-[1.15] md:line-clamp-none";
+  "min-w-0 max-w-full text-pretty break-words [overflow-wrap:anywhere] [word-break:break-word] line-clamp-3 max-md:line-clamp-2 max-md:!leading-[1.15] @max-md/preview:line-clamp-2";
 
 /**
- * Fluid hero H1 — phones stay compact, then scale with the hero container.
+ * Fluid hero H1 (max 44px) — phones stay compact, then scale with the hero container.
  * Preview device frames stay compact via `@container/preview`.
  */
 export const heroBannerHeadingTypeClass = cn(
   heroHeadingWrapClass,
-  "!text-[clamp(1.3rem,0.675rem+2.85cqi,3.25rem)] !leading-[1.24]",
+  "!text-[clamp(1.3rem,0.7rem+2.4cqi,2.75rem)] !leading-[1.2]",
 );
 
-/** Multi-location home hero — slightly smaller cap than the location banner. */
+/** Multi-location home hero — same scale as the location / event banner. */
 export const heroHomeHeadingTypeClass = cn(
   heroHeadingWrapClass,
-  "!text-[clamp(1.3rem,0.65rem+2.7cqi,3rem)] !leading-[1.24]",
+  "!text-[clamp(1.3rem,0.7rem+2.4cqi,2.75rem)] !leading-[1.2]",
 );
 
 /* ---- Hero band height (location page + multi-location home) ---- */

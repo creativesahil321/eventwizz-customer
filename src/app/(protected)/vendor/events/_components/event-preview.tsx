@@ -68,6 +68,7 @@ import {
 } from "@/lib/event-sticky-scroll-offset";
 import { lowestBookableFromPrice } from "@/lib/event-room-chooser-item";
 import {
+  buildEventHeroBreadcrumbs,
   labelsFromEventHeroSlices,
   readEventCategoryLabel,
 } from "@/lib/event-hero-meta";
@@ -709,13 +710,10 @@ export function EventPreview({
             bannerVideo={bannerVideo}
             cacheBustImage
             imageAlt={eventName}
-            breadcrumbs={[
-              { label: "Home" },
-              ...(parentLocationLabel
-                ? [{ label: parentLocationLabel }]
-                : []),
-              { label: eventName },
-            ]}
+            breadcrumbs={buildEventHeroBreadcrumbs({
+              eventLabel: eventName,
+              locationLabel: parentLocationLabel,
+            })}
             categoryLabel={heroCategoryLabel}
             meta={{
               date: heroDateLabel,
@@ -855,7 +853,6 @@ export function EventPreview({
             <PreviewEditWrap label="Gallery" onEdit={previewEdit?.onEditGallery} skipButtons>
               <EventGallery
                 gallery={galleryImages}
-                galleryTitle={siteEssentials?.event_gallery_title || undefined}
                 headingEmphasis={headingEmphasisForHero}
               />
             </PreviewEditWrap>

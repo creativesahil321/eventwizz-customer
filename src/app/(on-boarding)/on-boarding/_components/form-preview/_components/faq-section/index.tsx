@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import {
   Accordion,
   AccordionContent,
@@ -43,14 +44,14 @@ export default function FaqSection({
   return (
     <section
       className={cn(
-        "w-full scroll-mt-20 bg-[var(--color-background)] px-4 py-8 text-center text-[var(--color-text)] md:py-10",
+        "w-full scroll-mt-20 bg-[var(--color-background)] px-4 py-8 text-center text-[var(--color-text)] md:py-10 @max-md/preview:!px-4 @max-md/preview:!py-8",
         !narrowPreview && "sm:scroll-mt-24",
       )}
       aria-labelledby="faq-section-heading"
     >
       <div className="mx-auto w-full max-w-2xl">
-        <div className="mb-8 space-y-3 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+        <div className="mb-8 space-y-3 text-center @max-md/preview:!mb-8 @max-md/preview:!space-y-3">
+          <p className={SECTION_EYEBROW_CLASS}>
             Got Questions?
           </p>
           <div id="faq-section-heading">
@@ -60,7 +61,6 @@ export default function FaqSection({
               emphasis={headingEmphasis}
               variant="onSurface"
               align="center"
-              className="!text-3xl !font-black tracking-tight md:!text-4xl"
             />
           </div>
         </div>
@@ -69,7 +69,7 @@ export default function FaqSection({
           <Accordion type="single" collapsible className="w-full">
             {filteredFaqs.map((data, index) => (
               <AccordionItem
-                className="mb-1.5 overflow-hidden rounded-lg border-none"
+                className="mb-1.5 overflow-hidden rounded-lg border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)] shadow-sm"
                 value={`item-${index}`}
                 key={index}
               >
@@ -77,6 +77,7 @@ export default function FaqSection({
                   className={cn(
                     "items-center gap-2 rounded-none border-none bg-[var(--color-surface)] px-3 !py-2.5 text-left text-sm font-medium text-[var(--color-on-surface)] hover:no-underline focus-visible:ring-0 [&[data-state=open]]:rounded-b-none",
                     !narrowPreview && "sm:px-4 sm:!py-3 sm:text-[15px]",
+                    "@max-md/preview:!px-3 @max-md/preview:!py-2.5 @max-md/preview:!text-sm",
                   )}
                   style={{
                     wordBreak: "break-word",
@@ -89,6 +90,7 @@ export default function FaqSection({
                   className={cn(
                     "overflow-hidden whitespace-normal break-words bg-[var(--color-background)] px-3 pt-2 pb-3 text-sm leading-relaxed text-[var(--color-on-background)]",
                     !narrowPreview && "sm:px-4",
+                    "@max-md/preview:!px-3",
                   )}
                   style={{
                     wordBreak: "break-word",

@@ -9,16 +9,20 @@ import {
   usePreviewNarrowLayout,
 } from "@/hooks/use-preview-narrow-layout";
 import { SiteHeading } from "@/components/public/site-heading";
+import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { PUBLIC_SECTION_CONTAINER_CLASS } from "@/lib/public-rhythm";
 
 interface ExperienceSectionProps {
   aboutTitle?: string | null;
   aboutDescription?: string | null;
+  /** Same as hero — required on platform-host Site Essentials previews. */
+  headingEmphasis?: HeadingEmphasis;
 }
 
 export default function ExperienceSection({
   aboutTitle,
   aboutDescription,
+  headingEmphasis,
 }: ExperienceSectionProps) {
   const { theme } = useContext(ServerContext);
   const vendorTheme = theme as ThemeSchema;
@@ -61,12 +65,9 @@ export default function ExperienceSection({
         <SiteHeading
           level={2}
           title={titleText}
+          emphasis={headingEmphasis}
           variant="onSurface"
-          className={cn(
-            "!mt-0 !leading-[1.08] break-words !text-3xl !font-black tracking-tight",
-            !phoneFrame && "sm:!text-4xl",
-            !framedBelowLg && "lg:!text-5xl",
-          )}
+          className="!mt-0 break-words"
         />
         <div
           className={cn(

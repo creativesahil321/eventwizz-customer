@@ -292,8 +292,8 @@ export function buildAiEventJsonSchemaBlock(
 {
   "stepOne": {
     "event_name": "string (max 40 chars)",
-    "event_banner_heading": "string (max 30 words)",
-    "event_banner_sub_heading": "string (max 80 chars)",
+    "event_banner_heading": "string (max 12 words / 80 chars)",
+    "event_banner_sub_heading": "string (max 160 chars, one complete sentence)",
     "about_event_heading": "string (max 50 chars)",
     "about_event_sub_heading": "string (max 80 chars)",
     "about_event_description": "string (max 340 chars, no HTML)",

@@ -16,7 +16,7 @@ export default function SellingPoints({
             title={content.title}
             variant="onSurface"
             align="center"
-            className="mb-3 !text-3xl !font-bold md:!text-4xl"
+            className="mb-3"
           />
           <p className="text-[color:var(--color-text-dimmed)] max-w-xl mx-auto">
             {content.subtitle}

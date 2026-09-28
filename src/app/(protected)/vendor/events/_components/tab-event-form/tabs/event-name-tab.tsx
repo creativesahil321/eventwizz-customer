@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  BANNER_HEADING_MAX_CHARS,
+  BANNER_SUB_HEADING_MAX_CHARS,
+} from "@/lib/hero-copy-limits";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -883,6 +887,7 @@ export default function EventNameTab() {
                       </FormLabel>
                       <FormControl>
                         <Input
+                          maxLength={BANNER_HEADING_MAX_CHARS}
                           {...field}
                           placeholder="Enter a banner heading (max 30 words)"
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
@@ -931,6 +936,7 @@ export default function EventNameTab() {
                       <Input
                         {...field}
                         placeholder="Enter a short banner supporting line"
+                        maxLength={BANNER_SUB_HEADING_MAX_CHARS}
                         className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                         onFocus={() =>
                           handleFieldFocus("event_banner_sub_heading")

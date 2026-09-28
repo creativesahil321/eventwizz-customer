@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { useState } from "react";
 import { CheckCircle2, Info, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
@@ -92,7 +93,7 @@ function SubscribeShell({
           "relative z-10 text-center",
         )}
       >
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
+        <p className={cn("mb-3", SECTION_EYEBROW_CLASS)}>
           Stay updated
         </p>
         <SiteHeading
@@ -101,9 +102,9 @@ function SubscribeShell({
           title="Never miss what's on"
           emphasis={emphasis}
           variant="onSurface"
-          className="mb-4 !text-3xl !font-semibold tracking-tight !text-[var(--color-on-surface)] md:!text-4xl"
+          className="mb-4 !text-[var(--color-on-surface)]"
         />
-        <p className="mx-auto mb-8 max-w-xl text-base text-[var(--color-text-dimmed)] md:mb-9 md:text-lg">
+        <p className={cn("mx-auto mb-8 max-w-xl md:mb-9", SECTION_SUBTITLE_CLASS)}>
           {subtitle}
         </p>
         {children}

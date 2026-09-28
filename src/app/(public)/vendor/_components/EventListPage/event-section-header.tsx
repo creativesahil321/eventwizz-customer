@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import { SiteHeading } from "@/components/public/site-heading";
 
 type EventSectionHeaderProps = {
@@ -16,14 +17,13 @@ export function EventSectionHeader({
 }: EventSectionHeaderProps) {
   return (
     <div className={className ?? "mb-8 w-full space-y-3 text-left"}>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+      <p className={SECTION_EYEBROW_CLASS}>
         {sectionLabel}
       </p>
       <SiteHeading
         level={2}
         title={sectionTitle}
         variant="onSurface"
-        className="!text-3xl !font-black tracking-tight md:!text-4xl"
       />
     </div>
   );

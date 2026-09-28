@@ -1,5 +1,6 @@
 "use client";
 
+import { BANNER_SUB_HEADING_MAX_CHARS } from "@/lib/hero-copy-limits";
 import React, { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -529,7 +530,7 @@ function StepOneEditor({
         label="Banner subheading"
         value={content.event_banner_sub_heading}
         onChange={(v) => onChange("event_banner_sub_heading", v)}
-        maxLength={80}
+        maxLength={BANNER_SUB_HEADING_MAX_CHARS}
       />
       <EditableField
         label="About heading"

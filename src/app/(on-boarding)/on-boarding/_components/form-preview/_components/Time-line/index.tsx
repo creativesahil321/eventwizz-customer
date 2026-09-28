@@ -1,3 +1,4 @@
+import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import {
   Building2,
   Check,
@@ -466,7 +467,7 @@ const timelineStyles = `
 
 @media (min-width: 768px) {
   .tl-section:not(.tl-section--preview-narrow) .tl-header__subtitle {
-    font-size: 0.9375rem;
+    font-size: 1rem;
   }
 }
 
@@ -1177,7 +1178,7 @@ export default function Timeline({
         <div style={{ position: "relative", zIndex: 10, maxWidth: "72rem", margin: "0 auto" }}>
           {/* Header */}
           <header className="tl-header space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+            <p className={SECTION_EYEBROW_CLASS}>
               Schedule
             </p>
             <SiteHeading
@@ -1186,7 +1187,7 @@ export default function Timeline({
               emphasis={headingEmphasis}
               variant="onSurface"
               align="center"
-              className="!mx-auto !block !text-3xl !font-black tracking-tight md:!text-4xl"
+              className="!mx-auto !block"
             />
             {subtitle ? (
               <p className="tl-header__subtitle">{subtitle}</p>

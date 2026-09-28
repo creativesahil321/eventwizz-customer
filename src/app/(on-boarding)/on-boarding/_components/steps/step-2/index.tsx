@@ -1,4 +1,8 @@
 "use client";
+import {
+  BANNER_HEADING_MAX_CHARS,
+  BANNER_SUB_HEADING_MAX_CHARS,
+} from "@/lib/hero-copy-limits";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -718,6 +722,7 @@ export default function StepTwo() {
                           </OnboardingFieldGroupTitle>
                           <FormControl>
                             <Input
+                              maxLength={BANNER_HEADING_MAX_CHARS}
                               placeholder="Landing Page Banner Heading"
                               {...field}
                               onFocus={() => handleFieldFocus("banner_heading")}
@@ -749,7 +754,7 @@ export default function StepTwo() {
                     name="banner_sub_heading"
                     render={({ field }) => {
                       const currentLength = field.value?.length || 0;
-                      const maxLength = 80;
+                      const maxLength = BANNER_SUB_HEADING_MAX_CHARS;
                       return (
                         <FormItem>
                           <OnboardingFieldGroupTitle>

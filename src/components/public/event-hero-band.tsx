@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { Calendar, Clock, MapPin, Pencil } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
@@ -13,7 +12,6 @@ import {
   heroBannerContactRowClass,
   heroBannerHeadingTypeClass,
   heroBannerStackClass,
-  heroHeadingAlignClass,
   heroHeadingMeasureClass,
   heroBannerSubheadingClass,
   normalizeBannerHeadingAlign,
@@ -24,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { addCacheBusting } from "@/lib/image-utils";
 import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
+import { PublicHeroBreadcrumbs } from "@/components/public/public-hero-breadcrumbs";
 import {
   PreviewEditHoverBadge,
   PreviewEditHoverFrame,
@@ -300,55 +299,11 @@ export function EventHeroBand({
           )}
         >
           {crumbs.length > 0 ? (
-            <nav
-              aria-label="Breadcrumb"
-              className={cn(
-                "text-xs font-medium tracking-wide text-white/80 sm:text-sm",
-                previewNarrow
-                  ? "text-center"
-                  : heroHeadingAlignClass(bannerAlign, { fromMd: true }),
-              )}
-            >
-              <ol
-                className={cn(
-                  "flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1",
-                  !previewNarrow && bannerAlign === "left" && "md:justify-start",
-                  !previewNarrow && bannerAlign === "center" && "md:justify-center",
-                  !previewNarrow && bannerAlign === "right" && "md:justify-end",
-                )}
-              >
-                {crumbs.map((crumb, index) => {
-                  const isLast = index === crumbs.length - 1;
-                  return (
-                    <li
-                      key={`${crumb.label}-${index}`}
-                      className="inline-flex items-center gap-x-1.5"
-                    >
-                      {index > 0 ? (
-                        <span className="text-white/45" aria-hidden>
-                          /
-                        </span>
-                      ) : null}
-                      {crumb.href && !isLast ? (
-                        <Link
-                          href={crumb.href}
-                          className="underline decoration-white/35 underline-offset-2 transition-colors hover:text-white hover:decoration-white"
-                        >
-                          {crumb.label}
-                        </Link>
-                      ) : (
-                        <span
-                          className={isLast ? "text-white" : undefined}
-                          aria-current={isLast ? "page" : undefined}
-                        >
-                          {crumb.label}
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </nav>
+            <PublicHeroBreadcrumbs
+              crumbs={crumbs}
+              align={bannerAlign}
+              centerOnNarrow={previewNarrow}
+            />
           ) : (
             beforeTitle
           )}
@@ -372,16 +327,16 @@ export function EventHeroBand({
             align={bannerAlign}
             alignFromMd
             className={cn(
-              "font-black tracking-tight",
+              "font-bold tracking-tight",
               heroBannerHeadingTypeClass,
               bannerAlign === "left" ? "max-w-4xl md:max-w-3xl" : "max-w-4xl",
-              "max-md:line-clamp-2 max-md:!leading-[1.15]",
             )}
           />
           {subHeading ? (
             <p
               className={cn(
-                "max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg md:text-xl",
+                // Body scale, not display: sm → base → lg, compact inside phone preview frames.
+                "line-clamp-3 max-w-2xl text-sm leading-relaxed text-white/85 sm:text-base md:text-lg @max-md/preview:!text-sm @max-md/preview:!leading-snug",
                 heroBannerSubheadingClass(bannerAlign, { fromMd: true }),
               )}
             >

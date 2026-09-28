@@ -173,22 +173,25 @@ function FooterPageLinks({
   isPreviewMode: boolean;
   className?: string;
 }) {
-  if (isPreviewMode) return null;
+  const linkClassName =
+    "text-xs text-[var(--color-on-footer)]/65 transition-colors hover:text-[color:var(--color-primary)]";
 
   return (
     <nav
       aria-label="Footer pages"
       className={cn("flex flex-wrap items-center gap-x-4 gap-y-1", className)}
     >
-      {VENDOR_FOOTER_PAGE_LINKS.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          className="text-xs text-[var(--color-on-footer)]/65 transition-colors hover:text-[color:var(--color-primary)]"
-        >
-          {link.label}
-        </Link>
-      ))}
+      {VENDOR_FOOTER_PAGE_LINKS.map((link) =>
+        isPreviewMode ? (
+          <span key={link.href} className={linkClassName}>
+            {link.label}
+          </span>
+        ) : (
+          <Link key={link.href} href={link.href} className={linkClassName}>
+            {link.label}
+          </Link>
+        ),
+      )}
     </nav>
   );
 }

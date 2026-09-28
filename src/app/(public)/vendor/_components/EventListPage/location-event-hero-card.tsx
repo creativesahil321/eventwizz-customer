@@ -102,7 +102,7 @@ export function LocationEventHeroCard({
           title={event.title}
           variant="onDark"
           className={cn(
-            "!text-left !text-xl !font-semibold leading-tight drop-shadow-sm sm:!text-2xl md:!text-3xl",
+            "!text-left drop-shadow-sm",
             "transition-colors duration-300 group-hover:!text-[color:var(--color-primary)]",
           )}
         />

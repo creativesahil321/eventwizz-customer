@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import {
   Carousel,
   CarouselContent,
@@ -80,7 +81,7 @@ export default function RecentEventsGlimpse({
     <section className="bg-transparent py-16 md:py-28">
       <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <div className="text-center mb-8 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-primary)]">
+          <p className={SECTION_EYEBROW_CLASS}>
             Latest Memories
           </p>
           <SiteHeading
@@ -88,10 +89,9 @@ export default function RecentEventsGlimpse({
             align="center"
             title={galleryTitle}
             variant="onSurface"
-            className="!text-3xl !font-black tracking-tight md:!text-4xl"
           />
           {images.length > 0 ? (
-            <p className="text-sm text-[var(--color-text-dimmed)]">
+            <p className={SECTION_SUBTITLE_CLASS}>
               Tap an image to view the full gallery
             </p>
           ) : null}
@@ -105,7 +105,7 @@ export default function RecentEventsGlimpse({
                 align="center"
                 title="Gallery Content Coming Soon"
                 variant="onSurface"
-                className="!text-2xl md:!text-3xl !font-semibold !text-gray-800 mb-6"
+                className="!text-gray-800 mb-6"
               />
               <p className="text-lg text-gray-600 leading-relaxed">
                 We&apos;re curating an amazing collection of event photos and

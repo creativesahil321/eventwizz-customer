@@ -1,3 +1,4 @@
+import { truncateAtWordBoundary } from "@/lib/hero-copy-limits";
 import type {
   AIDate,
   AIRoomDates,
@@ -976,8 +977,8 @@ export function ensureStepSevenRooms(
 export function buildAiOnboardingJsonSchemaBlock(stepNineMaxFaqs: number): string {
   return `Return this JSON shape (compact keys, no extra commentary):
 {
-  "stepTwo": {"banner_heading":"≤30 words","banner_sub_heading":"≤80 chars","about_title":"≤40 chars","about_description":"≤340 chars, no HTML","footer_brand_description":"1 complete sentence, ≤140 chars preferred / ≤180 hard max, warm professional blurb under the logo — never labels like venue name/summary, never mid-sentence cut-offs"},
-  "stepThree": {"event_name":"≤40 chars","event_address":"exact event address near the venue","event_banner_heading":"≤30 words","event_banner_sub_heading":"≤80 chars","about_event_heading":"≤50 chars","about_event_sub_heading":"≤80 chars","about_event_description":"≤340 chars, no HTML"},
+  "stepTwo": {"banner_heading":"≤12 words and ≤80 chars, one clean line, no filler","banner_sub_heading":"≤160 chars, one complete sentence","about_title":"≤40 chars","about_description":"≤340 chars, no HTML","footer_brand_description":"1 complete sentence, ≤140 chars preferred / ≤180 hard max, warm professional blurb under the logo — never labels like venue name/summary, never mid-sentence cut-offs"},
+  "stepThree": {"event_name":"≤40 chars","event_address":"exact event address near the venue","event_banner_heading":"≤12 words and ≤80 chars, one clean line, no filler","event_banner_sub_heading":"≤160 chars, one complete sentence","about_event_heading":"≤50 chars","about_event_sub_heading":"≤80 chars","about_event_description":"≤340 chars, no HTML"},
   "stepFour": {"package_title":"≤40","package_description":"≤160","package_button_name":"≤18","package_details":[{"title":"≤40"},{"title":"≤40"},{"title":"≤40"},{"title":"≤40"},{"title":"≤40"}],"event_schedular_title":"≤40","event_schedule_subtitle":"≤160 optional","event_schedular":[{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"},{"title":"≤40","time":"HH:mm"}]},
   "stepFive": {
     "dates":[{"event_date":"YYYY-MM-DD","booking_type":"tickets|tables|both","tickets":[{"title":"≤25","description":"≤160","total_capacity":"n","price":"n"}],"tables":[{"min_persons":"n","max_persons":"n","price":"n","total_tables":"n"}],"payment_type":"full|deposit","is_deposit_enabled":false,"deposit_type":"amount|percentage","deposit_value":"n","deposit_due_date":"YYYY-MM-DD"}],
@@ -1383,8 +1384,7 @@ function firstNonEmpty(...values: Array<string | undefined | null>): string {
 }
 
 function clipText(value: string, max: number): string {
-  if (value.length <= max) return value;
-  return value.slice(0, max).trim();
+  return truncateAtWordBoundary(value, max);
 }
 
 export function fillOnboardingContentDefaults(

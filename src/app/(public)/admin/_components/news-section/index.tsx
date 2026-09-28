@@ -39,7 +39,7 @@ export default function NewsSection({
             title={content.title}
             variant="onSurface"
             align="left"
-            className="mb-2 !text-2xl !font-bold sm:!text-3xl md:!text-4xl"
+            className="mb-2"
           />
           <p className="text-sm text-[color:var(--color-text-dimmed)] sm:text-base">
             {content.subtitle}

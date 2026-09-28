@@ -35,9 +35,11 @@ import {
   buildEventSectionNavItems,
 } from "@/components/public/event-section-nav";
 import {
+  buildEventHeroBreadcrumbs,
   formatEventHeroDateRange,
   formatEventHeroTimeRange,
 } from "@/lib/event-hero-meta";
+import { eventBreadcrumbCityLabel } from "@/lib/slug-short-label";
 import {
   formatEventLocationLabel,
   resolveEventLocation,
@@ -988,6 +990,12 @@ export default function FormPreview() {
     const heroLocationLabel = formatEventLocationLabel(
       activePreviewBrochureLocation.description,
     );
+    const heroBreadcrumbCity = eventBreadcrumbCityLabel({
+      city: formState.stepOne?.city,
+      address:
+        formState.stepOne?.address ||
+        activePreviewBrochureLocation.description,
+    });
     const heroEventLabel =
       formState.stepThree?.event_name?.trim() ||
       formState.stepThree?.event_banner_heading?.trim() ||
@@ -1071,13 +1079,10 @@ export default function FormPreview() {
             }
             accentHint={tryHeroPreviewProps?.bannerHeadingAccent ?? null}
             headingEmphasis={tryHeroPreviewProps?.headingEmphasis ?? undefined}
-            breadcrumbs={[
-              { label: "Home" },
-              ...(heroLocationLabel
-                ? [{ label: heroLocationLabel }]
-                : []),
-              { label: heroEventLabel },
-            ]}
+            breadcrumbs={buildEventHeroBreadcrumbs({
+              eventLabel: heroEventLabel,
+              locationLabel: heroBreadcrumbCity,
+            })}
             meta={{
               date: heroDateLabel,
               time: heroTimeLabel,
@@ -1374,6 +1379,9 @@ export default function FormPreview() {
                   catering_option={activePreviewCatering?.catering_option ?? 1}
                   menus={activePreviewCatering?.menus || []}
                   menu_background_image={menuBackgroundImage}
+                  headingEmphasis={
+                    tryHeroPreviewProps?.headingEmphasis ?? undefined
+                  }
                 />
               </Suspense>
             </PreviewEditHit>
@@ -1412,6 +1420,9 @@ export default function FormPreview() {
                   roomId={activePreviewRoomScope.roomId}
                   roomIndex={activePreviewRoomScope.roomIndex}
                   defaultExpanded
+                  headingEmphasis={
+                    tryHeroPreviewProps?.headingEmphasis ?? undefined
+                  }
                 />
               </Suspense>
             </PreviewEditHit>
@@ -1441,6 +1452,7 @@ export default function FormPreview() {
           >
             <BrochureSection
               location={activePreviewBrochureLocation}
+              showMapImmediately
               headingEmphasis={
                 tryHeroPreviewProps?.headingEmphasis ?? undefined
               }

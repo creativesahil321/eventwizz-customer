@@ -1,5 +1,6 @@
 "use client";
 
+import { SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
 import {
   useState,
@@ -547,12 +548,7 @@ export default function DatesSection({
     "relative w-full bg-transparent text-[var(--color-text)]",
     narrowPreview ? "py-4" : "py-4 sm:py-6",
   );
-  const headingClass = cn(
-    "mb-0 !block !w-full !font-black",
-    narrowPreview
-      ? "!text-3xl"
-      : "!text-3xl sm:!text-4xl md:!text-5xl",
-  );
+  const headingClass = "mb-0 !block !w-full";
   const headerWrapClass = cn(
     "relative z-10 mb-5 flex w-full flex-col items-center gap-2 px-4 text-center",
     !narrowPreview && "sm:mb-6",
@@ -1078,7 +1074,7 @@ export default function DatesSection({
             className={headingClass}
             emphasis={headingEmphasis as HeadingEmphasis | undefined}
           />
-          <p className="text-sm text-[var(--color-text-dimmed)]">
+          <p className={SECTION_SUBTITLE_CLASS}>
             Add dates in the form to preview them here.
           </p>
         </div>
@@ -1127,7 +1123,7 @@ export default function DatesSection({
           <p
             data-book-now-hint
             hidden
-            className="mt-1 max-w-md text-sm font-medium text-[var(--color-text-dimmed)]"
+            className={cn("mt-1 max-w-md", SECTION_SUBTITLE_CLASS)}
             role="status"
           >
             Choose a date below to continue booking
@@ -1226,7 +1222,7 @@ export default function DatesSection({
         <p
           data-book-now-hint
           hidden
-          className="mt-1 max-w-md text-sm font-medium text-[var(--color-text-dimmed)]"
+          className={cn("mt-1 max-w-md", SECTION_SUBTITLE_CLASS)}
           role="status"
         >
           Choose a date below to continue booking
@@ -1237,9 +1233,9 @@ export default function DatesSection({
         {needsPagination && (
           <div
             className={cn(
-              "absolute top-1/2 z-20 -translate-y-1/2 transform left-0",
-              !narrowPreview && "sm:left-2",
-            )}
+                "absolute top-1/2 z-20 -translate-y-1/2 transform left-0",
+                !narrowPreview && "sm:left-2",
+              )}
           >
             <button
               type="button"
@@ -1276,9 +1272,9 @@ export default function DatesSection({
         {needsPagination && (
           <div
             className={cn(
-              "absolute top-1/2 z-20 -translate-y-1/2 transform right-0",
-              !narrowPreview && "sm:right-2",
-            )}
+                "absolute top-1/2 z-20 -translate-y-1/2 transform right-0",
+                !narrowPreview && "sm:right-2",
+              )}
           >
             <button
               type="button"

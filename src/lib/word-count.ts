@@ -1,5 +1,5 @@
-/** Max words for site / event hero banner headings (onboarding + site essentials). */
-export const BANNER_HEADING_MAX_WORDS = 30;
+/** Hero limits live in `hero-copy-limits`; re-exported for existing importers. */
+export { BANNER_HEADING_MAX_WORDS } from "./hero-copy-limits";
 
 export function countWords(s: string): number {
   const t = s.trim();
