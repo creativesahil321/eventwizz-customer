@@ -299,7 +299,8 @@ export default function DrinkSection({
                         size="sm"
                         onClick={() => handleAdd(singlePackage)}
                         className={cn(
-                          "w-full px-4 py-2 text-sm",
+                          // Pill like "Book now" — public CTAs share one shape.
+                          "w-full rounded-full px-4 py-2 text-sm",
                           !narrowPreview && "sm:w-auto sm:px-6 sm:text-base",
                           previewFullWidthUntilMd,
                           previewPhoneTextSm,

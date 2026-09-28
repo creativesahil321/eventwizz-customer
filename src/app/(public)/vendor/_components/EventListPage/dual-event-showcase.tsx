@@ -1,5 +1,6 @@
 "use client";
 
+import { PUBLIC_EVENT_LIST_PY_CLASS } from "@/lib/public-rhythm";
 import { useMemo } from "react";
 import type { LocationEventCardModel } from "./location-event-card";
 import { LocationEventCard } from "./location-event-card";
@@ -51,7 +52,7 @@ export function DualEventShowcase({
   return (
     <section
       id={sectionId}
-      className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
+      className={cn("w-full bg-transparent text-[var(--color-text)]", PUBLIC_EVENT_LIST_PY_CLASS)}
     >
       <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <EventSectionHeader

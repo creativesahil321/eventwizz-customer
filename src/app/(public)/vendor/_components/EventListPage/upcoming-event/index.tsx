@@ -1,5 +1,6 @@
 "use client";
 
+import { PUBLIC_EVENT_LIST_PY_CLASS } from "@/lib/public-rhythm";
 import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import { toLocationEventCardModel } from "../event-card-utils";
 import { LocationEventCard } from "../location-event-card";
@@ -70,7 +71,7 @@ export default function UpcomingEvents({
     }
 
     return (
-      <section className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28">
+      <section className={cn("w-full bg-transparent text-[var(--color-text)]", PUBLIC_EVENT_LIST_PY_CLASS)}>
         <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
           <EventSectionHeader
             sectionLabel="Upcoming Events"
@@ -193,7 +194,7 @@ export default function UpcomingEvents({
     return (
       <section
         id="upcoming-events"
-        className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
+        className={cn("w-full bg-transparent text-[var(--color-text)]", PUBLIC_EVENT_LIST_PY_CLASS)}
       >
         <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
           <div className="mb-8 w-full text-left space-y-3">
@@ -261,7 +262,7 @@ export default function UpcomingEvents({
   return (
     <section
       id="upcoming-events"
-      className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
+      className={cn("w-full bg-transparent text-[var(--color-text)]", PUBLIC_EVENT_LIST_PY_CLASS)}
     >
       <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <EventSectionHeader

@@ -1,5 +1,6 @@
 "use client";
 
+import { PUBLIC_EVENT_LIST_PY_CLASS } from "@/lib/public-rhythm";
 import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import {
   Carousel,
@@ -78,7 +79,7 @@ export default function RecentEventsGlimpse({
   };
 
   return (
-    <section className="bg-transparent py-16 md:py-28">
+    <section className={cn("bg-transparent", PUBLIC_EVENT_LIST_PY_CLASS)}>
       <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <div className="text-center mb-8 space-y-3">
           <p className={SECTION_EYEBROW_CLASS}>

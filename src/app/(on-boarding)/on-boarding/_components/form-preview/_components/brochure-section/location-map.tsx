@@ -51,6 +51,12 @@ function resolveDisplayAddress(address?: string): string {
   return trimmed;
 }
 
+/** Map overlay actions use the vendor theme (were hard-coded blue / green). */
+const MAP_ACTION_BASE_CLASS =
+  "inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold shadow-md transition-colors";
+const MAP_ACTION_PRIMARY_CLASS = `${MAP_ACTION_BASE_CLASS} bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:bg-[var(--color-primary-hover)]`;
+const MAP_ACTION_SECONDARY_CLASS = `${MAP_ACTION_BASE_CLASS} bg-[var(--color-surface)] text-[var(--color-text)] ring-1 ring-[color:color-mix(in_srgb,var(--color-text)_12%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-text)_6%,var(--color-surface))]`;
+
 function openDirections(address: string, lat?: number | null, lng?: number | null) {
   const directionsUrl = buildEventDirectionsUrl({
     address,
@@ -607,7 +613,7 @@ export default function LocationMap({
                   currentLocation.longitude,
                 );
               }}
-              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md shadow-lg text-xs font-medium transition-colors"
+              className={MAP_ACTION_PRIMARY_CLASS}
               title="Get directions to this location"
             >
               <Navigation className="h-3 w-3" />
@@ -625,7 +631,7 @@ export default function LocationMap({
                 const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
                 window.open(streetViewUrl, "_blank", "noopener,noreferrer");
               }}
-              className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md shadow-lg text-xs font-medium transition-colors"
+              className={MAP_ACTION_SECONDARY_CLASS}
               title="View street view of this location"
             >
               <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
@@ -645,7 +651,7 @@ export default function LocationMap({
                 const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&query_place_id=`;
                 window.open(mapsUrl, "_blank", "noopener,noreferrer");
               }}
-              className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md shadow-lg text-xs font-medium transition-colors"
+              className={MAP_ACTION_SECONDARY_CLASS}
               title="Open this location in Google Maps"
             >
               <MapPin className="h-3 w-3" />

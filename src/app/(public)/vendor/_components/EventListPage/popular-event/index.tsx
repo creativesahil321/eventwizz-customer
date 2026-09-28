@@ -1,5 +1,6 @@
 "use client";
 
+import { PUBLIC_EVENT_LIST_PY_CLASS } from "@/lib/public-rhythm";
 import { toLocationEventCardModel } from "../event-card-utils";
 import { LocationEventCard } from "../location-event-card";
 import { useContext, useState, useMemo } from "react";
@@ -99,7 +100,7 @@ export default function PopularEvents({
     return (
       <section
         id="latest-events"
-        className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
+        className={cn("w-full bg-transparent text-[var(--color-text)]", PUBLIC_EVENT_LIST_PY_CLASS)}
       >
         <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
           <EventSectionHeader
@@ -161,7 +162,7 @@ export default function PopularEvents({
   return (
     <section
       id="latest-events"
-      className="w-full bg-transparent py-16 text-[var(--color-text)] md:py-28"
+      className={cn("w-full bg-transparent text-[var(--color-text)]", PUBLIC_EVENT_LIST_PY_CLASS)}
     >
       <div className={PUBLIC_SECTION_CONTAINER_CLASS}>
         <EventSectionHeader
