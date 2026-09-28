@@ -74,6 +74,12 @@ export default function InlineTableAllocation({
   const [isConfirmed, setIsConfirmed] = useState(false);
   /** Show Auto Distribute / Reset only after the user edits a table. */
   const [hasTouchedTables, setHasTouchedTables] = useState(false);
+  /**
+   * "How many guests?" is the one main control — tables are filled for the
+   * customer and shown as read-only rows. Per-table steppers only appear on
+   * request (2+ tables), so there is never a second, competing control.
+   */
+  const [isAdjusting, setIsAdjusting] = useState(false);
 
   // Sync before paint so Confirm seating never submits stale allocation after
   // group-size / auto-match updates (useEffect was one frame too late).
@@ -195,6 +201,12 @@ export default function InlineTableAllocation({
   const showConfirmButton =
     validation.isValid && !isStoreConfirmed && !isSavingSeating;
 
+  // Splitting guests only makes sense across several tables.
+  const canAdjustTables = table.quantity > 1;
+  // An invalid split must stay fixable, so open the controls automatically.
+  const showTableControls =
+    canAdjustTables && (isAdjusting || !validation.isValid);
+
   const handleConfirmSeating = async () => {
     if (!validation.isValid) {
       toast.error("Please assign all guests correctly before confirming seating.");
@@ -246,16 +258,16 @@ export default function InlineTableAllocation({
                       ? `Table for ${maxPersons} guests`
                       : `Table for ${minPersons}–${maxPersons} guests`}
             </p>
-            <p className="mt-0.5 text-[11px] text-[color:var(--checkout-muted-foreground)]">
+            <p className="mt-0.5 text-xs text-[color:var(--checkout-muted-foreground)]">
               {table.quantity} table{table.quantity !== 1 ? "s" : ""} ·{" "}
-              {minPersons}–{maxPersons} per table
+              {draftGuestTotal} guest{draftGuestTotal !== 1 ? "s" : ""}
             </p>
           </div>
           <div className="shrink-0 text-left sm:text-right">
             <p className="text-sm font-bold tabular-nums text-[color:var(--checkout-foreground)]">
               {formatMoney(pricePerPerson * draftGuestTotal)}
             </p>
-            <p className="text-[10px] tabular-nums text-[color:var(--checkout-muted-foreground)]">
+            <p className="text-xs tabular-nums text-[color:var(--checkout-muted-foreground)]">
               {formatMoney(pricePerPerson)}/person
             </p>
           </div>
@@ -275,7 +287,7 @@ export default function InlineTableAllocation({
           />
         </div>
 
-        {hasTouchedTables ? (
+        {showTableControls && hasTouchedTables ? (
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
@@ -322,47 +334,41 @@ export default function InlineTableAllocation({
         )}
       </div>
 
-      <div
-        className={cn(
-          "grid grid-cols-2 gap-2 border-t border-[color:var(--checkout-border)] px-3 py-3 min-[420px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5",
-          table.quantity > 6 &&
-            "max-h-[min(50vh,420px)] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]",
-        )}
-      >
-        {Array.from({ length: table.quantity }, (_, index) => {
-          const currentValue = draftAllocation[index] ?? minPersons;
-          const isFull = currentValue >= maxPersons;
-          const isOverflow = currentValue > maxPersons;
-          const isUnder = currentValue < minPersons;
+      <div className="border-t border-[color:var(--checkout-border)] px-3 py-3">
+        <div
+          className={cn(
+            "grid gap-2",
+            showTableControls
+              ? "grid-cols-1 min-[420px]:grid-cols-2"
+              : "grid-cols-2 sm:grid-cols-3",
+            table.quantity > 6 &&
+              "max-h-[min(50vh,420px)] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]",
+          )}
+        >
+          {Array.from({ length: table.quantity }, (_, index) => {
+            const currentValue = draftAllocation[index] ?? minPersons;
+            const isOverflow = currentValue > maxPersons;
+            const isUnder = currentValue < minPersons;
 
-          return (
-            <div
-              key={index}
-              className={cn(
-                "min-w-0 rounded-lg border bg-white px-1.5 py-2 sm:px-2",
-                isOverflow
-                  ? "border-red-200"
-                  : isUnder
-                    ? "border-amber-200"
-                    : "border-[color:var(--checkout-border)]",
-              )}
-            >
-              <div className="mb-1 flex items-center justify-between gap-0.5">
-                <span className="text-[8px] font-semibold uppercase tracking-wider text-[color:var(--checkout-muted-foreground)]">
-                  Table {index + 1}
-                </span>
-                {isFull && !isOverflow && (
-                  <span className="text-[8px] font-bold uppercase text-emerald-600">
-                    Full
-                  </span>
+            return (
+              <div
+                key={index}
+                className={cn(
+                  "flex min-w-0 items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2",
+                  isOverflow
+                    ? "border-red-200"
+                    : isUnder
+                      ? "border-amber-200"
+                      : "border-[color:var(--checkout-border)]",
                 )}
-              </div>
-
-              <div className="flex items-center justify-between gap-1">
-                <div>
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[color:var(--checkout-muted-foreground)]">
+                    Table {index + 1}
+                  </p>
                   <p
                     className={cn(
-                      "text-lg font-bold tabular-nums leading-none",
+                      "text-sm font-bold tabular-nums",
                       isOverflow
                         ? "text-red-600"
                         : isUnder
@@ -370,41 +376,53 @@ export default function InlineTableAllocation({
                           : "text-[color:var(--checkout-foreground)]",
                     )}
                   >
-                    {currentValue}
+                    {currentValue} guest{currentValue !== 1 ? "s" : ""}
                   </p>
-                  <p className="mt-0.5 text-[8px] text-[color:var(--checkout-muted-foreground)]">
-                    Max {maxPersons}
-                  </p>
-                  <p className="mt-1 text-[8px] font-semibold tabular-nums text-[color:var(--checkout-foreground)]">
-                    {formatMoney(pricePerPerson * currentValue)}
-                  </p>
+                  {showTableControls ? (
+                    <p className="text-xs tabular-nums text-[color:var(--checkout-muted-foreground)]">
+                      {formatMoney(pricePerPerson * currentValue)} · max {maxPersons}
+                    </p>
+                  ) : null}
                 </div>
 
-                <div className="flex overflow-hidden rounded border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/40">
-                  <button
-                    type="button"
-                    onClick={() => stepAllocation(index, -1)}
-                    disabled={currentValue <= minPersons}
-                    className="flex h-6 w-6 items-center justify-center text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-white disabled:opacity-30"
-                    aria-label={`Decrease guests at table ${index + 1}`}
-                  >
-                    <Minus className="h-2.5 w-2.5" />
-                  </button>
-                  <div className="w-px bg-[color:var(--checkout-border)]" />
-                  <button
-                    type="button"
-                    onClick={() => stepAllocation(index, 1)}
-                    disabled={currentValue >= maxPersons}
-                    className="flex h-6 w-6 items-center justify-center text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-white disabled:opacity-30"
-                    aria-label={`Increase guests at table ${index + 1}`}
-                  >
-                    <Plus className="h-2.5 w-2.5" />
-                  </button>
-                </div>
+                {showTableControls ? (
+                  <div className="flex shrink-0 items-center overflow-hidden rounded-lg border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/40">
+                    <button
+                      type="button"
+                      onClick={() => stepAllocation(index, -1)}
+                      disabled={currentValue <= minPersons}
+                      className="flex h-10 w-10 items-center justify-center text-[color:var(--checkout-foreground)] transition-colors hover:bg-white disabled:opacity-30"
+                      aria-label={`Decrease guests at table ${index + 1}`}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <div className="h-6 w-px bg-[color:var(--checkout-border)]" />
+                    <button
+                      type="button"
+                      onClick={() => stepAllocation(index, 1)}
+                      disabled={currentValue >= maxPersons}
+                      className="flex h-10 w-10 items-center justify-center text-[color:var(--checkout-foreground)] transition-colors hover:bg-white disabled:opacity-30"
+                      aria-label={`Increase guests at table ${index + 1}`}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : null}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+
+        {canAdjustTables && validation.isValid ? (
+          <button
+            type="button"
+            onClick={() => setIsAdjusting((open) => !open)}
+            className="mt-2 inline-flex min-h-9 items-center text-sm font-semibold text-[color:var(--checkout-brand-accent)] underline-offset-2 hover:underline"
+            aria-expanded={isAdjusting}
+          >
+            {isAdjusting ? "Done adjusting" : "Adjust tables"}
+          </button>
+        ) : null}
       </div>
 
       {!validation.isValid && validation.errors.length > 0 && (

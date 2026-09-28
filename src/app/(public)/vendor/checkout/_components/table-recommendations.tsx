@@ -117,14 +117,14 @@ function GroupSizeStepper({
         type="button"
         onClick={() => step(-1)}
         disabled={!clearOnZero && peopleCount <= 1}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-white disabled:opacity-30"
+        className="flex h-10 w-10 items-center justify-center rounded-md text-[color:var(--checkout-foreground)] transition-colors hover:bg-white disabled:opacity-30"
         aria-label={
           clearOnZero && peopleCount <= 1
             ? "Remove table seating"
             : "Decrease group size"
         }
       >
-        <Minus className="h-3 w-3" />
+        <Minus className="h-4 w-4" />
       </button>
       <input
         type="text"
@@ -142,17 +142,17 @@ function GroupSizeStepper({
             e.currentTarget.blur();
           }
         }}
-        className="w-9 border-0 bg-transparent text-center text-sm font-bold tabular-nums text-[color:var(--checkout-foreground)] focus:outline-none focus:ring-0"
-        aria-label="Group size"
+        className="w-10 border-0 bg-transparent text-center text-base font-bold tabular-nums text-[color:var(--checkout-foreground)] focus:outline-none focus:ring-0"
+        aria-label="Number of guests"
       />
       <button
         type="button"
         onClick={() => step(1)}
         disabled={peopleCount >= 500}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-[color:var(--checkout-muted-foreground)] transition-colors hover:bg-white disabled:opacity-30"
+        className="flex h-10 w-10 items-center justify-center rounded-md text-[color:var(--checkout-foreground)] transition-colors hover:bg-white disabled:opacity-30"
         aria-label="Increase group size"
       >
-        <Plus className="h-3 w-3" />
+        <Plus className="h-4 w-4" />
       </button>
     </div>
   );
@@ -160,8 +160,8 @@ function GroupSizeStepper({
   if (embedded) {
     return (
       <div className="flex items-center justify-between gap-3 border-b border-[color:var(--checkout-border)] px-4 py-3">
-        <p className="text-xs font-medium text-[color:var(--checkout-muted-foreground)]">
-          Group size
+        <p className="text-sm font-semibold text-[color:var(--checkout-foreground)]">
+          How many guests?
         </p>
         {stepper}
       </div>
@@ -170,8 +170,8 @@ function GroupSizeStepper({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/25 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs font-semibold text-[color:var(--checkout-foreground)]">
-        Group size
+      <p className="text-sm font-semibold text-[color:var(--checkout-foreground)]">
+        How many guests?
       </p>
       {stepper}
     </div>
