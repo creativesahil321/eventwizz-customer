@@ -14,6 +14,7 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { BannerHeadingLimitCounter } from "@/components/shared/banner-heading-limit-counter";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { SectionCard } from "../ui/section-card";
 import { SiteEssentialsFormValues } from "../../_lib/schema";
@@ -21,7 +22,6 @@ import { BANNER_SUB_HEADING_MAX_CHARS } from "../../_lib/schema";
 import { addCacheBusting } from "@/lib/image-utils";
 import {
   BANNER_HEADING_MAX_WORDS,
-  countWords,
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useSiteEssentialsUpdateGate } from "../../_lib/site-essentials-update-context";
@@ -145,7 +145,6 @@ export function MainLandingPageSection({
             control={form.control}
             name="main_landing_banner_heading"
             render={({ field }) => {
-              const wc = countWords(field.value || "");
               return (
                 <FormItem>
                   <FormLabel>Main page heading</FormLabel>
@@ -166,11 +165,7 @@ export function MainLandingPageSection({
                       }
                     />
                   </FormControl>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    <span>
-                      {wc}/{BANNER_HEADING_MAX_WORDS} words
-                    </span>
-                  </div>
+                  <BannerHeadingLimitCounter value={field.value} />
                   <FormMessage />
                 </FormItem>
               );

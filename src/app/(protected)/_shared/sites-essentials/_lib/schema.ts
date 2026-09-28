@@ -4,7 +4,11 @@ import {
   countWords,
 } from "@/lib/word-count";
 import { FOOTER_BRAND_DESCRIPTION_MAX_CHARS } from "@/lib/footer-brand-description";
-import { plainTextCharCount } from "@/lib/plain-text-length";
+import {
+  ABOUT_DESCRIPTION_LIMIT_MESSAGE,
+  isAboutDescriptionWithinLimits,
+  plainTextCharCount,
+} from "@/lib/plain-text-length";
 
 /** Hero heading / subline limits are shared with onboarding, events and AI. */
 export {
@@ -312,7 +316,11 @@ export const siteEssentialsFormSchema = z.object({
     .max(40, "About title must not exceed 40 characters")
     .nullable()
     .optional(),
-  about_description: z.string().nullable().optional(),
+  about_description: z
+    .string()
+    .nullable()
+    .optional()
+    .refine(isAboutDescriptionWithinLimits, ABOUT_DESCRIPTION_LIMIT_MESSAGE),
   about_link_title: z
     .string()
     .max(18, "Button text must not exceed 18 characters")

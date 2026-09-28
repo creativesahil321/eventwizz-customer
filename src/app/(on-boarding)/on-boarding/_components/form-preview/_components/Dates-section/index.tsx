@@ -165,7 +165,7 @@ function getDateCardContainerClass(
   const base = cn(
     "flex-shrink-0 overflow-hidden rounded-2xl border p-0 text-center transition-all duration-300",
     "bg-[#14141c] text-white shadow-[0_12px_28px_-16px_rgba(0,0,0,0.45)]",
-    narrowPreview ? "w-[85px]" : "w-[85px] sm:w-[100px] md:w-[120px]",
+    narrowPreview ? "w-[96px]" : "w-[96px] sm:w-[104px] md:w-[120px]",
   );
 
   if (visual.isSoldOut) {
@@ -397,7 +397,7 @@ function DateRowsScroller({
           className={cn(
             "flex flex-nowrap items-center",
             getDateRowJustifyClass(firstRowCount),
-            narrowPreview ? "gap-3" : "gap-3 sm:gap-5",
+            narrowPreview ? "gap-4" : "gap-4 sm:gap-5",
           )}
         >
           {Array.from({ length: firstRowCount }).map((_, i) => {
@@ -411,7 +411,7 @@ function DateRowsScroller({
             className={cn(
               "flex flex-nowrap items-center",
               getDateRowJustifyClass(secondRowCount),
-              narrowPreview ? "gap-3" : "gap-3 sm:gap-5",
+              narrowPreview ? "gap-4" : "gap-4 sm:gap-5",
             )}
           >
             {Array.from({ length: secondRowCount }).map((_, i) => {
@@ -534,17 +534,17 @@ export default function DatesSection({
       : cn("justify-start", !narrowPreview && "sm:justify-center");
 
   const dateCardBodyClass = narrowPreview
-    ? "p-2"
-    : "p-2 sm:p-3";
+    ? "px-2 pb-2.5 pt-3"
+    : "px-2 pb-2.5 pt-3 sm:p-3";
   const dateCardDayClass = narrowPreview
-    ? "mb-0.5 text-xs text-white/70"
-    : "mb-0.5 text-xs text-white/70 sm:mb-1 sm:text-sm";
+    ? "truncate text-[11px] leading-tight text-white/70"
+    : "truncate text-[11px] leading-tight text-white/70 sm:mb-1 sm:text-sm";
   const dateCardNumberClass = narrowPreview
-    ? "py-1 text-3xl font-bold text-white"
-    : "py-1 text-3xl font-bold text-white sm:text-4xl md:text-5xl";
+    ? "py-1.5 text-3xl font-bold leading-none text-white"
+    : "py-1.5 text-3xl font-bold leading-none text-white sm:py-2 sm:text-4xl md:text-5xl";
   const dateCardMonthClass = narrowPreview
-    ? "text-xs text-white/70"
-    : "text-xs text-white/70 sm:text-sm";
+    ? "truncate text-[11px] leading-tight text-white/70"
+    : "truncate text-[11px] leading-tight text-white/70 sm:text-sm";
   const sectionClass = cn(
     "relative w-full bg-transparent text-[var(--color-text)]",
     PUBLIC_SECTION_PY_CLASS,

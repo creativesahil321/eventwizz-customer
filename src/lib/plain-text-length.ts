@@ -1,4 +1,4 @@
-import { truncateToMaxWords } from "@/lib/word-count";
+import { countWords, truncateToMaxWords } from "@/lib/word-count";
 
 /**
  * Plain-text length after stripping HTML and trimming — used for rich-text fields
@@ -82,3 +82,31 @@ export function toPlainSnippet(
 
 /** Shared cap for menu item and drink-package descriptions (HTML allowed in UI). */
 export const RICH_DESCRIPTION_MAX_CHARS = 160;
+
+/** About copy on the site home and event page (rich text, visible text counted). */
+export const ABOUT_DESCRIPTION_MAX_CHARS = 340;
+export const ABOUT_DESCRIPTION_MAX_WORDS = 50;
+
+/** Visible text of rich/plain `value` fits both caps (a cap of 0 is ignored). */
+export function isWithinPlainTextLimits(
+  value: string | null | undefined,
+  maxChars: number,
+  maxWords = 0,
+): boolean {
+  const plain = toPlainText(value);
+  if (maxChars > 0 && plain.length > maxChars) return false;
+  if (maxWords > 0 && countWords(plain) > maxWords) return false;
+  return true;
+}
+
+export const ABOUT_DESCRIPTION_LIMIT_MESSAGE = `Description must not exceed ${ABOUT_DESCRIPTION_MAX_CHARS} characters or ${ABOUT_DESCRIPTION_MAX_WORDS} words`;
+
+export function isAboutDescriptionWithinLimits(
+  value: string | null | undefined,
+): boolean {
+  return isWithinPlainTextLimits(
+    value,
+    ABOUT_DESCRIPTION_MAX_CHARS,
+    ABOUT_DESCRIPTION_MAX_WORDS,
+  );
+}

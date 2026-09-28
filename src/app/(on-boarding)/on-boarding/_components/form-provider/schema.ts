@@ -20,6 +20,8 @@ import {
   isEventGalleryCountValid,
 } from "@/lib/event-gallery-count";
 import {
+  ABOUT_DESCRIPTION_LIMIT_MESSAGE,
+  isAboutDescriptionWithinLimits,
   plainTextCharCount,
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/plain-text-length";
@@ -204,7 +206,10 @@ export const stepTwoSchema = z.object({
     .string()
     .min(1, "Title is required")
     .max(40, "Title must not exceed 40 characters"),
-  about_description: z.string().min(1, "Description is required"),
+  about_description: z
+    .string()
+    .min(1, "Description is required")
+    .refine(isAboutDescriptionWithinLimits, ABOUT_DESCRIPTION_LIMIT_MESSAGE),
   footer_brand_description: z.string().refine(
     (s) => plainTextCharCount(s) <= FOOTER_BRAND_DESCRIPTION_MAX_CHARS,
     `Footer brand description must not exceed ${FOOTER_BRAND_DESCRIPTION_MAX_CHARS} characters`,
@@ -258,7 +263,8 @@ export const stepThreeSchema = z.object({
     .max(80, "About event sub heading must not exceed 80 characters"),
   about_event_description: z
     .string()
-    .min(1, "About event description is required"),
+    .min(1, "About event description is required")
+    .refine(isAboutDescriptionWithinLimits, ABOUT_DESCRIPTION_LIMIT_MESSAGE),
   event_address: z.string().min(1, "Event address is required"),
   latitude: z.number().optional(),
   longitude: z.number().optional(),

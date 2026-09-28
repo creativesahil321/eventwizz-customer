@@ -17,6 +17,11 @@ import {
 } from "@/components/ui/form";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { Input } from "@/components/ui/input";
+import { BannerHeadingLimitCounter } from "@/components/shared/banner-heading-limit-counter";
+import {
+  ABOUT_DESCRIPTION_MAX_CHARS,
+  ABOUT_DESCRIPTION_MAX_WORDS,
+} from "@/lib/plain-text-length";
 import { Button } from "@/components/ui/button";
 import { useFormContext } from "../../form-provider";
 import { stepTwoSchema, StepTwoType } from "../../form-provider/schema";
@@ -32,7 +37,6 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
   BANNER_HEADING_MAX_WORDS,
-  countWords,
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
@@ -715,7 +719,6 @@ export default function StepTwo() {
                     render={({ field }) => {
                       const text =
                         typeof field.value === "string" ? field.value : "";
-                      const wordCount = countWords(text);
                       return (
                         <FormItem>
                           <OnboardingFieldGroupTitle>
@@ -740,11 +743,7 @@ export default function StepTwo() {
                               }}
                             />
                           </FormControl>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            <span>
-                              {wordCount}/{BANNER_HEADING_MAX_WORDS} words
-                            </span>
-                          </div>
+                          <BannerHeadingLimitCounter value={text} />
                           <FormMessage />
                         </FormItem>
                       );
@@ -889,8 +888,8 @@ export default function StepTwo() {
                               );
                             }}
                             placeholder="Write a compelling description about your business..."
-                            maxLength={340}
-                            maxWords={50}
+                            maxLength={ABOUT_DESCRIPTION_MAX_CHARS}
+                            maxWords={ABOUT_DESCRIPTION_MAX_WORDS}
                             className="min-h-[120px] w-full overflow-hidden max-w-[300px]"
                             showAIButton={true}
                             wrapText={true}

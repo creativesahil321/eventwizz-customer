@@ -20,6 +20,11 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { BannerHeadingLimitCounter } from "@/components/shared/banner-heading-limit-counter";
+import {
+  ABOUT_DESCRIPTION_MAX_CHARS,
+  ABOUT_DESCRIPTION_MAX_WORDS,
+} from "@/lib/plain-text-length";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { MAX_VIDEO_SIZE_BYTES, MAX_VIDEO_SIZE_MB } from "@/utils/video-validator";
@@ -42,7 +47,6 @@ import { useParams, useRouter } from "next/navigation";
 import { addCacheBusting } from "@/lib/image-utils";
 import {
   BANNER_HEADING_MAX_WORDS,
-  countWords,
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { mapGlobalStepOneToLocal } from "../../../_lib/map-global-step-to-local";
@@ -880,7 +884,6 @@ export default function EventNameTab() {
                 control={form.control}
                 name="event_banner_heading"
                 render={({ field }) => {
-                  const wc = countWords(field.value || "");
                   return (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
@@ -915,11 +918,7 @@ export default function EventNameTab() {
                         {BANNER_HEADING_MAX_WORDS} words and{" "}
                         {BANNER_HEADING_MAX_CHARS} characters.
                       </FormDescription>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        <span>
-                          {wc}/{BANNER_HEADING_MAX_WORDS} words
-                        </span>
-                      </p>
+                      <BannerHeadingLimitCounter value={field.value} />
                       <FormMessage />
                     </FormItem>
                   );
@@ -1491,8 +1490,8 @@ export default function EventNameTab() {
                         }}
                         placeholder="Write a clear description of the event…"
                         className="bg-gray-100 p-2 rounded-md"
-                        maxLength={340}
-                        maxWords={50}
+                        maxLength={ABOUT_DESCRIPTION_MAX_CHARS}
+                        maxWords={ABOUT_DESCRIPTION_MAX_WORDS}
                         showAIButton={true}
                         wrapText={true}
                         aiContext={{

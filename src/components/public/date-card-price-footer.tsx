@@ -58,7 +58,9 @@ export function DateCardPriceFooter({
       <span
         className={cn(
           "block px-1 font-semibold tracking-wider text-white",
-          compact ? "py-1 text-xs" : "py-1 text-sm sm:py-1.5 sm:text-base",
+          compact
+            ? "py-1 text-xs"
+            : "py-1.5 text-xs sm:text-base",
           className,
         )}
       >
@@ -78,14 +80,17 @@ export function DateCardPriceFooter({
   const priceRow = (
     <span
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 font-semibold tracking-wider text-white",
-        compact ? "text-sm leading-none" : "text-base leading-none sm:text-lg",
+        "inline-flex items-center justify-center gap-1.5 font-semibold tracking-wide text-white",
+        compact
+          ? "text-sm leading-none"
+          : "text-sm leading-none sm:text-lg sm:tracking-wider",
       )}
     >
       <BookingTypeIcons
         bookingType={bookingType}
-        size={compact ? 13 : 16}
-        className="shrink-0 text-white"
+        size={12}
+        className="shrink-0 gap-1 text-white/90"
+        iconClassName={compact ? undefined : "sm:h-4 sm:w-4"}
       />
       <span className="tabular-nums">{priceLabel}</span>
     </span>
@@ -110,7 +115,7 @@ export function DateCardPriceFooter({
   return (
     <span
       className={cn(
-        "flex flex-col items-center justify-center gap-0.5 px-1 text-white",
+        "flex flex-col items-center justify-center gap-1 px-1.5 text-white",
         compact ? "py-1" : "py-1 sm:py-1.5",
         className,
       )}

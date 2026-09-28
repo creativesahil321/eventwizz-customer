@@ -33,11 +33,13 @@ function shouldShowSectionEdit(
   sectionIndex: number,
   sectionId: string,
 ) {
-  const isApproved = guided.approvedSections.has(sectionId);
   const isActive = guided.currentSectionIndex === sectionIndex;
-  // Keep Edit available after approve-all so vendors can revise any completed
-  // section before saving. The active section is already open for editing.
-  return isApproved && !isActive;
+  if (isActive) return false;
+  if (guided.approvedSections.has(sectionId)) return true;
+  // Preview clicks can jump ahead, leaving earlier blocks locked but unapproved.
+  return (
+    guided.currentSectionIndex >= 0 && sectionIndex < guided.currentSectionIndex
+  );
 }
 
 /** Icon + label control only (e.g. align with an existing title row). */

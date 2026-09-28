@@ -18,6 +18,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { BannerHeadingLimitCounter } from "@/components/shared/banner-heading-limit-counter";
+import {
+  ABOUT_DESCRIPTION_MAX_CHARS,
+  ABOUT_DESCRIPTION_MAX_WORDS,
+} from "@/lib/plain-text-length";
 import { Button } from "@/components/ui/button";
 import { FileUploader } from "@/components/ui/file-uploader";
 import { useFormContext } from "../../form-provider";
@@ -41,7 +46,6 @@ import { addCacheBusting } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
   BANNER_HEADING_MAX_WORDS,
-  countWords,
   truncateToMaxWordsForInput,
 } from "@/lib/word-count";
 import { useGuidedOnboardingSections } from "../../../_lib/hooks/use-guided-onboarding-sections";
@@ -852,7 +856,6 @@ export default function StepThree() {
                     render={({ field }) => {
                       const text =
                         typeof field.value === "string" ? field.value : "";
-                      const headingWordCount = countWords(text);
                       return (
                         <FormItem>
                           <FormLabel className="text-sm font-medium">
@@ -891,12 +894,7 @@ export default function StepThree() {
                             {BANNER_HEADING_MAX_WORDS} words and{" "}
                             {BANNER_HEADING_MAX_CHARS} characters.
                           </FormDescription>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            <span>
-                              {headingWordCount}/{BANNER_HEADING_MAX_WORDS}{" "}
-                              words
-                            </span>
-                          </div>
+                          <BannerHeadingLimitCounter value={text} />
                           <FormMessage />
                         </FormItem>
                       );
@@ -1303,8 +1301,8 @@ export default function StepThree() {
                             }}
                             placeholder="Write a compelling description..."
                             className="min-h-[120px] w-full overflow-hidden max-w-[300px]"
-                            maxLength={340}
-                            maxWords={50}
+                            maxLength={ABOUT_DESCRIPTION_MAX_CHARS}
+                            maxWords={ABOUT_DESCRIPTION_MAX_WORDS}
                             showAIButton={true}
                             wrapText={true}
                             aiContext={{

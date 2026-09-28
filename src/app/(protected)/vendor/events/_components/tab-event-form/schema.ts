@@ -25,6 +25,8 @@ import {
   isEventGalleryCountValid,
 } from "@/lib/event-gallery-count";
 import {
+  ABOUT_DESCRIPTION_LIMIT_MESSAGE,
+  isAboutDescriptionWithinLimits,
   plainTextCharCount,
   RICH_DESCRIPTION_MAX_CHARS,
 } from "@/lib/plain-text-length";
@@ -150,7 +152,8 @@ export const stepOneSchema = z
       .max(80, "About event subtitle must not exceed 80 characters"),
     about_event_description: z
       .string()
-      .min(1, "About event description is required"),
+      .min(1, "About event description is required")
+      .refine(isAboutDescriptionWithinLimits, ABOUT_DESCRIPTION_LIMIT_MESSAGE),
     /** Sent on step 1 create/update so persistence returns `is_rooms` on GET. */
     is_rooms: z.union([z.literal(0), z.literal(1)]).optional(),
     event_address: z

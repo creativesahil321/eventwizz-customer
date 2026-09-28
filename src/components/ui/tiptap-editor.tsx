@@ -45,13 +45,20 @@ import {
 } from "@/lib/plain-text-length";
 import { countWords } from "@/lib/word-count";
 import { looksLikeAiInstructionLeak } from "@/app/api/ai/lib/extract-json";
+import {
+  PLAIN_TEXT_LIMIT_BYPASS_META,
+  PlainTextLimit,
+  type PlainTextLimits,
+} from "./tiptap-plain-text-limit";
 
 interface TiptapEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** Visible-text character cap; typing and pasting stop here. */
   maxLength?: number;
+  /** Optional word cap; omit for fields limited by characters only. */
   maxWords?: number;
   aiContext?: {
     title?: string;
@@ -98,7 +105,7 @@ export function TiptapEditor({
   placeholder = "Write something...",
   className,
   maxLength = 340,
-  maxWords = 50,
+  maxWords,
   aiContext,
   showAIButton = true,
   wrapText = false,
@@ -119,6 +126,18 @@ export function TiptapEditor({
 
   onUploadImageRef.current = onUploadImage;
   onChangeRef.current = onChange;
+
+  const wordCap = maxWords ?? 0;
+  const plainTextLimitsRef = useRef<PlainTextLimits>({
+    enabled: false,
+    maxChars: maxLength,
+    maxWords: wordCap,
+  });
+  plainTextLimitsRef.current = {
+    enabled: !readOnly,
+    maxChars: maxLength,
+    maxWords: wordCap,
+  };
 
   const insertUploadedImage = React.useCallback(
     async (file: File, pos?: number) => {
@@ -209,6 +228,9 @@ export function TiptapEditor({
         placeholder,
       }),
       CharacterCount,
+      PlainTextLimit.configure({
+        getLimits: () => plainTextLimitsRef.current,
+      }),
       TextAlign.configure({
         types: enableRichBlocks ? ["paragraph", "heading"] : ["paragraph"],
         alignments: ["left", "center", "right"],
@@ -292,9 +314,9 @@ export function TiptapEditor({
 
   editorRef.current = editor;
 
-  // Update editor content when value prop changes.
-  // CharacterCount.limit silently rejects setContent over the cap, so over-limit
-  // footer HTML from AI must be clipped before it is applied.
+  // Sync editor content when the value prop changes (form reset, saved data).
+  // Over-limit footer copy is clipped; other fields load as-is so the vendor
+  // can see the red counter and trim it.
   React.useEffect(() => {
     if (!editor) return;
 
@@ -303,10 +325,10 @@ export function TiptapEditor({
       const plain = toPlainText(nextHtml);
       if (
         plain &&
-        (plain.length > maxLength || countWords(plain) > maxWords)
+        (plain.length > maxLength || (wordCap > 0 && countWords(plain) > wordCap))
       ) {
         nextHtml = wrapPlainTextAsHtml(
-          clipPlainTextToLimits(plain, maxLength, maxWords),
+          clipPlainTextToLimits(plain, maxLength, wordCap),
         );
         if (nextHtml !== value) {
           onChangeRef.current(nextHtml);
@@ -315,11 +337,15 @@ export function TiptapEditor({
     }
 
     const nextPlain = toPlainText(nextHtml);
-    const currentPlain = editor.getText().replace(/\s+/g, " ").trim();
+    const currentPlain = toPlainText(editor.getHTML());
     if (nextPlain !== currentPlain) {
-      editor.commands.setContent(nextHtml);
+      editor
+        .chain()
+        .setMeta(PLAIN_TEXT_LIMIT_BYPASS_META, true)
+        .setContent(nextHtml)
+        .run();
     }
-  }, [editor, value, maxLength, maxWords, aiContext?.contentType]);
+  }, [editor, value, maxLength, wordCap, aiContext?.contentType]);
 
   React.useEffect(() => {
     editor?.setEditable(!readOnly);
@@ -418,7 +444,7 @@ export function TiptapEditor({
               clipPlainTextToLimits(
                 String(data.summary),
                 maxLength,
-                maxWords,
+                wordCap,
               ),
             )
           : String(data.summary);
@@ -426,7 +452,11 @@ export function TiptapEditor({
           toast.error("Generated copy was empty. Please try again.");
           return;
         }
-        editor.commands.setContent(html);
+        editor
+          .chain()
+          .setMeta(PLAIN_TEXT_LIMIT_BYPASS_META, true)
+          .setContent(html)
+          .run();
         onChange(html);
         toast.success("Content generated successfully!");
       }
@@ -439,14 +469,9 @@ export function TiptapEditor({
     }
   };
 
-  const characterCount =
-    aiContext?.contentType === "footer"
-      ? toPlainText(editor?.getHTML() ?? "").length
-      : (editor?.getText().length ?? 0);
-  const wordCount =
-    aiContext?.contentType === "footer"
-      ? countWords(toPlainText(editor?.getHTML() ?? ""))
-      : (editor?.getText().split(/\s+/).filter(Boolean).length ?? 0);
+  const visibleText = toPlainText(editor?.getHTML() ?? "");
+  const characterCount = visibleText.length;
+  const wordCount = countWords(visibleText);
 
   if (!editor) {
     return null;
@@ -665,9 +690,11 @@ export function TiptapEditor({
         <span className={characterCount > maxLength ? "text-destructive" : ""}>
           {characterCount}/{maxLength} characters
         </span>
-        <span className={wordCount > maxWords ? "text-destructive" : ""}>
-          {wordCount}/{maxWords} words
-        </span>
+        {wordCap > 0 ? (
+          <span className={wordCount > wordCap ? "text-destructive" : ""}>
+            {wordCount}/{wordCap} words
+          </span>
+        ) : null}
       </div>
     </div>
   );

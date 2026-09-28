@@ -50,7 +50,7 @@ export const ONBOARDING_PREVIEW_EDITOR_TARGETS = {
   eventBanner: {
     step: 3,
     field: "event_banner_heading",
-    guidedSectionId: "banner",
+    guidedSectionId: "event-hero",
   },
   eventAbout: {
     step: 3,
