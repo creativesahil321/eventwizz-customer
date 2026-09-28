@@ -213,7 +213,7 @@ export function EventListingHorizontalScroll({
         ref={scrollContainerRef}
         style={slotStyle}
         className={cn(
-          "no-scrollbar relative z-[1] flex min-w-0 flex-1 cursor-grab select-none items-stretch gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain py-1 [-webkit-overflow-scrolling:touch] sm:gap-5",
+          "@container no-scrollbar relative z-[1] flex min-w-0 flex-1 cursor-grab select-none items-stretch gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain py-1 [-webkit-overflow-scrolling:touch] sm:gap-5",
           "snap-x snap-mandatory scroll-smooth",
           !showArrows && "justify-center",
         )}

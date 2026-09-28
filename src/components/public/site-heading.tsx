@@ -167,6 +167,10 @@ export function SiteHeading({
           !compactType && levelClass[level],
           baseColorClass,
           "px-[0.12em] py-[0.08em]",
+          // The glyph-safety padding pushed left-aligned titles ~3px right of
+          // their eyebrow / body text; pull back so the left edges line up.
+          align === "left" &&
+            (alignFromMd ? "md:-ml-[0.12em]" : "-ml-[0.12em]"),
           className,
           compactType,
         )}
@@ -188,6 +192,8 @@ export function SiteHeading({
             ? accentOnPhoto
             : accentSolidPrimary,
           "px-[0.2em] py-[0.1em]",
+          align === "left" &&
+            (alignFromMd ? "md:-ml-[0.2em]" : "-ml-[0.2em]"),
           className,
           compactType,
         )}
@@ -211,6 +217,8 @@ export function SiteHeading({
         headingLine,
         !compactType && levelClass[level],
         "py-[0.14em] pl-[0.12em] pr-[0.4em]",
+        (align ?? "left") === "left" &&
+          (alignFromMd ? "md:-ml-[0.12em]" : "-ml-[0.12em]"),
         className,
         compactType,
       )}

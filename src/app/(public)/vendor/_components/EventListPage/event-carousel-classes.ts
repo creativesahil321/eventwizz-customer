@@ -29,8 +29,16 @@ export const mobileEventRowPeekItemClass =
 export const mobileEventRowPeekScrollItemClass =
   "shrink-0 snap-center w-[min(19.5rem,calc(var(--event-scroll-slot,100%)-0.75rem))] sm:w-[min(20.5rem,calc(var(--event-scroll-slot,100%)-1rem))]";
 
+/**
+ * Many-event rows: phone keeps the one-card peek; from `sm` the cards divide
+ * the measured track (`--event-scroll-slot`) so only whole cards show — 2 / 3 / 4
+ * across. A fixed `xl:w-[280px]` left a half card clipped through its "View"
+ * button beside the arrow. Container queries (the track is `@container`) so the
+ * count follows the real track width — live, and inside preview device frames.
+ * Gap math matches the track (`gap-4 sm:gap-5`).
+ */
 export const eventListingManyScrollItemClass =
-  "shrink-0 snap-center w-[min(19.5rem,calc(var(--event-scroll-slot,100%)-0.75rem))] sm:w-[min(20rem,46%)] md:w-[min(18rem,32%)] lg:w-[min(16rem,24%)] xl:w-[280px]";
+  "shrink-0 snap-start w-[min(19.5rem,calc(var(--event-scroll-slot,100%)-0.75rem))] @lg:w-[calc((var(--event-scroll-slot,100%)-1.25rem)/2)] @3xl:w-[calc((var(--event-scroll-slot,100%)-2.5rem)/3)] @5xl:w-[calc((var(--event-scroll-slot,100%)-3.75rem)/4)]";
 
 /** Centered carousel-slide width for single-event hero sections (~65–70% of container). */
 export const singleEventShowcaseSlideClass =
