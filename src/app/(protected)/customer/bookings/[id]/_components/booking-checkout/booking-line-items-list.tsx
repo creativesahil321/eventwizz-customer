@@ -197,7 +197,7 @@ function LineItemRow({
             )
           }
           disabled={isDeleting}
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md disabled:opacity-50 hover:enabled:bg-[color-mix(in_srgb,var(--destructive,#dc2626)_10%,transparent)]"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md disabled:opacity-50 hover:enabled:bg-[color-mix(in_srgb,var(--destructive,#dc2626)_10%,transparent)]"
           style={lineDeleteStyle}
           title={`Remove ${item.name}`}
           aria-label={`Remove ${item.name}`}
@@ -237,7 +237,7 @@ function LineItemRow({
               </p>
               {item.isSavedAddon || item.isPaidAddonHistory ? (
                 <span
-                  className="rounded text-[9px] font-bold tracking-[0.04em] uppercase px-1.5 py-0.5"
+                  className="rounded text-[11px] font-bold tracking-[0.04em] uppercase px-1.5 py-0.5"
                   style={item.isPaidAddonHistory ? addonBadgePaidStyle : addonBadgeStyle}
                 >
                   Add-on
@@ -249,7 +249,7 @@ function LineItemRow({
               )}
               {item.quantity && item.quantity > 1 && variant !== "breakdown" && (
                 <span
-                  className="rounded text-[9px] font-bold uppercase px-1.5 py-0.5"
+                  className="rounded text-[11px] font-bold uppercase px-1.5 py-0.5"
                   style={qtyBadgeStyle}
                 >
                   ×{item.quantity}
@@ -269,7 +269,7 @@ function LineItemRow({
             {item.allocation.map((pill, pillIndex) => (
               <span
                 key={`${item.id}-alloc-${pill.id ?? pillIndex}`}
-                className="rounded-md px-2 py-[0.2rem] text-[10px] font-semibold text-muted-foreground"
+                className="rounded-md px-2 py-[0.2rem] text-[11px] font-semibold text-muted-foreground"
                 style={tableAllocationStyle}
               >
                 {pill.seatsLabel ?? `${pill.label}: ${pill.value}`}
@@ -516,7 +516,7 @@ function GroupedAddonRow({
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="mt-3.5 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[color-mix(in_srgb,var(--muted)_50%,transparent)]"
+          className="mt-2.5 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-[color-mix(in_srgb,var(--muted)_50%,transparent)]"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-label={
@@ -549,7 +549,7 @@ function GroupedAddonRow({
         </div>
       </div>
       {!expanded && members.length > 1 && (
-        <p className="mt-[-0.25rem] mb-2 ml-7 text-[10px] text-muted-foreground">
+        <p className="mt-[-0.25rem] mb-2 ml-7 text-[11px] text-muted-foreground">
           {members.length} items combined · select the arrow to view details
         </p>
       )}

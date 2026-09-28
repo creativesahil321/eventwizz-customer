@@ -151,6 +151,12 @@ export function TableSeatingPanel({
   const [seatingConfirmed, setSeatingConfirmed] = useState(false);
   /** Show Auto Distribute / Reset only after the user edits a table. */
   const [hasTouchedTables, setHasTouchedTables] = useState(false);
+  /**
+   * "How many guests?" is the one main control; tables are filled for the
+   * customer and shown as read-only rows. Per-table steppers only on request
+   * (2+ tables) — same pattern as public checkout.
+   */
+  const [isAdjusting, setIsAdjusting] = useState(false);
   const lastAppliedPlanRef = useRef<string>("");
 
   const belowMinimum = effectiveGroupSize > 0 && effectiveGroupSize < minPersons;
@@ -371,6 +377,11 @@ export function TableSeatingPanel({
     toast.success("Seating ready. Select Add to booking to save.");
   };
 
+  const canAdjustTables = tableQuantity > 1;
+  // Keep an invalid split fixable: open the controls automatically.
+  const showTableControls =
+    canAdjustTables && (isAdjusting || !validation.isValid);
+
   const showConfirmButton =
     effectiveGroupSize > 0 &&
     tableQuantity > 0 &&
@@ -383,7 +394,7 @@ export function TableSeatingPanel({
       {(sectionTitle || onClose) && (
         <div className="flex items-center justify-between gap-3 border-b border-border pb-2">
           {sectionTitle ? (
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--booking-kind-table)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--booking-kind-table)]">
               {sectionTitle}
             </p>
           ) : (
@@ -392,7 +403,7 @@ export function TableSeatingPanel({
           {onClose ? (
             <button
               type="button"
-              className="shrink-0 text-[10px] font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              className="inline-flex min-h-9 shrink-0 items-center px-1 text-xs font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               onClick={onClose}
             >
               Close
@@ -402,12 +413,13 @@ export function TableSeatingPanel({
       )}
       {!isControlledGroupSize && (
         <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
-          <span className="text-xs font-medium text-foreground">Group size</span>
+          <span className="text-sm font-semibold text-foreground">
+            How many guests?
+          </span>
           <QuantityStepper
             value={groupSize}
             max={maxGroupSize}
             onChange={(next) => setGroupSize(next)}
-            size="sm"
             useKindAccent
           />
         </div>
@@ -465,16 +477,17 @@ export function TableSeatingPanel({
                       ? `Table for ${maxPersons} guests`
                       : `Table for ${minPersons}–${maxPersons} guests`}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {tableQuantity} table{tableQuantity === 1 ? "" : "s"} ·{" "}
-                    {minPersons}–{maxPersons} per table · {maxTables} available
+                    {draftGuestTotal} guest{draftGuestTotal === 1 ? "" : "s"} ·{" "}
+                    {maxTables} available
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold tabular-nums text-foreground">
                     {formatCurrency(pricePerPerson * draftGuestTotal)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {formatUnit(pricePerPerson)}/person
                   </p>
                 </div>
@@ -485,7 +498,7 @@ export function TableSeatingPanel({
                   className={cn(
                     "h-full rounded-full transition-all duration-300",
                     validation.isValid
-                      ? "bg-emerald-500"
+                      ? "bg-[color:var(--color-primary)]"
                       : validation.totalAllocated > effectiveGroupSize
                         ? "bg-red-500"
                         : "bg-primary",
@@ -494,11 +507,11 @@ export function TableSeatingPanel({
                 />
               </div>
 
-              {hasTouchedTables ? (
+              {showTableControls && hasTouchedTables ? (
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <button
                     type="button"
-                    className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border-0 text-xs font-semibold leading-none transition-opacity hover:opacity-90 sm:w-auto sm:px-3"
+                    className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border-0 text-sm font-semibold leading-none transition-opacity hover:opacity-90 sm:h-9 sm:w-auto sm:px-3"
                     style={{
                       backgroundColor: "var(--color-primary)",
                       color: "var(--color-primary-foreground, #fff)",
@@ -510,7 +523,7 @@ export function TableSeatingPanel({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-xs font-semibold leading-none text-muted-foreground transition-colors hover:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))] sm:w-auto sm:px-3"
+                    className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-semibold leading-none text-muted-foreground transition-colors hover:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))] sm:w-auto sm:px-3"
                     onClick={handleReset}
                   >
                     <RotateCcw className="h-3 w-3" strokeWidth={2} />
@@ -521,14 +534,16 @@ export function TableSeatingPanel({
 
               <div
                 className={cn(
-                  "grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-4",
+                  "grid gap-2",
+                  showTableControls
+                    ? "grid-cols-1 min-[420px]:grid-cols-2"
+                    : "grid-cols-2 sm:grid-cols-3",
                   tableQuantity > 6 &&
                     "max-h-[min(50vh,420px)] overflow-y-auto overscroll-contain",
                 )}
               >
                 {Array.from({ length: tableQuantity }, (_, index) => {
                   const currentValue = activeAllocation[index] ?? minPersons;
-                  const isFull = currentValue >= maxPersons;
                   const isOverflow = currentValue > maxPersons;
                   const isUnder = currentValue < minPersons;
 
@@ -536,7 +551,7 @@ export function TableSeatingPanel({
                     <div
                       key={index}
                       className={cn(
-                        "min-w-0 rounded-lg border bg-card px-1.5 py-2 sm:px-2",
+                        "flex min-w-0 items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2",
                         isOverflow
                           ? "border-red-200"
                           : isUnder
@@ -544,65 +559,68 @@ export function TableSeatingPanel({
                             : "border-border",
                       )}
                     >
-                      <div className="mb-1 flex items-center justify-between gap-0.5">
-                        <span className="text-[8px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-muted-foreground">
                           Table {index + 1}
-                        </span>
-                        {isFull && !isOverflow && (
-                          <span className="text-[8px] font-bold uppercase text-emerald-600">
-                            Full
-                          </span>
-                        )}
+                        </p>
+                        <p
+                          className={cn(
+                            "text-sm font-bold tabular-nums",
+                            isOverflow
+                              ? "text-red-600"
+                              : isUnder
+                                ? "text-amber-600"
+                                : "text-foreground",
+                          )}
+                        >
+                          {currentValue} guest{currentValue === 1 ? "" : "s"}
+                        </p>
+                        {showTableControls ? (
+                          <p className="text-xs tabular-nums text-muted-foreground">
+                            {formatCurrency(pricePerPerson * currentValue)} · max{" "}
+                            {maxPersons}
+                          </p>
+                        ) : null}
                       </div>
 
-                      <div className="flex items-center justify-between gap-1">
-                        <div>
-                          <p
-                            className={cn(
-                              "text-lg font-bold tabular-nums leading-none",
-                              isOverflow
-                                ? "text-red-600"
-                                : isUnder
-                                  ? "text-amber-600"
-                                  : "text-foreground",
-                            )}
-                          >
-                            {currentValue}
-                          </p>
-                          <p className="mt-0.5 text-[8px] text-muted-foreground">
-                            {minPersons}–{maxPersons} guests
-                          </p>
-                          <p className="mt-1 text-[8px] font-semibold tabular-nums text-foreground">
-                            {formatCurrency(pricePerPerson * currentValue)}
-                          </p>
-                        </div>
-
-                        <div className="flex overflow-hidden rounded border border-border bg-muted/40">
+                      {showTableControls ? (
+                        <div className="flex shrink-0 items-center overflow-hidden rounded-lg border border-border bg-muted/40">
                           <button
                             type="button"
                             onClick={() => stepAllocation(index, -1)}
                             disabled={currentValue <= minPersons}
-                            className="flex h-6 w-6 items-center justify-center text-muted-foreground transition-colors hover:bg-background disabled:opacity-30"
+                            className="flex h-10 w-10 items-center justify-center text-foreground transition-colors hover:bg-background disabled:opacity-30"
                             aria-label={`Decrease guests at table ${index + 1}`}
                           >
-                            <Minus className="h-2.5 w-2.5" />
+                            <Minus className="h-4 w-4" />
                           </button>
-                          <div className="w-px bg-border" />
+                          <div className="h-6 w-px bg-border" />
                           <button
                             type="button"
                             onClick={() => stepAllocation(index, 1)}
                             disabled={currentValue >= maxPersons}
-                            className="flex h-6 w-6 items-center justify-center text-muted-foreground transition-colors hover:bg-background disabled:opacity-30"
+                            className="flex h-10 w-10 items-center justify-center text-foreground transition-colors hover:bg-background disabled:opacity-30"
                             aria-label={`Increase guests at table ${index + 1}`}
                           >
-                            <Plus className="h-2.5 w-2.5" />
+                            <Plus className="h-4 w-4" />
                           </button>
                         </div>
-                      </div>
+                      ) : null}
                     </div>
                   );
                 })}
               </div>
+
+              {canAdjustTables && validation.isValid ? (
+                <button
+                  type="button"
+                  onClick={() => setIsAdjusting((open) => !open)}
+                  className="inline-flex min-h-9 items-center self-start text-sm font-semibold text-[color:var(--color-primary)] underline-offset-2 hover:underline"
+                  aria-expanded={isAdjusting}
+                >
+                  {isAdjusting ? "Done adjusting" : "Adjust tables"}
+                </button>
+              ) : null}
 
               {showConfirmButton && (
                 <>
@@ -615,9 +633,9 @@ export function TableSeatingPanel({
                   </p>
                   <button
                     type="button"
-                    className="h-8 w-full rounded-md text-xs font-bold leading-none hover:opacity-[0.92]"
+                    className="h-11 w-full rounded-lg text-sm font-bold leading-none hover:opacity-[0.92]"
                     style={{
-                      backgroundColor: "var(--color-success)",
+                      backgroundColor: "var(--color-primary)",
                       color: "var(--color-primary-foreground, #fff)",
                     }}
                     onClick={handleConfirmSeating}

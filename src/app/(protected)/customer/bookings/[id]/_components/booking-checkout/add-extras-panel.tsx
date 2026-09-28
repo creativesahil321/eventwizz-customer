@@ -378,7 +378,7 @@ function NewTableSetupPrompt({
           {title}
         </p>
         {description ? (
-          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -537,7 +537,7 @@ function CatalogCard({
     >
       <p className="text-[13px] font-semibold leading-[1.35] text-foreground">{title}</p>
       {description && (
-        <p className="mt-0.5 text-[10px] leading-[1.4] text-muted-foreground line-clamp-2">
+        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground line-clamp-2">
           {description}
         </p>
       )}
@@ -548,7 +548,7 @@ function CatalogCard({
         {priceLabel}
       </p>
       {maxQuantity > 0 && (
-        <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">
+        <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
           {maxQuantity === 1 ? "1 available" : `${maxQuantity} available`}
         </p>
       )}
@@ -564,7 +564,7 @@ function CatalogCard({
             />
             <button
               type="button"
-              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[color-mix(in_srgb,var(--destructive,#dc2626)_10%,transparent)]"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[color-mix(in_srgb,var(--destructive,#dc2626)_10%,transparent)]"
               style={{ color: "var(--destructive, #dc2626)" }}
               onClick={() => onQuantityChange(0)}
               aria-label={`Remove ${title}`}
@@ -1915,7 +1915,7 @@ export function AddExtrasSection({
                       How many guests are you adding?
                     </p>
                     {guestAddPriceHintLabel ? (
-                      <p className="mt-[0.15rem] text-[10px] text-muted-foreground">
+                      <p className="mt-[0.15rem] text-[11px] text-muted-foreground">
                         {guestAddPriceHintLabel}
                       </p>
                     ) : null}
@@ -2049,7 +2049,7 @@ export function AddExtrasSection({
                       background: "color-mix(in srgb, var(--booking-kind-table) 5%, var(--card))",
                     }}
                   >
-                    <p className="m-0 text-[10px] font-bold tracking-[0.08em] uppercase text-muted-foreground">
+                    <p className="m-0 text-[11px] font-bold tracking-[0.08em] uppercase text-muted-foreground">
                       {showStuckPlacementHelp ? "Can't seat all guests" : "Quick options"}
                     </p>
                     {showStuckPlacementHelp && (
@@ -2112,7 +2112,7 @@ export function AddExtrasSection({
                   tableConfig && (
                   <div className="flex flex-col gap-2">
                     {newTablePanelMessage ? (
-                      <p className="text-[10px] font-medium leading-snug text-muted-foreground">
+                      <p className="text-[11px] font-medium leading-snug text-muted-foreground">
                         {newTablePanelMessage}
                       </p>
                     ) : null}

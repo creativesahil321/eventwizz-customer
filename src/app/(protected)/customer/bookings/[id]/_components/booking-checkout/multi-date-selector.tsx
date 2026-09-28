@@ -104,18 +104,18 @@ function DateCardGridItem({
           </p>
         )}
         {hasRescheduleRequest && (
-          <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+          <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
             <RotateCcw className="h-2.5 w-2.5" />
             Reschedule due
           </span>
         )}
         <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Total
             </p>
             {card.savedAmount != null ? (
-              <p className="mt-0.5 text-[10px] font-semibold text-emerald-700">
+              <p className="mt-0.5 text-[11px] font-semibold text-emerald-700">
                 You saved {formatCurrency(card.savedAmount)}
               </p>
             ) : null}
@@ -126,7 +126,7 @@ function DateCardGridItem({
           <div className="shrink-0 text-right">
             {isFullyPaid ? (
               <>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-[#16a34a]">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#16a34a]">
                   Paid
                 </p>
                 <p className="mt-0.5 text-base font-bold leading-none text-[#16a34a]">
@@ -135,7 +135,7 @@ function DateCardGridItem({
               </>
             ) : pendingDue > 0 ? (
               <>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-[#ea580c]">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#ea580c]">
                   Due
                 </p>
                 <p className="mt-0.5 text-base font-bold leading-none text-[#ea580c]">
@@ -144,7 +144,7 @@ function DateCardGridItem({
               </>
             ) : (
               <>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Paid
                 </p>
                 <p className="mt-0.5 text-base font-bold leading-none text-muted-foreground">
@@ -240,13 +240,13 @@ function DateStripPill({
         </p>
       )}
       {hasRescheduleRequest && (
-        <span className="mt-1 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800">
+        <span className="mt-1 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[11px] font-semibold text-amber-800">
           <RotateCcw className="h-2 w-2" />
           Due
         </span>
       )}
       <div className="mt-2 flex items-baseline justify-between gap-2">
-        <span className="text-[10px] font-semibold text-muted-foreground">
+        <span className="text-[11px] font-semibold text-muted-foreground">
           {card.savedAmount != null ? (
             <>
               <span className="font-bold text-foreground">
@@ -262,7 +262,7 @@ function DateStripPill({
         </span>
         <span
           className={cn(
-            "text-[10px] font-bold",
+            "text-[11px] font-bold",
             isFullyPaid ? "text-[#16a34a]" : pendingDue > 0 ? "text-[#ea580c]" : "text-muted-foreground",
           )}
         >
@@ -308,7 +308,7 @@ function SelectedDateActionBar({
           />
         )}
         {hasRescheduleRequest && (
-          <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+          <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
             <RotateCcw className="h-2.5 w-2.5" />
             Reschedule payment due
           </span>

@@ -336,10 +336,10 @@ export function VendorBookingCheckoutPage({
       className="w-full min-w-0 lg:!pb-0"
       style={
         {
-          "--booking-kind-table": "var(--color-info)",
-          "--booking-kind-ticket": "var(--chart-3)",
-          "--booking-kind-package": "var(--color-success)",
-          "--booking-kind-addon": "var(--color-warning)",
+          "--booking-kind-table": "var(--color-primary)",
+          "--booking-kind-ticket": "var(--color-primary)",
+          "--booking-kind-package": "var(--color-primary)",
+          "--booking-kind-addon": "var(--color-primary)",
           paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
         } as CSSProperties
       }
@@ -442,7 +442,7 @@ export function VendorBookingCheckoutPage({
         </div>
 
         <section className="border-b border-border p-4 sm:p-6 lg:p-8">
-          <p className="mb-3 text-[10px] font-bold tracking-[0.18em] leading-none uppercase text-muted-foreground">
+          <p className="mb-3 text-[11px] font-bold tracking-[0.18em] leading-none uppercase text-muted-foreground">
             {hasMultipleDates
               ? `Dates${dateCards.length > 1 ? ` · ${dateCards.length}` : ""}`
               : "Event date"}
@@ -461,7 +461,7 @@ export function VendorBookingCheckoutPage({
           {canUpdateBooking && checkout.dates.length > 0 ? (
             <div className="mt-4 overflow-hidden rounded-xl border border-border bg-card">
               {hasMultipleDates ? (
-                <p className="border-b border-border bg-muted/30 px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground sm:px-5">
+                <p className="border-b border-border bg-muted/30 px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground sm:px-5">
                   Payment status by date
                 </p>
               ) : null}
@@ -584,7 +584,7 @@ export function VendorBookingCheckoutPage({
           </div>
         ) : null}
         <div className="flex items-center justify-between gap-3 border-b border-border bg-card p-4 py-3 pr-14 sm:p-6 sm:pr-6 lg:p-8 lg:pr-8 sm:py-3.5">
-          <p className="text-[10px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">
+          <p className="text-[11px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">
             Payment Summary
           </p>
           <button
@@ -630,7 +630,7 @@ export function VendorBookingCheckoutPage({
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p
-                  className="text-[10px] font-bold tracking-[0.18em] leading-none uppercase"
+                  className="text-[11px] font-bold tracking-[0.18em] leading-none uppercase"
                   style={{
                     color:
                       "color-mix(in srgb, var(--card) 62%, transparent)",

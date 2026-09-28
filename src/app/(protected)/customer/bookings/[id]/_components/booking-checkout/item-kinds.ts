@@ -83,7 +83,7 @@ export function getKindStyles(kind: LineItemKind) {
     chipSmClassName: "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
     iconSmClassName: "h-3.5 w-3.5 shrink-0",
     badgeClassName: cn(
-      "rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+      "rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide",
     ),
     sectionClassName: "text-[13px] font-extrabold tracking-[0.07em] leading-[1.25] uppercase",
   };

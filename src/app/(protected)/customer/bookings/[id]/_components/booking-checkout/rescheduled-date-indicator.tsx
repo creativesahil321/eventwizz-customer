@@ -32,7 +32,7 @@ export function RescheduledDateIndicator({
     return (
       <div
         className={cn(
-          "mt-1.5 flex flex-wrap items-center gap-1 text-[10px] leading-snug",
+          "mt-1.5 flex flex-wrap items-center gap-1 text-[11px] leading-snug",
           className,
         )}
       >

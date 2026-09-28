@@ -86,7 +86,7 @@ export default function AllergenSection({
           <Shield className="h-4 w-4" />
           Add Allergens & Dietary
           {count > 0 && (
-            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 text-[10px] font-bold rounded-full bg-indigo-600 text-white">
+            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 text-[11px] font-bold rounded-full bg-indigo-600 text-white">
               {count}
             </span>
           )}

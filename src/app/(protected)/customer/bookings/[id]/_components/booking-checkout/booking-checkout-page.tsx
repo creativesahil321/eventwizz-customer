@@ -595,10 +595,10 @@ export default function BookingCheckoutPage({
       className="w-full min-w-0 lg:!pb-0"
       style={
         {
-          "--booking-kind-table": "var(--color-info)",
-          "--booking-kind-ticket": "var(--chart-3)",
-          "--booking-kind-package": "var(--color-success)",
-          "--booking-kind-addon": "var(--color-warning)",
+          "--booking-kind-table": "var(--color-primary)",
+          "--booking-kind-ticket": "var(--color-primary)",
+          "--booking-kind-package": "var(--color-primary)",
+          "--booking-kind-addon": "var(--color-primary)",
           paddingBottom: showPaymentFooter
             ? "calc(4.75rem + max(0.75rem, env(safe-area-inset-bottom, 0px)))"
             : "max(1rem, env(safe-area-inset-bottom, 0px))",
@@ -652,7 +652,7 @@ export default function BookingCheckoutPage({
                     {rescheduleStatus && (
                       <>
                         <span className="text-muted-foreground/50">·</span>
-                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
                           <RotateCcw className="h-3 w-3" />
                           Reschedule payment pending
                         </span>
@@ -698,7 +698,7 @@ export default function BookingCheckoutPage({
 
         {/* Dates selector */}
         <section className="border-b border-border p-4 sm:p-6 lg:p-8">
-          <p className="mb-3 text-[10px] font-bold tracking-[0.18em] leading-none uppercase text-muted-foreground">
+          <p className="mb-3 text-[11px] font-bold tracking-[0.18em] leading-none uppercase text-muted-foreground">
             {hasMultipleDates
               ? `Dates${dateCards.length > 1 ? ` · ${dateCards.length}` : ""}`
               : "Event date"}
@@ -802,7 +802,7 @@ export default function BookingCheckoutPage({
           </div>
         ) : null}
         <div className="flex items-center justify-between gap-3 border-b border-border bg-card p-4 py-3 pr-14 sm:p-6 sm:pr-6 lg:p-8 lg:pr-8 sm:py-3.5">
-          <p className="text-[10px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">
+          <p className="text-[11px] font-extrabold tracking-[0.18em] leading-none uppercase text-foreground">
             Payment Summary
           </p>
           <button
@@ -873,7 +873,7 @@ export default function BookingCheckoutPage({
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p
-                  className="text-[10px] font-bold tracking-[0.18em] leading-none uppercase"
+                  className="text-[11px] font-bold tracking-[0.18em] leading-none uppercase"
                   style={{
                     color: "color-mix(in srgb, var(--card) 62%, transparent)",
                   }}
@@ -955,7 +955,7 @@ export default function BookingCheckoutPage({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p
-                className="text-[10px] font-bold tracking-[0.18em] leading-none uppercase"
+                className="text-[11px] font-bold tracking-[0.18em] leading-none uppercase"
                 style={{
                   color: "color-mix(in srgb, var(--card) 62%, transparent)",
                 }}

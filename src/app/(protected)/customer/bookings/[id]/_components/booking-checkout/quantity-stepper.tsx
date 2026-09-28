@@ -25,8 +25,9 @@ export function QuantityStepper({
   useKindAccent = false,
 }: QuantityStepperProps) {
   const btnSize =
-    size === "sm" ? "h-6 w-6 rounded-md" : "h-8 w-8 rounded-lg";
-  const iconSize = size === "sm" ? "h-2.5 w-2.5" : "h-3.5 w-3.5";
+    // Phone-first touch targets (were 24px / 32px).
+    size === "sm" ? "h-9 w-9 rounded-md" : "h-10 w-10 rounded-lg";
+  const iconSize = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
 
   const canDecrease = value > min;
   const canIncrease = max === undefined || value < max;

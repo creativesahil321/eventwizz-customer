@@ -385,7 +385,7 @@ export function ExistingTablesPlacedSummary({
     <div className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-extrabold tracking-[0.14em] uppercase text-muted-foreground">Existing tables</p>
+          <p className="text-[11px] font-extrabold tracking-[0.14em] uppercase text-muted-foreground">Existing tables</p>
           <p className="mt-1 text-[11px] font-medium leading-[1.35] text-muted-foreground">
             {snapshot.totalAdded} guest
             {snapshot.totalAdded === 1 ? "" : "s"} added to your booked tables
@@ -415,12 +415,12 @@ export function ExistingTablesPlacedSummary({
                   <p className="text-[0.8125rem] font-bold text-foreground">
                     {slot.label}
                   </p>
-                  <p className="mt-[0.15rem] text-[10px] text-muted-foreground">
+                  <p className="mt-[0.15rem] text-[11px] text-muted-foreground">
                     {effectiveOccupied} / {slot.capacity} seats occupied
                   </p>
                 </div>
                 <span
-                  className="rounded text-[9px] font-bold uppercase px-1.5 py-0.5"
+                  className="rounded text-[11px] font-bold uppercase px-1.5 py-0.5"
                   style={{
                     background: "color-mix(in srgb, var(--color-success) 14%, var(--card))",
                     color: "var(--color-success)",
@@ -671,7 +671,7 @@ export function FillExistingTablesPanel({
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-extrabold tracking-[0.14em] uppercase text-muted-foreground">
+          <p className="text-[11px] font-extrabold tracking-[0.14em] uppercase text-muted-foreground">
             {optional ? "Fill existing tables (optional)" : "Fill existing tables"}
           </p>
           {optional && (
@@ -683,7 +683,7 @@ export function FillExistingTablesPanel({
         {canAutoFillExisting && (
           <button
             type="button"
-            className="shrink-0 mt-0.5 rounded-full px-[0.625rem] py-1 text-[10px] font-bold"
+            className="shrink-0 mt-0.5 rounded-full px-[0.625rem] py-1 text-[11px] font-bold"
             style={{
               background: "color-mix(in srgb, var(--color-success) 14%, var(--card))",
               color: "var(--color-success)",
@@ -718,12 +718,12 @@ export function FillExistingTablesPanel({
                   <p className="text-[0.8125rem] font-bold text-foreground">
                     {slot.label}
                   </p>
-                  <p className="mt-[0.15rem] text-[10px] text-muted-foreground">
+                  <p className="mt-[0.15rem] text-[11px] text-muted-foreground">
                     {effectiveOccupied} / {slot.capacity} seats occupied
                   </p>
                 </div>
                 <span
-                  className="rounded text-[9px] font-bold uppercase px-1.5 py-0.5"
+                  className="rounded text-[11px] font-bold uppercase px-1.5 py-0.5"
                   style={isFull ? {
                     background: "color-mix(in srgb, var(--muted) 50%, var(--card))",
                     color: "var(--muted-foreground)",
@@ -758,13 +758,13 @@ export function FillExistingTablesPanel({
 
               {isPhysicallyFull ? (
                 added > 0 ? (
-                  <p className="mt-[0.625rem] text-[10px] font-semibold text-muted-foreground">
+                  <p className="mt-[0.625rem] text-[11px] font-semibold text-muted-foreground">
                     +{added} · {formatCurrency(added * slot.pricePerPerson)}
                   </p>
                 ) : null
               ) : (
                 <div className="mt-[0.625rem] flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-semibold text-muted-foreground">
+                  <span className="text-[11px] font-semibold text-muted-foreground">
                     {added > 0
                       ? `+${added} · ${formatCurrency(added * slot.pricePerPerson)}`
                       : "No guests added"}
@@ -790,7 +790,7 @@ export function FillExistingTablesPanel({
               {guestsToAdd === 1 ? "" : "s"} placed
             </span>
             {unplacedGuests > 0 && totalAdded > 0 && (
-              <p className="mt-1 text-[10px] font-semibold leading-[1.4] text-[#b45309]">
+              <p className="mt-1 text-[11px] font-semibold leading-[1.4] text-[#b45309]">
                 {unplacedGuests} guest{unplacedGuests === 1 ? "" : "s"} remaining
                 {canPlaceRemainingOnNewTable
                   ? " — you can add a new table below."
