@@ -345,9 +345,11 @@ export function EventHeroBand({
           ) : null}
           {hasMeta ? (
             <div
-              className={heroBannerContactRowClass(bannerAlign, {
-                fromMd: true,
-              })}
+              className={cn(
+                heroBannerContactRowClass(bannerAlign, { fromMd: true }),
+                "max-sm:hidden",
+                previewNarrow && "hidden",
+              )}
             >
               {metaDate ? (
                 <HeroMetaItem
