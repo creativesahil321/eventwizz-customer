@@ -1,5 +1,6 @@
 "use client";
 
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm, useFieldArray, Resolver, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -604,7 +605,7 @@ export default function DrinksTab() {
                         Description <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input
+                        <LongTextInput
                           {...field}
                           placeholder="e.g. Please note: Special terms and conditions apply..."
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
@@ -730,7 +731,7 @@ export default function DrinksTab() {
                             Package Description
                           </FormLabel>
                           <FormControl>
-                            <Input
+                            <LongTextInput
                               {...field}
                               placeholder="e.g. Includes premium access and special amenities…"
                               className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"

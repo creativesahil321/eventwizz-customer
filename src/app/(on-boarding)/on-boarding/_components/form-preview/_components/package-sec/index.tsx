@@ -110,7 +110,7 @@ export default function PackageSection({
   const useThreeColumns = details.length >= 12;
 
   return (
-    <section className={cn("w-full bg-[var(--color-background)] px-4", PUBLIC_SECTION_PY_CLASS, "@max-5xl/preview:!py-12")}>
+    <section className={cn("w-full bg-[var(--color-background)] px-4", PUBLIC_SECTION_PY_CLASS)}>
       <div className="container mx-auto max-w-7xl">
         <div
           className={cn(

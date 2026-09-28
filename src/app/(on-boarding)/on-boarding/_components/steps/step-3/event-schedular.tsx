@@ -124,7 +124,7 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
       {fields.map((fieldItem, index) => (
         <div
           key={fieldItem.id}
-          className="flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-4"
+          className="flex flex-wrap items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4"
         >
           <FormField
             control={control}
@@ -133,7 +133,7 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
               const currentLength = field.value?.length || 0;
               const maxLength = 40;
               return (
-                <FormItem className="flex-1">
+                <FormItem className="basis-full">
                   <FormControl>
                     <div>
                       <Input
@@ -178,7 +178,7 @@ const EventScheduler: React.FC<EventSchedulerProps> = ({
             control={control}
             name={`event_schedular.${index}.time`}
             render={({ field }) => (
-              <FormItem className="flex-1">
+              <FormItem className="w-36 shrink-0">
                 <FormControl>
                   <Input
                     type="time"

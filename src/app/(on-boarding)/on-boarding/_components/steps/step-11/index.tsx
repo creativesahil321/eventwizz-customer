@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyInvalidOnboardingFields } from "../../../_lib/notify-invalid-onboarding-fields";
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useForm, useWatch } from "react-hook-form";
@@ -485,7 +486,7 @@ export default function StepEleven() {
                           !selectedDomain ||
                           !form.watch("confirm_domain")
                         }
-                        onContinue={() => void form.handleSubmit(onSubmit)()}
+                        onContinue={() => void form.handleSubmit(onSubmit, notifyInvalidOnboardingFields)()}
                         primaryButtonClassName="h-12 px-10"
                       />
                       {!selectedDomain && (

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, lazy, Suspense, useState, useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useFormContext } from "../form-provider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +12,12 @@ import { Button } from "@/components/ui/button";
 import { ChevronsLeftRight } from "lucide-react";
 import { useWatch } from "react-hook-form";
 
+/**
+ * Fade the new step in. Keyed so each step mounts fresh; deliberately no
+ * `AnimatePresence` exit — with the split layout staying mounted across steps,
+ * `mode="wait"` could stall on the old step's exit and leave the previous
+ * step's form on screen while the stepper and preview had moved on.
+ */
 function StepTransition({
   stepKey,
   children,
@@ -20,18 +26,15 @@ function StepTransition({
   children: React.ReactNode;
 }) {
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={stepKey}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-        className="w-full min-w-0"
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <motion.div
+      key={stepKey}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className="w-full min-w-0"
+    >
+      {children}
+    </motion.div>
   );
 }
 

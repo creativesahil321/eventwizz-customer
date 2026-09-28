@@ -1,4 +1,5 @@
 "use client";
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, {
   useState,
   useEffect,
@@ -61,7 +62,7 @@ import {
   useRoomManager,
 } from "../../rooms/use-room-manager";
 import { hasMeaningfulVendorDates } from "@/app/(protected)/vendor/events/_lib/vendor-step-three-rooms";
-import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
+import { focusNextIncompleteOnboardingRoom, onboardingRoomSaveLabel } from "../../../_lib/onboarding-multi-room-progress";
 import { EventDateInput } from "@/components/event-date-input";
 import {
   hasEventDateOrderChanged,
@@ -72,7 +73,7 @@ import {
   getTodayLocalDateString,
 } from "@/lib/min-event-date";
 
-// Helper function to format date consistently as DD-MM-YYYY
+// Date row header label, e.g. "Sun, 14 Feb 2027"
 const formatDateDisplay = (dateString: string | undefined | null): string => {
   if (!dateString) return "New Date";
 
@@ -85,12 +86,13 @@ const formatDateDisplay = (dateString: string | undefined | null): string => {
       return "New Date";
     }
 
-    // Format as DD-MM-YYYY
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-
-    return `${day}-${month}-${year}`;
+    // Readable UK label, e.g. "Sun, 14 Feb 2027" (was "14-02-2027").
+    return date.toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   } catch (error) {
     console.error("Error formatting date:", error);
     return "New Date";
@@ -775,7 +777,7 @@ export default function StepFive() {
                               Description
                             </FormLabel>
                             <FormControl>
-                              <Input
+                              <LongTextInput
                                 placeholder="e.g. Access to all areas"
                                 {...field}
                                 className="w-full h-11 bg-white/5 border-white/10"
@@ -1917,7 +1919,7 @@ export default function StepFive() {
                     alwaysShowReadyLabel={roomScope.isMultiRoom}
                     labelWhenReady={
                       roomScope.isMultiRoom
-                        ? "Apply to this room only"
+                        ? onboardingRoomSaveLabel(rooms, "dates", currentRoomIndex)
                         : "Save & continue"
                     }
                     onContinue={() => void handleSubmit()}

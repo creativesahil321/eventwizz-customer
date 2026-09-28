@@ -8,7 +8,11 @@ import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import type { EventRoomChooserItem } from "@/lib/event-room-chooser-item";
 import { previewGridCols1UntilMd } from "@/lib/preview-container-layout";
-import { PUBLIC_MOTION_DURATION_MEDIUM, PUBLIC_MOTION_EASE } from "@/lib/public-rhythm";
+import {
+  PUBLIC_MOTION_DURATION_MEDIUM,
+  PUBLIC_MOTION_EASE,
+  PUBLIC_SECTION_PY_CLASS,
+} from "@/lib/public-rhythm";
 
 type EventRoomChooserProps = {
   rooms: EventRoomChooserItem[];
@@ -53,7 +57,8 @@ export function EventRoomChooser({
     <section
       aria-label="Choose your room"
       className={cn(
-        "w-full bg-[var(--color-background)] px-4 py-16 md:py-20",
+        "w-full bg-[var(--color-background)] px-4",
+        PUBLIC_SECTION_PY_CLASS,
         className,
       )}
     >

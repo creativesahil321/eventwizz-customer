@@ -1,5 +1,6 @@
 "use client";
 
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import { SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { CircleChevronLeft, CircleChevronRight } from "lucide-react";
 import {
@@ -445,7 +446,7 @@ function AlreadyBookedLogin({
       Already booked?{" "}
       <button
         type="button"
-        className="font-medium text-[var(--color-text)] underline decoration-[color:color-mix(in_srgb,var(--color-text)_35%,transparent)] underline-offset-4 hover:decoration-[var(--color-primary)]"
+        className="inline-flex min-h-9 items-center font-medium text-[var(--color-text)] underline decoration-[color:color-mix(in_srgb,var(--color-text)_35%,transparent)] underline-offset-4 hover:decoration-[var(--color-primary)]"
         onClick={onLogin}
       >
         Log in
@@ -546,7 +547,7 @@ export default function DatesSection({
     : "text-xs text-white/70 sm:text-sm";
   const sectionClass = cn(
     "relative w-full bg-transparent text-[var(--color-text)]",
-    narrowPreview ? "py-4" : "py-4 sm:py-6",
+    PUBLIC_SECTION_PY_CLASS,
   );
   const headingClass = "mb-0 !block !w-full";
   const headerWrapClass = cn(

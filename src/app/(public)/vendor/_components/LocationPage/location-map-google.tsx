@@ -1,12 +1,12 @@
 /// <reference types="google.maps" />
 "use client";
 
+import { loadGoogleMaps as loadGoogleMapsApi } from "@/lib/load-google-maps";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { VenueLocation } from "@/types/api.types";
 import { LocationData } from "@/types/theme.types";
 import { motion } from "framer-motion";
 import { LayoutGrid, Maximize2 } from "lucide-react";
-import { env } from "@/env";
 import { useTheme } from "@/providers/theme-provider/ThemeContext";
 import {
   getAnchorColor,
@@ -435,44 +435,18 @@ export default function GoogleLocationMap({
   // Initialize Google Maps
   useEffect(() => {
     const initGeneration = ++mapInitGenerationRef.current;
-    let removeExistingScriptListener: (() => void) | undefined;
 
-    const loadGoogleMaps = () => {
-      const existingScript = document.querySelector(
-        `script[src*="maps.googleapis.com"]`
-      );
-
-      if (window.google && window.google.maps) {
+    loadGoogleMapsApi()
+      .then(() => {
         void initializeMap(initGeneration);
-      } else if (existingScript) {
-        const handleLoad = () => {
-          void initializeMap(initGeneration);
-        };
-        existingScript.addEventListener("load", handleLoad);
-        removeExistingScriptListener = () => {
-          existingScript.removeEventListener("load", handleLoad);
-        };
-      } else {
-        const script = document.createElement("script");
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&v=weekly`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-          void initializeMap(initGeneration);
-        };
-        script.onerror = () => {
-          if (mapInitGenerationRef.current !== initGeneration) return;
-          setError("Failed to load Google Maps. Please check your API key.");
-          setIsLoading(false);
-        };
-        document.head.appendChild(script);
-      }
-    };
-
-    loadGoogleMaps();
+      })
+      .catch(() => {
+        if (mapInitGenerationRef.current !== initGeneration) return;
+        setError("Failed to load Google Maps. Please check your API key.");
+        setIsLoading(false);
+      });
 
     return () => {
-      removeExistingScriptListener?.();
       markersRef.current.forEach((marker) => {
         marker.map = null;
       });

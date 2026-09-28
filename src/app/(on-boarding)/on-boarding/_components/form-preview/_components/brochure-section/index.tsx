@@ -1,5 +1,6 @@
 "use client";
 
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import LocationMap from "./location-map";
 import { cn } from "@/lib/utils";
@@ -45,7 +46,7 @@ export default function BrochureSection({
   };
 
   return (
-    <section className="bg-[color:var(--color-background)] px-4 py-16 @max-md/preview:!py-16">
+    <section className={cn("bg-[color:var(--color-background)] px-4", PUBLIC_SECTION_PY_CLASS)}>
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 space-y-3 text-center @max-md/preview:!mb-8 @max-md/preview:!space-y-3">
           <p className={SECTION_EYEBROW_CLASS}>

@@ -4,9 +4,12 @@ import { cn } from "@/lib/utils";
 export const PUBLIC_SECTION_PY_CLASS =
   "py-12 md:py-16 @max-md/preview:!py-12";
 
-/** Location event listings — live phone `py-16`, tablet+ `md:py-28`. */
-export const PUBLIC_EVENT_LIST_PY_CLASS =
-  "py-16 md:py-28 @max-md/preview:!py-16";
+/**
+ * Location event listings — same rhythm as every other section (48px / 64px).
+ * Was `py-16 md:py-28` (112px each side on desktop), which left 224px gaps
+ * between listings and made the location page feel emptier than event pages.
+ */
+export const PUBLIC_EVENT_LIST_PY_CLASS = PUBLIC_SECTION_PY_CLASS;
 
 /** Standard content width + horizontal gutters. */
 export const PUBLIC_SECTION_CONTAINER_CLASS =

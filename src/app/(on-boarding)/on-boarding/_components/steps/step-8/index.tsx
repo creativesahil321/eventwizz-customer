@@ -1,5 +1,7 @@
 "use client";
 
+import { notifyInvalidOnboardingFields } from "../../../_lib/notify-invalid-onboarding-fields";
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -56,7 +58,7 @@ import {
   normalizeDrinksOptionFlag,
   resolveDrinksOptionFlag,
 } from "@/app/(protected)/vendor/events/_lib/vendor-step-six-rooms";
-import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
+import { focusNextIncompleteOnboardingRoom, onboardingRoomSaveLabel } from "../../../_lib/onboarding-multi-room-progress";
 
 export default function StepEight() {
   const currencySymbol = useCurrencySymbol();
@@ -467,9 +469,9 @@ export default function StepEight() {
                       loading={loading}
                       alwaysShowReadyLabel={isMultiRoom}
                       labelWhenReady={
-                        isMultiRoom ? "Apply to this room only" : "Save & continue"
+                        isMultiRoom ? onboardingRoomSaveLabel(rooms, "drinks", currentRoomIndex) : "Save & continue"
                       }
-                      onContinue={() => void form.handleSubmit(onSubmit)()}
+                      onContinue={() => void form.handleSubmit(onSubmit, notifyInvalidOnboardingFields)()}
                       extraActions={
                         canShowApplyToAllButton(rooms, canApplyToAllRooms) ? (
                           <Button
@@ -477,8 +479,7 @@ export default function StepEight() {
                             type="button"
                             onClick={() =>
                               void form.handleSubmit((payload) =>
-                                submitStepEight(payload, true),
-                              )()
+                                submitStepEight(payload, true), notifyInvalidOnboardingFields)()
                             }
                             className={guidedOnboardingSkipButtonClass}
                           >
@@ -658,7 +659,7 @@ export default function StepEight() {
                             return (
                               <FormItem className="mt-2">
                                 <FormControl>
-                                  <Input
+                                  <LongTextInput
                                     {...field}
                                     placeholder="e.g. Please note: Special terms and conditions apply..."
                                     className="h-10 bg-white/5 border-white/10"
@@ -785,7 +786,7 @@ export default function StepEight() {
                                         Extra description
                                       </FormLabel>
                                       <FormControl>
-                                        <Input
+                                        <LongTextInput
                                           {...field}
                                           placeholder="e.g. Includes premium access, special amenities..."
                                           className="h-10 bg-white/5 border-white/10"

@@ -611,7 +611,7 @@ export default function StepOne() {
                                   />
                                 )}
                               </FormControl>
-                              <p className="text-xs text-[color:var(--color-primary)] mt-1 font-medium">
+                              <p className="text-xs text-muted-foreground mt-1">
                                 {isBrandMode
                                   ? "ⓘ Type your trading or brand name — it does not need to match a Google listing."
                                   : "ⓘ Only verified venues from Google Places can be selected"}
@@ -658,7 +658,7 @@ export default function StepOne() {
                           "pointer-events-none",
                       )}
                     >
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+                      <div className="grid grid-cols-2 items-start gap-x-8 gap-y-6">
                         <FormField
                           control={form.control}
                           name="contact_number"

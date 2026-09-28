@@ -1,5 +1,6 @@
 "use client";
 
+import { LongTextInput } from "@/components/ui/long-text-input";
 import { BANNER_HEADING_MAX_CHARS } from "@/lib/hero-copy-limits";
 import { useEffect, useState } from "react";
 import { useFormContext } from "react-hook-form";
@@ -186,7 +187,7 @@ export function MainLandingPageSection({
                 <FormItem>
                   <FormLabel>Main page subheading</FormLabel>
                   <FormControl>
-                    <Input
+                    <LongTextInput
                       placeholder="Discover verified venues and curated events in your area."
                       disabled={readOnly}
                       {...field}
@@ -309,7 +310,7 @@ export function MainLandingPageSection({
                 <FormItem>
                   <FormLabel>Locations list subtitle</FormLabel>
                   <FormControl>
-                    <Input
+                    <LongTextInput
                       placeholder="Tap a city to see all upcoming events"
                       disabled={readOnly}
                       {...field}

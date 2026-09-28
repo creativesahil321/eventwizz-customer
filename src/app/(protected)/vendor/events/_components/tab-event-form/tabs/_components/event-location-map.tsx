@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { env } from "@/env";
 import {
   isCoarseUkFallbackPin,
   isUnusableMapPin,
@@ -9,10 +8,7 @@ import {
   shouldRefreshMapForAddress,
   type MapLatLng,
 } from "@/lib/sync-event-location-map";
-import {
-  isGoogleMapsApiReady,
-  resolveGoogleMapsLoadAction,
-} from "@/lib/google-maps-ready";
+import { loadGoogleMaps } from "@/lib/load-google-maps";
 import {
   isWithinVenueArea,
   venueAreaBoundsLiteral,
@@ -521,10 +517,6 @@ export default function EventLocationMap({
     let isMounted = true;
     let timeoutId: NodeJS.Timeout | null = null;
 
-    const existingScript = document.querySelector(
-      `script[src*="maps.googleapis.com/maps/api/js"]`,
-    );
-
     const initializeMapCallback = () => {
       if (!isMounted) return;
 
@@ -544,50 +536,16 @@ export default function EventLocationMap({
       tryInitialize();
     };
 
-    const loadAction = resolveGoogleMapsLoadAction({
-      hasMapsApi: isGoogleMapsApiReady(),
-      scriptExists: Boolean(existingScript),
-      scriptMarkedLoaded:
-        existingScript?.getAttribute("data-loaded") === "true",
-    });
-
-    if (loadAction === "init") {
-      initializeMapCallback();
-    } else if (loadAction === "wait-script" && existingScript) {
-      const handleLoad = () => {
-        existingScript.setAttribute("data-loaded", "true");
+    loadGoogleMaps()
+      .then(() => {
         if (isMounted) initializeMapCallback();
-      };
-      existingScript.addEventListener("load", handleLoad);
-      const pollId = window.setInterval(() => {
-        if (!isGoogleMapsApiReady()) return;
-        window.clearInterval(pollId);
-        existingScript.setAttribute("data-loaded", "true");
-        if (isMounted) initializeMapCallback();
-      }, 150);
-      return () => {
-        isMounted = false;
-        if (timeoutId) clearTimeout(timeoutId);
-        window.clearInterval(pollId);
-        existingScript.removeEventListener("load", handleLoad);
-      };
-    } else {
-      const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        script.setAttribute("data-loaded", "true");
-        if (isMounted) initializeMapCallback();
-      };
-      script.onerror = () => {
+      })
+      .catch(() => {
         if (isMounted) {
           setError("Failed to load Google Maps. Please refresh the page.");
           setIsLoading(false);
         }
-      };
-      document.head.appendChild(script);
-    }
+      });
 
     return () => {
       isMounted = false;

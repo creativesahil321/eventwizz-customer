@@ -1,5 +1,7 @@
 "use client";
 
+import { notifyInvalidOnboardingFields } from "../../../_lib/notify-invalid-onboarding-fields";
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -236,7 +238,7 @@ export default function StepNine() {
                       guided={guided}
                       loading={loading}
                       labelWhenReady="Save & continue"
-                      onContinue={() => void form.handleSubmit(onSubmit)()}
+                      onContinue={() => void form.handleSubmit(onSubmit, notifyInvalidOnboardingFields)()}
                       extraActions={
                         <Button
                           variant="event-outline"
@@ -291,7 +293,7 @@ export default function StepNine() {
                                         Question {index + 1}
                                       </FormLabel>
                                       <FormControl>
-                                        <Input
+                                        <LongTextInput
                                           {...field}
                                           placeholder="e.g. Is the venue heated?"
                                           className="h-10 bg-white/5 border-white/10"

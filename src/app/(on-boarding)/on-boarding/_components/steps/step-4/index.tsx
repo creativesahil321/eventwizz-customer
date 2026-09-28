@@ -1,5 +1,6 @@
 "use client";
 
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
@@ -63,7 +64,7 @@ import {
 } from "../../rooms/use-room-manager";
 import { MultiSpaceHeader } from "../../rooms/multi-space-header";
 import { selectOnboardingRoomsForApi } from "../../../_lib/onboarding-room-save";
-import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
+import { focusNextIncompleteOnboardingRoom, onboardingRoomSaveLabel } from "../../../_lib/onboarding-multi-room-progress";
 import { isVendorRoomPackageStepComplete } from "@/app/(protected)/vendor/events/_lib/normalize-step-two-fields";
 
 /** IDs of persisted gallery rows still in the final list (backend `replace_gallery`). */
@@ -841,7 +842,9 @@ const StepFour = () => {
                       loading={loading}
                       alwaysShowReadyLabel={isMultiRoom}
                       labelWhenReady={
-                        isMultiRoom ? "Apply to this room only" : "Save & continue"
+                        isMultiRoom
+                          ? onboardingRoomSaveLabel(rooms, "package", currentRoomIndex)
+                          : "Save & continue"
                       }
                       onContinue={() => void handleContinue()}
                       extraActions={
@@ -934,7 +937,7 @@ const StepFour = () => {
                               Timeline subtitle (optional)
                             </FormLabel>
                             <FormControl>
-                              <Input
+                              <LongTextInput
                                 placeholder="Set the flow for your guests, from doors open to final call."
                                 {...field}
                                 maxLength={maxLength}
@@ -973,13 +976,13 @@ const StepFour = () => {
                       {schedulerFields.map((item, index) => (
                         <div
                           key={item.id}
-                          className="flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-4"
+                          className="flex flex-wrap items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4"
                         >
                           <FormField
                             control={form.control}
                             name={`event_schedular.${index}.title`}
                             render={({ field }) => (
-                              <FormItem className="flex-1">
+                              <FormItem className="basis-full">
                                 <FormControl>
                                   <Input
                                     type="text"
@@ -1015,7 +1018,7 @@ const StepFour = () => {
                             control={form.control}
                             name={`event_schedular.${index}.time`}
                             render={({ field }) => (
-                              <FormItem className="flex-1">
+                              <FormItem className="w-36 shrink-0">
                                 <FormControl>
                                   <Input
                                     type="time"
@@ -1149,7 +1152,7 @@ const StepFour = () => {
                               Subheading
                             </FormLabel>
                             <FormControl>
-                              <Input
+                              <LongTextInput
                                 {...field}
                                 placeholder={`e.g., Prices From ${currencySymbol}65 Plus VAT Include:`}
                                 className="h-11 bg-white/5 border-white/10"

@@ -334,25 +334,27 @@ const timelineStyles = `
   position: relative;
   width: 100%;
   overflow-x: hidden;
-  padding: 2rem 0.75rem;
+  padding: 3rem 1rem; /* 16px sides like every other section (px-4) */
   background: var(--tl-bg);
 }
 
 @media (min-width: 640px) {
   .tl-section:not(.tl-section--preview-narrow) {
-    padding: 2.5rem 1.5rem;
+    padding: 4rem 1.5rem;
   }
 }
 
+/* Compact keeps its tighter rows but uses the shared section rhythm
+   (48px / 64px — PUBLIC_SECTION_PY_CLASS) so live and preview match. */
 .tl-section--compact {
-  padding-top: 1.5rem;
-  padding-bottom: 1.5rem;
+  padding-top: 3rem;
+  padding-bottom: 3rem;
 }
 
 @media (min-width: 640px) {
   .tl-section--compact:not(.tl-section--preview-narrow) {
-    padding-top: 1.75rem;
-    padding-bottom: 1.75rem;
+    padding-top: 4rem;
+    padding-bottom: 4rem;
   }
 }
 

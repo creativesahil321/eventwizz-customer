@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { MapPin, Navigation } from "lucide-react";
-import { env } from "@/env";
+import { loadGoogleMaps } from "@/lib/load-google-maps";
 import { Button } from "@/components/ui";
 import {
   buildEventDirectionsUrl,
@@ -361,10 +361,6 @@ export default function LocationMap({
 
     let isMounted = true;
     let retryTimeoutId: NodeJS.Timeout | null = null;
-    let onExistingScriptLoad: (() => void) | null = null;
-    const existingScript = document.querySelector<HTMLScriptElement>(
-      `script[src*="maps.googleapis.com/maps/api/js"]`,
-    );
 
     const initializeMapCallback = () => {
       if (!isMounted) return;
@@ -385,41 +381,20 @@ export default function LocationMap({
       tryInitialize();
     };
 
-    if (window.google?.maps) {
-      initializeMapCallback();
-    } else if (existingScript) {
-      if (existingScript.getAttribute("data-loaded") === "true") {
-        initializeMapCallback();
-      } else {
-        onExistingScriptLoad = () => {
-          if (isMounted) initializeMapCallback();
-        };
-        existingScript.addEventListener("load", onExistingScriptLoad);
-      }
-    } else {
-      const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        script.setAttribute("data-loaded", "true");
+    loadGoogleMaps()
+      .then(() => {
         if (isMounted) initializeMapCallback();
-      };
-      script.onerror = () => {
+      })
+      .catch(() => {
         if (isMounted) {
           setError("Failed to load Google Maps. Please refresh the page.");
           setIsLoading(false);
         }
-      };
-      document.head.appendChild(script);
-    }
+      });
 
     return () => {
       isMounted = false;
       if (retryTimeoutId) clearTimeout(retryTimeoutId);
-      if (onExistingScriptLoad && existingScript) {
-        existingScript.removeEventListener("load", onExistingScriptLoad);
-      }
       if (globalTimeoutRef.current) {
         clearTimeout(globalTimeoutRef.current);
         globalTimeoutRef.current = null;

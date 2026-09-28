@@ -1,5 +1,6 @@
 "use client";
 
+import { PUBLIC_SECTION_PY_CLASS } from "@/lib/public-rhythm";
 import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import {
   Accordion,
@@ -44,7 +45,8 @@ export default function FaqSection({
   return (
     <section
       className={cn(
-        "w-full scroll-mt-20 bg-[var(--color-background)] px-4 py-8 text-center text-[var(--color-text)] md:py-10 @max-md/preview:!px-4 @max-md/preview:!py-8",
+        "w-full scroll-mt-20 bg-[var(--color-background)] px-4 text-center text-[var(--color-text)] @max-md/preview:!px-4",
+        PUBLIC_SECTION_PY_CLASS,
         !narrowPreview && "sm:scroll-mt-24",
       )}
       aria-labelledby="faq-section-heading"

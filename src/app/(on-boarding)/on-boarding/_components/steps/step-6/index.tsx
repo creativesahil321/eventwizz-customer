@@ -1,5 +1,7 @@
 "use client";
 
+import { notifyInvalidOnboardingFields } from "../../../_lib/notify-invalid-onboarding-fields";
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, {
   useState,
   useEffect,
@@ -44,7 +46,7 @@ import {
   isOnboardingCateringRoomReady,
   sanitizeOnboardingMenusForSubmit,
 } from "../../../_lib/onboarding-catering-ready";
-import { focusNextIncompleteOnboardingRoom } from "../../../_lib/onboarding-multi-room-progress";
+import { focusNextIncompleteOnboardingRoom, onboardingRoomSaveLabel } from "../../../_lib/onboarding-multi-room-progress";
 import { useFieldFocusHandler } from "../../form-preview/field-focus-handler";
 import { useEventId } from "../../../_lib/hooks/useEventId";
 import { WholeStepGuidedShell } from "../../whole-step-guided-shell";
@@ -851,11 +853,11 @@ export default function StepSix() {
                       alwaysShowReadyLabel={roomScope.isMultiRoom}
                       labelWhenReady={
                         roomScope.isMultiRoom
-                          ? "Apply to this room only"
+                          ? onboardingRoomSaveLabel(rooms, "catering", currentRoomIndex)
                           : "Save & continue"
                       }
                       onContinue={() =>
-                        void form.handleSubmit((data) => onSubmit(data, false))()
+                        void form.handleSubmit((data) => onSubmit(data, false), notifyInvalidOnboardingFields)()
                       }
                       extraActions={
                         canShowApplyToAllButton(rooms, canApplyToAllRooms) ? (
@@ -864,8 +866,7 @@ export default function StepSix() {
                             type="button"
                             onClick={() =>
                               void form.handleSubmit((data) =>
-                                onSubmit(data, true),
-                              )()
+                                onSubmit(data, true), notifyInvalidOnboardingFields)()
                             }
                             className={guidedOnboardingSkipButtonClass}
                           >
@@ -1034,7 +1035,7 @@ export default function StepSix() {
                                     Menu description
                                   </FormLabel>
                                   <FormControl>
-                                    <Input
+                                    <LongTextInput
                                       {...field}
                                       placeholder="e.g. Select from our menus"
                                       className="h-10 bg-white/5 border-white/10"
@@ -1320,7 +1321,7 @@ export default function StepSix() {
                                                     Description
                                                   </FormLabel>
                                                   <FormControl>
-                                                    <Input
+                                                    <LongTextInput
                                                       {...field}
                                                       placeholder="e.g. Spicy chicken with basmati rice"
                                                       className="h-10 bg-white/5 border-white/10"

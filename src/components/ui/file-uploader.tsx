@@ -681,7 +681,7 @@ export function FileUploader(props: FileUploaderProps) {
                     <p className="font-medium text-muted-foreground">
                       Drag {`'n'`} drop files here, or click to select files
                     </p>
-                    <p className="text-sm text-muted-foreground/70">
+                    <p className="text-sm text-muted-foreground">
                       {moreLabel
                         ? maxFileCount > 1
                           ? isDocumentOnlyUploader

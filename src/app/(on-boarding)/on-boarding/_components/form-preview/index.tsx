@@ -836,16 +836,37 @@ export default function FormPreview() {
     }
   }, [activeStep, activeField]);
 
-  // When editing dates, scroll the preview so the booking strip is in view (split layout).
+  // Opening a step brings the section it edits into view, so the vendor sees
+  // their changes land without hunting (previously only step 5 did this; other
+  // steps waited for a field focus and showed the hero).
   useEffect(() => {
-    if (activeStep !== 5) return;
-    const id = window.requestAnimationFrame(() => {
-      scrollToElementIfNeeded(datesRef.current, {
-        headerOffsetPx: PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX,
-        scrollContainer: previewContainerRef.current,
-        trustEmbeddedScrollContainer: true,
-      });
-    });
+    const target = (
+      {
+        4: timelineRef,
+        5: datesRef,
+        6: menuRef,
+        7: moreInfoRef,
+        8: drinkRef,
+        9: faqRef,
+      } as Record<number, React.RefObject<HTMLDivElement | null>>
+    )[activeStep];
+    if (!target) return;
+
+    // Sections mount after hydration / room data — retry for a few frames.
+    let attempts = 0;
+    let id = 0;
+    const tick = () => {
+      if (target.current) {
+        scrollToElementIfNeeded(target.current, {
+          headerOffsetPx: PREVIEW_BOOK_NOW_SCROLL_OFFSET_PX,
+          scrollContainer: previewContainerRef.current,
+          trustEmbeddedScrollContainer: true,
+        });
+        return;
+      }
+      if (attempts++ < 30) id = window.requestAnimationFrame(tick);
+    };
+    id = window.requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
   }, [activeStep]);
 

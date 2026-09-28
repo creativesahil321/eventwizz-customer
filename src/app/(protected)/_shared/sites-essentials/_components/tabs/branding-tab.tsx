@@ -1,5 +1,6 @@
 "use client";
 
+import { LongTextInput } from "@/components/ui/long-text-input";
 import { BANNER_HEADING_MAX_CHARS } from "@/lib/hero-copy-limits";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -1035,7 +1036,7 @@ export function BrandingTab({
                   <FormItem>
                     <FormLabel>Location page subheading</FormLabel>
                     <FormControl>
-                      <Input
+                      <LongTextInput
                         placeholder="Discover amazing events"
                         disabled={readOnly}
                         {...field}

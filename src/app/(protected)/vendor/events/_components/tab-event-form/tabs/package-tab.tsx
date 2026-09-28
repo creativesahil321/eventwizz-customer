@@ -1,5 +1,6 @@
 "use client";
 
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, { useCallback, useState, useEffect } from "react";
 import {
   useForm,
@@ -1248,7 +1249,7 @@ export default function PackageTab() {
                         Subheading <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input
+                        <LongTextInput
                           {...field}
                           placeholder={`e.g. Prices from ${currencySymbol}65 plus VAT. Includes:`}
                           className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
@@ -1664,7 +1665,7 @@ export default function PackageTab() {
                       )}
                     />
                   </div>
-                  <div className="flex-1">
+                  <div className="w-40 shrink-0">
                     <FormField
                       control={form.control}
                       name={`event_schedular.${index}.time`}

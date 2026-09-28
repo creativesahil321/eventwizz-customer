@@ -1,4 +1,5 @@
 "use client";
+import { LongTextInput } from "@/components/ui/long-text-input";
 import {
   BANNER_HEADING_MAX_CHARS,
   BANNER_SUB_HEADING_MAX_CHARS,
@@ -761,7 +762,7 @@ export default function StepTwo() {
                             Add a banner subheading
                           </OnboardingFieldGroupTitle>
                           <FormControl>
-                            <Input
+                            <LongTextInput
                               placeholder="e.g. Unforgettable nights at your venue"
                               {...field}
                               maxLength={maxLength}

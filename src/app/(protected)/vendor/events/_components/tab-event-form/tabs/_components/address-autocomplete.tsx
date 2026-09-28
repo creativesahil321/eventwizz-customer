@@ -1,5 +1,6 @@
 "use client";
 
+import { loadGoogleMaps } from "@/lib/load-google-maps";
 import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { FieldClearButton } from "@/components/ui/field-clear-button";
@@ -72,49 +73,7 @@ export default function AddressAutocomplete({
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const biasCoordsRef = useRef<google.maps.LatLngLiteral | null>(null);
 
-  const loadGooglePlacesScript = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (window.google?.maps?.places) {
-        resolve();
-        return;
-      }
-
-      const existingScript = document.getElementById(
-        "google-maps-places-script"
-      ) as HTMLScriptElement | null;
-
-      if (existingScript) {
-        existingScript.addEventListener("load", () => resolve(), {
-          once: true,
-        });
-        existingScript.addEventListener(
-          "error",
-          () => reject(new Error("Google Maps script failed to load")),
-          { once: true }
-        );
-        return;
-      }
-
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        reject(new Error("Missing NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"));
-        return;
-      }
-
-      const script = document.createElement("script");
-      script.id = "google-maps-places-script";
-      script.async = true;
-      script.defer = true;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      script.onload = () => {
-        script.setAttribute("data-loaded", "true");
-        resolve();
-      };
-      script.onerror = () =>
-        reject(new Error("Google Maps script failed to load"));
-      document.head.appendChild(script);
-    });
-  };
+  const loadGooglePlacesScript = (): Promise<void> => loadGoogleMaps();
 
   // Handle autofocus
   useEffect(() => {

@@ -51,12 +51,13 @@ export type SiteHeadingProps = {
  * and onboarding preview.
  *
  * 1 hero:    heroes pass the fluid `hero*HeadingTypeClass` (max 44px, bold)
- * 2 section: 24px → 30px (tablet) → 36px (lg+), bold — always below the fluid hero
+ * 2 section: fluid 24px → 36px, bold. Container-relative like the hero, so it
+ *            stays below the hero in narrow preview frames as well as on the live site.
  * 3 card:    20px → 24px, semibold
  */
 const levelClass: Record<SiteHeadingLevel, string> = {
   1: "text-4xl font-bold tracking-tight md:text-5xl",
-  2: "text-2xl font-bold !leading-[1.15] tracking-tight sm:text-[1.875rem] lg:text-4xl",
+  2: "text-[clamp(1.5rem,0.75rem+2cqi,2.25rem)] font-bold !leading-[1.15] tracking-tight",
   3: "text-xl font-semibold !leading-snug tracking-tight md:text-2xl",
 };
 
@@ -65,13 +66,15 @@ const levelClass: Record<SiteHeadingLevel, string> = {
  * win while the preview sits in a wide monitor. Same scale as `levelClass`. */
 const compactLevelClass = {
   mobile: {
-    1: "font-bold tracking-tight !text-[1.65rem] !leading-[1.22] sm:!text-[1.65rem] sm:!leading-[1.22] md:!text-[1.65rem] md:!leading-[1.22] lg:!text-[1.65rem] lg:!leading-[1.22] xl:!text-[1.65rem] xl:!leading-[1.22]",
-    2: "font-bold tracking-tight !text-2xl !leading-[1.15] sm:!text-2xl sm:!leading-[1.15] md:!text-2xl md:!leading-[1.15] lg:!text-2xl lg:!leading-[1.15] xl:!text-2xl xl:!leading-[1.15]",
+    // 1 & 2 are container-fluid (cqi), so the preview frame computes the same
+    // size as a real device of that width — no override, exact live parity.
+    1: "",
+    2: "",
     3: "font-semibold tracking-tight !text-xl !leading-snug sm:!text-xl sm:!leading-snug md:!text-xl md:!leading-snug lg:!text-xl lg:!leading-snug xl:!text-xl xl:!leading-snug",
   },
   tablet: {
-    1: "font-bold tracking-tight !text-[2.15rem] !leading-[1.18] sm:!text-[2.15rem] sm:!leading-[1.18] md:!text-[2.15rem] md:!leading-[1.18] lg:!text-[2.15rem] lg:!leading-[1.18] xl:!text-[2.15rem] xl:!leading-[1.18]",
-    2: "font-bold tracking-tight !text-[1.875rem] !leading-[1.15] sm:!text-[1.875rem] sm:!leading-[1.15] md:!text-[1.875rem] md:!leading-[1.15] lg:!text-[1.875rem] lg:!leading-[1.15] xl:!text-[1.875rem] xl:!leading-[1.15]",
+    1: "",
+    2: "",
     3: "font-semibold tracking-tight !text-[1.375rem] !leading-snug sm:!text-[1.375rem] sm:!leading-snug md:!text-[1.375rem] md:!leading-snug lg:!text-[1.375rem] lg:!leading-snug xl:!text-[1.375rem] xl:!leading-snug",
   },
 } as const satisfies Record<
@@ -113,7 +116,7 @@ export function SiteHeading({
   );
   const compactType =
     narrowPreview && previewDevice !== "desktop"
-      ? compactLevelClass[previewDevice]
+      ? compactLevelClass[previewDevice][level] || null
       : null;
 
   const Tag = level === 2 ? "h2" : level === 3 ? "h3" : "h1";
@@ -165,7 +168,7 @@ export function SiteHeading({
           baseColorClass,
           "px-[0.12em] py-[0.08em]",
           className,
-          compactType?.[level],
+          compactType,
         )}
         style={{ fontFamily: headingFamily }}
       >
@@ -186,7 +189,7 @@ export function SiteHeading({
             : accentSolidPrimary,
           "px-[0.2em] py-[0.1em]",
           className,
-          compactType?.[level],
+          compactType,
         )}
         style={{ fontFamily: headingFamily }}
       >
@@ -209,7 +212,7 @@ export function SiteHeading({
         !compactType && levelClass[level],
         "py-[0.14em] pl-[0.12em] pr-[0.4em]",
         className,
-        compactType?.[level],
+        compactType,
       )}
       style={{ fontFamily: bodyFamily }}
     >

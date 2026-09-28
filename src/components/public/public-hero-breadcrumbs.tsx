@@ -49,7 +49,10 @@ export function PublicHeroBreadcrumbs({
           return (
             <li
               key={`${crumb.label}-${index}`}
-              className="inline-flex items-center gap-x-1.5"
+              className={cn(
+                "inline-flex items-center gap-x-1.5",
+                isLast && "min-w-0 max-w-full",
+              )}
             >
               {index > 0 ? (
                 <span className="text-white/45" aria-hidden>
@@ -65,7 +68,15 @@ export function PublicHeroBreadcrumbs({
                 </Link>
               ) : (
                 <span
-                  className={isLast ? "text-white" : undefined}
+                  // Current page: one line with an ellipsis — long event names
+                  // ("Bars | Christmas At … | Festive Happy Hour") otherwise
+                  // wrap to a second line above the hero title on phones.
+                  className={
+                    isLast
+                      ? "block min-w-0 max-w-[16rem] truncate text-white sm:max-w-md @max-md/preview:max-w-[16rem]"
+                      : undefined
+                  }
+                  title={isLast ? crumb.label : undefined}
                   aria-current={isLast ? "page" : undefined}
                 >
                   {crumb.label}

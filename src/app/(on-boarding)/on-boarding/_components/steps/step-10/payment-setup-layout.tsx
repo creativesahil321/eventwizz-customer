@@ -552,7 +552,9 @@ export function PaymentSetupLayout({
   const [selectedCard, setSelectedCard] = useState<CardProvider | null>(
     stripeConnected ? "stripe" : paypalConnected ? "paypal" : null,
   );
-  const [bankFormOpen, setBankFormOpen] = useState(!truelayerConnected);
+  // Bank transfers are optional — show the compact "Connect TrueLayer" row
+  // until the vendor opts in, instead of an open credentials form.
+  const [bankFormOpen, setBankFormOpen] = useState(false);
 
   const showCardPicker = !cardConnected;
   const showBankConnect = !truelayerConnected && bankFormOpen;

@@ -1,3 +1,4 @@
+import { LongTextInput } from "@/components/ui/long-text-input";
 import { Button } from "@/components/ui/button";
 import {
   FormControl,
@@ -67,7 +68,7 @@ export default function MenuItems({
               <FormItem className="w-full">
                 <FormLabel>Item description</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. Spicy, grilled" {...field} />
+                  <LongTextInput placeholder="e.g. Spicy, grilled" {...field} />
                 </FormControl>
                 {error && <FormMessage>{error.message}</FormMessage>}
               </FormItem>

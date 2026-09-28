@@ -41,10 +41,14 @@ export const guidedOnboardingNextSectionButtonClass =
 export const guidedOnboardingActionDockClass =
   "flex w-full min-w-0 flex-col items-center justify-center gap-3 rounded-xl border border-white/15 bg-black/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:px-5 sm:py-5";
 
-/** Inset bar at the bottom of a rounded guided card (steps 4–11). */
+/**
+ * Inset bar at the bottom of a rounded guided card (steps 4–11).
+ * `w-auto` (not the base `w-full`) so the 12px inset margins stay inside the
+ * card — `w-full` + `m-3` overflowed the card edge by 24px.
+ */
 export const guidedOnboardingActionDockAttachedClass = cn(
   guidedOnboardingActionDockClass,
-  "m-3 mt-1",
+  "m-3 mt-1 w-auto",
 );
 
 /** Standalone dock under stacked section cards (steps 1–3). Static — same as 4–11. */

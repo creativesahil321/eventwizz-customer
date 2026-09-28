@@ -1,5 +1,6 @@
 "use client";
 
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, {
   useState,
   useEffect,
@@ -1476,7 +1477,7 @@ export default function CateringTab() {
                                                     Description
                                                   </FormLabel>
                                                   <FormControl>
-                                                    <Input
+                                                    <LongTextInput
                                                       {...field}
                                                       placeholder="e.g. Spicy, served with rice"
                                                       className="h-10 border-[#E5E7EB] bg-[#F9FAFB]"

@@ -1,5 +1,7 @@
 "use client";
 
+import { notifyInvalidOnboardingFields } from "../../../_lib/notify-invalid-onboarding-fields";
+import { onboardingRoomSaveLabel } from "../../../_lib/onboarding-multi-room-progress";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -505,13 +507,12 @@ export default function StepSeven() {
                       alwaysShowReadyLabel={roomScope.isMultiRoom}
                       labelWhenReady={
                         roomScope.isMultiRoom
-                          ? "Apply to this room only"
+                          ? onboardingRoomSaveLabel(rooms, "brochure", currentRoomIndex)
                           : "Save & continue"
                       }
                       onContinue={() =>
                         void form.handleSubmit((data) =>
-                          handleSubmit(data),
-                        )()
+                          handleSubmit(data), notifyInvalidOnboardingFields)()
                       }
                       extraActions={
                         canShowApplyToAllButton(rooms, true) ? (
@@ -520,8 +521,7 @@ export default function StepSeven() {
                             type="button"
                             onClick={() =>
                               void form.handleSubmit((data) =>
-                                handleSubmit(data, { applyToAllRooms: true }),
-                              )()
+                                handleSubmit(data, { applyToAllRooms: true }), notifyInvalidOnboardingFields)()
                             }
                             className={guidedOnboardingSkipButtonClass}
                           >

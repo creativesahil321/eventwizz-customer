@@ -1,5 +1,6 @@
 "use client";
 
+import { LongTextInput } from "@/components/ui/long-text-input";
 import {
   BANNER_HEADING_MAX_CHARS,
   BANNER_SUB_HEADING_MAX_CHARS,
@@ -889,7 +890,7 @@ export default function EventNameTab() {
                         <Input
                           maxLength={BANNER_HEADING_MAX_CHARS}
                           {...field}
-                          placeholder="Enter a banner heading (max 30 words)"
+                          placeholder={`Enter a banner heading (max ${BANNER_HEADING_MAX_WORDS} words)`}
                           className="h-11 bg-[#F9FAFB] border-[#E5E7EB]"
                           onFocus={() =>
                             handleFieldFocus("event_banner_heading")
@@ -910,8 +911,9 @@ export default function EventNameTab() {
                         />
                       </FormControl>
                       <FormDescription>
-                        Shown on the hero banner. Keep it to 30 words or fewer
-                        and no more than 500 characters.
+                        Shown on the hero banner. Keep it to{" "}
+                        {BANNER_HEADING_MAX_WORDS} words and{" "}
+                        {BANNER_HEADING_MAX_CHARS} characters.
                       </FormDescription>
                       <p className="text-xs text-muted-foreground mt-1">
                         <span>
@@ -933,7 +935,7 @@ export default function EventNameTab() {
                       Banner subheading <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input
+                      <LongTextInput
                         {...field}
                         placeholder="Enter a short banner supporting line"
                         maxLength={BANNER_SUB_HEADING_MAX_CHARS}

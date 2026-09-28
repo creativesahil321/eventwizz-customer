@@ -3,6 +3,9 @@ import localFont from "next/font/local";
 /** Tiempos Headline — onboarding + global error only (kept separate from app Inter to avoid huge shared chunks). */
 export const tiemposHeadline = localFont({
   variable: "--font-tiempos-headline",
+  // Only a theme fallback — don't preload all 12 weights on every onboarding
+  // load (browsers warned "preloaded but not used"); faces load on demand.
+  preload: false,
   src: [
     {
       path: "../../public/fonts/TiemposHeadline-Light.otf",

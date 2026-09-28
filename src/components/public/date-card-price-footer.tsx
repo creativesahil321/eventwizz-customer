@@ -120,8 +120,8 @@ export function DateCardPriceFooter({
           className={cn(
             "font-bold uppercase tracking-[0.16em] text-white",
             compact
-              ? "text-[9px] leading-none"
-              : "text-[10px] leading-none sm:text-xs",
+              ? "text-[10px] leading-none"
+              : "text-[11px] leading-none sm:text-xs",
           )}
         >
           {hint}

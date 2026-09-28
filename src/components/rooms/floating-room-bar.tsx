@@ -44,16 +44,17 @@ export interface FloatingRoomBarProps {
 const SIZE_STYLES = {
   sm: {
     bar: "gap-2 px-3 py-2",
-    label: "text-[10px] tracking-[0.18em]",
+    label: "text-[11px] tracking-[0.18em]",
     group: "gap-1",
-    button: "gap-1.5 px-2.5 py-1.5 text-xs leading-snug",
+    // min-h-9: 36px touch target on phones (was ~29px).
+    button: "min-h-9 gap-1.5 px-3 py-1.5 text-xs leading-snug",
     dot: "h-2 w-2",
   },
   lg: {
     bar: "gap-2.5 px-3.5 py-2.5",
-    label: "text-[11px] tracking-[0.18em]",
+    label: "text-xs tracking-[0.18em]",
     group: "gap-1.5",
-    button: "gap-1.5 px-3 py-2 text-sm leading-snug",
+    button: "min-h-10 gap-1.5 px-3 py-2 text-sm leading-snug",
     dot: "h-2 w-2",
   },
 } as const;

@@ -26,3 +26,20 @@ export function focusNextIncompleteOnboardingRoom(
   toast.info("Saved. Continue with the next room.");
   return true;
 }
+
+/**
+ * Primary button label in multi-room steps. The button saves the current room,
+ * then jumps to the next room still missing this section — or on to the next
+ * step when every other room is done — so say which will happen.
+ */
+export function onboardingRoomSaveLabel(
+  rooms: RoomType[],
+  section: RoomSection,
+  currentRoomIndex: number,
+): string {
+  const otherRoomsComplete = rooms.every(
+    (room, index) =>
+      index === currentRoomIndex || isRoomSectionComplete(room, section),
+  );
+  return otherRoomsComplete ? "Save & continue" : "Save room & next";
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { LongTextInput } from "@/components/ui/long-text-input";
 import React, {
   useCallback,
   useEffect,
@@ -711,7 +712,7 @@ export default function DatesTab() {
                             Description
                           </FormLabel>
                           <FormControl>
-                            <Input
+                            <LongTextInput
                               placeholder="e.g., Access to all areas"
                               {...field}
                               className="w-full h-11 bg-[#F9FAFB] border-[#E5E7EB]"
