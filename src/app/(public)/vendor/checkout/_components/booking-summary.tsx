@@ -32,7 +32,6 @@ import {
   isDepositChoiceAvailable,
   hasUnconfirmedTableSeating,
   calculateUnconfirmedTablesTotal,
-  getDateGuestCount,
   resolveCartDateDiscounts,
 } from "../_lib/cart-calculations";
 import {
@@ -90,6 +89,8 @@ import {
   findFirstIncompleteCheckoutDate,
   formatCheckoutBookingMetaLine,
   resolveCheckoutCtaState,
+  countDatePurchases,
+  sumPurchaseCounts,
 } from "../_lib/checkout-readiness";
 
 const checkoutPayButtonClass = (disabled: boolean) =>
@@ -790,13 +791,13 @@ export default function BookingSummary({}: BookingSummaryProps) {
     }, 0);
   }, [availableDates, currentEventSlug, editingData, getDateData]);
 
-  const totalGuests = useMemo(() => {
-    if (!currentEventSlug) return 0;
-    return availableDates.reduce((sum, dateKey) => {
-      const dateData = getDateData(currentEventSlug, dateKey);
-      if (!dateData) return sum;
-      return sum + getDateGuestCount(dateData);
-    }, 0);
+  const purchaseTotals = useMemo(() => {
+    if (!currentEventSlug) return { tickets: 0, tables: 0 };
+    return sumPurchaseCounts(
+      availableDates.map((dateKey) =>
+        countDatePurchases(getDateData(currentEventSlug, dateKey)),
+      ),
+    );
   }, [availableDates, currentEventSlug, editingData, getDateData]);
 
   const summaryMetaLine = useMemo(() => {
@@ -810,7 +811,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
       roomMode: roomMode && rooms.length > 0,
       roomCount: rooms.length,
       dateCounts,
-      guestCount: totalGuests,
+      purchaseCounts: purchaseTotals,
     });
   }, [
     availableDates,
@@ -819,7 +820,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
     getDateData,
     roomMode,
     rooms.length,
-    totalGuests,
+    purchaseTotals,
   ]);
 
   const itineraryDates = useMemo(() => {

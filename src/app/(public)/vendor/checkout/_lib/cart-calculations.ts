@@ -1051,26 +1051,26 @@ export function buildDateSelectionSummary(dateData: {
 }): string {
   const parts: string[] = [];
 
+  const activeTickets = dateData.tickets.filter((t) => t.quantity > 0);
+  if (activeTickets.length > 0) {
+    const ticketCount = activeTickets.reduce((sum, t) => sum + t.quantity, 0);
+    parts.push(`${ticketCount} ticket${ticketCount !== 1 ? "s" : ""}`);
+  }
+
+  // Seat count belongs to the table ("1 table for 3"), never a loose
+  // "group of 3" that read as the whole party.
   const activeTables = dateData.tables.filter((t) => t.quantity > 0);
   if (activeTables.length > 0) {
     const tableCount = activeTables.reduce((sum, t) => sum + t.quantity, 0);
-    parts.push(`${tableCount} table${tableCount !== 1 ? "s" : ""}`);
-
     const guests = activeTables.reduce((sum, t) => {
       if (t.allocation && t.allocation.length > 0) {
         return sum + t.allocation.reduce((a, g) => a + g, 0);
       }
       return sum + (t.minPersons || 1) * t.quantity;
     }, 0);
-    if (guests > 0) {
-      parts.push(`group of ${guests}`);
-    }
-  }
-
-  const activeTickets = dateData.tickets.filter((t) => t.quantity > 0);
-  if (activeTickets.length > 0) {
-    const ticketCount = activeTickets.reduce((sum, t) => sum + t.quantity, 0);
-    parts.push(`${ticketCount} ticket${ticketCount !== 1 ? "s" : ""}`);
+    parts.push(
+      `${tableCount} table${tableCount !== 1 ? "s" : ""}${guests > 0 ? ` for ${guests}` : ""}`,
+    );
   }
 
   const activeDrinks = dateData.drinks.filter((d) => d.quantity > 0);

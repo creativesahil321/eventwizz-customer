@@ -86,6 +86,8 @@ import {
 import {
   countCheckoutDateStatuses,
   formatCheckoutBookingMetaLine,
+  countDatePurchases,
+  sumPurchaseCounts,
 } from "../_lib/checkout-readiness";
 import { useEventDetail } from "@/app/(public)/[locationSlug]/events/[eventSlug]/_lib/hooks";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
@@ -583,16 +585,18 @@ export default function CartManager({}: CartManagerProps) {
     editingData,
   ]);
 
-  const totalGuestsAcrossCart = useMemo(() => {
-    if (!currentEventSlug || !currentEventApiData) return 0;
+  const purchaseTotalsAcrossCart = useMemo(() => {
+    if (!currentEventSlug || !currentEventApiData) {
+      return { tickets: 0, tables: 0 };
+    }
     const dateKeys = roomMode
       ? getAllRoomDateKeys(currentEventApiData)
       : getAvailableDates(currentEventApiData);
-    return dateKeys.reduce((sum, dateKey) => {
-      const dateData = getDateData(currentEventSlug, dateKey);
-      if (!dateData) return sum;
-      return sum + getDateGuestCount(dateData);
-    }, 0);
+    return sumPurchaseCounts(
+      dateKeys.map((dateKey) =>
+        countDatePurchases(getDateData(currentEventSlug, dateKey)),
+      ),
+    );
     // editingData: guest counts live in the cart edit store, not only API cart.
   }, [
     currentEventSlug,
@@ -770,7 +774,7 @@ export default function CartManager({}: CartManagerProps) {
     roomMode: roomMode && bookedRoomCount > 0,
     roomCount: bookedRoomCount,
     dateCounts: checkoutDateCounts,
-    guestCount: totalGuestsAcrossCart,
+    purchaseCounts: purchaseTotalsAcrossCart,
   });
 
   const locationName =

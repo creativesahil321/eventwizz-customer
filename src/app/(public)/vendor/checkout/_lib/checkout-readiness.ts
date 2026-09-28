@@ -76,24 +76,71 @@ function formatDateReadinessPart(counts: CheckoutDateCounts): string {
   return `${ready} of ${total} dates ready`;
 }
 
+export interface CheckoutPurchaseCounts {
+  tickets: number;
+  tables: number;
+}
+
+type PurchaseCountSource = {
+  tickets: Array<{ quantity: number }>;
+  tables: Array<{ quantity: number }>;
+};
+
+/** What was actually bought on a date — tickets and tables are separate purchases. */
+export function countDatePurchases(
+  dateData: PurchaseCountSource | null | undefined,
+): CheckoutPurchaseCounts {
+  if (!dateData) return { tickets: 0, tables: 0 };
+  const sum = (items: Array<{ quantity: number }>) =>
+    items.reduce((total, item) => total + Math.max(0, item.quantity || 0), 0);
+  return { tickets: sum(dateData.tickets), tables: sum(dateData.tables) };
+}
+
+export function sumPurchaseCounts(
+  counts: CheckoutPurchaseCounts[],
+): CheckoutPurchaseCounts {
+  return counts.reduce(
+    (total, c) => ({
+      tickets: total.tickets + c.tickets,
+      tables: total.tables + c.tables,
+    }),
+    { tickets: 0, tables: 0 },
+  );
+}
+
+function formatPurchasePart(counts?: CheckoutPurchaseCounts): string {
+  if (!counts) return "";
+  const parts: string[] = [];
+  if (counts.tickets > 0) {
+    parts.push(`${counts.tickets} ticket${counts.tickets !== 1 ? "s" : ""}`);
+  }
+  if (counts.tables > 0) {
+    parts.push(`${counts.tables} table${counts.tables !== 1 ? "s" : ""}`);
+  }
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}
+
+/**
+ * Booking header / mobile total bar, e.g. "2 rooms · 2 dates ready · 4 tickets · 1 table".
+ * Shows what was bought rather than a single "guests" total: tickets and table
+ * seats are separate purchases, so summing them (or showing only table guests)
+ * never matched what the customer paid for.
+ */
 export function formatCheckoutBookingMetaLine(params: {
   roomMode: boolean;
   roomCount: number;
   dateCounts: CheckoutDateCounts;
-  guestCount?: number;
+  purchaseCounts?: CheckoutPurchaseCounts;
 }): string {
-  const { roomMode, roomCount, dateCounts, guestCount = 0 } = params;
-  const guestSuffix =
-    guestCount > 0
-      ? ` · ${guestCount} guest${guestCount !== 1 ? "s" : ""}`
-      : "";
+  const { roomMode, roomCount, dateCounts, purchaseCounts } = params;
+  const purchaseSuffix = formatPurchasePart(purchaseCounts);
   const datePart = formatDateReadinessPart(dateCounts);
 
   if (roomMode && roomCount > 0) {
-    return `${roomCount} room${roomCount !== 1 ? "s" : ""} · ${datePart}${guestSuffix}`;
+    return `${roomCount} room${roomCount !== 1 ? "s" : ""} · ${datePart}${purchaseSuffix}`;
   }
 
-  return `${datePart}${guestSuffix}`;
+  return `${datePart}${purchaseSuffix}`;
 }
 
 export interface CheckoutDateReadiness {

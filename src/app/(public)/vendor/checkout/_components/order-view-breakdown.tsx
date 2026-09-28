@@ -8,7 +8,6 @@ import type { ApiRoomCartData } from "@/lib/types/cart.types";
 import {
   parseRoomDateKey,
   getBillableTables,
-  getDateGuestCount,
 } from "../_lib/cart-calculations";
 import { getRoomFloatingAccent } from "@/lib/room-accent-palette";
 import { cn } from "@/lib/utils";
@@ -102,7 +101,6 @@ function DateBreakdownCard({
   const activeTables = getBillableTables(dateData);
   const activeTickets = dateData.tickets.filter((t) => t.quantity > 0);
   const activeDrinks = dateData.drinks.filter((d) => d.quantity > 0);
-  const guestCount = getDateGuestCount(dateData);
 
   return (
     <div className="rounded-xl border border-[color:var(--checkout-border)] bg-white p-3">
@@ -112,11 +110,6 @@ function DateBreakdownCard({
           <span className="font-semibold text-[color:var(--checkout-foreground)]">
             {formatDate(key)}
           </span>
-          {guestCount > 0 && (
-            <span className="text-[color:var(--checkout-muted-foreground)]">
-              · {guestCount} guest{guestCount !== 1 ? "s" : ""}
-            </span>
-          )}
         </div>
         <span className="shrink-0 text-xs font-bold tabular-nums text-[color:var(--checkout-foreground)]">
           {formatMoney(fullAmount)}
@@ -172,7 +165,11 @@ function DateBreakdownCard({
               return (
                 <BreakdownLineItem
                   key={table.id}
-                  label={`Tables (${min}–${max}) × ${table.quantity}`}
+                  label={
+                    table.quantity === 1
+                      ? `Table for ${tableTotal} guest${tableTotal !== 1 ? "s" : ""}`
+                      : `${table.quantity} tables · ${tableTotal} guests`
+                  }
                   unitPrice={ppp}
                   unitLabel="per guest"
                   amount={ppp * tableTotal}
