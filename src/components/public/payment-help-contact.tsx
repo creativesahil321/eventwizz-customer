@@ -1,25 +1,45 @@
 "use client";
 
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { resolvePublicPageContact } from "@/lib/resolve-venue-contact";
 import type { ThemeSchema } from "@/types/theme.types";
 import { cn } from "@/lib/utils";
+import { recallCheckoutLocation } from "@/lib/checkout-location-memory";
 
 /** Only used when the venue has no contact email configured. */
 export const PLATFORM_SUPPORT_EMAIL = "support@eventwizz.com";
 
 /**
- * The venue's own contact details for payment result pages. Customers book
+ * The booked location's contact details for payment result pages (falls back
+ * to the venue-wide details). Customers book
  * with the venue — showing the platform inbox (or a placeholder phone number)
  * there reads as a different company and breaks trust.
  */
 export function usePaymentSupportContact() {
   const { theme } = useContext(ServerContext);
+  const themeSchema = theme as ThemeSchema | null;
+  // Location the booking was made for (remembered at checkout) — read after
+  // mount, sessionStorage is not available during SSR.
+  const [locationSlug, setLocationSlug] = useState<string | null>(null);
+  useEffect(() => {
+    setLocationSlug(recallCheckoutLocation());
+  }, []);
+
+  // Same resolution as the event page footer: location contact first, then
+  // the venue-wide contact details.
   const resolved = resolvePublicPageContact({
-    theme: theme as ThemeSchema | null,
+    theme: themeSchema,
+    locationSlug,
   });
-  const venueName = (theme as ThemeSchema | null)?.name?.trim() || null;
+  const brandName = themeSchema?.name?.trim() || null;
+  const locationCity = locationSlug
+    ? themeSchema?.locations
+        ?.find((loc) => loc.slug?.toLowerCase() === locationSlug.toLowerCase())
+        ?.city?.trim() || null
+    : null;
+  const venueName =
+    brandName && locationCity ? `${brandName} – ${locationCity}` : brandName;
   return {
     venueName,
     email: resolved.email || PLATFORM_SUPPORT_EMAIL,

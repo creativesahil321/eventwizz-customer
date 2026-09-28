@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberCheckoutLocation } from "@/lib/checkout-location-memory";
 import {
   useMemo,
   useState,
@@ -151,6 +152,10 @@ export default function CartManager({}: CartManagerProps) {
   );
 
   const locationSlug = useLocationSlug();
+  // Payment result pages show this location's contact details.
+  useEffect(() => {
+    rememberCheckoutLocation(locationSlug);
+  }, [locationSlug]);
   const { domain } = useDomain();
 
   const roomMode = useMemo(
