@@ -124,6 +124,20 @@ export function readPreviewScrollportBox(host: HTMLElement): {
   };
 }
 
+/** Editor chrome pinned over the bottom of the preview stage (e.g. review/approve bar). */
+export const PREVIEW_BOTTOM_CHROME_ATTR = "data-preview-bottom-chrome";
+
+function previewVisibleBottom(rectBottom: number): number {
+  let bottom = Math.min(rectBottom, window.innerHeight);
+  document
+    .querySelectorAll<HTMLElement>(`[${PREVIEW_BOTTOM_CHROME_ATTR}]`)
+    .forEach((chrome) => {
+      const chromeTop = chrome.getBoundingClientRect().top;
+      if (chromeTop > 0) bottom = Math.min(bottom, chromeTop);
+    });
+  return bottom;
+}
+
 /** On-screen box of the device frame — use for a `position: fixed` overlay. */
 export function readPreviewFrameViewport(host: HTMLElement): {
   top: number;
@@ -133,11 +147,13 @@ export function readPreviewFrameViewport(host: HTMLElement): {
   borderRadius: string;
 } {
   const rect = host.getBoundingClientRect();
+  const bottom =
+    typeof window === "undefined" ? rect.bottom : previewVisibleBottom(rect.bottom);
   return {
     top: rect.top,
     left: rect.left,
     width: rect.width,
-    height: rect.height,
+    height: Math.max(0, bottom - rect.top),
     borderRadius:
       typeof getComputedStyle === "undefined"
         ? ""

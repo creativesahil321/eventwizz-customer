@@ -160,6 +160,9 @@ export default function LocationMap({
           },
           streetViewControl: false,
           clickableIcons: false,
+          // "auto" turns greedy inside preview frames (the page itself doesn't scroll),
+          // so the wheel zooms the map and traps the vendor.
+          gestureHandling: "cooperative",
         });
 
         mapInstanceRef.current = mapInstance;

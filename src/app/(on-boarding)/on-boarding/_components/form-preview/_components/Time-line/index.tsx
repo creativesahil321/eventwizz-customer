@@ -465,6 +465,7 @@ const timelineStyles = `
   font-size: 0.875rem;
   line-height: 1.65;
   color: var(--tl-dimmed);
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 768px) {
@@ -794,6 +795,7 @@ const timelineStyles = `
   border: 1px solid color-mix(in srgb, var(--tl-border) 70%, transparent);
   background: var(--tl-surface);
   padding: 0.875rem;
+  min-width: 0;
   overflow: hidden;
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -967,6 +969,8 @@ const timelineStyles = `
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  width: 100%;
   text-align: center;
   margin: 0;
 }
@@ -1189,7 +1193,7 @@ export default function Timeline({
               emphasis={headingEmphasis}
               variant="onSurface"
               align="center"
-              className="!mx-auto !block"
+              className="!mx-auto !block max-w-full [overflow-wrap:anywhere]"
             />
             {subtitle ? (
               <p className="tl-header__subtitle">{subtitle}</p>

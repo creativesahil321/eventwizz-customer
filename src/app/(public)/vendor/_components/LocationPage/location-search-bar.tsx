@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
   addDays,
   addMonths,
@@ -122,6 +122,16 @@ export function LocationSearchBar({
   const [calendarMonth, setCalendarMonth] = useState<Date>(() =>
     startOfMonth(value.date ?? new Date()),
   );
+  const [previewFrame, setPreviewFrame] = useState<HTMLElement | null>(null);
+  const rootRef = useCallback((el: HTMLDivElement | null) => {
+    setPreviewFrame(el?.closest<HTMLElement>("[data-preview-device]") ?? null);
+  }, []);
+  /** Keep dropdowns inside the device frame in previews, and inside the viewport live. */
+  const popoverBoundsProps = {
+    collisionBoundary: previewFrame ?? undefined,
+    collisionPadding: 8,
+    hideWhenDetached: true,
+  } as const;
 
   const cityOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -261,6 +271,7 @@ export function LocationSearchBar({
 
   return (
     <div
+      ref={rootRef}
       id={id}
       className={cn("w-full max-w-3xl scroll-mt-24", className)}
     >
@@ -350,7 +361,8 @@ export function LocationSearchBar({
                 </PopoverTrigger>
                 <PopoverContent
                   align="start"
-                  className="w-64 p-1.5"
+                  {...popoverBoundsProps}
+                  className="max-h-[var(--radix-popover-content-available-height)] w-64 overflow-y-auto p-1.5"
                   style={{
                     background: "var(--color-surface)",
                     color: "var(--color-text)",
@@ -441,7 +453,8 @@ export function LocationSearchBar({
               </PopoverTrigger>
               <PopoverContent
                 align="end"
-                className="w-auto max-w-[calc(100vw-2rem)] p-0"
+                {...popoverBoundsProps}
+                className="max-h-[var(--radix-popover-content-available-height)] w-auto max-w-[min(calc(100vw-2rem),var(--radix-popover-content-available-width))] overflow-y-auto p-0"
                 style={{
                   background: "var(--color-surface)",
                   color: "var(--color-text)",

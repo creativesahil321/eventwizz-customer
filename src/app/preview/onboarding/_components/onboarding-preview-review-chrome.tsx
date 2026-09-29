@@ -118,6 +118,7 @@ export function OnboardingPreviewReviewChrome({
   return (
     <div
       ref={chromeRef}
+      data-preview-bottom-chrome=""
       className="fixed inset-x-0 bottom-0 z-[80] isolate border-t border-slate-200 bg-white text-slate-900 shadow-[0_-2px_16px_rgba(15,23,42,0.1)]"
       role="region"
       aria-label="Onboarding preview review actions"

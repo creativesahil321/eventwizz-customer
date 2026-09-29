@@ -215,14 +215,14 @@ function getDateCardFooterClass(
     return `${base} bg-gradient-to-b from-red-600 to-red-800 text-white font-semibold border-t border-red-500/40 tracking-wide`;
   }
   if (visual.isSelecting) {
-    return `${base} bg-gradient-to-b from-[var(--color-primary)]/95 to-[#232a61]`;
+    return `${base} bg-gradient-to-b from-[var(--color-primary)]/95 to-[color-mix(in_srgb,var(--color-primary)_70%,black)]`;
   }
   if (visual.isInCart) {
     return inCartStyle === "green"
       ? `${base} bg-gradient-to-b from-green-500 to-green-700`
       : `${base} bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-primary)]/80 text-white font-semibold shadow-lg`;
   }
-  return `${base} bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] hover:from-[var(--color-primary)]/90 hover:to-[#232a61]/90 hover:shadow-lg`;
+  return `${base} bg-gradient-to-b from-[var(--color-primary)] to-[color-mix(in_srgb,var(--color-primary)_70%,black)] hover:from-[var(--color-primary)]/90 hover:to-[color-mix(in_srgb,var(--color-primary)_62%,black)] hover:shadow-lg`;
 }
 
 function DateCardSelectingIndicator() {

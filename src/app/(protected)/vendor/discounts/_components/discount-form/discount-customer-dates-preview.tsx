@@ -262,7 +262,7 @@ export function DiscountCustomerDatesPreview({
                           <p className="text-xs font-medium">Date</p>
                         )}
                       </div>
-                      <div className="bg-gradient-to-b from-[var(--color-primary)] to-[#232a61]">
+                      <div className="bg-gradient-to-b from-[var(--color-primary)] to-[color-mix(in_srgb,var(--color-primary)_70%,black)]">
                         {needsOfferPrompt ? (
                           <DateCardPriceFooter
                             currencySymbol={currencySymbol}

@@ -100,7 +100,7 @@ export const DateCard = ({
           {dateInfo.month}
         </p>
       </div>
-      <div className="bg-gradient-to-b from-[var(--color-primary)] to-[#232a61] text-white">
+      <div className="bg-gradient-to-b from-[var(--color-primary)] to-[color-mix(in_srgb,var(--color-primary)_70%,black)] text-white">
         <DateCardPriceFooter
           currencySymbol={currencySymbol}
           listPrice={Number.isFinite(listPrice) ? listPrice : 0}

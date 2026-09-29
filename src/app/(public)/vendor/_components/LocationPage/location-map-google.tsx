@@ -196,6 +196,8 @@ export default function GoogleLocationMap({
           ],
         },
         streetViewControl: false,
+        // "auto" turns greedy inside preview frames (the page itself doesn't scroll).
+        gestureHandling: "cooperative",
       });
 
       mapInstanceRef.current = mapInstance;
