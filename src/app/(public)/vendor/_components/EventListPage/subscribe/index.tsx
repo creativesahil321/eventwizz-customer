@@ -218,7 +218,7 @@ function CustomerSubscribeCard() {
           </Button>
         )}
       </div>
-      <p className="mx-auto mt-4 max-w-md text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:mt-5 sm:text-[13px]">
+      <p className="mx-auto mt-4 max-w-md text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:mt-5 sm:text-[13px] @max-md/preview:!text-xs">
         No spam. Only event updates. Unsubscribe anytime.
       </p>
     </>
@@ -443,7 +443,7 @@ function GuestSubscribeForm() {
         </Button>
       </form>
 
-      <p className="mx-auto mt-4 max-w-md text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:mt-5 sm:text-[13px]">
+      <p className="mx-auto mt-4 max-w-md text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:mt-5 sm:text-[13px] @max-md/preview:!text-xs">
         No spam. Only event updates. Unsubscribe anytime.
       </p>
     </>

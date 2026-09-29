@@ -158,16 +158,16 @@ export function EventRoomChooser({
                 </div>
 
                 <div className="flex flex-1 flex-col gap-2 p-4 sm:p-5">
-                  <h3 className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg">
+                  <h3 className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg @max-md/preview:!text-base">
                     {room.name}
                   </h3>
 
                   {isDisabled ? (
-                    <p className="text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm">
+                    <p className="text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm @max-md/preview:!text-xs">
                       Dates not available for this room yet.
                     </p>
                   ) : room.highlights.length > 0 ? (
-                    <p className="line-clamp-2 text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm">
+                    <p className="line-clamp-2 text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm @max-md/preview:!text-xs">
                       {room.highlights.join(" • ")}
                     </p>
                   ) : null}

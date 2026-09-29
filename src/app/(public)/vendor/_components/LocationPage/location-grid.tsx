@@ -293,7 +293,7 @@ export default function LocationGrid({
                               <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">
                                 Next up
                               </p>
-                              <p className="line-clamp-2 text-sm font-semibold leading-snug text-white sm:text-base">
+                              <p className="line-clamp-2 text-sm font-semibold leading-snug text-white sm:text-base @max-md/preview:!text-sm">
                                 {upcomingEvent.name}
                               </p>
                               <p className="flex items-center gap-1.5 text-sm text-white/75">

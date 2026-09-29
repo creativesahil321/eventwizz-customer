@@ -354,7 +354,7 @@ export function VendorMainLandingView({
               )}
             />
 
-            <p className="mx-auto w-full max-w-2xl text-center text-sm leading-relaxed text-white/85 sm:text-base">
+            <p className="mx-auto w-full max-w-2xl text-center text-sm leading-relaxed text-white/85 sm:text-base @max-md/preview:!text-sm">
               {heroSubheading}
             </p>
           </motion.div>
@@ -383,7 +383,7 @@ export function VendorMainLandingView({
               }}
             />
             {nearMeActive ? (
-              <p className="mt-3 text-center text-xs text-white/75 sm:text-sm">
+              <p className="mt-3 text-center text-xs text-white/75 sm:text-sm @max-md/preview:!text-xs">
                 Showing events nearest to you
               </p>
             ) : null}

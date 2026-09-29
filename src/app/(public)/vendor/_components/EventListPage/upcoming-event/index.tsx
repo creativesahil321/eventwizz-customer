@@ -100,7 +100,7 @@ export default function UpcomingEvents({
               <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300">
                 <div className="flex items-center space-x-3">
                   <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                  <span className="text-xl md:text-2xl font-bold text-white tracking-wider">
+                  <span className="text-xl md:text-2xl font-bold text-white tracking-wider @max-md/preview:!text-xl">
                     COMING SOON
                   </span>
                   <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>

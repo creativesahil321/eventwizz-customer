@@ -35,7 +35,7 @@ function ContactCard({
       <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--color-text-dimmed)]">
         {label}
       </p>
-      <p className="mt-1.5 break-words text-sm font-medium leading-snug text-[color:var(--color-text)] md:text-base">
+      <p className="mt-1.5 break-words text-sm font-medium leading-snug text-[color:var(--color-text)] md:text-base @max-md/preview:!text-sm">
         {value}
       </p>
     </>

@@ -46,7 +46,7 @@ function AboutHeroSection({
           )}
         >
           <h2
-            className="text-2xl md:text-3xl font-bold text-center break-words"
+            className="text-2xl md:text-3xl font-bold text-center break-words @max-md/preview:!text-2xl"
             style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
           >
             {title || "e.g. About your venue"}
@@ -54,7 +54,7 @@ function AboutHeroSection({
         </div>
         <div className="w-full min-w-0 flex flex-col gap-6">
           <p
-            className="text-base md:text-lg text-[var(--color-text-dimmed)] break-words"
+            className="text-base md:text-lg text-[var(--color-text-dimmed)] break-words @max-md/preview:!text-base"
             dangerouslySetInnerHTML={{
               __html:
                 description ||

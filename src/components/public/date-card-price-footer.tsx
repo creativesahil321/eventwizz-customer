@@ -60,7 +60,7 @@ export function DateCardPriceFooter({
           "block px-1 font-semibold tracking-wider text-white",
           compact
             ? "py-1 text-xs"
-            : "py-1.5 text-xs sm:text-base",
+            : "py-1.5 text-xs sm:text-base @max-md/preview:!text-xs",
           className,
         )}
       >
@@ -83,7 +83,7 @@ export function DateCardPriceFooter({
         "inline-flex items-center justify-center gap-1.5 font-semibold tracking-wide text-white",
         compact
           ? "text-sm leading-none"
-          : "text-sm leading-none sm:text-lg sm:tracking-wider",
+          : "text-sm leading-none sm:text-lg sm:tracking-wider @max-md/preview:!text-sm",
       )}
     >
       <BookingTypeIcons

@@ -151,7 +151,7 @@ export function EventCouponStrip({
             </div>
             {headline?.trim() ? (
               <p
-                className="mt-0.5 truncate text-sm font-semibold leading-snug sm:text-base"
+                className="mt-0.5 truncate text-sm font-semibold leading-snug sm:text-base @max-md/preview:!text-sm"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {headline}

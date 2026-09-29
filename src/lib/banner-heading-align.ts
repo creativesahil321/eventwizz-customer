@@ -109,7 +109,9 @@ export function heroBannerBodyClass(
 ): string {
   return cn(
     "w-full max-w-xl overflow-visible break-words text-pretty text-sm leading-relaxed text-white/85 [overflow-wrap:anywhere] sm:max-w-2xl sm:text-base sm:leading-relaxed",
-    "@max-md/preview:!max-w-full @max-md/preview:!text-sm @max-md/preview:!leading-snug",
+    // Size is pinned so a narrow frame ignores sm:/md: steps; leading is left
+    // alone so the preview matches a real phone (was `!leading-snug`, tighter).
+    "@max-md/preview:!max-w-full @max-md/preview:!text-sm",
     measureAlignClass(align, scope?.fromMd),
     !scope?.fromMd && align === "center" && "text-center",
     !scope?.fromMd && align === "left" && "text-left",

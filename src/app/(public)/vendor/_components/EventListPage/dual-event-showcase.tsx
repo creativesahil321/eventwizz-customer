@@ -103,7 +103,7 @@ export function DualEventShowcase({
         ) : null}
 
         {footnote ? (
-          <p className="mx-auto mt-5 max-w-lg text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm">
+          <p className="mx-auto mt-5 max-w-lg text-center text-xs leading-relaxed text-[var(--color-text-dimmed)] sm:text-sm @max-md/preview:!text-xs">
             {footnote}
           </p>
         ) : null}

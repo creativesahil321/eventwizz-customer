@@ -144,7 +144,7 @@ export default function LocationSelectionHeader({
       />
     </div>
   ) : (
-    <span className="max-w-[10rem] truncate text-base font-bold sm:max-w-[14rem] sm:text-lg lg:text-xl">
+    <span className="max-w-[10rem] truncate text-base font-bold sm:max-w-[14rem] sm:text-lg lg:text-xl @max-md/preview:!text-base">
       {name || "EventWizz"}
     </span>
   );

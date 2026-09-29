@@ -80,7 +80,7 @@ export function LocationEventHeroCard({
       />
 
       {fromPrice ? (
-        <div className="absolute right-3 top-3 z-[1] inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold tabular-nums leading-none text-[var(--color-primary-foreground)] shadow-md md:right-4 md:top-4 md:px-3.5 md:py-2 md:text-sm">
+        <div className="absolute right-3 top-3 z-[1] inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-xs font-bold tabular-nums leading-none text-[var(--color-primary-foreground)] shadow-md md:right-4 md:top-4 md:px-3.5 md:py-2 md:text-sm @max-md/preview:!text-xs">
           <BookingTypeIcons
             bookingType={event.bookingType}
             size={12}
@@ -107,7 +107,7 @@ export function LocationEventHeroCard({
           )}
         />
         {event.dateLabel || event.timeLabel ? (
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-white/90 sm:text-sm">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-white/90 sm:text-sm @max-md/preview:!text-xs">
             {event.dateLabel ? (
               <span className="inline-flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
@@ -129,7 +129,7 @@ export function LocationEventHeroCard({
           </div>
         ) : null}
         {!event.dateLabel && !event.timeLabel && placeLabel ? (
-          <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
+          <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm @max-md/preview:!text-xs">
             <MapPin className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
             <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] line-clamp-2">{placeLabel}</span>
           </div>

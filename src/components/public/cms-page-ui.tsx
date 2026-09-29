@@ -63,13 +63,13 @@ export function CmsPageLayout({
               {brandName}
             </p>
             <h1
-              className="mt-3 text-3xl font-bold tracking-tight text-[color:var(--color-text)] md:mt-4 md:text-4xl lg:text-[2.75rem] lg:leading-tight"
+              className="mt-3 text-3xl font-bold tracking-tight text-[color:var(--color-text)] md:mt-4 md:text-4xl lg:text-[2.75rem] lg:leading-tight @max-md/preview:!text-3xl"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {title}
             </h1>
             {subtitle ? (
-              <p className="mt-4 max-w-2xl text-base leading-relaxed text-[color:var(--color-text-dimmed)] md:text-lg">
+              <p className="mt-4 max-w-2xl text-base leading-relaxed text-[color:var(--color-text-dimmed)] md:text-lg @max-md/preview:!text-base">
                 {subtitle}
               </p>
             ) : null}

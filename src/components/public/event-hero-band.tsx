@@ -336,7 +336,10 @@ export function EventHeroBand({
             <p
               className={cn(
                 // Body scale, not display: sm → base → lg, compact inside phone preview frames.
-                "line-clamp-3 max-w-2xl text-sm leading-relaxed text-white/85 sm:text-base md:text-lg @max-md/preview:!text-sm @max-md/preview:!leading-snug",
+                // `!text-sm` cancels sm:/md: sizes inside a narrow preview frame (the
+                // preview viewport is wide). Leading stays `relaxed` so the frame
+                // matches a real phone exactly — `!leading-snug` made it tighter.
+                "line-clamp-3 max-w-2xl text-sm leading-relaxed text-white/85 sm:text-base md:text-lg @max-md/preview:!text-sm",
                 heroBannerSubheadingClass(bannerAlign, { fromMd: true }),
               )}
             >

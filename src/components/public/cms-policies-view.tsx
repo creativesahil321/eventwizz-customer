@@ -109,7 +109,7 @@ export function CmsPoliciesView({
           <CmsContentPanel>
             <div className="mb-6 border-b border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] pb-6">
               <h2
-                className="text-2xl font-bold tracking-tight text-[color:var(--color-text)] md:text-3xl"
+                className="text-2xl font-bold tracking-tight text-[color:var(--color-text)] md:text-3xl @max-md/preview:!text-2xl"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {activeContent.title}

@@ -85,20 +85,20 @@ export default function HotelSearch({ moreInfo }: MoreInfoList) {
               >
                 {info.description || "No description provided"}
               </p>
-              <p className="text-lg sm:text-xl text-muted-foreground">
+              <p className="text-lg sm:text-xl text-muted-foreground @max-md/preview:!text-lg">
                 {info.phone_number || "N/A"}
               </p>
               {info.button_name && info.button_link ? (
                 <Link
                   href={info.button_link}
-                  className="mt-4 sm:mt-5 inline-block rounded-full bg-foreground text-background py-2 sm:py-3 px-5 sm:px-6 text-xs sm:text-sm hover:bg-foreground/90"
+                  className="mt-4 sm:mt-5 inline-block rounded-full bg-foreground text-background py-2 sm:py-3 px-5 sm:px-6 text-xs sm:text-sm hover:bg-foreground/90 @max-md/preview:!text-xs"
                 >
                   {info.button_name}
                 </Link>
               ) : (
                 <Button
                   variant="outline"
-                  className="mt-4 sm:mt-5 rounded-full py-2 sm:py-3 px-5 sm:px-6 text-xs sm:text-sm"
+                  className="mt-4 sm:mt-5 rounded-full py-2 sm:py-3 px-5 sm:px-6 text-xs sm:text-sm @max-md/preview:!text-xs"
                   disabled
                 >
                   Find Out More

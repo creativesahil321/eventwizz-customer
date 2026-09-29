@@ -30,7 +30,7 @@ export function PublicHeroBreadcrumbs({
     <nav
       aria-label="Breadcrumb"
       className={cn(
-        "text-xs font-medium tracking-wide text-white/80 sm:text-sm",
+        "text-xs font-medium tracking-wide text-white/80 sm:text-sm @max-md/preview:!text-xs",
         centerOnNarrow
           ? "text-center"
           : heroHeadingAlignClass(align, { fromMd: true }),

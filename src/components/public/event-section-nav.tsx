@@ -463,7 +463,7 @@ export function EventSectionNav({
           <button
             type="button"
             onClick={jumpToBook}
-            className="inline-flex h-8 items-center rounded-full bg-[color:var(--color-primary)] px-3 text-xs font-semibold text-[color:var(--color-primary-foreground,white)] shadow-sm transition-opacity hover:opacity-95 sm:h-9 sm:px-4 sm:text-sm"
+            className="inline-flex h-8 items-center rounded-full bg-[color:var(--color-primary)] px-3 text-xs font-semibold text-[color:var(--color-primary-foreground,white)] shadow-sm transition-opacity hover:opacity-95 sm:h-9 sm:px-4 sm:text-sm @max-md/preview:!text-xs"
           >
             Book now
           </button>

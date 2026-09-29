@@ -76,7 +76,10 @@ export default function AboutEventSec({
             />
           </div>
           <div
-            className="prose prose-sm mt-6 max-w-[64ch] text-[var(--color-text)] prose-headings:text-[var(--color-text)] prose-p:text-left prose-p:text-[var(--color-text-dimmed)] prose-strong:text-[var(--color-text)] prose-p:leading-relaxed sm:prose-base @max-md/preview:!mt-6 @max-md/preview:sm:!text-sm"
+            // Paragraph type is pinned with `[&_p]:` (beats prose's zero-specificity
+            // :where rules) instead of prose-sm / sm:prose-base, so the live page and
+            // the preview frame render the same 16px/relaxed body at every width.
+            className="prose mt-6 max-w-[64ch] text-[var(--color-text)] prose-headings:text-[var(--color-text)] prose-p:text-left prose-p:text-[var(--color-text-dimmed)] prose-strong:text-[var(--color-text)] [&_p]:text-base [&_p]:leading-relaxed @max-md/preview:!mt-6"
             style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
             dangerouslySetInnerHTML={{
               __html: about_event_description || defaultDescription,
@@ -95,7 +98,7 @@ export default function AboutEventSec({
                       <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--color-text-dimmed)] sm:tracking-[0.16em]">
                         {highlight.label}
                       </dt>
-                      <dd className="mt-1 break-words text-sm font-semibold leading-snug text-[var(--color-text)] sm:mt-1.5 sm:text-base">
+                      <dd className="mt-1 break-words text-sm font-semibold leading-snug text-[var(--color-text)] sm:mt-1.5 sm:text-base @max-md/preview:!text-sm">
                         {highlight.value}
                       </dd>
                     </div>

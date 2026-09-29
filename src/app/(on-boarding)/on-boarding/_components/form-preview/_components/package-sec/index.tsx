@@ -154,7 +154,7 @@ export default function PackageSection({
               className="max-w-3xl min-w-0 break-words [overflow-wrap:anywhere]"
             />
             {subTrim ? (
-              <p className="mt-2 max-w-full min-w-0 break-words text-base font-semibold leading-snug text-[var(--color-text)] [overflow-wrap:anywhere] md:text-lg">
+              <p className="mt-2 max-w-full min-w-0 break-words text-base font-semibold leading-snug text-[var(--color-text)] [overflow-wrap:anywhere] md:text-lg @max-md/preview:!text-base">
                 {highlightPricesInText(subTrim, currencySymbol)}
               </p>
             ) : null}
@@ -189,7 +189,7 @@ export default function PackageSection({
                           aria-hidden
                         />
                       </span>
-                      <span className="min-w-0 max-w-full break-words text-sm font-medium leading-snug text-[var(--color-text)] [overflow-wrap:anywhere] md:text-base">
+                      <span className="min-w-0 max-w-full break-words text-sm font-medium leading-snug text-[var(--color-text)] [overflow-wrap:anywhere] md:text-base @max-md/preview:!text-sm">
                         {item.title}
                       </span>
                     </li>

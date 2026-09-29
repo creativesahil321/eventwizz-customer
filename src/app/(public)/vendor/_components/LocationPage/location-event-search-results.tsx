@@ -73,7 +73,7 @@ export function LocationEventSearchResults({
               align="left"
               className="break-words"
             />
-            <p className="mt-0.5 text-xs text-[var(--color-text-dimmed)] sm:mt-1 sm:text-sm">
+            <p className="mt-0.5 text-xs text-[var(--color-text-dimmed)] sm:mt-1 sm:text-sm @max-md/preview:!text-xs">
               {count === 0
                 ? "No events match your search"
                 : `${count} event${count === 1 ? "" : "s"} found`}
@@ -83,7 +83,7 @@ export function LocationEventSearchResults({
           <button
             type="button"
             onClick={onClear}
-            className="mt-0.5 inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)] sm:mt-1 sm:h-10 sm:px-4 sm:text-sm"
+            className="mt-0.5 inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--color-text)_14%,transparent)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)] sm:mt-1 sm:h-10 sm:px-4 sm:text-sm @max-md/preview:!text-xs"
           >
             Clear
           </button>
