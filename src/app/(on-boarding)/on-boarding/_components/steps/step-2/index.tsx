@@ -795,8 +795,6 @@ export default function StepTwo() {
                   />
                   <GuidedSectionActionFooter
                     isActive={guided.currentSectionIndex === 1}
-                    sectionLabel={guided.sectionFlow[1]?.label ?? "Banner"}
-                    sectionProgress={`2 / ${guided.sectionFlow.length}`}
                   >
                     <GuidedSectionCoreActions guided={guided} />
                   </GuidedSectionActionFooter>

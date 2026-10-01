@@ -61,6 +61,11 @@ function buildSsrDomainValue(
 export const DomainProvider = ({ children }: { children: ReactNode }) => {
   // Use the Zustand store
   const domainStore = useDomainStore();
+  // Stable action reference. `domainStore` is a fresh object on every store
+  // write, so depending on it below re-ran the effect after each `setDomain`;
+  // when the theme API returned no settings the early-return guard never
+  // matched and the two looped until React threw "Maximum update depth".
+  const setDomain = useDomainStore((state) => state.setDomain);
   const serverContext = useContext(ServerContext);
 
   // Extract only the values we need to check for changes
@@ -87,7 +92,7 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
       const detectedDomain = getDomain();
 
       if (!detectedDomain) {
-        domainStore.setDomain({
+        setDomain({
           domain: null,
           tenantId: null,
           website_role: null,
@@ -112,7 +117,7 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
 
         const tenantData = buildTenantDataFromTheme(clientHost, ssrTheme);
         primeTenantDataCache(clientHost, tenantData);
-        domainStore.setDomain({
+        setDomain({
           domain: detectedDomain,
           tenantId: tenantData.tenantId,
           website_role: tenantData.website_role,
@@ -131,7 +136,7 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const tenantData = await getTenantIdFromDomain(detectedDomain);
-        domainStore.setDomain({
+        setDomain({
           domain: detectedDomain,
           tenantId: tenantData?.tenantId || null,
           website_role: tenantData?.website_role || null,
@@ -142,7 +147,7 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
         });
       } catch (error) {
         console.error("Error loading domain data", error);
-        domainStore.setDomain({
+        setDomain({
           domain: detectedDomain,
           tenantId: null,
           website_role: null,
@@ -159,7 +164,7 @@ export const DomainProvider = ({ children }: { children: ReactNode }) => {
     currentDomain,
     currentSettings,
     isLoading,
-    domainStore,
+    setDomain,
     serverContext.theme,
     serverContext.host,
   ]);

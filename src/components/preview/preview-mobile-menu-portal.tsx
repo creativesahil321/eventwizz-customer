@@ -38,18 +38,25 @@ export function PreviewMobileMenuPortal({
 
   useLayoutEffect(() => {
     if (!pinToFrame) return;
-    const update = () => setViewport(readPreviewFrameViewport(host));
-    update();
-    const observer =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
-    observer?.observe(host);
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+    // The frame can move without resizing (editor side panel toggles, CSS
+    // transitions), which no observer reports — track its box every frame.
+    let rafId = 0;
+    const track = () => {
+      const next = readPreviewFrameViewport(host);
+      setViewport((prev) =>
+        prev &&
+        prev.top === next.top &&
+        prev.left === next.left &&
+        prev.width === next.width &&
+        prev.height === next.height &&
+        prev.borderRadius === next.borderRadius
+          ? prev
+          : next,
+      );
+      rafId = requestAnimationFrame(track);
     };
+    track();
+    return () => cancelAnimationFrame(rafId);
   }, [host, pinToFrame]);
 
   const themeStyle = readPreviewThemeVarStyle(themeFrom);

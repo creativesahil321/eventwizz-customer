@@ -86,7 +86,12 @@ export function LocationEventCard({
   const showPlace = Boolean(placeLabel);
   const hasDistance =
     typeof event.distanceKm === "number" && Number.isFinite(event.distanceKm);
+  // Split so the `from` prefix can sit on the same line at a smaller size —
+  // as one string it wrapped onto two lines in a 152px column.
   const fromPrice = formatEventCardFromPrice(event.price);
+  const priceAmount = fromPrice
+    ? fromPrice.replace(/^from\s+/i, "").trim()
+    : null;
 
   const [imageSrc, setImageSrc] = useState(() => addCacheBusting(event.image));
   useEffect(() => {
@@ -140,7 +145,7 @@ export function LocationEventCard({
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col p-4 md:p-5 @max-md/preview:!p-4">
+      <div className="flex flex-1 flex-col p-3 sm:p-4 md:p-5 @max-md/preview:!p-3">
         <h3
           className={cn(
             PUBLIC_CARD_TITLE_CLASS,
@@ -152,17 +157,31 @@ export function LocationEventCard({
         </h3>
 
         {event.dateLabel || event.timeLabel ? (
-          <div className={cn("mt-2 space-y-1", PUBLIC_METADATA_TEXT_CLASS)}>
+          <div
+            className={cn(
+              "mt-1.5 space-y-0.5 sm:mt-2 sm:space-y-1",
+              PUBLIC_METADATA_TEXT_CLASS,
+              // Two cards per row leaves ~120px of text: at `text-sm` the date and
+              // the time range each wrapped to two lines, adding ~60px per card.
+              "text-xs sm:text-sm @max-md/preview:!text-xs",
+            )}
+          >
             {event.dateLabel ? (
-              <p className="flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                <span>{event.dateLabel}</span>
+              <p className="flex min-w-0 items-center gap-1.5">
+                <Calendar
+                  className="h-3 w-3 shrink-0 opacity-80 sm:h-3.5 sm:w-3.5 @max-md/preview:!h-3 @max-md/preview:!w-3"
+                  aria-hidden
+                />
+                <span className="truncate">{event.dateLabel}</span>
               </p>
             ) : null}
             {event.timeLabel ? (
-              <p className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                <span>{event.timeLabel}</span>
+              <p className="flex min-w-0 items-center gap-1.5">
+                <Clock
+                  className="h-3 w-3 shrink-0 opacity-80 sm:h-3.5 sm:w-3.5 @max-md/preview:!h-3 @max-md/preview:!w-3"
+                  aria-hidden
+                />
+                <span className="truncate">{event.timeLabel}</span>
               </p>
             ) : null}
           </div>
@@ -171,29 +190,37 @@ export function LocationEventCard({
         {showPlace && placeLabel ? (
           <p className="mt-1.5 flex items-start gap-1 text-xs font-medium text-[var(--color-text-dimmed)]">
             <MapPin className="mt-0.5 h-3 w-3 shrink-0 opacity-90" aria-hidden />
-            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] line-clamp-2">
+            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] line-clamp-1 sm:line-clamp-2 @max-md/preview:!line-clamp-1">
               {placeLabel}
             </span>
           </p>
         ) : null}
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-          {fromPrice ? (
-            <span className="inline-flex min-w-0 items-center gap-1.5">
+        <div className="mt-auto flex items-center justify-between gap-2 pt-3 sm:pt-4">
+          {priceAmount ? (
+            <span className="inline-flex min-w-0 items-baseline gap-1">
               <BookingTypeIcons
                 bookingType={event.bookingType}
                 size={14}
-                className="shrink-0 text-[color:var(--color-primary)]"
+                className="shrink-0 self-center text-[color:var(--color-primary)]"
                 labelled
               />
-              <span className={cn(PUBLIC_PRICE_TEXT_CLASS, "min-w-0 break-words")}>
-                {fromPrice}
+              <span className="shrink-0 text-[11px] font-medium text-[var(--color-text-dimmed)] sm:text-xs">
+                from
+              </span>
+              <span
+                className={cn(
+                  PUBLIC_PRICE_TEXT_CLASS,
+                  "min-w-0 truncate !text-base sm:!text-lg @max-md/preview:!text-base",
+                )}
+              >
+                {priceAmount}
               </span>
             </span>
           ) : (
             <span />
           )}
-          <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-[var(--color-primary)] px-3 text-xs font-semibold text-[var(--color-primary-foreground)]">
+          <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-[var(--color-primary)] px-2.5 text-[11px] font-semibold text-[var(--color-primary-foreground)] sm:px-3 sm:text-xs">
             View
           </span>
         </div>

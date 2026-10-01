@@ -21,7 +21,6 @@ import {
 } from "./_lib/use-onboarding-preview-queries";
 import { mapOnboardingEventToDetailData } from "./_lib/map-onboarding-event-to-detail";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
-import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
 import {
   OnboardingPreviewReviewChrome,
   type OnboardingPreviewTab,
@@ -472,11 +471,8 @@ function OnboardingPreviewContent() {
         </div>
         <PreviewDeviceFrame
           ref={deviceFrameRef}
-          stageClassName="min-h-0 flex-1 items-stretch bg-slate-900 px-2 pb-2 pt-1 sm:px-4"
+          stageClassName="min-h-0 flex-1 items-stretch bg-slate-900 px-2 pb-[calc(var(--preview-review-chrome-height,8rem)+0.5rem)] pt-1 sm:px-4"
           frameClassName="min-h-0"
-          style={{
-            paddingBottom: `var(${PREVIEW_REVIEW_CHROME_HEIGHT_VAR}, 8rem)`,
-          }}
         >
           {/* Main Landing Page */}
           {activeTab === "main-landing" && mainPreviewData && (

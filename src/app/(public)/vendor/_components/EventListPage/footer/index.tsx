@@ -29,7 +29,6 @@ import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { cn } from "@/lib/utils";
 import { hasPlainText, toPlainSnippet } from "@/lib/plain-text-length";
 import { firstFooterBrandDescription } from "@/lib/footer-brand-description";
-import { PREVIEW_REVIEW_CHROME_HEIGHT_VAR } from "@/hooks/use-preview-review-chrome-height";
 import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
 import { PreviewEditRegion } from "@/components/preview/preview-edit-hint";
 
@@ -308,13 +307,6 @@ export default function FooterSection({
     !isPreviewMode ||
     Boolean(pathname?.includes("/preview/site")) ||
     Boolean(pathname?.includes("/preview/event"));
-  /**
-   * Fixed bottom review chrome exists on site/onboarding preview only.
-   * Event preview (`/preview/event`, editor embed) has no chrome — do not pad.
-   */
-  const needsReviewChromePadding =
-    Boolean(pathname?.includes("/preview/site")) ||
-    Boolean(pathname?.includes("/preview/onboarding"));
   /** Live site uses vendor theme; preview passes site-essentials so we never use platform dummy contact. */
   const themeForContact = contactTheme ?? vendorTheme;
 
@@ -456,13 +448,6 @@ export default function FooterSection({
     <footer
       data-preview-footer=""
       className="bg-[color:var(--color-footer)] text-[var(--color-on-footer)]"
-      style={
-        needsReviewChromePadding
-          ? {
-              paddingBottom: `var(${PREVIEW_REVIEW_CHROME_HEIGHT_VAR}, 9rem)`,
-            }
-          : undefined
-      }
     >
       <div className={cn(PUBLIC_CHROME_CONTAINER_CLASS, "py-8 sm:py-14")}>
         <div

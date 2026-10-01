@@ -389,7 +389,7 @@ export default function LocationSelectionHeader({
                 disabled={isPreviewMode}
                 pillGlassOnHero={false}
                 triggerClassName="!h-11 !w-full !rounded-xl !px-4 justify-center font-semibold"
-                menuContentClassName="!w-full max-w-none"
+                menuContentClassName="z-[310] !w-[var(--radix-dropdown-menu-trigger-width)] max-w-none"
                 onLocationNavigate={() => {
                   setMobileMenuOpen(false);
                 }}

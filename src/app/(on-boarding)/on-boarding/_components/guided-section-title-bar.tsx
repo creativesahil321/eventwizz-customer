@@ -93,6 +93,7 @@ export function GuidedSectionTitleBar({
   title,
   className,
 }: Props) {
+  const sectionTotal = guided.sectionFlow.length;
   return (
     <div
       className={cn(
@@ -105,6 +106,14 @@ export function GuidedSectionTitleBar({
           {title}
         </OnboardingSectionTitle>
       </div>
+      {sectionTotal > 1 ? (
+        <span
+          className="shrink-0 text-[11px] font-medium text-slate-400 tabular-nums"
+          aria-label={`Section ${sectionIndex + 1} of ${sectionTotal}`}
+        >
+          {sectionIndex + 1} / {sectionTotal}
+        </span>
+      ) : null}
       <GuidedSectionUnlockButton
         sectionIndex={sectionIndex}
         sectionId={sectionId}
