@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SkipLink } from "@/components/public/skip-link";
 
 /** Shared rich-text styles for CMS HTML content */
 export const CMS_PROSE_CLASS =
@@ -54,8 +55,9 @@ export function CmsPageLayout({
   return (
     // Full-height column: on tall screens (TV / zoomed out) the footer stays at the bottom.
     <div className="flex min-h-screen flex-col bg-[color:var(--color-background)]">
+      <SkipLink />
       {header}
-      <main className="min-h-[60vh] flex-1 bg-[color:var(--color-background)] pt-20 md:pt-24">
+      <main id="main-content" className="min-h-[60vh] flex-1 bg-[color:var(--color-background)] pt-20 md:pt-24">
         <section className="border-b border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-text)_3%,var(--color-surface))] py-8 md:py-10 lg:py-12">
           <div
             className={`mx-auto px-4 md:px-6 ${wide ? "max-w-6xl" : "max-w-4xl"}`}

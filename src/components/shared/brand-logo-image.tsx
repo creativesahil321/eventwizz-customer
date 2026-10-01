@@ -106,6 +106,9 @@ export function BrandLogoImage({
       width={width}
       height={height}
       decoding="async"
+      // A logo is never the LCP element; keep it from competing with the hero
+      // image for bandwidth on slow connections.
+      fetchPriority="low"
       style={{ filter }}
       className={cn("h-auto w-auto object-contain", className)}
     />

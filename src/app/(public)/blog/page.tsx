@@ -6,6 +6,7 @@ import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
 import { BLOG_LIST_PER_PAGE, blogPublicPaths } from "@/lib/blogs";
 import { getPublishedBlogsForRequest } from "@/lib/blogs/public-api";
 import BlogListingContent from "./_components/blog-listing-content";
+import { SkipLink } from "@/components/public/skip-link";
 
 export const metadata: Metadata = {
   title: "Blog - Latest News & Articles",
@@ -35,8 +36,9 @@ export default async function BlogListingPage() {
   return (
     // Full-height column: on tall screens (TV / zoomed out) the footer stays at the bottom.
     <div className="flex min-h-screen flex-col">
+      <SkipLink />
       <AdminHeader />
-      <main className="flex-1 pt-24">
+      <main id="main-content" className="flex-1 pt-24">
         <BlogListingContent articles={articles} />
       </main>
       <AdminFooter />

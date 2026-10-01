@@ -7,6 +7,7 @@ import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
 import { resolveBlogMeta, blogPublicPaths } from "@/lib/blogs";
 import { getPublishedBlogBySlugForRequest } from "@/lib/blogs/public-api";
 import BlogArticleContent from "./_components/blog-article-content";
+import { SkipLink } from "@/components/public/skip-link";
 
 interface BlogArticlePageProps {
   params: Promise<{ slug: string }>;
@@ -53,8 +54,9 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
   return (
     // Full-height column: on tall screens (TV / zoomed out) the footer stays at the bottom.
     <div className="flex min-h-screen flex-col">
+      <SkipLink />
       <AdminHeader />
-      <main className="flex-1 pt-24 font-body text-[color:var(--color-text)]">
+      <main id="main-content" className="flex-1 pt-24 font-body text-[color:var(--color-text)]">
         <BlogArticleContent post={post} />
       </main>
       <AdminFooter />

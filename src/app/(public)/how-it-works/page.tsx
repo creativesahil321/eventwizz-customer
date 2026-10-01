@@ -5,6 +5,7 @@ import HowItWorksContent from "./_components/how-it-works-content";
 import { appConfig } from "@/config/app";
 import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
 import { fetchInfoPagesHtml } from "@/lib/server-info-pages";
+import { SkipLink } from "@/components/public/skip-link";
 
 export const metadata: Metadata = {
   title: "How It Works - Event Management Process",
@@ -39,8 +40,9 @@ export default async function HowItWorksPage() {
   return (
     // Full-height column: on tall screens (TV / zoomed out) the footer stays at the bottom.
     <div className="flex min-h-screen flex-col">
+      <SkipLink />
       <AdminHeader />
-      <main className="flex-1 pt-24">
+      <main id="main-content" className="flex-1 pt-24">
         <HowItWorksContent
           contentHtml={content.how_it_works_page_content ?? null}
         />

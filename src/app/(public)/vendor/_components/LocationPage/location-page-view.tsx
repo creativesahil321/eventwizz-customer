@@ -46,6 +46,7 @@ import {
   useLocationPageSearch,
 } from "./location-page-hero-search";
 import { resolveVendorHasMultipleLocations } from "./_lib/search-filters";
+import { SkipLink } from "@/components/public/skip-link";
 
 export type LocationPagePreviewEdit = {
   onEditCover?: () => void;
@@ -290,6 +291,7 @@ export function LocationPageView({
 
   return (
     <HeadingEmphasisOverrideProvider value={headingEmphasis}>
+      {mainLandmark ? <SkipLink /> : null}
       <CommonHeader
         variant={headerVariant}
         locationSlug={locationSlug}

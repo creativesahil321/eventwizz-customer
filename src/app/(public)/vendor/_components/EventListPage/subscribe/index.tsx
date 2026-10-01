@@ -1,7 +1,7 @@
 "use client";
 
 import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Info, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
   useCustomerNewsletterToggle,
   usePublicSubscribe,
   useResendNewsletterConfirmation,
+  useSyncCustomerNewsletterFlag,
   useThemeNewsletterSubscription,
   type NewsletterSubscribeResult,
   type SubscribePayload,
@@ -44,6 +45,29 @@ export default function SubscribeSection({
   const accountType = useAuthStore((s) => s.account_type);
   const { isLoggedInCustomer } = useThemeNewsletterSubscription();
 
+  // Fetch the customer's newsletter flag only when this section is close to
+  // the viewport: it sits at the bottom of the page, so this keeps the extra
+  // theme request out of the initial page load (and skips it if never reached).
+  const sectionRef = useRef<HTMLElement>(null);
+  const [nearViewport, setNearViewport] = useState(false);
+  useEffect(() => {
+    if (nearViewport) return;
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setNearViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setNearViewport(true);
+      },
+      { rootMargin: "800px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [nearViewport]);
+  useSyncCustomerNewsletterFlag(nearViewport);
+
   const authPending = !isPreviewMode && !isSessionChecked;
   const awaitingCustomerTheme =
     !isPreviewMode &&
@@ -54,6 +78,7 @@ export default function SubscribeSection({
 
   return (
     <SubscribeShell
+      sectionRef={sectionRef}
       emphasis={emphasis}
       subtitle={
         isLoggedInCustomer
@@ -73,16 +98,18 @@ export default function SubscribeSection({
 }
 
 function SubscribeShell({
+  sectionRef,
   emphasis,
   subtitle,
   children,
 }: {
+  sectionRef?: React.Ref<HTMLElement>;
   emphasis?: HeadingEmphasis;
   subtitle: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn("relative overflow-hidden bg-[var(--color-surface)]", PUBLIC_SECTION_PY_CLASS)}>
+    <section ref={sectionRef} className={cn("relative overflow-hidden bg-[var(--color-surface)]", PUBLIC_SECTION_PY_CLASS)}>
       <div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,color-mix(in_srgb,var(--color-primary)_8%,transparent),transparent)]"
         aria-hidden

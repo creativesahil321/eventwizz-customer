@@ -7,11 +7,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import {
   useCustomerNewsletterToggle,
+  useSyncCustomerNewsletterFlag,
   useThemeNewsletterSubscription,
 } from "@/services/common/newsletter";
 
 export default function DashboardNewsletterCard() {
   const { settings } = useDomain();
+  // The dashboard shows the subscription status right away.
+  useSyncCustomerNewsletterFlag(true);
   const { isLoggedInCustomer, isSubscribed } = useThemeNewsletterSubscription();
   const toggle = useCustomerNewsletterToggle();
 

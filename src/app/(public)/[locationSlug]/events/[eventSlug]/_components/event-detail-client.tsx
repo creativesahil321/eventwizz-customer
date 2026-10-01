@@ -73,6 +73,7 @@ import {
   EVENT_SECTION_NAV_HEIGHT_PX,
   buildEventSectionNavItems,
 } from "@/components/public/event-section-nav";
+import { SkipLink } from "@/components/public/skip-link";
 import {
   EVENT_STICKY_SCROLL_MT_FALLBACK,
   buildEventStickyOffsetCssVar,
@@ -398,6 +399,7 @@ export default function EventDetailClient({
           }),
         }}
       >
+        <SkipLink />
         <CommonHeader
           variant="default"
           headerDownloads={pdfDownloadLinks}
