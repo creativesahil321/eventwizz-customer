@@ -1,4 +1,6 @@
 "use client";
+
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
 import * as React from "react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -109,7 +111,7 @@ export function EmailShowDialog({
             <div
               className="prose prose-sm max-w-full text-foreground opacity-80 break-words whitespace-normal"
               dangerouslySetInnerHTML={{
-                __html: displayBody,
+                __html: sanitizeHtml(displayBody),
               }}
             />
           </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -91,7 +93,7 @@ export default function RevolutioniseSection({
               />
               <div
                 className="space-y-4 text-[color:var(--color-text-dimmed)] leading-relaxed mb-8 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_a]:underline"
-                dangerouslySetInnerHTML={{ __html: content.body }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
               />
 
               <h3

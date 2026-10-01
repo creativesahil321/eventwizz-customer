@@ -5,6 +5,8 @@ import {
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
+import { safeFetch } from "@/lib/security/ssrf";
+import { guardPublicApi } from "@/lib/security/api-guard";
 
 type ColorTheme = {
   primary: string;
@@ -46,12 +48,12 @@ async function analyzeWebsiteTheme(url: string): Promise<{
   title?: string;
   colors: string[];
 }> {
-  const response = await fetch(url, {
+  // SSRF-safe: validates host + DNS and re-validates each redirect hop.
+  const response = await safeFetch(url, {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (compatible; EventWizzThemeBot/1.0; +https://eventwizz.com)",
     },
-    redirect: "follow",
     cache: "no-store",
   });
 
@@ -560,6 +562,9 @@ function validateContrast(colorTheme: ColorTheme): {
 }
 
 export async function POST(req: Request) {
+  const guard = guardPublicApi(req, "ai:color-theme", { limit: 15, windowMs: 60_000 });
+  if (guard) return guard;
+
   try {
     const {
       businessType,
@@ -596,10 +601,10 @@ export async function POST(req: Request) {
       try {
         websiteAnalysis = await analyzeWebsiteTheme(cleanUrl);
       } catch (error) {
+        // Do not leak the upstream/internal error detail (SSRF probing signal).
         return NextResponse.json(
           {
             error: "Could not analyze this website URL. Please check the link and try again.",
-            details: error instanceof Error ? error.message : "Unknown error",
           },
           { status: 400 },
         );

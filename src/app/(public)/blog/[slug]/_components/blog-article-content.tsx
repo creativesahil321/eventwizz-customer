@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { blogPublicPaths, formatBlogDateLong, type BlogPost } from "@/lib/blogs";
@@ -82,7 +83,7 @@ export default function BlogArticleContent({ post }: BlogArticleContentProps) {
           {post.content ? (
             <div
               className={BLOG_PROSE_CLASS}
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
             />
           ) : null}
 

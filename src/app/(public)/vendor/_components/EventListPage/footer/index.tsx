@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import Link from "next/link";
 import {
   Facebook,
@@ -567,7 +569,7 @@ export default function FooterSection({
           {resolvedCopyright ? (
             <div
               className="break-words text-xs leading-relaxed text-[var(--color-on-footer)]/70 [&_a]:underline [&_em]:italic [&_p]:mb-0 [&_strong]:font-semibold"
-              dangerouslySetInnerHTML={{ __html: resolvedCopyright }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(resolvedCopyright) }}
             />
           ) : (
             <p className="break-words text-xs leading-relaxed text-[var(--color-on-footer)]/70">

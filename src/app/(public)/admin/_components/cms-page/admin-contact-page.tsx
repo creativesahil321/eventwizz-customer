@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import Link from "next/link";
 import { useContext, useMemo } from "react";
 import { Clock, Mail, Phone } from "lucide-react";
@@ -134,7 +136,7 @@ export default function AdminContactPage({
       {content.body ? (
         <div
           className={`${CMS_PROSE_CLASS} mb-8 max-w-3xl`}
-          dangerouslySetInnerHTML={{ __html: content.body }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
         />
       ) : null}
 

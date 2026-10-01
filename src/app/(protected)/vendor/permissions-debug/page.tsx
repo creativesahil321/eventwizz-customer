@@ -1,7 +1,11 @@
+import { notFound } from "next/navigation";
 import PermissionDebug from "../permission-debug";
 import { PermissionRoute } from "@/components/permission";
 
 export default function PermissionsDebugPage() {
+  // Diagnostic page — hidden in production.
+  if (process.env.NODE_ENV === "production") notFound();
+
   return (
     <PermissionRoute
       permissionKey="read-dashboard"

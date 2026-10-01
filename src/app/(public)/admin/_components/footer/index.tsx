@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import { useContext } from "react";
 import Link from "next/link";
 import {
@@ -174,7 +176,7 @@ export default function AdminFooter() {
           {customCopyrightHtml ? (
             <div
               className="mx-auto max-w-4xl text-center text-xs leading-relaxed text-[var(--color-on-footer)]/65 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic [&_a]:underline [&_a]:transition-colors hover:[&_a]:text-[color:var(--color-primary)]"
-              dangerouslySetInnerHTML={{ __html: customCopyrightHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(customCopyrightHtml) }}
             />
           ) : (
             <>

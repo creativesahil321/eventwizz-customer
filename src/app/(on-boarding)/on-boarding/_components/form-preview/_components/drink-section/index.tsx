@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import { SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { useState, useEffect } from "react";
 import { useDrinkSelectionStore } from "@/store/drink-selection.store";
@@ -249,7 +251,7 @@ export default function DrinkSection({
                         hyphens: "auto",
                       }}
                       dangerouslySetInnerHTML={{
-                        __html: singlePackage.description || "",
+                        __html: sanitizeHtml(singlePackage.description || ""),
                       }}
                     />
                   </article>

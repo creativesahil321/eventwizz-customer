@@ -1,4 +1,5 @@
 import { LOGO_PROCESS_MAX_BYTES } from "./constants";
+import { safeFetch } from "@/lib/security/ssrf";
 
 const BLOCKED_HOSTS = new Set([
   "localhost",
@@ -62,8 +63,8 @@ export function assertSafeLogoUrl(rawUrl: string): URL {
 
 export async function fetchLogoBufferFromUrl(rawUrl: string): Promise<Buffer> {
   const url = assertSafeLogoUrl(rawUrl);
-  const response = await fetch(url.toString(), {
-    redirect: "follow",
+  // safeFetch re-validates host + DNS on every redirect hop (SSRF-safe).
+  const response = await safeFetch(url.toString(), {
     cache: "no-store",
   });
 

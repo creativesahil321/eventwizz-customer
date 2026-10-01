@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import type { AiProviderType } from "@/lib/ai/providers";
 import { normalizeListedModels } from "@/lib/ai/model-catalog";
+import { authOptions } from "@/lib/auth/authOptions";
+import { enforceSameOrigin } from "@/lib/security/api-guard";
 
 /**
  * Lists chat models from a provider using the admin-pasted API key.
  * POST { provider_type, base_url, api_key }
+ *
+ * Admin-only: this route fetches an arbitrary base_url server-side, so it must
+ * never be reachable unauthenticated (prevents SSRF/credential-relay abuse).
  */
 export async function POST(req: NextRequest) {
+  const crossOrigin = enforceSameOrigin(req);
+  if (crossOrigin) return crossOrigin;
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.token || session.user.account_type !== "admin") {
+    return NextResponse.json(
+      { error: "Not authorized.", models: [] },
+      { status: 403 },
+    );
+  }
+
   try {
     const body = (await req.json()) as {
       provider_type?: AiProviderType;

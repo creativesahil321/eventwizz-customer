@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import { useContext, useMemo } from "react";
 import { ServerContext } from "@/lib/server-context";
 import type { ThemeSchema } from "@/types/theme.types";
@@ -51,7 +53,7 @@ export default function VendorContactPage({
       <VendorCmsContentPanel>
         <div
           className={VENDOR_CMS_PROSE_CLASS}
-          dangerouslySetInnerHTML={{ __html: content.body }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
         />
       </VendorCmsContentPanel>
     </VendorCmsShell>

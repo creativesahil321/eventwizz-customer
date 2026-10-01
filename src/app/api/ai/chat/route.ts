@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardPublicApi } from "@/lib/security/api-guard";
 import {
   KNOWLEDGE_BASE,
   CHAT_INSTRUCTIONS,
@@ -363,6 +364,9 @@ function buildSystemPrompt(context: ChatContext): string {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardPublicApi(req, "ai:chat", { limit: 30, windowMs: 60_000 });
+  if (guard) return guard;
+
   try {
     const { messages, context } = (await req.json()) as {
       messages: Message[];

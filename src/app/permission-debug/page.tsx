@@ -5,8 +5,12 @@ import { PermissionMenuDebug } from "@/components/permission/PermissionMenuDebug
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { notFound } from "next/navigation";
 
 export default function PermissionDebugPage() {
+  // Diagnostic page — hidden in production.
+  if (process.env.NODE_ENV === "production") notFound();
+
   return (
     <section className="page bg-[var(--color-background,#f3f4f6)]">
       <Shell>

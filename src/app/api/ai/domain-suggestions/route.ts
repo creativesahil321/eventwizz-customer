@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardPublicApi } from "@/lib/security/api-guard";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import {
   aiRuntimeFailureMeta,
@@ -19,6 +20,9 @@ type DomainSuggestion = {
 };
 
 export async function POST(req: NextRequest) {
+  const guard = guardPublicApi(req, "ai:domain-suggestions", { limit: 30, windowMs: 60_000 });
+  if (guard) return guard;
+
   try {
     // Resolve the active AI provider (dynamic; falls back to GROQ_API_KEY)
     const aiConfig = await resolveAiRuntimeConfig();

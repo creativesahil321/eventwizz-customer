@@ -1,9 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { notFound } from "next/navigation";
 import { usePermissions } from "@/hooks/usePermission";
 
 export default function DebugPermissionsPage() {
+  // Diagnostic page — never expose permission/session internals in production.
+  if (process.env.NODE_ENV === "production") notFound();
+
   const { permissions, isLoaded, isHydrated } = usePermissions();
   const [localStoragePerms, setLocalStoragePerms] =
     useState<string>("Loading...");

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardPublicApi } from "@/lib/security/api-guard";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import {
   AI_PLAIN_TEXT,
@@ -285,6 +286,9 @@ function buildFallbackFooterBlurb(venueName: string, city?: string): string {
 }
 
 export async function POST(req: Request) {
+  const guard = guardPublicApi(req, "ai:summary", { limit: 30, windowMs: 60_000 });
+  if (guard) return guard;
+
   try {
     const {
       title,

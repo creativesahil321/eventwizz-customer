@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardPublicApi } from "@/lib/security/api-guard";
 import {
   BANNER_SUB_HEADING_MAX_CHARS,
   clampHeroHeading,
@@ -175,6 +176,9 @@ export interface AIEventGeneratedContent {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardPublicApi(req, "ai:generate-event", { limit: 20, windowMs: 60_000 });
+  if (guard) return guard;
+
   try {
     const aiConfig = await resolveAiRuntimeConfig();
     if (!aiConfig.isConfigured) {

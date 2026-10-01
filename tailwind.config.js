@@ -18,22 +18,13 @@ const config = {
           "0%": { transform: "translateY(0) translateX(0)", opacity: "0" },
           "10%": { opacity: "1" },
           "90%": { opacity: "0.6" },
-          "100%": {
-            transform: "translateY(-100vh) translateX(20px)",
-            opacity: "0",
-          },
+          "100%": { transform: "translateY(-100vh) translateX(20px)", opacity: "0" },
         },
         "fall-drift": {
-          "0%": {
-            transform: "translateY(-20px) translateX(0) rotate(0deg)",
-            opacity: "0",
-          },
+          "0%": { transform: "translateY(-20px) translateX(0) rotate(0deg)", opacity: "0" },
           "10%": { opacity: "1" },
           "90%": { opacity: "0.4" },
-          "100%": {
-            transform: "translateY(100vh) translateX(40px) rotate(360deg)",
-            opacity: "0",
-          },
+          "100%": { transform: "translateY(100vh) translateX(40px) rotate(360deg)", opacity: "0" },
         },
         "float-drift": {
           "0%, 100%": { transform: "translateY(0) translateX(0)" },
@@ -54,14 +45,8 @@ const config = {
           "50%": { opacity: "1", transform: "scale(1.2)" },
         },
         "sound-wave": {
-          "0%": {
-            transform: "translate(-50%, -50%) scale(0.8)",
-            opacity: "0.4",
-          },
-          "100%": {
-            transform: "translate(-50%, -50%) scale(1.4)",
-            opacity: "0",
-          },
+          "0%": { transform: "translate(-50%, -50%) scale(0.8)", opacity: "0.4" },
+          "100%": { transform: "translate(-50%, -50%) scale(1.4)", opacity: "0" },
         },
         "neon-sweep": {
           "0%": { transform: "translateX(-100%)", opacity: "0" },
@@ -73,10 +58,7 @@ const config = {
           "50%": { opacity: "0.04" },
         },
         spotlight: {
-          "0%, 100%": {
-            opacity: "0.6",
-            transform: "translateX(-50%) scaleX(1)",
-          },
+          "0%, 100%": { opacity: "0.6", transform: "translateX(-50%) scaleX(1)" },
           "50%": { opacity: "1", transform: "translateX(-50%) scaleX(1.1)" },
         },
       },

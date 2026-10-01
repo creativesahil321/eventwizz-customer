@@ -133,62 +133,15 @@ export async function validateCartPrices(
       };
     }
 
-    // Validate table prices
-    if (cartData.tables && cartData.tables.length > 0) {
-      const serverTables = serverDateData.tables || [];
-
-      for (const clientTable of cartData.tables) {
-        const serverTable = serverTables.find((t) => t.id === clientTable.id);
-        if (serverTable) {
-          const clientPrice = Number(serverTable.price) * clientTable.no_tables;
-          const serverPrice = Number(serverTable.price) * clientTable.no_tables;
-
-          if (Math.abs(clientPrice - serverPrice) > 0.01) {
-            // Allow for floating point precision
-            const difference = serverPrice - clientPrice;
-            manipulatedItems.push({
-              type: "table",
-              id: clientTable.id,
-              title: `Table Capacity – Minimum ${serverTable.min_persons}, Maximum ${serverTable.max_persons}`,
-              clientPrice,
-              serverPrice,
-              difference,
-            });
-            totalDifference += difference;
-          }
-        }
-      }
-    }
-
-    // Validate ticket prices
-    if (cartData.tickets && cartData.tickets.length > 0) {
-      const serverTickets = serverDateData.tickets || [];
-
-      for (const clientTicket of cartData.tickets) {
-        const serverTicket = serverTickets.find(
-          (t) => t.id === clientTicket.id
-        );
-        if (serverTicket) {
-          const clientPrice =
-            Number(serverTicket.price) * clientTicket.quantity;
-          const serverPrice =
-            Number(serverTicket.price) * clientTicket.quantity;
-
-          if (Math.abs(clientPrice - serverPrice) > 0.01) {
-            const difference = serverPrice - clientPrice;
-            manipulatedItems.push({
-              type: "ticket",
-              id: clientTicket.id,
-              title: serverTicket.title,
-              clientPrice,
-              serverPrice,
-              difference,
-            });
-            totalDifference += difference;
-          }
-        }
-      }
-    }
+    // NOTE (security): table and ticket prices are SERVER-AUTHORITATIVE.
+    // The cart submits table/ticket IDs + quantities only (never a price), and
+    // the backend prices each line by ID. There is therefore no client-supplied
+    // price to validate here — the authoritative guard is the backend
+    // recomputing every total from its own prices. (The previous table/ticket
+    // "validation" compared the server price against itself and could never
+    // detect anything; it has been removed to avoid a false sense of security.)
+    // Only drink packages carry a client-submitted price, validated below and
+    // overwritten server-side by sanitizeCartPrices before submission.
 
     // Validate drink prices
     if (cartData.drink_package && cartData.drink_package.length > 0) {

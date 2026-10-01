@@ -1,4 +1,5 @@
 import type { AdminHomeContent } from "@/lib/admin-cms-content";
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
 import { SiteHeading } from "@/components/public/site-heading";
 
 export default function WhatIsSection({
@@ -19,7 +20,7 @@ export default function WhatIsSection({
         </div>
         <div
           className="space-y-6 text-[color:var(--color-text-dimmed)] text-base md:text-lg leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_a]:underline"
-          dangerouslySetInnerHTML={{ __html: content.body }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
         />
       </div>
     </section>

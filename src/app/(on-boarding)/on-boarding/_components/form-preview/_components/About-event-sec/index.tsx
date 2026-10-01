@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import { SECTION_EYEBROW_CLASS } from "@/lib/section-type";
 import { SiteHeading } from "@/components/public/site-heading";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
@@ -82,7 +84,7 @@ export default function AboutEventSec({
             className="prose mt-6 max-w-[64ch] text-[var(--color-text)] prose-headings:text-[var(--color-text)] prose-p:text-left prose-p:text-[var(--color-text-dimmed)] prose-strong:text-[var(--color-text)] [&_p]:text-base [&_p]:leading-relaxed @max-md/preview:!mt-6"
             style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
             dangerouslySetInnerHTML={{
-              __html: about_event_description || defaultDescription,
+              __html: sanitizeHtml(about_event_description || defaultDescription),
             }}
           />
 

@@ -1,4 +1,5 @@
 import { CMS_PROSE_CLASS } from "@/components/public/cms-page-ui";
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
 
 const STEPS = [
   {
@@ -50,7 +51,7 @@ export default function HowItWorksContent({
           {customHtml ? (
             <div
               className={CMS_PROSE_CLASS}
-              dangerouslySetInnerHTML={{ __html: customHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(customHtml) }}
             />
           ) : (
             <>

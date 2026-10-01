@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -121,7 +123,7 @@ export function CmsPoliciesView({
 
             <div
               className={CMS_PROSE_CLASS}
-              dangerouslySetInnerHTML={{ __html: activeContent.body }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(activeContent.body) }}
             />
           </CmsContentPanel>
         </article>

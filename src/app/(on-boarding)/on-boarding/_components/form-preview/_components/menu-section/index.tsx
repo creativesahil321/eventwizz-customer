@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import { SECTION_EYEBROW_CLASS, SECTION_SUBTITLE_CLASS } from "@/lib/section-type";
 import { useState, useEffect } from "react";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -229,7 +231,7 @@ export default function MenuSection({
                               hyphens: "auto",
                             }}
                             dangerouslySetInnerHTML={{
-                              __html: item.description,
+                              __html: sanitizeHtml(item.description),
                             }}
                           />
                         ) : null}

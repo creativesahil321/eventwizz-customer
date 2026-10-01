@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { BLOG_FEATURED_IMAGE_MAX_BYTES } from "@/lib/blogs";
 import { assertAllowedBlogMediaUrl } from "@/lib/blogs/allowed-media-url";
+import { safeFetch } from "@/lib/security/ssrf";
 
 export const runtime = "nodejs";
 
@@ -24,9 +25,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const upstream = await fetch(safeUrl.toString(), {
+    // safeFetch re-validates host + DNS on every redirect hop (SSRF-safe).
+    const upstream = await safeFetch(safeUrl.toString(), {
       headers: { Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" },
-      redirect: "follow",
       cache: "no-store",
     });
 

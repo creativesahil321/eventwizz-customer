@@ -251,8 +251,10 @@ apiClient.interceptors.request.use(
         const domain = useDomainStore.getState().domain;
         if (domain) {
           config.headers["X-Domain"] = domain;
-          console.log(`[API Client] Setting X-Domain header: ${domain}`);
-        } else {
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`[API Client] Setting X-Domain header: ${domain}`);
+          }
+        } else if (process.env.NODE_ENV !== "production") {
           console.warn(`[API Client] No domain available in domain store`);
         }
 

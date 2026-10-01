@@ -329,13 +329,24 @@ export async function proxy(req: NextRequest) {
       return NextResponse.next();
     }
 
-    // For protected routes, just allow them through
-    // NextAuth and page-level protection will handle security
+    // Protected routes: bounce clearly-unauthenticated visitors to login at the
+    // edge (defense-in-depth). We act ONLY on the ABSENCE of a NextAuth session
+    // cookie, so a valid — or merely expired — session is never locked out: the
+    // authoritative authentication + role checks stay in the (protected) layout
+    // `getServerSession` guards (which also handle expiry correctly). This
+    // deliberately avoids the role/onboarding/location redirects that previously
+    // caused redirect loops in single-domain mode.
     if (
       pathname.startsWith("/vendor") ||
       pathname.startsWith("/customer") ||
       pathname.startsWith("/admin")
     ) {
+      const hasSessionCookie =
+        req.cookies.has("next-auth.session-token") ||
+        req.cookies.has("__Secure-next-auth.session-token");
+      if (!hasSessionCookie) {
+        return redirectToLogin(req);
+      }
       return NextResponse.next();
     }
 

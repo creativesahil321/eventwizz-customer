@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
 import { CMS_PROSE_CLASS } from "@/components/public/cms-page-ui";
 
 const WHY_CHOOSE = [
@@ -86,7 +87,7 @@ export default function AboutContent({
         {customHtml ? (
           <div
             className={CMS_PROSE_CLASS}
-            dangerouslySetInnerHTML={{ __html: customHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(customHtml) }}
           />
         ) : (
           <DefaultAboutContent />

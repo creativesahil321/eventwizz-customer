@@ -1,6 +1,10 @@
+import { notFound } from "next/navigation";
 import { ThemeTester } from "@/components/theme-tester";
 
 export default function ThemeTestPage() {
+  // Demo page — hidden in production.
+  if (process.env.NODE_ENV === "production") notFound();
+
   return (
     <div className="container py-10">
       <h1 className="text-3xl font-bold text-center mb-4">

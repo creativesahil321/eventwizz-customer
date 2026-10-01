@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import { ArrowRight, Link } from "lucide-react";
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -56,9 +58,10 @@ function AboutHeroSection({
           <p
             className="text-base md:text-lg text-[var(--color-text-dimmed)] break-words @max-md/preview:!text-base"
             dangerouslySetInnerHTML={{
-              __html:
+              __html: sanitizeHtml(
                 description ||
-                "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum ullamcorper feugiat fringilla.</p>",
+                  "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum ullamcorper feugiat fringilla.</p>",
+              ),
             }}
           />
           <Link

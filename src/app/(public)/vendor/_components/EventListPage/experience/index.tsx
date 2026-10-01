@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
+
 import { useContext } from "react";
 import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
@@ -75,7 +77,7 @@ export default function ExperienceSection({
             phoneFrame ? "mt-4" : "sm:mt-6",
             !framedBelowLg && "lg:text-lg",
           )}
-          dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(descriptionHtml) }}
         />
       </div>
     </section>
