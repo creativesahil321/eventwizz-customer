@@ -13,7 +13,7 @@ import { MainLandingSitePreview } from "@/app/(protected)/_shared/sites-essentia
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
 import { EventPreview } from "@/app/(protected)/vendor/events/_components/event-preview";
 import { EventDetailData } from "@/services/vendor/events/type";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import {
   useOnboardingPreviewMainQuery,
   useOnboardingPreviewLocationQuery,
@@ -88,7 +88,6 @@ export default function OnboardingPreviewPage() {
 /* ──────────────────────────── main content ───────────────────── */
 function OnboardingPreviewContent() {
   const router = useRouter();
-  const { toast } = useToast();
   const deviceFrameRef = useRef<HTMLDivElement>(null);
 
   /* ── API: Main Landing (also provides locations list, multi-location flag) ── */
@@ -348,7 +347,7 @@ function OnboardingPreviewContent() {
             ? "Next, review your event page."
             : "Continue to the next page.";
 
-      toast({ title: toastTitle, description: toastDescription });
+      toast.success(toastTitle, { description: toastDescription });
     }
 
     if (isLastStep) {
@@ -374,7 +373,6 @@ function OnboardingPreviewContent() {
     handleContinue,
     locationLabel,
     reviewSteps,
-    toast,
   ]);
 
   const handleEdit = useCallback(() => {

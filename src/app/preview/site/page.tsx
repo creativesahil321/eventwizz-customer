@@ -29,7 +29,7 @@ import { PreviewThemeCustomizer } from "@/components/preview/preview-theme-custo
 import { PreviewImportWebsiteControl } from "@/app/(protected)/_shared/sites-essentials/_components/preview-import-website-control";
 import { RestoreDefaultThemeControl } from "@/app/(protected)/_shared/sites-essentials/_components/restore-default-theme-control";
 import { themeKeys } from "@/hooks/use-theme-query";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { resolveHasMultipleLocations } from "@/app/(protected)/_shared/sites-essentials/_lib/use-has-multiple-locations";
 import {
   mergeSiteEssentialsPreviewWithApi,
@@ -81,7 +81,6 @@ export default function SitePreviewPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
-  const { toast } = useToast();
   const { mutateAsync: switchLocation } = useSwitchLocation();
   const { data: siteEssentialsFromApi } = useSiteEssentialsQuery();
   const { locations: venueLocations, isLoading: isLoadingVenueLocations } =
@@ -611,8 +610,7 @@ export default function SitePreviewPage() {
   const handleDiscardPreviewChanges = useCallback(() => {
     const baseline = sessionBaselineRef.current;
     if (!baseline) {
-      toast({
-        title: "Nothing to discard",
+      toast("Nothing to discard", {
         description: "There is no earlier preview snapshot to restore.",
       });
       return;
@@ -625,18 +623,13 @@ export default function SitePreviewPage() {
       setPreviewData(restored);
       setPreviewRequiresSave(baselineRequiresSaveRef.current);
       setHasSessionEdits(false);
-      toast({
-        title: "Changes discarded",
-        description:
-          "Import and theme tries were undone. The preview is back to how it looked when you opened it.",
+      toast.success("Changes discarded", {
+        description: "Import and theme tries were undone. The preview is back to how it looked when you opened it.",
       });
     } catch {
-      toast({
-        title: "Could not discard changes",
-        variant: "destructive",
-      });
+      toast.error("Could not discard changes");
     }
-  }, [setPreviewData, setPreviewRequiresSave, toast]);
+  }, [setPreviewData, setPreviewRequiresSave]);
 
   const leavePreviewToEditor = useCallback(
     (options?: { keepUnsavedSnapshot?: boolean }) => {
@@ -680,10 +673,8 @@ export default function SitePreviewPage() {
   const handleApproveMain = (options?: { silent?: boolean }) => {
     setMainPageApproved(true);
     if (options?.silent) return;
-    toast({
-      title: "Main home approved",
-      description:
-        locationList.length > 0
+    toast.success("Main home approved", {
+      description: locationList.length > 0
           ? `Next, review ${locationList.length} location page${locationList.length > 1 ? "s" : ""}.`
           : "Continue when ready.",
     });
@@ -714,10 +705,8 @@ export default function SitePreviewPage() {
       setMainPageApproved(true);
     }
     if (locationList.length === 0) {
-      toast({
-        title: "No locations to review",
+      toast.error("No locations to review", {
         description: "Add at least one event location first.",
-        variant: "destructive",
       });
       return;
     }
@@ -732,8 +721,7 @@ export default function SitePreviewPage() {
     if (!currentSlug) return;
     approveLocationSlug(currentSlug);
     if (options?.silent) return;
-    toast({
-      title: `${currentLocation?.city ?? "Location"} approved`,
+    toast.success(`${currentLocation?.city ?? "Location"} approved`, {
       description: isLastLocation()
         ? "You can save your changes when ready."
         : "Continue to the next location.",
@@ -783,10 +771,8 @@ export default function SitePreviewPage() {
         : allPreviewLocationsApproved(locationList, approvedSlugs);
 
       if (!resolvedGlobalData) {
-        toast({
-          title: "Nothing to save",
+        toast.error("Nothing to save", {
           description: "Preview data is still loading. Try again in a moment.",
-          variant: "destructive",
         });
         return;
       }
@@ -796,10 +782,8 @@ export default function SitePreviewPage() {
         if (hasMultipleLocations && !mainPageApproved) {
           setReviewStep("main");
           scrollPreviewToTop();
-          toast({
-            title: "Review Main home first",
-            description:
-              "Approve the main home page, then continue through each location.",
+          toast("Review Main home first", {
+            description: "Approve the main home page, then continue through each location.",
           });
           return;
         }
@@ -812,18 +796,14 @@ export default function SitePreviewPage() {
           setReviewStep("location");
           setCurrentLocationIndex(pendingIndex);
           scrollPreviewToTop();
-          toast({
-            title: `Review ${pending.city}`,
-            description:
-              "This location was skipped — approve it here, then save again.",
+          toast(`Review ${pending.city}`, {
+            description: "This location was skipped — approve it here, then save again.",
           });
           return;
         }
 
-        toast({
-          title: "Approve all pages first",
+        toast.error("Approve all pages first", {
           description: "Finish reviewing each page, then save.",
-          variant: "destructive",
         });
         return;
       }
@@ -862,8 +842,7 @@ export default function SitePreviewPage() {
         // Keep painting this preview until navigation finishes — clearing the
         // store first flashed "No Preview Data" / reset the review chrome.
         setIsExiting(true);
-        toast({
-          title: "Saved",
+        toast.success("Saved", {
           description: "Site essentials were updated successfully.",
         });
         router.replace(editorPathForSession(session?.user?.account_type));
@@ -883,11 +862,8 @@ export default function SitePreviewPage() {
         }, 400);
       } catch {
         setIsExiting(false);
-        toast({
-          title: "Could not save",
-          description:
-            "Please try again from Site Essentials or fix any validation errors.",
-          variant: "destructive",
+        toast.error("Could not save", {
+          description: "Please try again from Site Essentials or fix any validation errors.",
         });
       }
     },
@@ -908,7 +884,6 @@ export default function SitePreviewPage() {
       clearPreviewData,
       session?.user?.account_type,
       session?.user?.vendor_location_id,
-      toast,
       leavePreviewToEditor,
     ],
   );
@@ -916,8 +891,7 @@ export default function SitePreviewPage() {
   const handleSaveTheme = useCallback(async () => {
     // View-only browse must not PATCH theme
     if (!useSitePreviewStore.getState().previewRequiresSave) {
-      toast({
-        title: "Nothing to save",
+      toast("Nothing to save", {
         description: "Change a color or font first, then save the theme.",
       });
       return;
@@ -977,8 +951,7 @@ export default function SitePreviewPage() {
       useSitePreviewStore.getState().setPreviewRequiresSave(false);
       useSitePreviewStore.getState().consumePreviewFresh();
       setIsExiting(true);
-      toast({
-        title: "Theme saved",
+      toast.success("Theme saved", {
         description: "Colors and fonts were updated.",
       });
       router.replace(editorPathForSession(session?.user?.account_type));
@@ -987,10 +960,7 @@ export default function SitePreviewPage() {
       }, 400);
     } catch {
       setIsExiting(false);
-      toast({
-        title: "Could not save theme",
-        variant: "destructive",
-      });
+      toast.error("Could not save theme");
     }
   }, [
     locationPreviewData,
@@ -1005,7 +975,6 @@ export default function SitePreviewPage() {
     router,
     saveSiteEssentials,
     applyThemePreset,
-    toast,
     clearPreviewData,
   ]);
 

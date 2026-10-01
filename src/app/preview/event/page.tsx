@@ -32,7 +32,7 @@ import { PreviewProvider } from "@/contexts/preview-context";
 import { EVENT_PREVIEW_REVIEW_CHROME_CLASSNAME } from "@/app/preview/event/event-preview-review-chrome";
 import { useEventPreviewSiteEssentials } from "@/app/(protected)/_shared/sites-essentials/_lib/use-event-preview-site-essentials";
 import { SiteEssentialsFormValues } from "@/app/(protected)/_shared/sites-essentials/_lib/schema";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import {
   clearVendorEventPreviewDraft,
   loadVendorEventDraft,
@@ -84,7 +84,6 @@ export default function EventPreviewPage() {
 function EventPreviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
 
   const eventId = searchParams.get("id");
   const urlRoomsParam = searchParams.get("rooms");
@@ -228,15 +227,12 @@ function EventPreviewPageContent() {
       await refetch();
       setPreviewDraft(null);
       setDiscardDialogOpen(false);
-      toast({
-        title: "Changes discarded",
+      toast.success("Changes discarded", {
         description: "Preview now shows the last saved event.",
       });
     } catch {
-      toast({
-        title: "Could not discard changes",
+      toast.error("Could not discard changes", {
         description: "Try again, or go back to the editor.",
-        variant: "destructive",
       });
     } finally {
       setIsDiscarding(false);
@@ -280,21 +276,16 @@ function EventPreviewPageContent() {
 
   const handlePublishEvent = async () => {
     if (!eventId || !/^\d+$/.test(eventId) || !eventPayloadRoot) {
-      toast({
-        title: isLiveEvent ? "Cannot save" : "Cannot publish",
-        description:
-          "Event data is not loaded. Go back to the editor and try again.",
-        variant: "destructive",
+      toast.error(isLiveEvent ? "Cannot save" : "Cannot publish", {
+        description: "Event data is not loaded. Go back to the editor and try again.",
       });
       return;
     }
     if (isEventCancelled) {
-      toast({
-        title: "Event is cancelled",
+      toast.error("Event is cancelled", {
         description: isLiveEvent
           ? "Cancelled events cannot be saved from preview."
           : "Cancelled events cannot be published.",
-        variant: "destructive",
       });
       return;
     }
@@ -316,14 +307,12 @@ function EventPreviewPageContent() {
 
     const parsed = stepEightSchema.safeParse(stepEightPayload);
     if (!parsed.success) {
-      toast({
-        title: isLiveEvent
+      toast.error(
+        isLiveEvent
           ? "Cannot save from preview"
           : "Cannot publish from preview",
-        description:
-          "Complete the Publish tab in the event editor (e.g. duplicate location fields) and submit from there.",
-        variant: "destructive",
-      });
+        { description: "Complete the Publish tab in the event editor (e.g. duplicate location fields) and submit from there." },
+      );
       setPublishDialogOpen(false);
       return;
     }
@@ -334,27 +323,21 @@ function EventPreviewPageContent() {
       if (response?.status) {
         invalidateCache?.();
         setPublishDialogOpen(false);
-        toast({
-          title: publishCopy.toastActive,
+        toast.success(publishCopy.toastActive, {
           description: isLiveEvent
             ? "Your live event was updated. Redirecting to events…"
             : "Your event was submitted as live. Redirecting to events…",
         });
         router.push("/vendor/events");
       } else {
-        toast({
-          title: isLiveEvent ? "Save failed" : "Publish failed",
-          description:
-            response?.message ||
+        toast.error(isLiveEvent ? "Save failed" : "Publish failed", {
+          description: response?.message ||
             "Use the Publish tab in the editor to fix any issues and try again.",
-          variant: "destructive",
         });
       }
     } catch {
-      toast({
-        title: isLiveEvent ? "Save failed" : "Publish failed",
+      toast.error(isLiveEvent ? "Save failed" : "Publish failed", {
         description: "Use the Publish tab in the editor or try again shortly.",
-        variant: "destructive",
       });
     } finally {
       setIsPublishing(false);

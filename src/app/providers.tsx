@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/providers/theme-provider/ThemeContext";
 import { DomainProvider } from "@/providers/domain-provider/domain-provider";
 import { ThemeSchema } from "@/types/theme.types";
 import NextTopLoader from "nextjs-toploader";
+import { MotionConfig } from "framer-motion";
 import { useAuthStore } from "@/store/auth.store";
 import { usePermissionStore } from "@/store/permission.store";
 import { PermissionProvider } from "@/providers/permission-provider/permission-provider";
@@ -68,7 +69,7 @@ export function Providers({
                   zIndex={2147483647}
                 />
                 <SessionValidator />
-                {children}
+                <MotionConfig reducedMotion="user">{children}</MotionConfig>
                 {/* Add permission debug in development mode */}
                 <PermissionDebug />
               </ChatBotProvider>

@@ -8,6 +8,7 @@ import { ServerContext } from "@/lib/server-context";
 import { ThemeSchema } from "@/types/theme.types";
 import { SiteHeading } from "@/components/public/site-heading";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
+import { HeroBackgroundVideo } from "@/components/public/hero-background-video";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import {
@@ -249,18 +250,19 @@ export default function HeroBanner({
       {/* Video background if video URL exists and should be used */}
       {!collapsed && useVideo && (
         <div className="absolute inset-0 h-full w-full overflow-hidden">
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
+          <HeroBackgroundVideo
             poster={finalImageUrl || undefined}
             className="absolute inset-0 h-full w-full scale-105 object-cover"
+            // Search dock sits along the bottom edge — keep the toggle clear of it (below the fixed header).
+            toggleClassName={
+              heroFooter
+                ? "right-3 top-[5.25rem] md:right-4 md:top-24"
+                : undefined
+            }
           >
             <source src={finalVideoUrl || undefined} type="video/mp4" />
             Your browser does not support the video tag.
-          </video>
+          </HeroBackgroundVideo>
           <div className={cn("absolute inset-0", heroBandMediaOverlayClass)} />
         </div>
       )}
@@ -295,7 +297,8 @@ export default function HeroBanner({
         style={heroBandCopyPlacementStyle(copyValign)}
       >
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          // SSR-visible LCP copy: no opacity:0 start state before hydration.
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className={cn(

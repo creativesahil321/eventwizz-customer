@@ -7,7 +7,7 @@ import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
 import { fetchInfoPagesHtml } from "@/lib/server-info-pages";
 
 export const metadata: Metadata = {
-  title: "About Us - EventWizz Event Management Platform",
+  title: "About Us - Event Management Platform",
   description:
     "EventWizz is passionate about helping UK businesses manage bookings, sell tickets online, and run events seamlessly from one easy-to-use dashboard.",
   keywords: [

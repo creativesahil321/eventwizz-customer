@@ -513,6 +513,8 @@ export default function GuestAllocationModal({
                           {/* Stepper input group */}
                           <div className="flex items-center justify-center gap-1">
                             <button
+                              type="button"
+                              aria-label={`Decrease guests for table ${index + 1}`}
                               onClick={() =>
                                 stepAllocation(table.id, index, table, -1)
                               }
@@ -551,6 +553,8 @@ export default function GuestAllocationModal({
                             />
 
                             <button
+                              type="button"
+                              aria-label={`Increase guests for table ${index + 1}`}
                               onClick={() =>
                                 stepAllocation(table.id, index, table, 1)
                               }

@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { BLOG_FEATURED_IMAGE_MAX_BYTES } from "@/lib/blogs";
 import { assertAllowedBlogMediaUrl } from "@/lib/blogs/allowed-media-url";
-import { safeFetch } from "@/lib/security/ssrf";
+import {
+  readBodyWithLimit,
+  ResponseTooLargeError,
+  safeFetch,
+} from "@/lib/security/ssrf";
 
 export const runtime = "nodejs";
 
@@ -29,6 +33,7 @@ export async function GET(request: NextRequest) {
     const upstream = await safeFetch(safeUrl.toString(), {
       headers: { Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" },
       cache: "no-store",
+      timeoutMs: 20_000,
     });
 
     if (!upstream.ok) {
@@ -46,7 +51,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const buffer = Buffer.from(await upstream.arrayBuffer());
+    // Stream with a byte cap so an oversized body is never fully buffered.
+    let buffer: Buffer;
+    try {
+      buffer = await readBodyWithLimit(upstream, MAX_BYTES);
+    } catch (error) {
+      if (!(error instanceof ResponseTooLargeError)) throw error;
+      buffer = Buffer.alloc(0);
+    }
     if (buffer.length === 0 || buffer.length > MAX_BYTES) {
       return NextResponse.json(
         { error: "Image is empty or too large." },

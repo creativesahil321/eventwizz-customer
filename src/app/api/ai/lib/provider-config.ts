@@ -183,6 +183,8 @@ async function fetchRuntimeConfig(): Promise<AiRuntimeConfig | null> {
           : {}),
       },
       cache: "no-store",
+      // Laravel config lookup; on timeout we fall through to the catch below.
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (res.status === 204) {

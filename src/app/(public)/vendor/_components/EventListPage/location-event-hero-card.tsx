@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Calendar, Clock, Loader2, MapPin } from "lucide-react";
-import { addCacheBusting } from "@/lib/image-utils";
+import { addCacheBusting, shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import {
   useIsPreviewMode,
@@ -46,6 +48,12 @@ export function LocationEventHeroCard({
   const placeLabel =
     event.eventAddress?.trim() || locationLabel?.trim() || "";
 
+  const [imageSrc, setImageSrc] = useState(() => addCacheBusting(event.image));
+  useEffect(() => {
+    setImageSrc(addCacheBusting(event.image));
+  }, [event.image]);
+  const resolvedImageSrc = imageSrc || imageFallback;
+
   // Visual hover is decoupled from click interactivity so the Site Essentials
   // preview matches the live site. Only the loading state blocks pointer events.
   const cardClassName = cn(
@@ -63,15 +71,19 @@ export function LocationEventHeroCard({
 
   const cardBody = (
     <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-900 sm:aspect-[16/9]">
-      <img
-        src={addCacheBusting(event.image)}
+      {/* Above the fold on single-event layouts: eager (no preload — the page hero owns that). */}
+      <Image
+        src={resolvedImageSrc}
         alt={event.title}
+        fill
+        loading="eager"
+        sizes="(min-width: 1189px) 832px, (min-width: 768px) 70vw, 100vw"
         className={cn("h-full w-full object-cover", PUBLIC_CARD_IMAGE_HOVER_ZOOM_CLASS)}
-        onError={(e) => {
-          const target = e.currentTarget;
-          if (target.dataset.fallbackApplied === "true") return;
-          target.dataset.fallbackApplied = "true";
-          target.src = imageFallback;
+        unoptimized={!shouldUseNextImageOptimization(resolvedImageSrc)}
+        onError={() => {
+          if (imageSrc !== imageFallback) {
+            setImageSrc(imageFallback);
+          }
         }}
       />
       <div

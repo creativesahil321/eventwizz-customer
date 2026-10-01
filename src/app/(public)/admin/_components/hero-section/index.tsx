@@ -6,6 +6,7 @@ import { CheckCircle2, Star } from "lucide-react";
 import BookACallModal from "../book-a-call-modal";
 import { isExternalUrl, type AdminHomeContent } from "@/lib/admin-cms-content";
 import { SiteHeading } from "@/components/public/site-heading";
+import { HeroCoverImage } from "@/components/public/hero-cover-image";
 
 export default function HeroSection({
   content,
@@ -25,12 +26,8 @@ export default function HeroSection({
       <section className="relative min-h-[92vh] flex items-center overflow-hidden">
         {/* ── Full-bleed background image ── */}
         <div className="absolute inset-0 z-0">
-          {/* Plain img so tenant-supplied remote URLs work without next/image domain config */}
-          <img
-            src={content.backgroundImage}
-            alt="Hero background"
-            className="absolute inset-0 h-full w-full object-cover object-center"
-          />
+          {/* LCP image: next/image + preload; falls back to unoptimized for non-allowlisted hosts */}
+          <HeroCoverImage src={content.backgroundImage} alt="" sizes="100vw" />
           {/* Dark gradient overlay so text is always readable */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/30" />
           {/* Subtle primary-colour tint on the left for brand personality */}

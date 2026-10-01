@@ -485,23 +485,25 @@ export const authOptions: NextAuthOptions = {
             parentDomain: env.NEXT_PUBLIC_WHITE_LABEL_URL,
           };
 
-          // Log tenant info and API call parameters
-          console.log("🏢 OAuth Tenant Info:", {
-            domain: tenantInfo.domain,
-            website_role: tenantInfo.website_role,
-            account_type: tenantInfo.account_type,
-            parentDomain: tenantInfo.parentDomain,
-          });
+          // Log tenant info and API call parameters (dev only — contains PII)
+          if (process.env.NODE_ENV === "development") {
+            console.log("🏢 OAuth Tenant Info:", {
+              domain: tenantInfo.domain,
+              website_role: tenantInfo.website_role,
+              account_type: tenantInfo.account_type,
+              parentDomain: tenantInfo.parentDomain,
+            });
 
-          console.log("📡 Social Auth API Call:", {
-            provider: account.provider,
-            email: user.email,
-            name: user.name,
-            provider_id: account.providerAccountId,
-            domain: tenantInfo.domain,
-            account_type: tenantInfo.account_type,
-            parent_domain: tenantInfo.parentDomain,
-          });
+            console.log("📡 Social Auth API Call:", {
+              provider: account.provider,
+              email: user.email,
+              name: user.name,
+              provider_id: account.providerAccountId,
+              domain: tenantInfo.domain,
+              account_type: tenantInfo.account_type,
+              parent_domain: tenantInfo.parentDomain,
+            });
+          }
 
           // Call the social auth API endpoint
           const response = await authService.socialAuth({
@@ -516,18 +518,19 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (response.status) {
-            // Log the complete API response for debugging
-            console.log("🔍 Social Auth API Response:", {
-              status: response.status,
-              message: response.message,
-              data: response.data,
-              user: response.data?.user,
-              token: response.data?.token ? "***TOKEN***" : "No token",
-              active_role: response.data?.active_role,
-              isOnboarded: response.data?.isOnboarded,
-              vendor_location_id: response.data?.vendor_location_id,
-              permissions: response.data?.permissions,
-            });
+            // Log the API response for debugging (dev only; never the token)
+            if (process.env.NODE_ENV === "development") {
+              console.log("🔍 Social Auth API Response:", {
+                status: response.status,
+                message: response.message,
+                user: response.data?.user,
+                token: response.data?.token ? "***TOKEN***" : "No token",
+                active_role: response.data?.active_role,
+                isOnboarded: response.data?.isOnboarded,
+                vendor_location_id: response.data?.vendor_location_id,
+                permissions: response.data?.permissions,
+              });
+            }
 
             // Map the response data to user object (same as credentials flow)
             const {
@@ -558,23 +561,23 @@ export const authOptions: NextAuthOptions = {
 
             // Log the final user object after assignment
             const finalUser = user as CustomUser;
-            console.log("👤 Final User Object:", {
-              email: finalUser.email,
-              account_type: finalUser.account_type,
-              active_role: finalUser.active_role,
-              isOnboarded: finalUser.isOnboarded,
-              vendor_location_id: finalUser.vendor_location_id,
-              permissions: finalUser.permissions,
-              hasToken: !!finalUser.token,
-              hasUuid: !!finalUser.uuid,
-            });
+            if (process.env.NODE_ENV === "development") {
+              console.log("👤 Final User Object:", {
+                email: finalUser.email,
+                account_type: finalUser.account_type,
+                active_role: finalUser.active_role,
+                isOnboarded: finalUser.isOnboarded,
+                vendor_location_id: finalUser.vendor_location_id,
+                permissions: finalUser.permissions,
+                hasToken: !!finalUser.token,
+                hasUuid: !!finalUser.uuid,
+              });
+            }
 
             // Note: Zustand store sync is handled by SessionValidator component in providers.tsx
 
             return true;
           }
-          console.log(response, "This is social login response");
-
           console.error(
             "❌ Social Auth Failed - Response Status:",
             response.status,
@@ -591,7 +594,11 @@ export const authOptions: NextAuthOptions = {
           // Return false to let NextAuth handle the error, but store the message for later use
           return false;
         } catch (error) {
-          console.error("❌ Social auth error:", error);
+          // Message only — the raw error (e.g. axios) can carry request data/headers.
+          console.error(
+            "❌ Social auth error:",
+            error instanceof Error ? error.message : "Unknown error"
+          );
 
           // Extract error message using utility function
           const errorMessage = extractErrorMessage(error);
@@ -670,20 +677,25 @@ export const authOptions: NextAuthOptions = {
 
           const redirectBackUrl = `${protocol}//${originalDomain}${port}${redirectPath}`;
 
-          // Log redirect information
-          console.log("🔄 OAuth Redirect:", {
-            originalDomain,
-            protocol,
-            port,
-            tenantAccountType: tenantInfo.account_type,
-            redirectPath,
-            finalRedirectUrl: redirectBackUrl,
-          });
+          // Log redirect information (dev only)
+          if (process.env.NODE_ENV === "development") {
+            console.log("🔄 OAuth Redirect:", {
+              originalDomain,
+              protocol,
+              port,
+              tenantAccountType: tenantInfo.account_type,
+              redirectPath,
+              finalRedirectUrl: redirectBackUrl,
+            });
+          }
 
           return redirectBackUrl;
         }
       } catch (error) {
-        console.error("Error processing tenant info in redirect:", error);
+        console.error(
+          "Error processing tenant info in redirect:",
+          error instanceof Error ? error.message : "Unknown error"
+        );
       }
 
       // If URL is relative, prepend baseUrl

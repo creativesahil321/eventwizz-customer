@@ -36,7 +36,7 @@ async function fetchBlobAndDownload(
   }
 
   const blob = new Blob([response.data], {
-    type: response.headers?.["content-type"] || "text/csv",
+    type: (response.headers?.["content-type"] as string | undefined) || "text/csv",
   });
   const objectUrl = window.URL.createObjectURL(blob);
   const link = document.createElement("a");

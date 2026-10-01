@@ -247,8 +247,8 @@ export const useHistory = (
       };
     },
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: false,
+    staleTime: 60_000, // 1 minute — bookings change as customers pay
+    refetchOnWindowFocus: true,
     ...options,
   });
 };

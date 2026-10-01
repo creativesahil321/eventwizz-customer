@@ -493,6 +493,8 @@ async function removeBackgroundWithApi(
     method: "POST",
     headers: { "X-Api-Key": apiKey },
     body: formData,
+    // Bound the paid third-party call; on timeout we fall back to Sharp.
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {

@@ -3,6 +3,7 @@ import { guardPublicApi } from "@/lib/security/api-guard";
 import { resolveAiRuntimeConfig } from "../lib/provider-config";
 import { tryModelsWithFallback, type FallbackResult } from "../lib/utils";
 import { assertSafeLogoUrl } from "@/lib/logo/fetch-logo-from-url";
+import { readBodyWithLimit, safeFetch } from "@/lib/security/ssrf";
 import {
   BANNER_HEADING_MAX_CHARS,
   BANNER_HEADING_MAX_WORDS,
@@ -85,11 +86,12 @@ async function fetchHtmlOnce(url: string): Promise<string> {
   const timeout = setTimeout(() => controller.abort(), 20_000);
 
   try {
-    const response = await fetch(url, {
+    // SSRF-safe: validates host + DNS and re-validates every redirect hop.
+    const response = await safeFetch(url, {
       headers: BROWSER_HEADERS,
-      redirect: "follow",
       cache: "no-store",
       signal: controller.signal,
+      timeoutMs: 20_000,
     });
 
     if (response.status === 403 || response.status === 401 || response.status === 429) {
@@ -113,14 +115,15 @@ async function fetchHtmlOnce(url: string): Promise<string> {
       throw new ImportFetchError("The URL did not return an HTML page.");
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    // Stream at most MAX_HTML_BYTES (truncated, as before) instead of
+    // buffering an unbounded body.
+    const buffer = await readBodyWithLimit(response, MAX_HTML_BYTES, {
+      truncate: true,
+    });
     if (buffer.length === 0) {
       throw new ImportFetchError("The website returned an empty page.");
     }
-    const html =
-      buffer.length > MAX_HTML_BYTES
-        ? buffer.subarray(0, MAX_HTML_BYTES).toString("utf-8")
-        : buffer.toString("utf-8");
+    const html = buffer.toString("utf-8");
 
     if (looksLikeBotChallenge(html)) {
       throw new ImportFetchError(

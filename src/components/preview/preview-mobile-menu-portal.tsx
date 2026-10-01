@@ -1,6 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -14,7 +20,12 @@ type PreviewMobileMenuPortalProps = {
   onDismiss: () => void;
   children: ReactNode;
   panelClassName?: string;
+  /** Accessible name for the menu dialog. */
+  ariaLabel?: string;
 };
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Hamburger layer. Brand tokens are copied from the themed root.
@@ -30,7 +41,40 @@ export function PreviewMobileMenuPortal({
   onDismiss,
   children,
   panelClassName,
+  ariaLabel = "Menu",
 }: PreviewMobileMenuPortalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  // Callers mount this only while the menu is open: Escape closes, focus moves
+  // into the panel on open and returns to the opener (hamburger) on close.
+  useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const firstFocusable =
+      panelRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+    (firstFocusable ?? panelRef.current)?.focus({ preventScroll: true });
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onDismissRef.current();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (previouslyFocused?.isConnected) {
+        previouslyFocused.focus({ preventScroll: true });
+      }
+    };
+  }, []);
+
   const pinToFrame = host !== document.body;
   const [viewport, setViewport] = useState(() =>
     pinToFrame ? readPreviewFrameViewport(host) : null,
@@ -84,11 +128,17 @@ export function PreviewMobileMenuPortal({
     >
       <button
         type="button"
-        aria-label="Close menu"
+        tabIndex={-1}
+        aria-hidden="true"
         className="absolute inset-0 bg-black/50"
         onClick={onDismiss}
       />
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        tabIndex={-1}
         className={cn(
           "absolute inset-0 z-[1] flex h-full w-full flex-col overflow-y-auto",
           pinToFrame

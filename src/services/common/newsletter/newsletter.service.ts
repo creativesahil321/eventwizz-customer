@@ -380,7 +380,7 @@ export const newsletterService = {
 
       const blob = await assertCsvBlob(
         response.data,
-        response.headers?.["content-type"],
+        (response.headers?.["content-type"] as string | undefined),
       );
       return {
         blob,

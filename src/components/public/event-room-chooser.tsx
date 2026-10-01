@@ -130,6 +130,8 @@ export function EventRoomChooser({
                     <img
                       src={addCacheBusting(room.thumbnail)}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className={cn(
                         "h-full w-full object-cover transition-transform duration-200 ease-out motion-reduce:transition-none",
                         !isDisabled &&

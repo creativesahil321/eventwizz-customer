@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { QueryClient, dehydrate } from "@tanstack/react-query";
 import LocationPageClient from "./_components/location-page-client";
@@ -44,19 +45,46 @@ export async function generateMetadata(props: {
   if (!locationData) return { title: "Location Not Found" };
 
   const cityName = locationDisplayName(locationData.city, locationSlug);
+  const description =
+    toMetaDescription(locationData.banner_sub_heading) ||
+    toMetaDescription(locationData.about_description) ||
+    `Discover amazing events in ${cityName}`;
+  const canonical = `/${encodeURIComponent(locationSlug)}`;
 
   return {
     title: `${cityName} Events`,
-    description: `Discover amazing events in ${cityName}`,
+    description,
+    alternates: { canonical },
     openGraph: {
       title: `${cityName} Events`,
-      description: `Find exciting events in ${cityName} that match your interests.`,
+      description,
+      url: canonical,
       images: locationData.cover_image
         ? [{ url: locationData.cover_image }]
         : undefined,
     },
   };
 }
+
+/** Plain-text meta description from CMS text/HTML (max ~160 chars). */
+function toMetaDescription(value: string | null | undefined): string {
+  if (!value) return "";
+  const text = value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > 160 ? `${text.slice(0, 157).trimEnd()}…` : text;
+}
+
+/**
+ * One Laravel call per request: generateMetadata, the page and the React
+ * Query prefetch all share this memoized result (React cache is per request,
+ * so availability data is never reused across requests).
+ */
+const getLocationWithEventsCached = cache((slug: string, host: string) =>
+  eventsService.getLocationWithEvents(slug, host),
+);
 
 // Fetch location data for SSR
 async function fetchLocationData(slug: string) {
@@ -66,7 +94,7 @@ async function fetchLocationData(slug: string) {
 
   try {
     // Fetch location and events data from the API
-    const response = await eventsService.getLocationWithEvents(slug, host);
+    const response = await getLocationWithEventsCached(slug, host);
 
     if (!response.status || !response.data) {
       return {
@@ -120,7 +148,7 @@ export default async function LocationPage(props: {
   // Prefetch the query to populate the cache - only need to do this once
   await queryClient.prefetchQuery({
     queryKey: eventKeys.location(locationSlug, host),
-    queryFn: () => eventsService.getLocationWithEvents(locationSlug, host),
+    queryFn: () => getLocationWithEventsCached(locationSlug, host),
   });
 
   // Dehydrate the query cache to pass to the client

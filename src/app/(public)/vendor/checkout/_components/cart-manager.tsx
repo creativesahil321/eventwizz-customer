@@ -117,6 +117,8 @@ export default function CartManager({}: CartManagerProps) {
     error: cartError,
   } = useGetCartData(
     session?.user?.account_type === "customer" && !isPreviewMode,
+    // Checkout needs live cart data — refetch on mount instead of reusing cache.
+    { staleTime: 0, refetchOnMount: true },
   );
 
   const {
@@ -190,6 +192,8 @@ export default function CartManager({}: CartManagerProps) {
   const { data: eventDetailResponse } = useEventDetail(
     currentEventSlug ?? "",
     domain ?? "",
+    // Live availability at checkout — don't trust the event page's cached copy.
+    { staleTime: 0, refetchOnMount: true },
   );
   const eventDetail = eventDetailResponse?.data ?? null;
 

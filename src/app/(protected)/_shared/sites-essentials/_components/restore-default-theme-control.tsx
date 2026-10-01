@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import {
   useResetSiteEssentialsThemeMutation,
   useThemePresetsCatalogQuery,
@@ -42,7 +42,6 @@ export function RestoreDefaultThemeControl({
   getValues,
   onApplied,
 }: RestoreDefaultThemeControlProps) {
-  const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: themeCatalog } = useThemePresetsCatalogQuery();
   const {
@@ -60,19 +59,15 @@ export function RestoreDefaultThemeControl({
         updated.theme_preset_id ?? catalogDefaultId,
       );
       setDialogOpen(false);
-      toast({
-        title: "Default theme restored",
-        description:
-          "Colors and fonts were reset to EventWizz defaults. Your logo, copy, and images are unchanged.",
+      toast.success("Default theme restored", {
+        description: "Colors and fonts were reset to EventWizz defaults. Your logo, copy, and images are unchanged.",
       });
     } catch {
       onApplied(mergeSiteEssentialsDefaultTheme(getValues(), themeCatalog));
       writeLastAppliedSiteThemePresetId(presetCacheUserKey, catalogDefaultId);
       setDialogOpen(false);
-      toast({
-        title: "Default theme applied locally",
-        description:
-          "The reset API is not available yet — changes are in the preview only. Save from this page after the backend ships POST …/reset-theme-default.",
+      toast("Default theme applied locally", {
+        description: "The reset API is not available yet — changes are in the preview only. Save from this page after the backend ships POST …/reset-theme-default.",
       });
     }
   };

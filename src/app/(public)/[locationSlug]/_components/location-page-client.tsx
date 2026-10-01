@@ -23,6 +23,7 @@ export default function LocationPageClient({
     <LocationPageView
       locationData={locationData}
       locationSlug={locationSlug}
+      mainLandmark
     />
   );
 }

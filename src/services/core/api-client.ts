@@ -43,9 +43,10 @@ const safeToast = {
       toast.success(message);
     }
   },
-  error: (message: string) => {
+  /** `id` dedupes repeated identical toasts (sonner replaces instead of stacking). */
+  error: (message: string, id?: string) => {
     if (isBrowser) {
-      toast.error(message);
+      toast.error(message, id ? { id } : undefined);
     } else {
       console.error(message);
     }
@@ -62,6 +63,18 @@ const safeToast = {
       toast.info(message);
     }
   },
+};
+
+/** Stable toast id for an HTTP error: `${status}:${METHOD}:${url-without-query}`. */
+const httpErrorToastId = (
+  status: number | string,
+  config?: AxiosRequestConfig,
+  suffix?: string,
+): string => {
+  const method = (config?.method || "get").toUpperCase();
+  const path = (config?.url || "").split("?")[0];
+  const base = `${status}:${method}:${path}`;
+  return suffix ? `${base}:${suffix}` : base;
 };
 
 // Auth store state interface
@@ -432,7 +445,10 @@ apiClient.interceptors.response.use(
 
       // Handle domain authorization errors - show error without logout
       if (isDomainUnauthorized) {
-        safeToast.error(message);
+        safeToast.error(
+          message,
+          httpErrorToastId("domain-unauthorized", response.config),
+        );
         return Promise.reject(response.data);
       }
 
@@ -459,6 +475,7 @@ apiClient.interceptors.response.use(
       // For other status:false responses, show error toast
       safeToast.error(
         humanizeApiToastMessage(response.data.message || "Something went wrong"),
+        httpErrorToastId("status-false", response.config),
       );
       return Promise.reject(response.data);
     }
@@ -538,6 +555,7 @@ apiClient.interceptors.response.use(
                 typeof message === "string" && message.trim()
                   ? message
                   : "This QR code is not valid.",
+                httpErrorToastId(401, error.config),
               );
             }
             break;
@@ -637,7 +655,8 @@ apiClient.interceptors.response.use(
                 );
 
                 safeToast.error(
-                  `Invalid domain access. Redirecting to: ${correctDomain}`
+                  `Invalid domain access. Redirecting to: ${correctDomain}`,
+                  "invalid-domain-access",
                 );
 
                 // Redirect after a short delay to show the toast
@@ -665,6 +684,7 @@ apiClient.interceptors.response.use(
                 typeof message === "string" && message.trim()
                   ? message
                   : "You do not have permission to perform this action.",
+                httpErrorToastId(403, error.config),
               );
             }
           }
@@ -678,9 +698,15 @@ apiClient.interceptors.response.use(
           // Handle not found - show error toast with message from response
           const notFoundData = error.response.data as ApiErrorResponse;
           if (notFoundData?.message && !isLogoutInProgress) {
-            safeToast.error(notFoundData.message);
+            safeToast.error(
+              notFoundData.message,
+              httpErrorToastId(404, error.config),
+            );
           } else if (!isLogoutInProgress) {
-            safeToast.error("Resource not found");
+            safeToast.error(
+              "Resource not found",
+              httpErrorToastId(404, error.config),
+            );
           }
           break;
         }
@@ -698,13 +724,19 @@ apiClient.interceptors.response.use(
           ) {
             errorData.errors.forEach((errorMessage: string) => {
               if (!isLogoutInProgress) {
-                safeToast.error(errorMessage);
+                safeToast.error(
+                  errorMessage,
+                  httpErrorToastId(422, error.config, errorMessage),
+                );
               }
             });
           } else if (errorData?.message) {
             // Handle single error message
             if (!isLogoutInProgress) {
-              safeToast.error(errorData.message);
+              safeToast.error(
+                errorData.message,
+                httpErrorToastId(422, error.config),
+              );
             }
           }
           break;
@@ -719,14 +751,21 @@ apiClient.interceptors.response.use(
           ) {
             conflictData.errors.forEach((errorMessage: string) => {
               if (!isLogoutInProgress) {
-                safeToast.error(errorMessage);
+                safeToast.error(
+                  errorMessage,
+                  httpErrorToastId(409, error.config, errorMessage),
+                );
               }
             });
           } else if (conflictData?.message && !isLogoutInProgress) {
-            safeToast.error(conflictData.message);
+            safeToast.error(
+              conflictData.message,
+              httpErrorToastId(409, error.config),
+            );
           } else if (!isLogoutInProgress) {
             safeToast.error(
               "This action conflicts with the current booking state. Refresh the page and try again.",
+              httpErrorToastId(409, error.config),
             );
           }
           break;
@@ -738,7 +777,10 @@ apiClient.interceptors.response.use(
             !isLogoutInProgress &&
             error.response.status !== 422
           ) {
-            safeToast.error(message);
+            safeToast.error(
+              message,
+              httpErrorToastId(error.response.status, error.config),
+            );
           }
           break;
       }
@@ -747,7 +789,8 @@ apiClient.interceptors.response.use(
       // More specific error message for connection refused
       if (error.code === "ERR_NETWORK") {
         safeToast.error(
-          "Unable to connect to the server. Please ensure the server is running and accessible."
+          "Unable to connect to the server. Please ensure the server is running and accessible.",
+          "network-error",
         );
       } else if (
         error.code === "ECONNABORTED" ||
@@ -755,23 +798,26 @@ apiClient.interceptors.response.use(
       ) {
         // Handle timeout specifically
         safeToast.error(
-          "Request timed out. The server is taking too long to respond."
+          "Request timed out. The server is taking too long to respond.",
+          "request-timeout",
         );
 
         // For vendor locations API specifically, provide a better message
         if (error.config?.url?.includes("vendor/locations")) {
           safeToast.error(
-            "Location data could not be loaded. Please refresh or try again later."
+            "Location data could not be loaded. Please refresh or try again later.",
+            "locations-timeout",
           );
         }
       } else {
         safeToast.error(
-          "Unable to connect to the server. Please check your internet connection and try again."
+          "Unable to connect to the server. Please check your internet connection and try again.",
+          "network-error-offline",
         );
       }
     } else {
       // Something happened in setting up the request that triggered an Error
-      safeToast.error("Error setting up the request");
+      safeToast.error("Error setting up the request", "request-setup-error");
     }
 
     return Promise.reject(error);

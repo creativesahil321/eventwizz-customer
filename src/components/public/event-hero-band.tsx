@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Calendar, Clock, MapPin, Pencil } from "lucide-react";
 import { SiteHeading } from "@/components/public/site-heading";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
+import { HeroBackgroundVideo } from "@/components/public/hero-background-video";
 import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import type { EventHeroBreadcrumb, EventHeroMeta } from "@/lib/event-hero-meta";
@@ -241,15 +242,10 @@ export function EventHeroBand({
                 style={{ backgroundImage: `url(${bgImage})` }}
               />
             )}
-            <video
+            <HeroBackgroundVideo
               src={videoUrl}
               poster={bgImage || undefined}
               className={cn(heroStyles.videoBackground, "scale-105")}
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
             />
           </>
         ) : bgImage && !bgImage.startsWith("blob:") && priorityHeroImage ? (

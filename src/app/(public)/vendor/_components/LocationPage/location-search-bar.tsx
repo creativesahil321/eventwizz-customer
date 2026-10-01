@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import {
   addDays,
   addMonths,
@@ -20,7 +21,6 @@ import {
   Navigation,
   Search,
 } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
 import {
   eventThemesBySlugFromSearchResults,
   seasonThemesByDateFromEvents,
@@ -50,6 +50,20 @@ import {
 } from "@/services/common/public-search";
 import type { LocationSearchFilters } from "./_lib/search-filters";
 import { locationSearchQueryPlaceholder } from "./_lib/search-filters";
+
+/** Calendar (react-day-picker) only renders inside the open date popover — load on demand. */
+const Calendar = dynamic(
+  () => import("@/components/ui/calendar").then((mod) => mod.Calendar),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-2 p-3" aria-busy>
+        <Skeleton className="mx-auto h-5 w-28" />
+        <Skeleton className="h-56 w-[252px]" />
+      </div>
+    ),
+  },
+);
 
 export type SearchAvailabilityScope = {
   domain?: string | null;
@@ -293,7 +307,7 @@ export function LocationSearchBar({
             isPreviewMobile && "!flex-col !items-stretch !gap-1",
           )}
         >
-          <label className="relative flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-4 sm:px-5 @max-sm/preview:!h-11 @max-sm/preview:!px-4">
+          <label className="relative flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-4 transition-shadow focus-within:ring-2 focus-within:ring-[var(--color-primary)] focus-within:ring-offset-0 sm:px-5 @max-sm/preview:!h-11 @max-sm/preview:!px-4">
             <Search
               className="h-4 w-4 shrink-0 text-[var(--color-primary)]"
               aria-hidden

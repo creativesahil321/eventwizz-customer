@@ -28,15 +28,27 @@ export const useCheckoutData = (eventSlug: string, eventDate: string) => {
   });
 };
 
+/** Per-observer freshness overrides (e.g. checkout wants live data on mount). */
+export type CartDataQueryOptions = {
+  staleTime?: number;
+  refetchOnMount?: boolean | "always";
+};
+
 /**
  * Hook for fetching all cart data
  */
-export const useGetCartData = (enabled: boolean = true) => {
+export const useGetCartData = (
+  enabled: boolean = true,
+  options?: CartDataQueryOptions,
+) => {
   return useQuery({
     queryKey: ["cart-data"],
     queryFn: () => cartService.getCartData(),
     enabled,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: options?.staleTime ?? 2 * 60 * 1000, // 2 minutes
+    ...(options?.refetchOnMount !== undefined
+      ? { refetchOnMount: options.refetchOnMount }
+      : {}),
     retry: 2,
     // Keep cart visible during background refetch (e.g. after delete) — avoids full-page skeleton flash.
     placeholderData: keepPreviousData,

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { assertSafeLogoUrl } from "@/lib/logo/fetch-logo-from-url";
+import { guardPublicApi } from "@/lib/security/api-guard";
+import { assertResolvesToPublic } from "@/lib/security/ssrf";
 
 export const runtime = "nodejs";
 
@@ -78,6 +80,16 @@ function hasVideoSignature(buffer: Buffer): boolean {
  * (http/https, no private/local hosts), media types, and magic bytes.
  */
 export async function GET(request: NextRequest) {
+  // Loaded via <img>/<video src>, which send Referer but no Origin, so a
+  // request with neither header is tolerated; cross-site ones are rejected.
+  // Generous limit: one import can preview dozens of gallery images.
+  const guard = guardPublicApi(request, "ai:import-website-image", {
+    limit: 180,
+    windowMs: 60_000,
+    allowMissingOrigin: true,
+  });
+  if (guard) return guard;
+
   const rawUrl = request.nextUrl.searchParams.get("url");
   const mediaType = request.nextUrl.searchParams.get("type") === "video"
     ? "video"
@@ -100,6 +112,22 @@ export async function GET(request: NextRequest) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
       try {
+        // SSRF: re-validate DNS on every hop (blocks public hostnames that
+        // resolve to private / metadata addresses).
+        try {
+          await assertResolvesToPublic(currentUrl.hostname);
+        } catch {
+          return NextResponse.json(
+            {
+              error:
+                redirectCount === 0
+                  ? "URL is not allowed."
+                  : "Image URL redirected to an unsafe address.",
+            },
+            { status: 400 },
+          );
+        }
+
         const upstream = await fetch(currentUrl.toString(), {
           headers: {
             "User-Agent":
@@ -116,6 +144,7 @@ export async function GET(request: NextRequest) {
         });
         if (upstream.status >= 300 && upstream.status < 400) {
           const location = upstream.headers.get("location");
+          await upstream.body?.cancel().catch(() => undefined);
           if (!location || redirectCount === MAX_REDIRECTS) {
             return NextResponse.json(
               { error: "Image URL redirected too many times." },

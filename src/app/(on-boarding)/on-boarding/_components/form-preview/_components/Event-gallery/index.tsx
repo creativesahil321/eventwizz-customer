@@ -146,8 +146,8 @@ function GalleryImageTile({
           loaded ? "opacity-100" : "opacity-0",
         )}
         decoding="async"
-        fetchPriority={index < 4 ? "high" : "low"}
-        loading={index < 4 ? "eager" : "lazy"}
+        // Gallery sits below the fold on the event page: never compete with the hero (LCP).
+        loading="lazy"
         onLoad={() => setLoaded(true)}
         onError={() => setLoaded(true)}
       />

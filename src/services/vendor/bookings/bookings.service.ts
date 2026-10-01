@@ -695,7 +695,7 @@ export const vendorBookingsService = {
       // API may return JSON error body with HTTP 200 while responseType is blob
       await throwIfBlobIsApiError(
         response.data,
-        response.headers?.["content-type"]
+        (response.headers?.["content-type"] as string | undefined)
       );
 
       // Get filename from Content-Disposition header or use default
@@ -723,7 +723,7 @@ export const vendorBookingsService = {
       if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
         await throwIfBlobIsApiError(
           error.response.data,
-          error.response.headers?.["content-type"],
+          (error.response.headers?.["content-type"] as string | undefined),
           true
         );
       }

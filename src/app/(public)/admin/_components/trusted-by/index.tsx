@@ -97,6 +97,8 @@ export default function TrustedBy({
                   <img
                     src={logo}
                     alt={`Partner logo ${idx + 1}`}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-14 object-contain"
                   />
                 </div>

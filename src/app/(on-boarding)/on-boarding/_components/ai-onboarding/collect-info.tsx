@@ -10,7 +10,7 @@ import React, {
 import { useForm, useFieldArray, type Resolver, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader } from "@googlemaps/js-api-loader";
+import { loadGoogleMaps } from "@/lib/load-google-maps";
 import {
   Sparkles,
   Building2,
@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { NameAvailabilityInputCue } from "@/components/name-availability-input-cue";
 import { useSession } from "next-auth/react";
-import { env } from "@/env";
 import type { AIOnboardingInput } from "@/app/api/ai/generate-onboarding/route";
 import { useEventCategories } from "@/services/vendor/events/query";
 import { useBrandNameAvailability } from "@/hooks/use-brand-name-availability";
@@ -464,16 +463,17 @@ export default function AICollectInfo({
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const loader = new Loader({
-      apiKey: env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-      libraries: ["places"],
-    });
-    loader.load().then(() => {
-      if (window.google?.maps?.places) {
-        autocompleteRef.current =
-          new window.google.maps.places.AutocompleteService();
-      }
-    });
+    // Shared loader — same apiKey + "places" options, injected once per page.
+    loadGoogleMaps()
+      .then(() => {
+        if (window.google?.maps?.places) {
+          autocompleteRef.current =
+            new window.google.maps.places.AutocompleteService();
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load Google Maps Places:", error);
+      });
   }, []);
 
   const handleVenueSearch = useCallback(

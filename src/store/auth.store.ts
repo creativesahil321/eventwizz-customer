@@ -321,10 +321,14 @@ export const useAuthStore = create<AuthState>()(
 
         // Clear React Query cache
         try {
-          // Import the queryClient directly instead of using the hook
-          const { default: queryClient } = await import(
-            "@/providers/query-provider/queryClient"
+          // Prefer the live client registered by RootQueryProvider; fall back
+          // to the legacy module singleton if no provider has mounted.
+          const { getActiveQueryClient } = await import(
+            "@/providers/query-provider/active-query-client"
           );
+          const queryClient =
+            getActiveQueryClient() ??
+            (await import("@/providers/query-provider/queryClient")).default;
           if (queryClient) {
             // Reset all query cache data
             queryClient.clear();

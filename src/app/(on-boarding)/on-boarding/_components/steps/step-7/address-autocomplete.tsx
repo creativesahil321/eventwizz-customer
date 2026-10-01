@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, forwardRef } from "react";
-import { Loader } from "@googlemaps/js-api-loader";
+import { loadGoogleMaps } from "@/lib/load-google-maps";
 import { Input } from "@/components/ui/input";
 import { FieldClearButton } from "@/components/ui/field-clear-button";
 import { cityFromFormattedAddress } from "@/lib/city-from-formatted-address";
@@ -168,13 +168,8 @@ const AddressAutocomplete = forwardRef<
     const apiKey = env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) return;
 
-    const loader = new Loader({
-      apiKey,
-      libraries: ["places"],
-    });
-
-    loader
-      .load()
+    // Shared loader — same apiKey + "places" options, injected once per page.
+    loadGoogleMaps()
       .then(() => {
         if (!cancelled) attachServices();
       })

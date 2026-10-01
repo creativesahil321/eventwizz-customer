@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { guardPublicApi } from "@/lib/security/api-guard";
 import { env } from "@/env";
 import { adminContactFormSchema } from "@/lib/admin-contact-form";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 
 export async function POST(request: Request) {
+  const guard = guardPublicApi(request, "contact", { limit: 5, windowMs: 60_000 });
+  if (guard) return guard;
+
   try {
     const body = await request.json();
     const parsed = adminContactFormSchema.safeParse(body);

@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { FieldClearButton } from "@/components/ui/field-clear-button";
 import { cn } from "@/lib/utils";
 import React, { useEffect, useRef, useState } from "react";
-import { Loader } from "@googlemaps/js-api-loader";
+import { loadGoogleMaps } from "@/lib/load-google-maps";
 
 type Suggestion = {
   description: string;
@@ -37,17 +37,18 @@ const GoogleBusinessSearch: React.FC<Props> = ({
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const loader = new Loader({
-      apiKey,
-      libraries: ["places"],
-    });
-
-    loader.load().then(() => {
-      if (window.google?.maps?.places) {
-        autocompleteService.current =
-          new window.google.maps.places.AutocompleteService();
-      }
-    });
+    // Shared loader (env apiKey + "places") — all callers pass the same key;
+    // a second Loader with different options would throw anyway.
+    loadGoogleMaps()
+      .then(() => {
+        if (window.google?.maps?.places) {
+          autocompleteService.current =
+            new window.google.maps.places.AutocompleteService();
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load Google Maps Places:", error);
+      });
   }, [apiKey]);
 
   useEffect(() => {

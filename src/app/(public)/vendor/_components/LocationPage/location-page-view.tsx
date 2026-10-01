@@ -99,6 +99,11 @@ type LocationPageViewProps = {
    * not “this vendor already has 2+ venues”.
    */
   hasMultipleLocations?: boolean;
+  /**
+   * Render the page body as the `<main id="main-content">` landmark.
+   * Live public routes only — previews already sit inside an app `<main>`.
+   */
+  mainLandmark?: boolean;
 };
 
 /**
@@ -124,7 +129,9 @@ export function LocationPageView({
   footerBrandDescription,
   previewEdit,
   hasMultipleLocations,
+  mainLandmark = false,
 }: LocationPageViewProps) {
+  const BodyTag = mainLandmark ? "main" : "div";
   const { theme } = useContext(ServerContext) || { theme: null };
   const isPreviewMode = useIsPreviewMode();
   const { previewLocations } = usePreviewLocationNavigation();
@@ -297,7 +304,8 @@ export function LocationPageView({
         onEditLogo={previewEdit?.onEditLogo}
       />
 
-      <div
+      <BodyTag
+        id={mainLandmark ? "main-content" : undefined}
         className={
           isSearchMode
             ? "min-h-screen bg-[var(--color-background)] pt-[4.5rem]"
@@ -393,7 +401,7 @@ export function LocationPageView({
             locationLabel={cityLabel || null}
           />
         )}
-      </div>
+      </BodyTag>
 
       <SubscribeSection emphasis={headingEmphasis} />
 

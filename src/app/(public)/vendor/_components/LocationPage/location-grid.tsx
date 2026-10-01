@@ -199,7 +199,6 @@ export default function LocationGrid({
                       src={coverImage}
                       alt={locationName}
                       fill
-                      priority={idx < 2}
                       sizes="(max-width: 768px) 96px, (max-width: 1200px) 50vw, 33vw"
                       className={cn(
                         "object-cover",

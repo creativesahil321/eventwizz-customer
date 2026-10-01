@@ -228,7 +228,18 @@ export const useLocations = (
       const normalizedLocations = locations.map((location) => normalizeLocation(location));
       const meta = response?.meta;
 
-      if (normalizedLocations.length > 0) {
+      // Only an unfiltered first page is the full list (as LocationInitializer
+      // fetches). Searched/paged results must not replace the global store —
+      // the header location switcher reads `allLocations` from it.
+      const perPageNum = per_page != null ? Number(per_page) : NaN;
+      const isUnfilteredFullList =
+        !search?.trim() &&
+        !params?.status &&
+        (page == null || page === "1") &&
+        (per_page == null ||
+          (Number.isFinite(perPageNum) && perPageNum >= MAX_VENDOR_LOCATIONS));
+
+      if (isUnfilteredFullList && normalizedLocations.length > 0) {
         useLocationStore.getState().setLocations(normalizedLocations);
       }
 

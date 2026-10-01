@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Pencil } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import type { Vendor } from "./vendors-table";
 
 interface EditVendorModalProps {
@@ -69,7 +69,9 @@ export function EditVendorModal({
     await new Promise((r) => setTimeout(r, 600));
     const data = { name: name.trim(), address: address.trim(), status };
     onSaved?.({ ...vendor, ...data }, data);
-    toast({ title: "Venue updated", description: `${name.trim()} has been updated.` });
+    toast.success("Venue updated", {
+      description: `${name.trim()} has been updated.`,
+    });
     setIsSubmitting(false);
     handleOpenChange(false);
   };

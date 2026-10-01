@@ -27,6 +27,26 @@ import { normalizeHeadingEmphasis } from "@/lib/heading-emphasis";
 import { fontInter } from "@/lib/fonts";
 import { addCacheBustingSSR, shouldUseNextImageOptimization } from "@/lib/image-utils";
 import { resolveVendorMainLandingHeroSrc } from "@/lib/resolve-hero-cover-image";
+import { getRequestOrigin } from "@/lib/seo/request-origin";
+import { env } from "@/env";
+
+/** Hosts that serve the EventWizz marketing site even without a theme. */
+function isMainSiteHost(host: string): boolean {
+  const mainHosts = [appConfig.url, env.NEXT_PUBLIC_APP_URL]
+    .map((url) => {
+      try {
+        return url ? new URL(url).hostname : "";
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean);
+  return (
+    mainHosts.includes(host) ||
+    host === "localhost" ||
+    host.startsWith("127.")
+  );
+}
 
 /**
  * Dynamic metadata — single source of truth for brand name, favicon, and title template.
@@ -52,13 +72,32 @@ export async function generateMetadata(): Promise<Metadata> {
     ? (theme.seo.keywords as string).split(",").map((k) => k.trim()).filter(Boolean)
     : appConfig.seo.keywords;
 
+  const origin = await getRequestOrigin();
+  const ogImage = theme?.logo;
+
   return {
+    // Per-tenant base so relative canonical / OG URLs resolve to this host.
+    metadataBase: new URL(origin),
     title: {
       default: titleDefault,
       template: `%s | ${brandName}`,
     },
     description,
     keywords: keywords.length ? keywords : undefined,
+    // Only host-wide defaults here: pages without their own openGraph inherit
+    // this object as-is, so per-page title/description must not live in it
+    // (crawlers fall back to <title> and the meta description). Twitter tags
+    // are derived from openGraph by Next.js, so no twitter object is set here.
+    openGraph: {
+      type: "website",
+      siteName: brandName,
+      ...(typeof ogImage === "string" && ogImage ? { images: [{ url: ogImage }] } : {}),
+    },
+    // If the theme API failed on a tenant host, the page falls back to
+    // generic EventWizz content; keep that fallback out of search results.
+    ...(!theme && !isMainSiteHost(host) && {
+      robots: { index: false, follow: true },
+    }),
     ...(theme?.favicon && {
       icons: {
         icon: addCacheBustingSSR(theme.favicon, theme.media_updated_at),
@@ -145,7 +184,6 @@ export default async function RootLayout({
               initialTheme.media_updated_at,
             )}
             as="image"
-            fetchPriority="high"
           />
         )}
         {shouldPreloadVendorHero && vendorHeroPreloadSrc ? (

@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import AdminHomeContent from "./_components/admin-home-content";
+import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
 
 export const metadata: Metadata = {
   title: "Event Management Software for Venues",
@@ -17,6 +18,9 @@ export const metadata: Metadata = {
   ],
 };
 
-export default function AdminSiteHomePage() {
+export default async function AdminSiteHomePage() {
+  // The EventWizz marketing page must not be served on vendor domains
+  // (duplicate content under the vendor's brand). 404 there, like /about and /blog.
+  await assertAdminPublicSite();
   return <AdminHomeContent />;
 }

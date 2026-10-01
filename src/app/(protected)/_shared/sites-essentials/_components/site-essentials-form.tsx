@@ -13,7 +13,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { useSiteEssentials } from "../_lib/hooks";
 import {
   resolveHasMultipleLocations,
@@ -102,7 +102,6 @@ function SiteEssentialsFormInner() {
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const router = useRouter();
-  const { toast } = useToast();
   const {
     setPreviewData,
     clearPreviewData,
@@ -350,11 +349,7 @@ function SiteEssentialsFormInner() {
       console.error("Preview navigation error:", error);
       router.push("/preview/site");
       setPreviewLoading(false);
-      toast({
-        title: "Error",
-        description: "Failed to open preview",
-        variant: "destructive",
-      });
+      toast.error("Error", { description: "Failed to open preview" });
     }
   };
 
@@ -392,19 +387,13 @@ function SiteEssentialsFormInner() {
         form.reset(form.getValues(), { keepValues: true });
 
         router.refresh();
-        toast({
-          title: "Success",
+        toast.success("Success", {
           description: "Site essentials updated successfully",
-          variant: "default",
         });
       }
     } catch (error) {
       console.error(error);
-      toast({
-        title: "Error",
-        description: "Failed to update site essentials",
-        variant: "destructive",
-      });
+      toast.error("Error", { description: "Failed to update site essentials" });
     } finally {
       setSubmitting(false);
     }
@@ -425,12 +414,9 @@ function SiteEssentialsFormInner() {
       }
     }
 
-    toast({
-      title: "Validation Error",
-      description:
-        firstErrorMessage ||
+    toast.error("Validation Error", {
+      description: firstErrorMessage ||
         "Please complete all required fields in highlighted tabs",
-      variant: "destructive",
     });
 
     // Switch to the first tab with errors
@@ -476,18 +462,14 @@ function SiteEssentialsFormInner() {
         // Clear any error states
         setShowErrorSummary(false);
 
-        toast({
-          title: "Changes discarded",
+        toast.success("Changes discarded", {
           description: "The form was restored to your last saved values.",
-          variant: "default",
         });
       }
     } catch (error) {
       console.error("Error discarding form changes:", error);
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Failed to discard your unsaved changes",
-        variant: "destructive",
       });
     }
   };

@@ -63,6 +63,7 @@ export function SingleLocationHome({
       locationSlug={slug}
       settings={settings}
       hasMultipleLocations={false}
+      mainLandmark
     />
   );
 }

@@ -9,6 +9,7 @@
  * `srcset` (not just `<img src>`).
  */
 
+import { readBodyWithLimit, safeFetch } from "@/lib/security/ssrf";
 import {
   cssColorToHex,
   extractAppliedColorsFromCss,
@@ -582,23 +583,23 @@ async function fetchCssText(url: string): Promise<string | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LINKED_CSS_TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
+    // Stylesheet URLs come from the scraped (untrusted) page: SSRF-safe fetch
+    // validates host + DNS and re-validates every redirect hop.
+    const response = await safeFetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; EventWizzImportBot/1.0; +https://eventwizz.com)",
         Accept: "text/css,*/*;q=0.1",
       },
-      redirect: "follow",
       cache: "no-store",
       signal: controller.signal,
+      timeoutMs: LINKED_CSS_TIMEOUT_MS,
     });
     if (!response.ok) return null;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length === 0) return null;
-    const slice =
-      buffer.length > MAX_LINKED_CSS_BYTES
-        ? buffer.subarray(0, MAX_LINKED_CSS_BYTES)
-        : buffer;
+    const slice = await readBodyWithLimit(response, MAX_LINKED_CSS_BYTES, {
+      truncate: true,
+    });
+    if (slice.length === 0) return null;
     return slice.toString("utf-8");
   } catch {
     return null;

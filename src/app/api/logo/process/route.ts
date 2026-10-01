@@ -1,4 +1,7 @@
+import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
+import { authOptions } from "@/lib/auth/authOptions";
+import { guardPublicApi } from "@/lib/security/api-guard";
 import {
   LOGO_DEFAULT_HEADER_BACKGROUND,
   LOGO_PROCESS_MAX_BYTES,
@@ -35,6 +38,20 @@ function processLogoResponseHeaders(result: Awaited<ReturnType<typeof processLog
 }
 
 export async function POST(request: NextRequest) {
+  // Runs Sharp + the paid remove.bg API: same-origin + rate limit, and only
+  // for signed-in users (all callers live behind onboarding/protected layouts
+  // that already require a session).
+  const guard = guardPublicApi(request, "logo:process", { limit: 20, windowMs: 60_000 });
+  if (guard) return guard;
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: "You must be signed in to process a logo." },
+      { status: 401 },
+    );
+  }
+
   try {
     const formData = await request.formData();
     const logo = formData.get("logo");

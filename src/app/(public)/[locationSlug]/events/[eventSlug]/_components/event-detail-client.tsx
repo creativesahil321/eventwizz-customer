@@ -415,231 +415,234 @@ export default function EventDetailClient({
           }
         />
 
-        {showRoomSelector ? (
-          <EventRoomSelector
-            rooms={slices.rooms}
-            currentRoomIndex={currentRoomIndex}
-            onRoomChange={handleRoomChange}
-            visible={roomSelectorVisible}
-            stickyTop={roomSelectorStickyTop}
-          />
-        ) : null}
-
-        <div>
-          <EventHeroBand
-            sectionRef={heroRef}
-            title={heroTitle}
-            subHeading={eventData.event_banner_sub_heading || null}
-            accentHint={heroAccentHint}
-            headingEmphasis={headingEmphasisFromSite}
-            bannerHeadingAlign={eventData.banner_heading_align ?? null}
-            bannerHeadingValign={eventData.banner_heading_valign ?? null}
-            bannerImage={eventData.event_banner_image || null}
-            bannerVideo={eventData.event_banner_video || null}
-            cacheBustImage
-            imageAlt={eventData.event_name || "Event banner"}
-            breadcrumbs={buildEventHeroBreadcrumbs({
-              eventLabel:
-                eventData.event_name?.trim() ||
-                eventData.event_banner_heading?.trim() ||
-                "Event",
-              locationLabel: parentLocationLabel,
-              homeHref: "/",
-              locationHref: `/${locationSlug}`,
-            })}
-            categoryLabel={heroCategoryLabel}
-            meta={{
-              date: heroDateLabel,
-              time: heroTimeLabel,
-              location: eventLocationLabel,
-            }}
-          />
-        </div>
-
-        {showSectionNav ? (
-          <EventSectionNav
-            items={sectionNavItems}
-            stickyTop={sectionNavStickyTop}
-            headerOffsetPx={headerOffsetPx}
-            bookNowId={EVENT_SECTION_IDS.dates}
-          />
-        ) : null}
-
-        <div
-          ref={aboutRef}
-          id={EVENT_SECTION_IDS.about}
-          className={sectionAnchorClass}
-        >
-          <AboutEventSec
-            about_event_heading={eventData.about_event_heading}
-            about_event_sub_heading={eventData.about_event_sub_heading}
-            about_event_description={eventData.about_event_description}
-            eventImage={resolveAboutEventImage(
-              eventData.about_event_image,
-              eventData.event_banner_image,
-            )}
-            imageAlt={
-              eventData.event_name
-                ? `${eventData.event_name} event`
-                : "Event image"
-            }
-            highlights={aboutHighlights}
-            headingEmphasis={headingEmphasisFromSite}
-            aboutHeadingAccentHint={heroAccentHint}
-          />
-        </div>
-
-        {showRoomSelector ? (
-          <div
-            ref={chooserRef}
-            id={EVENT_SECTION_IDS.rooms}
-            className={sectionAnchorClass}
-          >
-            <EventRoomChooser
-              rooms={roomSummaries}
+        {/* `contents`: landmark only — keeps the page div as the sticky nav's containing block. */}
+        <main id="main-content" className="contents">
+          {showRoomSelector ? (
+            <EventRoomSelector
+              rooms={slices.rooms}
               currentRoomIndex={currentRoomIndex}
               onRoomChange={handleRoomChange}
+              visible={roomSelectorVisible}
+              stickyTop={roomSelectorStickyTop}
+            />
+          ) : null}
+
+          <div>
+            <EventHeroBand
+              sectionRef={heroRef}
+              title={heroTitle}
+              subHeading={eventData.event_banner_sub_heading || null}
+              accentHint={heroAccentHint}
               headingEmphasis={headingEmphasisFromSite}
+              bannerHeadingAlign={eventData.banner_heading_align ?? null}
+              bannerHeadingValign={eventData.banner_heading_valign ?? null}
+              bannerImage={eventData.event_banner_image || null}
+              bannerVideo={eventData.event_banner_video || null}
+              cacheBustImage
+              imageAlt={eventData.event_name || "Event banner"}
+              breadcrumbs={buildEventHeroBreadcrumbs({
+                eventLabel:
+                  eventData.event_name?.trim() ||
+                  eventData.event_banner_heading?.trim() ||
+                  "Event",
+                locationLabel: parentLocationLabel,
+                homeHref: "/",
+                locationHref: `/${locationSlug}`,
+              })}
+              categoryLabel={heroCategoryLabel}
+              meta={{
+                date: heroDateLabel,
+                time: heroTimeLabel,
+                location: eventLocationLabel,
+              }}
             />
           </div>
-        ) : null}
 
-        {showTimeline ? (
+          {showSectionNav ? (
+            <EventSectionNav
+              items={sectionNavItems}
+              stickyTop={sectionNavStickyTop}
+              headerOffsetPx={headerOffsetPx}
+              bookNowId={EVENT_SECTION_IDS.dates}
+            />
+          ) : null}
+
           <div
-            ref={timelineRef}
-            id={EVENT_SECTION_IDS.schedule}
+            ref={aboutRef}
+            id={EVENT_SECTION_IDS.about}
             className={sectionAnchorClass}
           >
-            <RoomContentTransition roomKey={roomContentKey}>
-              <Timeline
-                eventSchedular={timelineRows}
-                eventSchedularTitle={slices.event_schedular_title}
-                eventSchedularCopy={slices.event_schedule_subtitle}
-                eventDates={scheduleEventDates}
-                eventSchedularBackgroundImage={
-                  typeof slices.event_schedular_background_image === "string"
-                    ? slices.event_schedular_background_image
-                    : undefined
-                }
-              />
-            </RoomContentTransition>
-          </div>
-        ) : null}
-
-        <div
-          ref={packageRef}
-          id={showPackages ? EVENT_SECTION_IDS.packages : undefined}
-          className={showPackages ? sectionAnchorClass : undefined}
-        >
-          <RoomContentTransition roomKey={roomContentKey}>
-            <PackageSec
-              heading={slices.package_title}
-              subHeading={slices.package_description}
-              image={slices.package_image}
-              packageDetails={slices.package_details}
-              headingEmphasis={headingEmphasisFromSite}
-            />
-          </RoomContentTransition>
-        </div>
-
-        <div
-          ref={bookingRef}
-          id={EVENT_SECTION_IDS.dates}
-          className={cn(EVENT_BOOKING_SECTION_CLASSNAME, sectionAnchorClass)}
-        >
-          <RoomContentTransition roomKey={roomContentKey}>
-            <DatesSection
-              dates={slices.dates}
-              eventSlug={eventSlug}
-              eventName={eventData.event_name}
-              eventImage={
-                eventData.event_banner_image ||
-                eventData.event_banner_video ||
-                undefined
+            <AboutEventSec
+              about_event_heading={eventData.about_event_heading}
+              about_event_sub_heading={eventData.about_event_sub_heading}
+              about_event_description={eventData.about_event_description}
+              eventImage={resolveAboutEventImage(
+                eventData.about_event_image,
+                eventData.event_banner_image,
+              )}
+              imageAlt={
+                eventData.event_name
+                  ? `${eventData.event_name} event`
+                  : "Event image"
               }
-              roomId={activeRoomId}
+              highlights={aboutHighlights}
               headingEmphasis={headingEmphasisFromSite}
-            />
-          </RoomContentTransition>
-        </div>
-
-        {showGallery ? (
-          <div id={EVENT_SECTION_IDS.gallery} className={sectionAnchorClass}>
-            <EventGallery
-              gallery={galleryItems}
-              headingEmphasis={headingEmphasisFromSite}
+              aboutHeadingAccentHint={heroAccentHint}
             />
           </div>
-        ) : null}
 
-        {slices.menus && slices.menus.length > 0 && (
+          {showRoomSelector ? (
+            <div
+              ref={chooserRef}
+              id={EVENT_SECTION_IDS.rooms}
+              className={sectionAnchorClass}
+            >
+              <EventRoomChooser
+                rooms={roomSummaries}
+                currentRoomIndex={currentRoomIndex}
+                onRoomChange={handleRoomChange}
+                headingEmphasis={headingEmphasisFromSite}
+              />
+            </div>
+          ) : null}
+
+          {showTimeline ? (
+            <div
+              ref={timelineRef}
+              id={EVENT_SECTION_IDS.schedule}
+              className={sectionAnchorClass}
+            >
+              <RoomContentTransition roomKey={roomContentKey}>
+                <Timeline
+                  eventSchedular={timelineRows}
+                  eventSchedularTitle={slices.event_schedular_title}
+                  eventSchedularCopy={slices.event_schedule_subtitle}
+                  eventDates={scheduleEventDates}
+                  eventSchedularBackgroundImage={
+                    typeof slices.event_schedular_background_image === "string"
+                      ? slices.event_schedular_background_image
+                      : undefined
+                  }
+                />
+              </RoomContentTransition>
+            </div>
+          ) : null}
+
           <div
-            ref={menuRef}
-            id={EVENT_SECTION_IDS.menu}
-            className={sectionAnchorClass}
+            ref={packageRef}
+            id={showPackages ? EVENT_SECTION_IDS.packages : undefined}
+            className={showPackages ? sectionAnchorClass : undefined}
           >
             <RoomContentTransition roomKey={roomContentKey}>
-              <LazyMenuSection
-                menu_title={slices.menu_title}
-                menu_description={slices.menu_description}
-                menus={slices.menus}
-                catering_option={1}
-                menu_background_image={
-                  typeof slices.menu_background_image === "string"
-                    ? slices.menu_background_image
-                    : undefined
-                }
+              <PackageSec
+                heading={slices.package_title}
+                subHeading={slices.package_description}
+                image={slices.package_image}
+                packageDetails={slices.package_details}
                 headingEmphasis={headingEmphasisFromSite}
               />
             </RoomContentTransition>
           </div>
-        )}
 
-        {drinkPackages.length > 0 && (
           <div
-            ref={drinkRef}
-            id={EVENT_SECTION_IDS.drinks}
-            className={sectionAnchorClass}
+            ref={bookingRef}
+            id={EVENT_SECTION_IDS.dates}
+            className={cn(EVENT_BOOKING_SECTION_CLASSNAME, sectionAnchorClass)}
           >
             <RoomContentTransition roomKey={roomContentKey}>
-              <LazyDrinkSection
-                title={slices.drink_title}
-                description={slices.drink_description}
-                packages={drinkPackages}
+              <DatesSection
+                dates={slices.dates}
                 eventSlug={eventSlug}
+                eventName={eventData.event_name}
+                eventImage={
+                  eventData.event_banner_image ||
+                  eventData.event_banner_video ||
+                  undefined
+                }
                 roomId={activeRoomId}
                 headingEmphasis={headingEmphasisFromSite}
               />
             </RoomContentTransition>
           </div>
-        )}
 
-        <div>
-          <LazyBrochureSection
-            showMapImmediately
-            headingEmphasis={headingEmphasisFromSite}
-            location={{
-              title: "EVENT LOCATION",
-              description: slices.event_address || "",
-              icon: "MapPin",
-              latitude: slices.lat,
-              longitude: slices.long,
-            }}
-          />
-        </div>
+          {showGallery ? (
+            <div id={EVENT_SECTION_IDS.gallery} className={sectionAnchorClass}>
+              <EventGallery
+                gallery={galleryItems}
+                headingEmphasis={headingEmphasisFromSite}
+              />
+            </div>
+          ) : null}
 
-        {eventData.faqs && eventData.faqs.length > 0 && (
-          <div
-            ref={faqRef}
-            id={EVENT_SECTION_IDS.faqs}
-            className={sectionAnchorClass}
-          >
-            <LazyFaqSection
-              faqs={eventData.faqs}
+          {slices.menus && slices.menus.length > 0 && (
+            <div
+              ref={menuRef}
+              id={EVENT_SECTION_IDS.menu}
+              className={sectionAnchorClass}
+            >
+              <RoomContentTransition roomKey={roomContentKey}>
+                <LazyMenuSection
+                  menu_title={slices.menu_title}
+                  menu_description={slices.menu_description}
+                  menus={slices.menus}
+                  catering_option={1}
+                  menu_background_image={
+                    typeof slices.menu_background_image === "string"
+                      ? slices.menu_background_image
+                      : undefined
+                  }
+                  headingEmphasis={headingEmphasisFromSite}
+                />
+              </RoomContentTransition>
+            </div>
+          )}
+
+          {drinkPackages.length > 0 && (
+            <div
+              ref={drinkRef}
+              id={EVENT_SECTION_IDS.drinks}
+              className={sectionAnchorClass}
+            >
+              <RoomContentTransition roomKey={roomContentKey}>
+                <LazyDrinkSection
+                  title={slices.drink_title}
+                  description={slices.drink_description}
+                  packages={drinkPackages}
+                  eventSlug={eventSlug}
+                  roomId={activeRoomId}
+                  headingEmphasis={headingEmphasisFromSite}
+                />
+              </RoomContentTransition>
+            </div>
+          )}
+
+          <div>
+            <LazyBrochureSection
+              showMapImmediately
               headingEmphasis={headingEmphasisFromSite}
+              location={{
+                title: "EVENT LOCATION",
+                description: slices.event_address || "",
+                icon: "MapPin",
+                latitude: slices.lat,
+                longitude: slices.long,
+              }}
             />
           </div>
-        )}
+
+          {eventData.faqs && eventData.faqs.length > 0 && (
+            <div
+              ref={faqRef}
+              id={EVENT_SECTION_IDS.faqs}
+              className={sectionAnchorClass}
+            >
+              <LazyFaqSection
+                faqs={eventData.faqs}
+                headingEmphasis={headingEmphasisFromSite}
+              />
+            </div>
+          )}
+        </main>
 
         <FooterSection
           locationSlug={locationSlug}

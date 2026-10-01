@@ -1,10 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X, Loader2, CheckCircle2, Calendar } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogOverlay,
+  DialogPortal,
+} from "@/components/ui/dialog";
 
 interface BookACallModalProps {
   isOpen: boolean;
@@ -20,6 +27,8 @@ export default function BookACallModal({ isOpen, onClose }: BookACallModalProps)
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  /** Element focused before opening — focus returns here on close (no Radix trigger). */
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,15 +44,28 @@ export default function BookACallModal({ isOpen, onClose }: BookACallModalProps)
     }, 2500);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-1 ring-black/5">
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogPortal>
+        <DialogOverlay className="bg-black/60 backdrop-blur-sm" />
+        <DialogPrimitive.Content
+          onOpenAutoFocus={() => {
+            returnFocusRef.current =
+              document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            returnFocusRef.current?.focus();
+            returnFocusRef.current = null;
+          }}
+          className="fixed left-1/2 top-1/2 z-[101] w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overflow-x-hidden bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 ring-1 ring-black/5 focus:outline-none">
         {/* Header with accent bar — always dark text on white */}
         <div className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary)]/80 px-6 py-5">
           <div className="flex items-center justify-between">
@@ -52,18 +74,23 @@ export default function BookACallModal({ isOpen, onClose }: BookACallModalProps)
                 <Calendar className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Book a Call</h2>
-                <p className="text-sm text-white/90 mt-0.5">
+                <DialogPrimitive.Title className="text-xl font-bold text-white">
+                  Book a Call
+                </DialogPrimitive.Title>
+                <DialogPrimitive.Description className="text-sm text-white/90 mt-0.5">
                   We&apos;ll get back to you soon.
-                </p>
+                </DialogPrimitive.Description>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <DialogClose asChild>
+              <button
+                type="button"
+                aria-label="Close"
+                className="p-2 hover:bg-white/20 rounded-full transition-colors text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </button>
+            </DialogClose>
           </div>
         </div>
 
@@ -169,7 +196,8 @@ export default function BookACallModal({ isOpen, onClose }: BookACallModalProps)
             </div>
           </form>
         )}
-      </div>
-    </div>
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </Dialog>
   );
 }

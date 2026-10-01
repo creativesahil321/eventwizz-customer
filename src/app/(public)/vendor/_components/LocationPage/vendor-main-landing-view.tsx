@@ -8,12 +8,12 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Map, LayoutGrid, MapPin, CalendarDays } from "lucide-react";
 import { HeroCoverImage } from "@/components/public/hero-cover-image";
 import LocationSelectionHeader from "./location-selection-header";
 import LocationGrid from "./location-grid";
-import GoogleLocationMap from "./location-map-google";
 import { LocationSearchBar } from "./location-search-bar";
 import {
   PublicSearchResults,
@@ -50,6 +50,17 @@ import { usePreviewMobileLayout } from "@/hooks/use-preview-narrow-layout";
 import { useIsPreviewMode } from "@/contexts/preview-context";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { usePublicSearch } from "@/services/common/public-search";
+
+/** Map View is opt-in (Grid View is default) — keep Google Maps code out of the initial bundle. */
+const GoogleLocationMap = dynamic(() => import("./location-map-google"), {
+  ssr: false,
+  loading: () => (
+    <div
+      aria-busy
+      className="min-h-[560px] w-full animate-pulse rounded-[20px] border border-[color:color-mix(in_srgb,var(--color-text)_10%,transparent)] bg-[var(--color-surface)]"
+    />
+  ),
+});
 
 export type VendorMainLandingViewProps = {
   brandName: string;
@@ -326,7 +337,8 @@ export function VendorMainLandingView({
           )}
         >
           <motion.div
-            initial={{ y: 28, opacity: 0 }}
+            // SSR-visible LCP heading: no opacity:0 start state before hydration.
+            initial={false}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
@@ -437,13 +449,16 @@ export function VendorMainLandingView({
       <section
         id={exploreCitiesSectionId}
         className={cn(
-          "scroll-mt-20 bg-[var(--color-background)] pb-10 md:pb-20",
+          // flex-1: on tall screens (TV / zoomed out) this section takes the spare
+          // height so the subscribe band + footer sit at the bottom of the viewport.
+          "flex-1 scroll-mt-20 bg-[var(--color-background)] pb-10 md:pb-20",
           hideMapView ? "pt-6 sm:pt-8 md:pt-10" : "pt-3 md:pt-4",
         )}
       >
         <motion.div
           className={PUBLIC_CHROME_CONTAINER_CLASS}
-          initial={{ opacity: 0, y: 20 }}
+          // Often in the first viewport — keep the heading visible in SSR HTML.
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.12 }}
         >

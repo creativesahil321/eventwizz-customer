@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { authOptions } from "@/lib/auth/authOptions";
 import { assertSafeLogoUrl } from "@/lib/logo/fetch-logo-from-url";
+import { assertResolvesToPublic } from "@/lib/security/ssrf";
 import {
   BANNER_HEADING_MAX_CHARS,
   BANNER_HEADING_MAX_WORDS,
@@ -111,6 +112,19 @@ async function fetchEventPage(url: URL): Promise<{ html: string; finalUrl: URL }
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     try {
+      // SSRF: re-validate DNS on every hop so a public hostname (or redirect
+      // target) that resolves to a private/metadata address is rejected.
+      try {
+        await assertResolvesToPublic(currentUrl.hostname);
+      } catch {
+        throw redirectCount === 0
+          ? new EventImportFetchError("Could not reach this website.")
+          : new EventImportFetchError(
+              "The website redirected to an unsafe address.",
+              "blocked",
+            );
+      }
+
       const response = await fetch(currentUrl.toString(), {
         headers: {
           "User-Agent":
@@ -125,6 +139,7 @@ async function fetchEventPage(url: URL): Promise<{ html: string; finalUrl: URL }
 
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get("location");
+        await response.body?.cancel().catch(() => undefined);
         if (!location || redirectCount === MAX_REDIRECTS) {
           throw new EventImportFetchError(
             "The website redirected too many times.",

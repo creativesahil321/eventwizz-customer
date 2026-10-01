@@ -5,8 +5,9 @@ import {
   aiUnconfiguredPayload,
   resolveAiRuntimeConfig,
 } from "../lib/provider-config";
-import { safeFetch } from "@/lib/security/ssrf";
+import { readBodyWithLimit, safeFetch } from "@/lib/security/ssrf";
 import { guardPublicApi } from "@/lib/security/api-guard";
+
 
 type ColorTheme = {
   primary: string;
@@ -61,7 +62,10 @@ async function analyzeWebsiteTheme(url: string): Promise<{
     throw new Error(`Website returned status ${response.status}`);
   }
 
-  const html = await response.text();
+  // Cap the body (truncate) so an unbounded page can't exhaust memory.
+  const html = (
+    await readBodyWithLimit(response, 3_000_000, { truncate: true })
+  ).toString("utf-8");
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
   const title = titleMatch?.[1]?.trim();
 

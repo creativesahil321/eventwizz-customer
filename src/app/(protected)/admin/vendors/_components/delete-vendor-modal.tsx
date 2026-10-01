@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2, Trash2 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import type { Vendor } from "./vendors-table";
 
 interface DeleteVendorModalProps {
@@ -39,7 +39,9 @@ export function DeleteVendorModal({
     // TODO: call API to delete vendor
     await new Promise((r) => setTimeout(r, 600));
     onConfirm?.(vendor);
-    toast({ title: "Venue deleted", description: `${vendor.name} has been removed.` });
+    toast.success("Venue deleted", {
+      description: `${vendor.name} has been removed.`,
+    });
     setIsSubmitting(false);
     onOpenChange(false);
   };

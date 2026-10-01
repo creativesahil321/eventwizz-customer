@@ -1,4 +1,13 @@
 import sanitize from "sanitize-html";
+import {
+  ALLOWED_ATTRIBUTES,
+  ALLOWED_IMG_SCHEMES,
+  ALLOWED_SCHEMES,
+  ALLOWED_STYLE_PROPERTIES,
+  ALLOWED_TAGS,
+  NON_TEXT_TAGS,
+  SAFE_STYLE_VALUE,
+} from "./sanitize-html.config";
 
 /**
  * Central HTML sanitizer for any user/vendor/CMS-authored rich text that is
@@ -10,27 +19,21 @@ import sanitize from "sanitize-html";
  * it MUST be sanitized at render time to prevent stored XSS
  * (e.g. `<img src=x onerror=...>`, `<svg onload=...>`, `javascript:` links).
  *
- * Implemented with `sanitize-html` (pure JS, no jsdom) so it runs identically
- * in Next.js server components (Vercel serverless) and client components.
- * Allowlist is aligned with what the TipTap starter kit + extensions (link,
- * image, text-align, underline) emit, so legitimate formatting is preserved.
+ * This file is the server implementation (sanitize-html, pure JS, no jsdom),
+ * used by server components and by the SSR pass of client components.
+ * Browser bundles get `sanitize-html.browser.ts` (DOMPurify, same allowlist)
+ * via the `turbopack.resolveAlias` browser condition in `next.config.ts`.
+ * Allowlist lives in `sanitize-html.config.ts`.
  */
-
-const ALLOWED_TAGS = [
-  "p", "br", "hr", "span", "div",
-  "strong", "b", "em", "i", "u", "s", "strike", "del", "ins", "mark", "sub", "sup", "small",
-  "h1", "h2", "h3", "h4", "h5", "h6",
-  "ul", "ol", "li",
-  "blockquote", "pre", "code",
-  "a", "img",
-  "table", "thead", "tbody", "tfoot", "tr", "th", "td",
-  "figure", "figcaption",
-];
 
 export interface SanitizeHtmlOptions {
   /** Allow images. Default true. Set false for contexts where images are unwanted. */
   allowImages?: boolean;
 }
+
+const ALLOWED_STYLES: Record<string, RegExp[]> = Object.fromEntries(
+  ALLOWED_STYLE_PROPERTIES.map((prop) => [prop, [SAFE_STYLE_VALUE]]),
+);
 
 /**
  * Sanitize an HTML string. Returns a safe HTML string suitable for
@@ -49,19 +52,13 @@ export function sanitizeHtml(
 
   return sanitize(dirty, {
     allowedTags,
-    allowedAttributes: {
-      "*": ["class", "style", "title", "data-text-align"],
-      a: ["href", "target", "rel"],
-      img: ["src", "alt", "width", "height", "loading"],
-      td: ["colspan", "rowspan"],
-      th: ["colspan", "rowspan"],
-    },
-    // Only safe URL schemes; blocks javascript:, data:, vbscript:
-    allowedSchemes: ["http", "https", "mailto", "tel"],
-    allowedSchemesByTag: { img: ["http", "https"] },
+    allowedAttributes: ALLOWED_ATTRIBUTES,
+    allowedStyles: { "*": ALLOWED_STYLES },
+    allowedSchemes: ALLOWED_SCHEMES,
+    allowedSchemesByTag: { img: ALLOWED_IMG_SCHEMES },
     allowProtocolRelative: false,
     // script/style/etc. are dropped WITH their text content.
-    nonTextTags: ["script", "style", "textarea", "option", "noscript", "iframe"],
+    nonTextTags: NON_TEXT_TAGS,
     transformTags: {
       // Harden external links against reverse-tabnabbing.
       a: (tagName, attribs) => {

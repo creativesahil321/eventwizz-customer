@@ -11,14 +11,22 @@ import {
 import { isVendorPublicSite } from "@/lib/vendor-cms-content";
 import { fetchInfoPagesHtml } from "@/lib/server-info-pages";
 
-export const metadata: Metadata = {
-  title: "Contact Us - EventWizz",
-  description:
-    "Get in touch with the EventWizz team for support, sales enquiries, or general questions about our event management platform.",
-  alternates: {
-    canonical: `${appConfig.url}/contact`,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const host = await getRequestHost();
+  const theme = await fetchServerThemeCached(host);
+  const isVendor = isVendorPublicSite(getSubdomainFromDomain(host), theme);
+  const brand = theme?.name || appConfig.name;
+
+  // Canonical is relative: metadataBase (root layout) resolves it to this
+  // host, so vendor domains never point at the EventWizz domain.
+  return {
+    title: "Contact Us",
+    description: isVendor
+      ? `Get in touch with ${brand} about events, bookings and enquiries.`
+      : "Get in touch with the EventWizz team for support, sales enquiries, or general questions about our event management platform.",
+    alternates: { canonical: "/contact" },
+  };
+}
 
 export default async function ContactPage() {
   const host = await getRequestHost();

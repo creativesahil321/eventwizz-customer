@@ -8,7 +8,7 @@ import { getPublishedBlogsForRequest } from "@/lib/blogs/public-api";
 import BlogListingContent from "./_components/blog-listing-content";
 
 export const metadata: Metadata = {
-  title: "Blog - Latest News & Articles | EventWizz",
+  title: "Blog - Latest News & Articles",
   description:
     "Insights, tips, and best practices from the EventWizz team on event management, ticketing, and running venue events.",
   keywords: [

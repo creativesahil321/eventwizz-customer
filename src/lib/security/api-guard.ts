@@ -51,6 +51,25 @@ export function enforceSameOrigin(req: Request): NextResponse | null {
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
+/** Prune expired buckets every N calls, or sooner once the map grows large. */
+const PRUNE_EVERY_N_CALLS = 500;
+const PRUNE_SIZE_THRESHOLD = 5_000;
+let callsSincePrune = 0;
+
+function pruneExpiredBuckets(now: number): void {
+  callsSincePrune += 1;
+  if (
+    callsSincePrune < PRUNE_EVERY_N_CALLS &&
+    buckets.size <= PRUNE_SIZE_THRESHOLD
+  ) {
+    return;
+  }
+  callsSincePrune = 0;
+  for (const [key, bucket] of buckets) {
+    if (now >= bucket.resetAt) buckets.delete(key);
+  }
+}
+
 export interface RateLimitResult {
   allowed: boolean;
   retryAfterSec: number;
@@ -62,6 +81,7 @@ export function rateLimit(
   windowMs: number,
 ): RateLimitResult {
   const now = Date.now();
+  pruneExpiredBuckets(now);
   const bucket = buckets.get(key);
   if (!bucket || now >= bucket.resetAt) {
     buckets.set(key, { count: 1, resetAt: now + windowMs });
@@ -88,10 +108,23 @@ export function clientIp(req: Request): string {
 export function guardPublicApi(
   req: Request,
   routeKey: string,
-  opts: { limit?: number; windowMs?: number } = {},
+  opts: {
+    limit?: number;
+    windowMs?: number;
+    /**
+     * Skip the same-origin check when the request carries neither Origin nor
+     * Referer (e.g. `<img src>` GETs from privacy-hardened browsers). A
+     * present-but-foreign Origin/Referer is still rejected.
+     */
+    allowMissingOrigin?: boolean;
+  } = {},
 ): NextResponse | null {
-  const sameOrigin = enforceSameOrigin(req);
-  if (sameOrigin) return sameOrigin;
+  const hasOriginSignal =
+    req.headers.has("origin") || req.headers.has("referer");
+  if (hasOriginSignal || !opts.allowMissingOrigin) {
+    const sameOrigin = enforceSameOrigin(req);
+    if (sameOrigin) return sameOrigin;
+  }
 
   const { limit = 20, windowMs = 60_000 } = opts;
   const rl = rateLimit(`${routeKey}:${clientIp(req)}`, limit, windowMs);

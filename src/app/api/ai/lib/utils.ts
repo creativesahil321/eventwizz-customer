@@ -184,6 +184,9 @@ const GROQ_MAX_COMPLETION_TOKENS = 8192;
  */
 export const AI_JSON_MAX_TOKENS = 4096;
 
+/** Per-request timeout for outbound LLM calls (a hung provider must not pin the function). */
+const LLM_REQUEST_TIMEOUT_MS = 45_000;
+
 type CompletionTokenParam = "max_completion_tokens" | "max_tokens";
 
 function completionTokenLimit(
@@ -350,6 +353,7 @@ async function callProvider(
           ...(system ? { system } : {}),
           messages: chat,
         }),
+        signal: AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS),
       });
 
       if (response.ok) {
@@ -404,6 +408,7 @@ async function callProvider(
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS),
       });
 
       if (response.ok) {

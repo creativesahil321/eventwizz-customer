@@ -298,7 +298,8 @@ export default function LocationSelectionHeader({
       >
         <motion.div
           className="flex min-w-0 items-center"
-          initial={{ opacity: 0, x: -20 }}
+          // Brand mark visible in SSR HTML (no opacity:0 until hydration).
+          initial={false}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
         >

@@ -11,14 +11,22 @@ import {
 import { isVendorPublicSite } from "@/lib/vendor-cms-content";
 import { fetchInfoPagesHtml } from "@/lib/server-info-pages";
 
-export const metadata: Metadata = {
-  title: "Policies - EventWizz",
-  description:
-    "Read EventWizz terms, privacy, and refund policies for using our event management platform.",
-  alternates: {
-    canonical: `${appConfig.url}/policies`,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const host = await getRequestHost();
+  const theme = await fetchServerThemeCached(host);
+  const isVendor = isVendorPublicSite(getSubdomainFromDomain(host), theme);
+  const brand = theme?.name || appConfig.name;
+
+  // Canonical is relative: metadataBase (root layout) resolves it to this
+  // host, so vendor domains never point at the EventWizz domain.
+  return {
+    title: "Policies",
+    description: isVendor
+      ? `Read the terms and conditions, privacy policy and refund policy for ${brand}.`
+      : "Read EventWizz terms, privacy, and refund policies for using our event management platform.",
+    alternates: { canonical: "/policies" },
+  };
+}
 
 const VENDOR_POLICY_KEYS = [
   "terms_and_conditions",

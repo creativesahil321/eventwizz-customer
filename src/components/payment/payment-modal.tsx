@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { X, CreditCard, AlertCircle } from "lucide-react";
 import PaymentGatewaySelector, {
   PaymentGateway,
@@ -107,6 +107,19 @@ export default function PaymentModal({
     }
   };
 
+  const titleId = useId();
+  const descriptionId = useId();
+
+  // Escape closes (same guard as the close button: ignored while processing).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isProcessing) onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, isProcessing, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -119,7 +132,13 @@ export default function PaymentModal({
         />
 
         {/* Modal */}
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={description ? descriptionId : undefined}
+          className="relative bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+        >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b">
             <div className="flex items-center space-x-3">
@@ -127,12 +146,14 @@ export default function PaymentModal({
                 <CreditCard className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-                <p className="text-sm text-gray-600">{description}</p>
+                <h2 id={titleId} className="text-lg font-semibold text-gray-900">{title}</h2>
+                <p id={descriptionId} className="text-sm text-gray-600">{description}</p>
               </div>
             </div>
 
             <button
+              type="button"
+              aria-label="Close"
               onClick={handleClose}
               disabled={isProcessing}
               className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"

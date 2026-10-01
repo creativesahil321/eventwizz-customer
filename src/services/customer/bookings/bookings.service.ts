@@ -340,7 +340,7 @@ export const bookingsService = {
     }
 
     const blob = new Blob([response.data], {
-      type: response.headers?.["content-type"] || "application/pdf",
+      type: (response.headers?.["content-type"] as string | undefined) || "application/pdf",
     });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");

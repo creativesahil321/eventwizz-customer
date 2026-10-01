@@ -52,6 +52,8 @@ export default function RevolutioniseSection({
                 <img
                   src={content.image}
                   alt="Platform showcase"
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-auto object-cover"
                 />
                 {hasVideo ? (
