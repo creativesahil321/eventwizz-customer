@@ -8,8 +8,11 @@ import {
 } from "@/lib/server-theme";
 import { fetchPublishedBlogs } from "@/lib/blogs/public-api";
 import { BLOG_HOME_PER_PAGE } from "@/lib/blogs";
+import { resolveAdminHomeContent } from "@/lib/admin-cms-content";
+import type { ThemeSchema } from "@/types/theme.types";
 import { Hydrate } from "./[locationSlug]/_components/hydration-provider";
 import { HomeContent } from "./home-content";
+import AdminHomeContent from "./admin/_components/admin-home-content";
 
 export async function generateMetadata(): Promise<Metadata> {
   const host = await getRequestHost();
@@ -68,9 +71,14 @@ export default async function HomePage() {
     },
   });
 
+  // Admin marketing home: server-rendered (static sections ship no JS), with
+  // the blog teaser prefetched into the same React Query cache news-section reads.
+  const content = resolveAdminHomeContent(theme as ThemeSchema);
   return (
-    <Hydrate state={dehydrate(queryClient)}>
-      <HomeContent />
-    </Hydrate>
+    <main className="min-h-screen bg-[color:var(--color-background)] text-[color:var(--color-text)]">
+      <Hydrate state={dehydrate(queryClient)}>
+        <AdminHomeContent content={content} />
+      </Hydrate>
+    </main>
   );
 }

@@ -1,14 +1,19 @@
-# EventWizz Customer Sites
+# EventWizz
 
-EventWizz hosts white-label event booking sites for UK venues and promoters.
+> EventWizz hosts white-label event booking websites for UK venues and promoters. Each site lists a venue's locations and events and takes bookings and payments online.
 
-## Public pages
+## Pages
 
-- `/` — venue home (locations list or single-location events)
-- `/{location-slug}` — events in a city or venue
-- `/{location-slug}/events/{event-slug}` — event detail and booking
-- `/blog` — venue blog posts when enabled
+- [Home](/): venue home — a list of locations, or the events for a single-location venue
+- [Blog](/blog): venue news and articles, when enabled
+- [Contact](/contact): venue contact details and enquiry form
+- [Policies](/policies): terms and conditions, privacy policy and refund policy
 
-## Contact
+## URL patterns
 
-For platform support see https://eventwizz.com
+- [Location events](/): `/{location-slug}` — upcoming events in a city or venue
+- [Event detail](/): `/{location-slug}/events/{event-slug}` — a single event with booking
+
+## About
+
+- [EventWizz platform](https://eventwizz.com): the company behind these booking sites

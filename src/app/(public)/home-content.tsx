@@ -1,38 +1,15 @@
 "use client";
 
-import { useContext } from "react";
-import { ServerContext } from "@/lib/server-context";
-import AdminHomeContent from "./admin/_components/admin-home-content";
 import VendorSiteHomePage from "./vendor/page";
 
 /**
- * Client component that determines which homepage to render
- * Uses server-side data passed through ServerContext
+ * Vendor tenant homepage (client). The admin marketing home is server-rendered
+ * directly in page.tsx, so this only handles the vendor storefront case.
  */
 export function HomeContent() {
-  // Get server data from context
-  const { subdomain, theme } = useContext(ServerContext);
-
-  const vendorHome = (
-    <main className="min-h-screen bg-[color:var(--color-background)] text-[color:var(--color-text)]">
-      <VendorSiteHomePage />
-    </main>
-  );
-
-  // First try to detect by subdomain (fastest and most reliable)
-  if (subdomain === "vendor") {
-    return vendorHome;
-  }
-
-  // If no subdomain match, check theme data
-  if (theme?.website_role === "vendor") {
-    return vendorHome;
-  }
-
-  // Default to admin homepage
   return (
     <main className="min-h-screen bg-[color:var(--color-background)] text-[color:var(--color-text)]">
-      <AdminHomeContent />
+      <VendorSiteHomePage />
     </main>
   );
 }

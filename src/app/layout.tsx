@@ -15,6 +15,7 @@ import PermissionPreloader from "./permission-preloader";
 import { ServerContextProvider } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 import { GoogleTagManager } from "@next/third-parties/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import {
   googleFontsHrefFromTheme,
   THEME_GOOGLE_FONTS_LINK_ID,
@@ -208,11 +209,21 @@ export default async function RootLayout({
               href="https://fonts.gstatic.com"
               crossOrigin="anonymous"
             />
+            {/* Non-render-blocking: media="print" keeps it off the critical
+                path; the inline script below flips it to "all" on load. The
+                font stack already falls back (display=swap), so first paint
+                no longer waits on the Google Fonts round-trip. */}
             <link
               id={THEME_GOOGLE_FONTS_LINK_ID}
               rel="stylesheet"
               href={themeGoogleFontsHref}
+              media="print"
+              data-async-font=""
             />
+            <noscript>
+              {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+              <link rel="stylesheet" href={themeGoogleFontsHref} />
+            </noscript>
           </>
         ) : null}
         {themeCustomFontStylesheetUrls.map((href, i) => (
@@ -221,8 +232,26 @@ export default async function RootLayout({
             id={`${THEME_CUSTOM_FONT_STYLESHEET_LINK_ID_PREFIX}${i}`}
             rel="stylesheet"
             href={href}
+            media="print"
+            data-async-font=""
           />
         ))}
+        {themeCustomFontStylesheetUrls.map((href) => (
+          <noscript key={`ns-${href}`}>
+            {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+            <link rel="stylesheet" href={href} />
+          </noscript>
+        ))}
+        {(themeGoogleFontsHref || themeCustomFontStylesheetUrls.length > 0) && (
+          <script
+            // Flip async font stylesheets to media="all" once loaded, so they
+            // style the page without blocking the initial render.
+            dangerouslySetInnerHTML={{
+              __html:
+                "(function(){function a(l){l.media='all'}document.querySelectorAll('link[data-async-font]').forEach(function(l){if(l.sheet){a(l)}else{l.addEventListener('load',function(){a(l)})}})})()",
+            }}
+          />
+        )}
       </head>
       <body className="antialiased" suppressHydrationWarning={true}>
         <ServerContextProvider value={{ theme: initialTheme, host, subdomain }}>
@@ -234,6 +263,8 @@ export default async function RootLayout({
 
         {/* GTM: loaded after app shell — admin site only */}
         {isAdminSite && <GoogleTagManager gtmId="GTM-MJS3VPCZ" />}
+        {/* Real-user Core Web Vitals (RUM) from actual visitors on every tenant. */}
+        <SpeedInsights />
       </body>
     </html>
   );

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { themeKeys } from "@/hooks/use-theme-query";
 import { downloadBlob } from "@/lib/export";
 import { newsletterService } from "./newsletter.service";
+import { NEWSLETTER_STATUS_API_ENABLED } from "./config";
 import type {
   ConfirmSubscriptionResult,
   CustomerSubscribeResult,
@@ -39,7 +40,26 @@ export const newsletterKeys = {
   vendorCounts: () => [...newsletterKeys.vendor, "counts"] as const,
   unsubscribePreview: (token: string) =>
     ["public", "newsletter", "unsubscribe", token] as const,
+  customerStatus: (domain: string) =>
+    ["customer", "newsletter", "status", domain] as const,
 };
+
+/**
+ * Refresh the customer's subscription flag after a subscribe/unsubscribe.
+ * Uses the lightweight status query when enabled, otherwise the theme payload
+ * that currently carries the flag.
+ */
+function invalidateCustomerNewsletterFlag(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  if (NEWSLETTER_STATUS_API_ENABLED) {
+    void queryClient.invalidateQueries({
+      queryKey: ["customer", "newsletter", "status"],
+    });
+  } else {
+    void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+  }
+}
 
 function invalidateVendorLists(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: newsletterKeys.vendor });
@@ -66,11 +86,11 @@ export function handleSubscribeResponse(
       break;
     case "subscribed":
       if (notify === "toast") toast.success(message);
-      void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+      invalidateCustomerNewsletterFlag(queryClient);
       break;
     case "already_subscribed":
       if (notify === "toast") toast.info(message);
-      void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+      invalidateCustomerNewsletterFlag(queryClient);
       break;
   }
 }
@@ -182,7 +202,7 @@ export const useCustomerNewsletterToggle = () => {
         vars === "unsubscribe" ||
         (typeof vars !== "string" && vars.action === "unsubscribe");
       if (isUnsubscribe) {
-        void queryClient.invalidateQueries({ queryKey: themeKeys.all });
+        invalidateCustomerNewsletterFlag(queryClient);
         return;
       }
       handleSubscribeResponse(data as CustomerSubscribeResult, queryClient, {

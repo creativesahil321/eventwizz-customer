@@ -244,5 +244,8 @@ export function syncDocumentGoogleFontLinkForTheme(
     link.rel = "stylesheet";
     document.head.appendChild(link);
   }
+  // The SSR link ships media="print" (async, non-blocking). Ensure it is
+  // applied once we are on the client / when the theme changes in preview.
+  link.media = "all";
   link.href = href;
 }

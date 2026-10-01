@@ -1,9 +1,4 @@
-"use client";
-
-import { useContext } from "react";
-import { ServerContext } from "@/lib/server-context";
-import { ThemeSchema } from "@/types/theme.types";
-import { resolveAdminHomeContent } from "@/lib/admin-cms-content";
+import type { AdminHomeContent as AdminHomeContentData } from "@/lib/admin-cms-content";
 import AdminHeader from "./header";
 import HeroSection from "./hero-section";
 import WhatIsSection from "./what-is-section";
@@ -15,17 +10,19 @@ import NewsSection from "./news-section";
 import AdminFooter from "./footer";
 
 /**
- * Admin/main site landing content. Used by both:
- * - /admin route (server page with metadata)
- * - / route via HomeContent when subdomain/theme is admin
+ * Admin/main site landing content. Server component: resolved CMS content is
+ * passed in by the server page, so the static sections (what-is, trusted-by,
+ * event-types, selling-points) render with zero client JS. Only the
+ * interactive sections (header, hero, revolutionise, news, footer) are client
+ * islands and hydrate.
  *
- * Typography matches vendor public pages: body stack on the shell,
- * marketing titles via SiteHeading (--font-heading) inside sections.
+ * Used by /admin and / (admin host). Typography matches vendor public pages.
  */
-export default function AdminHomeContent() {
-  const { theme } = useContext(ServerContext);
-  const content = resolveAdminHomeContent(theme as ThemeSchema);
-
+export default function AdminHomeContent({
+  content,
+}: {
+  content: AdminHomeContentData;
+}) {
   return (
     <div className="font-body text-[color:var(--color-text)]">
       <AdminHeader />

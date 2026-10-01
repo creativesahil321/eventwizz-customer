@@ -511,3 +511,17 @@ export const newsletterService = {
     };
   },
 };
+
+/**
+ * Whether the authenticated customer is subscribed to the current tenant's
+ * newsletter. Lightweight replacement for reading is_newsletter_subscribed
+ * from the full /theme/settings payload.
+ * Backend contract: docs/backend-contracts/newsletter-status-api.md
+ */
+export async function getCustomerNewsletterStatus(): Promise<boolean> {
+  const raw = await api.get<{ subscribed?: boolean; data?: { subscribed?: boolean } }>(
+    API_ENDPOINTS.CUSTOMER.NEWSLETTER.STATUS,
+  );
+  // Tolerate both unwrapped ({subscribed}) and enveloped ({data:{subscribed}}).
+  return raw?.subscribed === true || raw?.data?.subscribed === true;
+}

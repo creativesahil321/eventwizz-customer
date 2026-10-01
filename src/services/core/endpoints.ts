@@ -280,6 +280,10 @@ export const API_ENDPOINTS = {
     NEWSLETTER: {
       SUBSCRIBE: "/customer/newsletter/subscribe",
       UNSUBSCRIBE: "/customer/newsletter/unsubscribe",
+      // Lightweight per-customer subscription flag; replaces reading
+      // is_newsletter_subscribed from the full /theme/settings payload.
+      // Spec: docs/backend-contracts/newsletter-status-api.md
+      STATUS: "/customer/newsletter/status",
     },
     BOOKINGS: {
       BOOKINGS: "/customer/bookings",

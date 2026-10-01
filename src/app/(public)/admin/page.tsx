@@ -1,6 +1,9 @@
 import { Metadata } from "next";
 import AdminHomeContent from "./_components/admin-home-content";
 import { assertAdminPublicSite } from "@/lib/assert-admin-public-site";
+import { fetchServerThemeCached } from "@/lib/server-theme";
+import { resolveAdminHomeContent } from "@/lib/admin-cms-content";
+import type { ThemeSchema } from "@/types/theme.types";
 
 export const metadata: Metadata = {
   title: "Event Management Software for Venues",
@@ -21,6 +24,8 @@ export const metadata: Metadata = {
 export default async function AdminSiteHomePage() {
   // The EventWizz marketing page must not be served on vendor domains
   // (duplicate content under the vendor's brand). 404 there, like /about and /blog.
-  await assertAdminPublicSite();
-  return <AdminHomeContent />;
+  const host = await assertAdminPublicSite();
+  const theme = await fetchServerThemeCached(host);
+  const content = resolveAdminHomeContent(theme as ThemeSchema);
+  return <AdminHomeContent content={content} />;
 }
