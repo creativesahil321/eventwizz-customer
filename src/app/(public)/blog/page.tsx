@@ -33,12 +33,13 @@ export default async function BlogListingPage() {
   const articles = await getPublishedBlogsForRequest(BLOG_LIST_PER_PAGE, 1);
 
   return (
-    <>
+    // Full-height column: on tall screens (TV / zoomed out) the footer stays at the bottom.
+    <div className="flex min-h-screen flex-col">
       <AdminHeader />
-      <main className="pt-24">
+      <main className="flex-1 pt-24">
         <BlogListingContent articles={articles} />
       </main>
       <AdminFooter />
-    </>
+    </div>
   );
 }

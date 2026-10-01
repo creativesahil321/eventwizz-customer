@@ -52,9 +52,10 @@ export function CmsPageLayout({
   wide = false,
 }: CmsPageLayoutProps) {
   return (
-    <>
+    // Full-height column: on tall screens (TV / zoomed out) the footer stays at the bottom.
+    <div className="flex min-h-screen flex-col bg-[color:var(--color-background)]">
       {header}
-      <main className="min-h-[60vh] bg-[color:var(--color-background)] pt-20 md:pt-24">
+      <main className="min-h-[60vh] flex-1 bg-[color:var(--color-background)] pt-20 md:pt-24">
         <section className="border-b border-[color:color-mix(in_srgb,var(--color-text)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-text)_3%,var(--color-surface))] py-8 md:py-10 lg:py-12">
           <div
             className={`mx-auto px-4 md:px-6 ${wide ? "max-w-6xl" : "max-w-4xl"}`}
@@ -85,6 +86,6 @@ export function CmsPageLayout({
         </section>
       </main>
       {footer}
-    </>
+    </div>
   );
 }

@@ -32,12 +32,13 @@ export default async function AboutPage() {
   const content = await fetchInfoPagesHtml("admin", ["about_page_content"], host);
 
   return (
-    <>
+    // Full-height column: on tall screens (TV / zoomed out) the footer stays at the bottom.
+    <div className="flex min-h-screen flex-col">
       <AdminHeader />
-      <main className="pt-24">
+      <main className="flex-1 pt-24">
         <AboutContent contentHtml={content.about_page_content ?? null} />
       </main>
       <AdminFooter />
-    </>
+    </div>
   );
 }

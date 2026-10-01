@@ -51,12 +51,13 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
   }
 
   return (
-    <>
+    // Full-height column: on tall screens (TV / zoomed out) the footer stays at the bottom.
+    <div className="flex min-h-screen flex-col">
       <AdminHeader />
-      <main className="pt-24 font-body text-[color:var(--color-text)]">
+      <main className="flex-1 pt-24 font-body text-[color:var(--color-text)]">
         <BlogArticleContent post={post} />
       </main>
       <AdminFooter />
-    </>
+    </div>
   );
 }
