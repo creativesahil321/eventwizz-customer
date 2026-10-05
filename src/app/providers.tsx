@@ -96,30 +96,11 @@ function SessionValidator() {
 
       if (isCustomer) {
         // Customers have no roles/permissions; mark store as loaded with empty array
-        // Do NOT write permission-storage to localStorage
         setPermissions([]);
-      } else if (
-        session.user.permissions !== undefined &&
-        Array.isArray(session.user.permissions) &&
-        session.user.permissions.length > 0
-      ) {
-        setPermissions(session.user.permissions);
-        try {
-          sessionStorage.setItem(
-            "permissions-backup",
-            JSON.stringify(session.user.permissions),
-          );
-          localStorage.setItem(
-            "permission-storage",
-            JSON.stringify({
-              state: { permissions: session.user.permissions, isLoaded: true },
-              version: 0,
-            }),
-          );
-        } catch (e) {
-          console.error("Error storing permissions:", e);
-        }
       }
+      // Vendor/admin permissions are NOT in the session (no longer in the JWT —
+      // cookie-size fix). PermissionProvider loads them from the API into the
+      // store, so there is nothing to seed here.
     } else if (status === "unauthenticated") {
       console.log("❌ SessionValidator: No session, clearing Zustand store");
       setSession(null);

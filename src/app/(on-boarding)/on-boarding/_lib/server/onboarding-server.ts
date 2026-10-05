@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/authOptions";
+import { getServerBackendToken } from "@/lib/auth/server-token";
 import { request } from "@/services/core/api-client";
 import {
   ApiResponse,
@@ -10,7 +11,8 @@ import { buildOnboardingStepsUrl } from "../onboarding-steps-url";
 
 export async function getServerOnboardingData(): Promise<ApiResponse | null> {
   const session = await getServerSession(authOptions);
-  const token = session?.user?.token;
+  // The Laravel token is server-only: read it from the HttpOnly JWT cookie.
+  const token = await getServerBackendToken();
   const locationId = session?.user?.vendor_location_id;
 
   if (!token || !locationId) {

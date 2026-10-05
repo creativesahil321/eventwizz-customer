@@ -64,13 +64,13 @@ function detachEventDataChangedListener() {
 
 // Function to fetch event data
 async function fetchEventData(
-  token: string,
+  hasSession: boolean,
   eventId: string,
   isRooms?: boolean,
 ): Promise<ApiResponse | null> {
-  if (!token || !eventId) {
-    console.warn("Missing token or eventId for event data fetch:", {
-      hasToken: !!token,
+  if (!hasSession || !eventId) {
+    console.warn("Missing session or eventId for event data fetch:", {
+      hasSession,
       eventId,
     });
     return null;
@@ -87,9 +87,8 @@ async function fetchEventData(
     return null;
   }
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-  };
+  // Auth is attached server-side by the /api/backend proxy (HttpOnly cookie).
+  const headers: Record<string, string> = {};
 
   try {
     const fetchByMode = async (roomsMode: boolean) =>
@@ -163,9 +162,9 @@ export function useEventData(
     alwaysFresh?: boolean;
   },
 ) {
-  const { data: session } = useSession();
+  const { status } = useSession();
   const queryClient = useQueryClient();
-  const token = session?.user?.token;
+  const hasSession = status === "authenticated";
   const isPreviewFromProvider = useIsPreviewModeFromProvider();
   const alwaysFresh = options?.alwaysFresh === true;
 
@@ -189,12 +188,12 @@ export function useEventData(
       ...eventKeys.data(eventId),
       isRooms === true ? "rooms" : isRooms === false ? "base" : "probe",
     ],
-    queryFn: () => fetchEventData(token as string, eventId as string, isRooms),
+    queryFn: () => fetchEventData(hasSession, eventId as string, isRooms),
     // Do not use URL `/preview/…` here — that blocked `/preview/event?id=` from loading.
     // Only skip when an ancestor PreviewProvider opts in (none today for useEventData call sites).
     enabled:
       options?.enabled !== false &&
-      !!token &&
+      hasSession &&
       !!isValidEventId &&
       (!isPreviewFromProvider || options?.allowFetchInPreview === true),
     staleTime: alwaysFresh ? 0 : 1000 * 60 * 5,

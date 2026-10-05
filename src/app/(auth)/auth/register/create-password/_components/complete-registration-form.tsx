@@ -148,7 +148,7 @@ export function CompleteRegistrationForm() {
           };
 
           // Update the auth store
-          authStore.login(token, authUserData);
+          authStore.login(authUserData);
         }
 
         // Store permissions

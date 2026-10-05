@@ -3,11 +3,12 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 
 /**
- * Minimal admin snapshot for session restore after impersonation ends.
- * Kept intentionally small (~1KB) to avoid sessionStorage bloat.
+ * Minimal, NON-SECRET admin snapshot used to repaint the UI after
+ * impersonation ends. The admin's credentials are NOT kept here: the admin
+ * session cookie is backed up server-side as an HttpOnly cookie
+ * (`/api/auth/impersonation/backup` → `/restore`).
  */
 export interface AdminSessionBackup {
-  token: string;
   email: string;
   uuid?: string;
   first_name?: string;
@@ -90,6 +91,15 @@ export const useImpersonationStore = create<ImpersonationState>()(
     })),
     {
       name: STORE_NAME,
+      version: 1,
+      // v0 stored the admin's raw Laravel token in sessionStorage — drop it.
+      migrate: (persisted) => {
+        const state = persisted as { originalAdmin?: Record<string, unknown> | null };
+        if (state?.originalAdmin && typeof state.originalAdmin === "object") {
+          delete state.originalAdmin.token;
+        }
+        return persisted as ImpersonationState;
+      },
       storage: createJSONStorage(() => {
         if (typeof window === "undefined") {
           const mem: Record<string, string> = {};

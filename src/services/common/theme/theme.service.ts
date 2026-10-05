@@ -3,31 +3,36 @@ import { ThemeSchema } from "@/types/theme.types";
 import { env } from "@/env";
 import { normalizeThemePayload } from "@/lib/normalize-theme-payload";
 import { useAuthStore } from "@/store/auth.store";
+import {
+  backendProxyHeaders,
+  backendProxyUrl,
+} from "@/lib/backend/backend-transport";
 import { ApiResponse, ServiceResponse } from "./type";
 
 function themeRequestHeaders(cleanDomain: string): Record<string, string> {
-  const headers: Record<string, string> = {
+  return {
     Accept: "application/json",
     "Content-Type": "application/json",
     "X-Requested-With": "XMLHttpRequest",
     "X-Domain": cleanDomain,
   };
+}
 
-  if (typeof window === "undefined") {
-    return headers;
-  }
-
+/**
+ * Signed-in customers fetch the theme authenticated (per-customer data);
+ * everyone else fetches it anonymously, direct to Laravel. Authenticated
+ * requests go through the same-origin proxy so the browser never holds the
+ * Laravel token.
+ */
+function isBrowserCustomerSession(): boolean {
+  if (typeof window === "undefined") return false;
   try {
-    const { token, tokenExpiry, account_type } = useAuthStore.getState();
-    const validToken = Boolean(token) && (!tokenExpiry || Date.now() < tokenExpiry);
-    if (validToken && account_type === "customer") {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    const { isAuthenticated, account_type } = useAuthStore.getState();
+    return isAuthenticated && account_type === "customer";
   } catch {
     // Auth store may be unavailable during early boot; guest fetch still works.
+    return false;
   }
-
-  return headers;
 }
 
 /**
@@ -46,15 +51,18 @@ export const themeService = {
       // Remove port from domain if present (e.g., example.com:3000 -> example.com)
       const cleanDomain = domainName.split(":")[0];
 
-      const apiUrl = env.NEXT_PUBLIC_API_URL;
-      const endpoint = `${apiUrl}${
-        API_ENDPOINTS.COMMON.THEME.SETTINGS
-      }?domain_name=${encodeURIComponent(cleanDomain)}`;
+      const themePath = `${API_ENDPOINTS.COMMON.THEME.SETTINGS}?domain_name=${encodeURIComponent(cleanDomain)}`;
+      const viaProxy = isBrowserCustomerSession();
+      const endpoint = viaProxy
+        ? backendProxyUrl(themePath)
+        : `${env.NEXT_PUBLIC_API_URL}${themePath}`;
 
       // Detect if running in a browser
       const isBrowser = typeof window !== "undefined";
 
-      const headers = themeRequestHeaders(cleanDomain);
+      const headers = viaProxy
+        ? { ...themeRequestHeaders(cleanDomain), ...backendProxyHeaders() }
+        : themeRequestHeaders(cleanDomain);
 
       // Use different options for browser vs server
       const fetchOptions: RequestInit = {

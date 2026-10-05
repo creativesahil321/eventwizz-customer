@@ -1,7 +1,11 @@
 "use client";
 
 import React, { ReactNode, useEffect } from "react";
-import { usePermission, useAnyPermission } from "@/hooks/usePermission";
+import {
+  usePermission,
+  useAnyPermission,
+  usePermissions,
+} from "@/hooks/usePermission";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/store/auth.store";
@@ -28,6 +32,10 @@ export function PermissionRoute({
 }: PermissionRouteProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  // Permissions are loaded from the API into the store (not the JWT), so they
+  // can arrive a moment after the session. We must NOT decide access until they
+  // have resolved, or a vendor gets bounced to the fallback right after login.
+  const { isLoaded: permissionsLoaded } = usePermissions();
 
   // Handle different permission check types
   // Always call hooks to follow Rules of Hooks
@@ -48,6 +56,10 @@ export function PermissionRoute({
   const hasPermission = hasSpecificPermission && hasAnyOfPermissions;
 
   useEffect(() => {
+    // Wait until permissions have actually loaded before deciding — otherwise
+    // we'd redirect during the brief API-load window after login.
+    if (!permissionsLoaded || hasPermission) return;
+
     // Small delay to allow for hydration to complete
     const timer = setTimeout(() => {
       // Only redirect to the fallback when the user is authenticated but truly
@@ -61,12 +73,17 @@ export function PermissionRoute({
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [hasPermission, isAuthenticated, router, fallbackPath]);
+  }, [hasPermission, isAuthenticated, router, fallbackPath, permissionsLoaded]);
 
-  // Show loader only when the user is authenticated but permissions are still
-  // being resolved. Skip during logout to avoid a skeleton flash before the
-  // login redirect takes over.
-  if (showLoader && !hasPermission && isAuthenticated && !getLogoutInProgress()) {
+  // Permission is satisfied (or none required) — render immediately.
+  if (hasPermission) {
+    return <>{children}</>;
+  }
+
+  // Show loader while the user is authenticated but permissions are still
+  // resolving, or are resolved-but-insufficient (just before redirect). Skip
+  // during logout to avoid a skeleton flash before the login redirect takes over.
+  if (showLoader && isAuthenticated && !getLogoutInProgress()) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-64" />

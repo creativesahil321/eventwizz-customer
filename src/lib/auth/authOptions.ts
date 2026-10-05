@@ -129,7 +129,7 @@ declare module "next-auth" {
       active_role?: string;
       user_id?: string;
       isOnboarded: boolean;
-      token: string | undefined;
+      /** Laravel token is server-only (JWT cookie) — never sent to the browser. */
       uuid: string | undefined;
       first_name?: string;
       last_name?: string;
@@ -361,10 +361,11 @@ export const authOptions: NextAuthOptions = {
         token.event_id = customUser.event_id;
         token.status = customUser.status;
 
-        // Store permissions if available from login
-        if (customUser.permissions) {
-          token.permissions = customUser.permissions;
-        }
+        // Permissions are intentionally NOT stored in the JWT. A vendor/admin
+        // can have 80+ permissions, which would blow past the ~4KB cookie limit
+        // and force cookie chunking (a login-failure risk on some browsers).
+        // The client loads them from the API into the permission store instead
+        // (PermissionProvider → /auth/user/permissions).
 
         // Payment gateway setup state (vendor)
         token.has_payment_provider = customUser.has_payment_provider ?? false;
@@ -411,18 +412,20 @@ export const authOptions: NextAuthOptions = {
           token.on_boarding_step = session.on_boarding_step;
         }
 
-        if (session?.permissions) {
-          token.permissions = session.permissions;
-        }
+        // Permissions are not kept in the JWT (see note above) — ignore any
+        // permissions passed through a session update.
 
         if (session?.has_payment_provider !== undefined) {
           token.has_payment_provider = session.has_payment_provider;
         }
       }
 
-      // Locations are fetched via React Query — never store in JWT (cookie size limit).
+      // These are fetched via React Query / the permission store — never store
+      // in the JWT (cookie size limit). `delete token.permissions` also purges
+      // it from sessions issued before this change.
       delete token.venue_locations;
       delete token.default_venue_location;
+      delete token.permissions;
 
       return token;
     },
@@ -439,7 +442,6 @@ export const authOptions: NextAuthOptions = {
             account_type: token.account_type as string,
             active_role: token.active_role as string,
             user_id: token.user_id as string,
-            token: token.token as string,
             uuid: token.uuid as string | undefined,
             first_name: token.first_name,
             last_name: token.last_name,
@@ -459,7 +461,6 @@ export const authOptions: NextAuthOptions = {
           active_role: token.active_role as string,
           user_id: token.user_id as string,
           isOnboarded: Boolean(token.isOnboarded),
-          token: token.token as string,
           uuid: token.uuid as string | undefined,
           first_name: token.first_name,
           last_name: token.last_name,
@@ -468,7 +469,8 @@ export const authOptions: NextAuthOptions = {
           vendor_location_id: token.vendor_location_id,
           event_id: token.event_id,
           status: token.status,
-          permissions: token.permissions || [],
+          // Loaded client-side from the API into the permission store, not the JWT.
+          permissions: [],
           has_payment_provider: Boolean(token.has_payment_provider),
         },
       };

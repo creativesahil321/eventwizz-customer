@@ -21,7 +21,6 @@ export function useCheckoutAuth() {
   const isSessionChecked = useAuthStore((s) => s.isSessionChecked);
   const accountType = useAuthStore((s) => s.account_type);
   const activeRole = useAuthStore((s) => s.active_role);
-  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     setIsClient(true);
@@ -44,7 +43,7 @@ export function useCheckoutAuth() {
       return;
     }
 
-    if (accountType !== "customer" || activeRole !== "customer" || !token) {
+    if (accountType !== "customer" || activeRole !== "customer") {
       router.push("/unauthorized");
     }
   }, [
@@ -53,15 +52,13 @@ export function useCheckoutAuth() {
     isAuthenticated,
     accountType,
     activeRole,
-    token,
     router,
   ]);
 
   const isCustomer =
     isAuthenticated &&
     accountType === "customer" &&
-    activeRole === "customer" &&
-    !!token;
+    activeRole === "customer";
 
   return {
     isClient,

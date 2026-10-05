@@ -13,6 +13,7 @@ import type { ThemeSchema } from "@/types/theme.types";
 import { Hydrate } from "./[locationSlug]/_components/hydration-provider";
 import { HomeContent } from "./home-content";
 import AdminHomeContent from "./admin/_components/admin-home-content";
+import { eventsService, eventKeys } from "@/services/common/events/events.service";
 
 export async function generateMetadata(): Promise<Metadata> {
   const host = await getRequestHost();
@@ -56,6 +57,26 @@ export default async function HomePage() {
     getSubdomainFromDomain(host) === "vendor" || theme?.website_role === "vendor";
 
   if (isVendorHome) {
+    // Single-location vendor home renders the location inline (SingleLocationHome),
+    // which otherwise fetches it client-side. Prefetch it on the server with the
+    // SAME query key (getRequestHost() === client getDomain() hostname) so the
+    // client reads from the hydrated cache instead of a waterfall. Additive:
+    // if the key ever mismatches, the client simply fetches as before.
+    const locations = theme?.locations ?? [];
+    const singleSlug = locations.length === 1 ? locations[0]?.slug : undefined;
+    if (singleSlug) {
+      const vendorQc = new QueryClient();
+      await vendorQc.prefetchQuery({
+        queryKey: eventKeys.location(singleSlug, host),
+        queryFn: () => eventsService.getLocationWithEvents(singleSlug, host),
+        staleTime: 1000 * 60 * 5,
+      });
+      return (
+        <Hydrate state={dehydrate(vendorQc)}>
+          <HomeContent />
+        </Hydrate>
+      );
+    }
     return <HomeContent />;
   }
 

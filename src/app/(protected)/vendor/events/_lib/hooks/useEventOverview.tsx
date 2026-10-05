@@ -28,8 +28,8 @@ export function useEventOverview({
   datePage = 1,
   enabled: enabledProp = true,
 }: UseEventOverviewParams) {
-  const { data: session } = useSession();
-  const token = session?.user?.token;
+  const { status } = useSession();
+  const hasSession = status === "authenticated";
 
   // Validate eventId before making the query
   const isValidEventId =
@@ -51,7 +51,7 @@ export function useEventOverview({
         });
         return response as unknown as EventOverviewResponse;
       },
-      enabled: enabledProp !== false && !!token && !!isValidEventId,
+      enabled: enabledProp !== false && hasSession && !!isValidEventId,
       staleTime: 1000 * 60 * 5, // 5 minutes
       refetchOnWindowFocus: false,
     });

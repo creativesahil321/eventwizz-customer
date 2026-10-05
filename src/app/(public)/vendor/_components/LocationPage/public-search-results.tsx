@@ -156,14 +156,12 @@ export function PublicSearchResults({
         | {
             account_type?: string;
             active_role?: string;
-            token?: string;
           }
         | undefined;
       const isCustomer =
         status === "authenticated" &&
         user?.account_type === "customer" &&
-        user?.active_role === "customer" &&
-        Boolean(user?.token);
+        user?.active_role === "customer";
 
       if (!isCustomer) {
         savePendingBooking(booking);

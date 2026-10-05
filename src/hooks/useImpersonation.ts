@@ -11,6 +11,24 @@ import { usePermissionStore } from "@/store/permission.store";
 import { impersonationService } from "@/services/admin/impersonation/impersonation.service";
 import type { ImpersonateVendorData } from "@/services/admin/impersonation/types";
 import { fetchProfileData } from "@/app/(protected)/_shared/profile/_lib/queries";
+import { backendProxyHeaders } from "@/lib/backend/backend-transport";
+
+/**
+ * Server-side admin session backup/restore (HttpOnly cookie). The admin's
+ * Laravel token never passes through browser JavaScript or storage.
+ */
+async function adminSessionCookie(action: "backup" | "restore"): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/auth/impersonation/${action}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: backendProxyHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Builds a NextAuth-compatible credentials object from impersonation data.
@@ -55,11 +73,12 @@ function isStaleSessionError(message: string): boolean {
  * Hook for starting vendor impersonation from the admin panel.
  *
  * Flow:
- * 1. Snapshot current admin session → sessionStorage
+ * 1. Snapshot non-secret admin profile → sessionStorage (for UI only)
  * 2. Call backend POST /admin/impersonate/vendor
  *    - If backend has a stale session (tab was closed mid-impersonation),
  *      auto-exit the stale backend record and retry once.
- * 3. Swap NextAuth session to vendor credentials
+ * 3. Back up the admin session cookie server-side, then swap NextAuth
+ *    session to vendor credentials
  * 4. Update Zustand stores (auth, permissions)
  * 5. Navigate to /vendor/dashboard
  */
@@ -115,7 +134,6 @@ export function useStartImpersonation() {
       }
 
       const adminBackup: AdminSessionBackup = {
-        token: admin.token!,
         email: admin.user?.email ?? "",
         uuid: admin.user?.uuid ?? undefined,
         first_name: snapshotFirstName,
@@ -153,7 +171,18 @@ export function useStartImpersonation() {
 
       const vendorData = response.data;
 
-      // 3. Save admin backup + set impersonation flag
+      // 3. Back up the admin session cookie BEFORE it is replaced. Without a
+      //    backup the admin could not be restored, so abort cleanly.
+      if (!(await adminSessionCookie("backup"))) {
+        try {
+          await impersonationService.exitImpersonation();
+        } catch {
+          // Best-effort — keep backend and frontend state consistent
+        }
+        throw new Error("Could not secure the admin session. Please try again.");
+      }
+
+      // 3a. Save non-secret admin profile + set impersonation flag
       impersonationStore().startImpersonation(adminBackup, {
         id: vendorId,
         name: vendorName,
@@ -173,7 +202,7 @@ export function useStartImpersonation() {
       }
 
       // 5. Update Zustand auth store with vendor data
-      useAuthStore.getState().login(vendorData.token, {
+      useAuthStore.getState().login({
         uuid: vendorData.user.uuid,
         email: vendorData.user.email,
         first_name: vendorData.user.first_name,
@@ -206,8 +235,8 @@ export function useStartImpersonation() {
  *
  * Flow:
  * 1. Notify backend (logs exit event + invalidates impersonation token)
- * 2. Read admin backup from impersonation store
- * 3. Swap NextAuth session back to admin credentials
+ * 2. Read the non-secret admin profile from the impersonation store
+ * 3. Restore the backed-up admin session cookie (server-side)
  * 4. Restore Zustand stores (auth, permissions)
  * 5. Clear impersonation state
  * 6. Navigate to admin panel
@@ -232,29 +261,16 @@ export function useExitImpersonation() {
         );
       }
 
-      // 2. Restore NextAuth session to admin
-      const signInResult = await signIn("credentials", {
-        redirect: false,
-        email: adminBackup.email,
-        token: adminBackup.token,
-        account_type: adminBackup.account_type,
-        active_role: adminBackup.active_role ?? "",
-        uuid: adminBackup.uuid ?? "",
-        first_name: adminBackup.first_name ?? "",
-        last_name: adminBackup.last_name ?? "",
-        avatar: adminBackup.avatar ?? "",
-        status: adminBackup.status ?? "active",
-        permissions: JSON.stringify(adminBackup.permissions),
-      });
-
-      if (signInResult?.error) {
+      // 2. Restore the admin session cookie that was backed up server-side
+      if (!(await adminSessionCookie("restore"))) {
+        store.endImpersonation();
         throw new Error(
           "Failed to restore admin session. Please log in again."
         );
       }
 
-      // 3. Restore Zustand auth store from backup
-      useAuthStore.getState().login(adminBackup.token, {
+      // 3. Restore Zustand auth store from the non-secret backup
+      useAuthStore.getState().login({
         uuid: adminBackup.uuid,
         email: adminBackup.email,
         first_name: adminBackup.first_name,
@@ -267,7 +283,7 @@ export function useExitImpersonation() {
 
       // 3a. The admin NextAuth session stores first_name/last_name as "" at
       //     login time (the login response may not include them). Fetch the
-      //     profile API now (using the restored admin token) so the header
+      //     profile API now (using the restored admin session) so the header
       //     shows the real name immediately after redirect, without waiting
       //     for the profile page to load.
       try {

@@ -42,7 +42,8 @@ export function useEventOverview({
   dateFilter,
   roomId,
 }: UseEventOverviewParams) {
-  const { data: session } = useSession();
+  const { status } = useSession();
+  const hasSession = status === "authenticated";
 
   return useQuery<EventOverviewResponse>({
     queryKey: eventOverviewKeys.byId(
@@ -53,7 +54,7 @@ export function useEventOverview({
       roomId,
     ),
     queryFn: async () => {
-      if (!session?.user?.token || !eventId) {
+      if (!hasSession || !eventId) {
         throw new Error("Missing authentication or event ID");
       }
 
@@ -67,7 +68,7 @@ export function useEventOverview({
 
       return response as EventOverviewResponse;
     },
-    enabled: !!session?.user?.token && !!eventId,
+    enabled: hasSession && !!eventId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,

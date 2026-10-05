@@ -188,18 +188,6 @@ export const authService = {
     return safeLocalStorage.getItem("uuid") || "";
   },
 
-  // Get current auth token from session or localStorage
-  getCurrentToken: async () => {
-    // Try to get from NextAuth session first
-    const session = await getSession();
-    if (session?.user?.token) {
-      return session.user.token;
-    }
-
-    // Fall back to localStorage during transition
-    return safeLocalStorage.getItem("token") || null;
-  },
-
   // Get current onboarding step from session
   getCurrentOnboardingStep: async () => {
     const session = await getSession();

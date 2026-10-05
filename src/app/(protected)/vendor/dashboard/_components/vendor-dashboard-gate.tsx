@@ -6,18 +6,19 @@ import { useSession } from "next-auth/react";
 import { PermissionRoute } from "@/components/permission";
 import { PageLoader } from "@/components/ui/page-loader";
 import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
+import { usePermissions } from "@/hooks/usePermission";
 
 export function VendorDashboardGate({ children }: { children: ReactNode }) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
+  // Permissions live in the store (loaded from the API), not the JWT/session.
+  const { permissions } = usePermissions();
 
   const fallbackPath = useMemo(
     () =>
       getFirstAccessibleVendorPath(
-        Array.isArray(session?.user?.permissions)
-          ? session.user.permissions
-          : undefined,
+        Array.isArray(permissions) ? permissions : undefined,
       ),
-    [session?.user?.permissions],
+    [permissions],
   );
 
   if (status === "loading") {

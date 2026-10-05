@@ -28,7 +28,6 @@ export interface AuthUser {
 interface AuthState {
   // State
   user: AuthUser | null;
-  token: string | null;
   isAuthenticated: boolean;
   account_type: UserType | null; // Renamed from userType
   active_role: StaffRole | string | null; // Renamed from userRole
@@ -39,12 +38,11 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   isSessionChecked: boolean;
-  tokenExpiry: number | null;
 
   // Actions
   setSession: (session: Session | null) => void;
   markSessionChecked: () => void;
-  login: (token: string, userData: AuthUser) => void;
+  login: (userData: AuthUser) => void;
   logout: (securityViolation?: boolean) => Promise<void>;
   clearError: () => void;
   verifySession: () => Promise<boolean>;
@@ -55,7 +53,14 @@ interface AuthState {
 const AUTH_STORE_NAME = "auth-storage";
 /** Session/local key used by onboarding to persist AI vs manual choice — cleared on logout */
 const ONBOARDING_MODE_STORAGE_KEY = "onboarding_mode";
-const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+/**
+ * The Laravel token is intentionally NOT kept in this store (or any browser
+ * storage). It lives only in the HttpOnly NextAuth cookie; browser API calls go
+ * through the same-origin `/api/backend` proxy. See backend-transport.ts.
+ */
+const AUTH_STORE_VERSION = 1;
+/** Legacy keys that used to hold the raw bearer token. */
+const LEGACY_TOKEN_KEYS = ["token"];
 
 // Check if code is running in browser environment
 const isBrowser = typeof window !== "undefined";
@@ -122,7 +127,6 @@ export const useAuthStore = create<AuthState>()(
     immer<AuthState>((set, get) => ({
       // Initial state
       user: null,
-      token: null,
       isAuthenticated: false,
       account_type: null, // Renamed from userType
       active_role: null, // Renamed from userRole
@@ -131,7 +135,6 @@ export const useAuthStore = create<AuthState>()(
       loading: false,
       error: null,
       isSessionChecked: false,
-      tokenExpiry: null,
 
       /**
        * Sets the session from NextAuth
@@ -140,19 +143,14 @@ export const useAuthStore = create<AuthState>()(
         if (!session) {
           set((state) => {
             state.user = null;
-            state.token = null;
             state.isAuthenticated = false;
             state.account_type = null; // Renamed from userType
             state.active_role = null; // Renamed from userRole
             state.vendor_location_id = null;
             state.isOnboarded = false;
-            state.tokenExpiry = null;
           });
           return;
         }
-
-        // Set expiry time based on current time + fixed duration
-        const expiryTime = Date.now() + TOKEN_EXPIRY_MS;
 
         // Safely transform session user data to our AuthUser format
         // Handle both active_role and account_type, with appropriate fallbacks
@@ -180,7 +178,6 @@ export const useAuthStore = create<AuthState>()(
 
         set((state) => {
           state.user = userData;
-          state.token = session.user?.token || null;
           state.isAuthenticated = !!session.user;
           // Use type assertion to access properties that might not exist in the type definition yet
           state.account_type =
@@ -189,7 +186,6 @@ export const useAuthStore = create<AuthState>()(
           state.active_role = (session.user as AuthUser).active_role || null;
           state.vendor_location_id = vendorLocationId;
           state.isOnboarded = Boolean(session.user?.isOnboarded);
-          state.tokenExpiry = expiryTime;
         });
 
         if (
@@ -217,54 +213,31 @@ export const useAuthStore = create<AuthState>()(
       },
 
       /**
-       * Logs in a user with token and user data
+       * Marks the user as logged in with the given profile data. The Laravel
+       * token is NOT accepted here — NextAuth holds it in the HttpOnly cookie.
        */
-      login: (token: string, userData: AuthUser) => {
-        if (!token) {
-          console.error("No token provided to login method");
-          return;
-        }
-
+      login: (userData: AuthUser) => {
         // Extract account_type and active_role from userData with backward compatibility
         const account_type = userData?.account_type || null;
         const active_role = userData?.active_role || null;
 
-        // Set expiry time based on current time + fixed duration
-        const expiryTime = Date.now() + TOKEN_EXPIRY_MS;
-
         set((state) => {
           state.user = userData;
-          state.token = token;
           state.isAuthenticated = true;
           state.account_type = account_type as UserType | null;
           state.active_role = active_role;
           state.loading = false;
           state.error = null;
-          state.tokenExpiry = expiryTime;
         });
       },
 
       /**
-       * Verifies if the current session is still valid
-       * Checks token expiration and returns authentication status
+       * Returns whether the user is currently signed in.
        */
       verifySession: async () => {
-        const state = get();
-
-        // If not authenticated or no token, session is invalid
-        if (!state.isAuthenticated || !state.token) {
-          return false;
-        }
-
-        // Check token expiration
-        if (state.tokenExpiry && Date.now() > state.tokenExpiry) {
-          // Token expired, log out and return false
-          await state.logout();
-          return false;
-        }
-
-        // Session is valid
-        return true;
+        // Session validity/expiry is owned by NextAuth (HttpOnly cookie); this
+        // only mirrors whether the app currently considers the user signed in.
+        return get().isAuthenticated;
       },
 
       /**
@@ -351,7 +324,6 @@ export const useAuthStore = create<AuthState>()(
         // Reset auth state
         set((state) => {
           state.user = null;
-          state.token = null;
           state.isAuthenticated = false;
           state.account_type = null;
           state.active_role = null;
@@ -359,7 +331,6 @@ export const useAuthStore = create<AuthState>()(
           state.isOnboarded = false;
           state.loading = false;
           state.error = null;
-          state.tokenExpiry = null;
         });
 
         // Persist middleware rewrites auth-storage after set() — wipe again so
@@ -405,15 +376,23 @@ export const useAuthStore = create<AuthState>()(
     {
       name: AUTH_STORE_NAME,
       storage: createJSONStorage(() => createIsomorphicStorage()),
+      version: AUTH_STORE_VERSION,
+      // v0 persisted the raw Laravel token; drop it from existing browsers.
+      migrate: (persisted) => {
+        if (persisted && typeof persisted === "object") {
+          const legacy = persisted as Record<string, unknown>;
+          delete legacy.token;
+          delete legacy.tokenExpiry;
+        }
+        return persisted as AuthState;
+      },
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
         isAuthenticated: state.isAuthenticated,
         account_type: state.account_type, // Renamed from userType
         active_role: state.active_role, // Renamed from userRole
         vendor_location_id: state.vendor_location_id,
         isOnboarded: state.isOnboarded,
-        tokenExpiry: state.tokenExpiry,
       }),
     }
   )
@@ -426,13 +405,22 @@ export const useAuthStore = create<AuthState>()(
 export const getAuthStatus = () => {
   const state = useAuthStore.getState();
   return {
-    hasToken: !!state.token,
     isAuthenticated: state.isAuthenticated,
     account_type: state.account_type, // Renamed from userType
     active_role: state.active_role, // Renamed from userRole
-    tokenValid: state.tokenExpiry ? Date.now() < state.tokenExpiry : false,
-    expiresIn: state.tokenExpiry
-      ? Math.floor((state.tokenExpiry - Date.now()) / 1000)
-      : 0,
   };
 };
+
+/** Remove legacy bearer-token keys left in browsers by older builds. */
+export function purgeLegacyTokenStorage(): void {
+  if (typeof window === "undefined") return;
+  for (const key of LEGACY_TOKEN_KEYS) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+purgeLegacyTokenStorage();

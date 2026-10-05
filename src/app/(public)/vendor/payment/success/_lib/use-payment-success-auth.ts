@@ -23,7 +23,6 @@ export function usePaymentSuccessAuth(
   const isSessionChecked = useAuthStore((s) => s.isSessionChecked);
   const accountType = useAuthStore((s) => s.account_type);
   const activeRole = useAuthStore((s) => s.active_role);
-  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     setIsClient(true);
@@ -37,8 +36,7 @@ export function usePaymentSuccessAuth(
   const isCustomer =
     isAuthenticated &&
     accountType === "customer" &&
-    activeRole === "customer" &&
-    !!token;
+    activeRole === "customer";
 
   useEffect(() => {
     if (!isClient || !isSessionChecked) return;

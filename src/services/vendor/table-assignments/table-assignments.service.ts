@@ -1,24 +1,20 @@
 import axios from "axios";
-import { getSession } from "next-auth/react";
 import { api } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
-import { env } from "@/env";
+import { backendProxyHeaders, backendProxyUrl } from "@/lib/backend/backend-transport";
 import { useDomainStore } from "@/store/domain.store";
 import type {
   TableAssignmentsQueryParams,
   TableAssignmentsResponse,
 } from "./type";
 
-/** GET CSV blob with Bearer + X-Domain (same pattern as menu choices exports). */
+/** GET CSV blob via the same-origin backend proxy (same pattern as menu choices exports). */
 async function fetchBlobAndDownload(
   url: string,
   options: { params?: Record<string, unknown>; defaultFilename: string },
 ): Promise<void> {
-  const session = await getSession();
-  const token = session?.user?.token as string | undefined;
   const domain = useDomainStore.getState().domain;
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const headers: Record<string, string> = backendProxyHeaders();
   if (domain) headers["X-Domain"] = domain;
 
   const response = await axios.get<Blob>(url, {
@@ -177,7 +173,7 @@ export const tableAssignmentsService = {
     date: string;
   }): Promise<void> => {
     const endpoint = API_ENDPOINTS.VENDOR.TABLE_ASSIGNMENTS.EXPORT;
-    await fetchBlobAndDownload(`${env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+    await fetchBlobAndDownload(backendProxyUrl(endpoint), {
       params: { event: params.event, date: params.date },
       defaultFilename: `table-assignments-${params.event}-${params.date}.csv`,
     });

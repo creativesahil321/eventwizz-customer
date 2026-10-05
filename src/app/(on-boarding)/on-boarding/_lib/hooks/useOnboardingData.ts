@@ -105,12 +105,12 @@ async function fetchOnboardingStepsByUrl(
 }
 
 async function fetchOnboardingData(
-  token: string,
+  hasSession: boolean,
   locationId: string,
 ): Promise<ApiResponse | null> {
-  if (!token || !locationId) {
-    console.warn("Missing token or locationId for onboarding data fetch:", {
-      hasToken: !!token,
+  if (!hasSession || !locationId) {
+    console.warn("Missing session or locationId for onboarding data fetch:", {
+      hasSession,
       locationId,
     });
     return null;
@@ -126,7 +126,6 @@ async function fetchOnboardingData(
   }
 
   const headers = {
-    Authorization: `Bearer ${token}`,
     "X-Venue-Location-Id": locationId,
   };
 
@@ -160,9 +159,10 @@ async function fetchOnboardingData(
 }
 
 export function useOnboardingData() {
-  const { data: session, update: updateSession } = useSession();
+  const { data: session, status, update: updateSession } = useSession();
   const queryClient = useQueryClient();
-  const token = session?.user?.token;
+  // Auth is attached server-side by the /api/backend proxy (HttpOnly cookie).
+  const hasSession = status === "authenticated";
   const { setLocations, setSelectedLocation } = useLocationStore();
 
   const locationId = session?.user?.vendor_location_id?.toString();
@@ -182,8 +182,8 @@ export function useOnboardingData() {
   } = useQuery({
     queryKey: onboardingKeys.data(),
     queryFn: () =>
-      fetchOnboardingData(token as string, locationId as string),
-    enabled: !!token && !!isValidLocationId,
+      fetchOnboardingData(hasSession, locationId as string),
+    enabled: hasSession && !!isValidLocationId,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });

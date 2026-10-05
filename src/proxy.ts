@@ -341,9 +341,15 @@ export async function proxy(req: NextRequest) {
       pathname.startsWith("/customer") ||
       pathname.startsWith("/admin")
     ) {
-      const hasSessionCookie =
-        req.cookies.has("next-auth.session-token") ||
-        req.cookies.has("__Secure-next-auth.session-token");
+      // NextAuth splits large JWTs into `next-auth.session-token.0`, `.1`…,
+      // so match by prefix rather than the exact cookie name.
+      const hasSessionCookie = req.cookies
+        .getAll()
+        .some(
+          ({ name }) =>
+            name.startsWith("next-auth.session-token") ||
+            name.startsWith("__Secure-next-auth.session-token"),
+        );
       if (!hasSessionCookie) {
         return redirectToLogin(req);
       }

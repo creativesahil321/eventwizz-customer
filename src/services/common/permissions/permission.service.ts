@@ -1,17 +1,30 @@
 import { api } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
-import { PermissionsResponse } from "./type";
 import axios from "axios";
+
+/** Pull the permission strings out of whatever shape the API returns. */
+function extractPermissions(payload: unknown): string[] {
+  if (Array.isArray(payload)) {
+    return payload.filter((p): p is string => typeof p === "string");
+  }
+  if (payload && typeof payload === "object") {
+    const obj = payload as Record<string, unknown>;
+    // api-client already unwraps the `{ data }` envelope, so the usual shape
+    // here is `{ permissions: [...] }`. Fall back to `data.permissions` in case
+    // a caller returns the full envelope.
+    if (Array.isArray(obj.permissions)) return extractPermissions(obj.permissions);
+    if (obj.data) return extractPermissions(obj.data);
+  }
+  return [];
+}
 
 export const permissionService = {
   getUserPermissions: async (): Promise<string[]> => {
     try {
-      const response = await api.get<PermissionsResponse>(
+      const response = await api.get<unknown>(
         API_ENDPOINTS.COMMON.PERMISSIONS.GET
       );
-
-      // Return just the permissions array
-      return response.data?.permissions || [];
+      return extractPermissions(response);
     } catch (error) {
       // Special handling for authentication errors (401)
       if (axios.isAxiosError(error) && error.response?.status === 401) {

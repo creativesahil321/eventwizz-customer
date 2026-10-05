@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import type { AiProviderType } from "@/lib/ai/providers";
 import { normalizeListedModels } from "@/lib/ai/model-catalog";
-import { authOptions } from "@/lib/auth/authOptions";
 import { enforceSameOrigin } from "@/lib/security/api-guard";
+import { getSessionJwtFromRequest } from "@/lib/auth/server-token";
 
 /**
  * Lists chat models from a provider using the admin-pasted API key.
@@ -16,8 +15,8 @@ export async function POST(req: NextRequest) {
   const crossOrigin = enforceSameOrigin(req);
   if (crossOrigin) return crossOrigin;
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.token || session.user.account_type !== "admin") {
+  const sessionJwt = await getSessionJwtFromRequest(req);
+  if (!sessionJwt?.token || sessionJwt.account_type !== "admin") {
     return NextResponse.json(
       { error: "Not authorized.", models: [] },
       { status: 403 },

@@ -7,25 +7,26 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useMemo } from "react";
 import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
+import { usePermissions } from "@/hooks/usePermission";
 
 export default function UnauthorizedPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  // Permissions come from the store (API-loaded), not the session/JWT.
+  const { permissions } = usePermissions();
 
   const homeHref = useMemo(() => {
     const at = session?.user?.account_type;
     if (at === "vendor") {
       return getFirstAccessibleVendorPath(
-        Array.isArray(session?.user?.permissions)
-          ? session.user.permissions
-          : undefined,
+        Array.isArray(permissions) ? permissions : undefined,
       );
     }
     if (at === "admin" || at === "customer") {
       return `/${at}/dashboard`;
     }
     return "/auth/login";
-  }, [session]);
+  }, [session, permissions]);
 
   const vendorHasNoMenuAccess =
     session?.user?.account_type === "vendor" && homeHref === "/unauthorized";

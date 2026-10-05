@@ -3,6 +3,7 @@ import axios, {
   AxiosInstance,
   AxiosRequestConfig,
   AxiosResponse,
+  InternalAxiosRequestConfig,
 } from "axios";
 import { toast } from "sonner";
 import { ApiError } from "@/types/api.types";
@@ -20,6 +21,12 @@ import {
   recoverFromOnboardingAlreadyCompleted,
 } from "@/lib/onboarding-completion";
 import { humanizeApiToastMessage } from "@/lib/api-toast-message";
+import {
+  BACKEND_PROXY_BASE,
+  BACKEND_PROXY_HEADER,
+  backendProxyHeaders,
+  fetchTransferToken,
+} from "@/lib/backend/backend-transport";
 // Browser environment check
 const isBrowser = typeof window !== "undefined";
 
@@ -79,9 +86,8 @@ const httpErrorToastId = (
 
 // Auth store state interface
 interface AuthStoreState {
-  token: string | null;
   user: Record<string, unknown>;
-  login: (token: string, user: Record<string, unknown>) => void;
+  login: (user: Record<string, unknown>) => void;
   logout: (securityViolation?: boolean) => Promise<void>;
 }
 
@@ -164,54 +170,59 @@ const clearSecurityViolations = (): void => {
   }
 };
 
-// Function to get session token from NextAuth
-// Safe function to get token that works on both client and server
-const getToken = async (): Promise<string | null> => {
-  // Only try to access Zustand/localStorage in browser environment
-  if (isBrowser) {
-    try {
-      // Try Zustand store (memory)
-      const store = useAuthStore.getState();
-      const tokenExpiry = store.tokenExpiry;
-      const token = store.token;
-      if (token && (!tokenExpiry || Date.now() < tokenExpiry)) return token;
+/** Laravel endpoints that always require the signed-in session. */
+const PROTECTED_API_PATH = /^\/?(vendor|customer|admin)\//;
 
-      // Fall back to localStorage if needed (for backward compatibility)
-      const legacyToken = localStorage.getItem("token");
-      if (legacyToken) return legacyToken;
+/**
+ * Multipart bodies larger than this go directly to Laravel: Vercel caps
+ * function request bodies at ~4.5 MB (event videos can be 30 MB).
+ */
+const PROXY_MAX_UPLOAD_BYTES = 3.5 * 1024 * 1024;
 
-      // Final fallback - check auth-storage in localStorage
-      const authStorage = localStorage.getItem("auth-storage");
-      if (authStorage) {
-        try {
-          const parsed = JSON.parse(authStorage);
-          if (parsed.state && parsed.state.token) {
-            // Manually check expiration if available
-            if (
-              parsed.state.tokenExpiry &&
-              Date.now() < parsed.state.tokenExpiry
-            ) {
-              return parsed.state.token;
-            } else if (!parsed.state.tokenExpiry) {
-              // No expiry info, assume token is valid
-              return parsed.state.token;
-            }
-          }
-        } catch (e) {
-          console.error("Error parsing auth-storage:", e);
-        }
-      }
+function formDataBytes(data: FormData): number {
+  let total = 0;
+  data.forEach((value) => {
+    total += typeof value === "string" ? value.length : value.size;
+  });
+  return total;
+}
 
-      return null;
-    } catch (e) {
-      console.error("Error accessing token:", e);
-      return null;
-    }
+/**
+ * Decide how a browser request reaches Laravel. The Laravel token is never
+ * held in browser JS — see `src/lib/backend/backend-transport.ts`:
+ * - signed-in / protected endpoints → same-origin `/api/backend` proxy, which
+ *   attaches the token from the HttpOnly session cookie;
+ * - large multipart uploads → direct, with a just-in-time token;
+ * - anonymous public calls → direct, unauthenticated (unchanged).
+ */
+async function routeBrowserRequest(
+  config: InternalAxiosRequestConfig,
+  skipAuth: boolean,
+): Promise<void> {
+  const url = config.url ?? "";
+  // Absolute URLs are owned by the caller.
+  if (/^https?:\/\//i.test(url)) return;
+
+  // The proxy is the only place that adds credentials.
+  delete config.headers.Authorization;
+
+  const { isAuthenticated } = useAuthStore.getState();
+  if (skipAuth || !(isAuthenticated || PROTECTED_API_PATH.test(url))) return;
+
+  const isLargeUpload =
+    typeof FormData !== "undefined" &&
+    config.data instanceof FormData &&
+    formDataBytes(config.data) > PROXY_MAX_UPLOAD_BYTES;
+
+  if (isLargeUpload) {
+    const token = await fetchTransferToken();
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return;
   }
 
-  // In server context, we can't access localStorage or zustand store
-  return null;
-};
+  config.baseURL = BACKEND_PROXY_BASE;
+  config.headers[BACKEND_PROXY_HEADER] = "1";
+}
 
 // Define ApiResponse type directly in this file
 export interface ApiResponse<T = unknown> {
@@ -249,12 +260,8 @@ apiClient.interceptors.request.use(
       "/social-auth/login/callback"
     );
 
-    if (!isSocialAuthEndpoint) {
-      // Get token safely using our isomorphic helper
-      const token = await getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    if (isBrowser) {
+      await routeBrowserRequest(config, Boolean(isSocialAuthEndpoint));
     }
 
     // Add location header if available (skip for social auth)
@@ -336,40 +343,34 @@ const handleUnauthorizedAccess = async (
         const store = useImpersonationStore.getState();
         const admin = store.originalAdmin;
         if (admin) {
-          const { signIn } = await import("next-auth/react");
-          await signIn("credentials", {
-            redirect: false,
-            email: admin.email,
-            token: admin.token,
-            account_type: admin.account_type,
-            active_role: admin.active_role ?? "",
-            uuid: admin.uuid ?? "",
-            first_name: admin.first_name ?? "",
-            last_name: admin.last_name ?? "",
-            avatar: admin.avatar ?? "",
-            status: admin.status ?? "active",
-            permissions: JSON.stringify(admin.permissions),
+          // The admin session cookie was backed up server-side (HttpOnly).
+          const restored = await fetch("/api/auth/impersonation/restore", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: backendProxyHeaders(),
           });
-          const authStore =
-            useAuthStore.getState() as unknown as AuthStoreState;
-          authStore.login(admin.token, {
-            uuid: admin.uuid,
-            email: admin.email,
-            first_name: admin.first_name,
-            last_name: admin.last_name,
-            avatar: admin.avatar,
-            status: admin.status ?? "active",
-            account_type: admin.account_type,
-            active_role: admin.active_role,
-          } as Record<string, unknown>);
+          if (restored.ok) {
+            const authStore =
+              useAuthStore.getState() as unknown as AuthStoreState;
+            authStore.login({
+              uuid: admin.uuid,
+              email: admin.email,
+              first_name: admin.first_name,
+              last_name: admin.last_name,
+              avatar: admin.avatar,
+              status: admin.status ?? "active",
+              account_type: admin.account_type,
+              active_role: admin.active_role,
+            } as Record<string, unknown>);
 
-          const { usePermissionStore } = await import(
-            "@/store/permission.store"
-          );
-          usePermissionStore.getState().setPermissions(admin.permissions);
-          store.endImpersonation();
-          window.location.href = "/admin/dashboard";
-          return;
+            const { usePermissionStore } = await import(
+              "@/store/permission.store"
+            );
+            usePermissionStore.getState().setPermissions(admin.permissions);
+            store.endImpersonation();
+            window.location.href = "/admin/dashboard";
+            return;
+          }
         }
         // If no admin backup, fall through to standard logout
         store.endImpersonation();

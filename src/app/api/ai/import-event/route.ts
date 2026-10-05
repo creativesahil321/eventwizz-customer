@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
+import { getSessionJwtFromRequest } from "@/lib/auth/server-token";
 import { NextResponse, type NextRequest } from "next/server";
-import { authOptions } from "@/lib/auth/authOptions";
 import { assertSafeLogoUrl } from "@/lib/logo/fetch-logo-from-url";
 import { assertResolvesToPublic } from "@/lib/security/ssrf";
 import {
@@ -573,11 +572,9 @@ function normalizeAiEnvelope(
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const sessionUser = session?.user as
-      | { token?: string; vendor_location_id?: string | number | null }
-      | undefined;
-    if (!sessionUser?.token || sessionUser.vendor_location_id == null) {
+    // Read the HttpOnly session JWT directly — the token is not on `session.user`.
+    const sessionJwt = await getSessionJwtFromRequest(req);
+    if (!sessionJwt?.token || sessionJwt.vendor_location_id == null) {
       return importErrorResponse(
         401,
         "You must be signed in as a vendor to import an event.",

@@ -6,8 +6,7 @@
 import { api } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
 import axios from "axios";
-import { env } from "@/env";
-import { useAuthStore } from "@/store/auth.store";
+import { backendProxyHeaders, backendProxyUrl } from "@/lib/backend/backend-transport";
 import { useDomainStore } from "@/store/domain.store";
 import { getSession } from "next-auth/react";
 import type {
@@ -440,9 +439,6 @@ export const vendorBookingsService = {
         bookingId.toString()
       ).replace("{date}", date);
 
-    // Get token from auth store
-    const token = useAuthStore.getState().token;
-
     // Get domain from domain store
     const domain = useDomainStore.getState().domain;
 
@@ -451,9 +447,7 @@ export const vendorBookingsService = {
     const locationId = session?.user?.vendor_location_id;
 
     // Build headers with required domain and location headers
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-    };
+    const headers: Record<string, string> = backendProxyHeaders();
 
     if (domain) {
       headers["X-Domain"] = domain;
@@ -465,7 +459,7 @@ export const vendorBookingsService = {
 
     // Use axios directly for blob download
     const response = await axios.get<Blob>(
-      `${env.NEXT_PUBLIC_API_URL}${endpoint}`,
+      backendProxyUrl(endpoint),
       {
         responseType: "blob",
         headers,
@@ -651,9 +645,6 @@ export const vendorBookingsService = {
       throw new Error("BULK_EXPORT endpoint not configured for bookings");
     }
 
-    // Get token from auth store
-    const token = useAuthStore.getState().token;
-
     // Get domain from domain store
     const domain = useDomainStore.getState().domain;
 
@@ -662,9 +653,7 @@ export const vendorBookingsService = {
     const locationId = session?.user?.vendor_location_id;
 
     // Build headers with required domain and location headers
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-    };
+    const headers: Record<string, string> = backendProxyHeaders();
 
     if (domain) {
       headers["X-Domain"] = domain;
@@ -684,7 +673,7 @@ export const vendorBookingsService = {
     try {
       // Use axios directly for blob download (bypasses apiClient toast interceptors)
       const response = await axios.post<Blob>(
-        `${env.NEXT_PUBLIC_API_URL}${API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS.BULK_EXPORT}`,
+        backendProxyUrl(API_ENDPOINTS.VENDOR.BOOKING_HISTORY.MULTIPLE_ACTIONS.BULK_EXPORT),
         formData,
         {
           responseType: "blob",

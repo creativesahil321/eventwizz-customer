@@ -10,17 +10,9 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { LoginFormInputs, loginSchema } from "./schema";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
-import { authService } from "@/services/common/auth/auth.service";
-import { detectOS } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth.store";
-import { usePermissionStore } from "@/store/permission.store";
-import {
-  AuthUser,
-  UserType,
-  StaffRole,
-  LoginResponse,
-} from "@/types/auth.types";
+import { signIn, getSession } from "next-auth/react";
+import { toast } from "sonner";
+import { UserType } from "@/types/auth.types";
 import { AuthRedirectingSkeleton } from "@/app/(auth)/_components/auth-redirecting-skeleton";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import { OAuthErrorBoundary } from "@/components/auth/OAuthErrorBoundary";
@@ -71,161 +63,58 @@ export default function LoginForm({
       const domain =
         typeof window !== "undefined" ? window.location.hostname : "";
 
-      // Call API to get auth token
-      const response = (await authService.login({
+      // Log in through NextAuth's Credentials provider. The call to the Laravel
+      // login API happens SERVER-SIDE inside `authorize()`, so the token and the
+      // raw backend response never appear in the browser Network tab. We only
+      // send the credentials the server needs.
+      const result = await signIn("credentials", {
+        redirect: false,
         email: data.email,
         password: data.password,
-        user_agent: navigator.userAgent,
-        os: detectOS(),
-        ip_address: "192.168.1.100",
+        remember: data.remember ? "true" : "false",
+        registration: "false",
         domain_name: domain || undefined,
-      })) as LoginResponse;
+      });
 
-      if (!response.status) {
-        throw new Error(response.message || "Login failed");
+      if (!result || result.error) {
+        const message =
+          result?.error && result.error !== "CredentialsSignin"
+            ? result.error
+            : "Invalid email or password.";
+        toast.error(message);
+        setLoading(false);
+        return;
       }
 
-      if (response.data.token) {
-        clearOnboardingBrowserState();
-
-        // Store auth data in Zustand
-        const store = useAuthStore.getState();
-        const account_type = (response.data.account_type ||
-          response.data.active_role ||
-          "vendor") as UserType;
-        const active_role = (response.data.active_role || "") as StaffRole;
-
-        const userData: AuthUser = {
-          uuid: response.data.user.uuid,
-          first_name: response.data.user.first_name,
-          last_name: response.data.user.last_name,
-          email: response.data.user.email,
-          avatar: response.data.user.avatar,
-          status: response.data.user.status || "active",
-          active_role,
-          account_type,
-        };
-
-        store.login(response.data.token, userData);
-
-        // Store permissions if available
-        if (response.data.permissions?.length) {
-          const permissionStore = usePermissionStore.getState();
-          permissionStore.setPermissions(response.data.permissions);
-
-          try {
-            sessionStorage.setItem(
-              "permissions-backup",
-              JSON.stringify(response.data.permissions)
-            );
-            localStorage.setItem(
-              "permission-storage",
-              JSON.stringify({
-                state: {
-                  permissions: response.data.permissions,
-                  isLoaded: true,
-                },
-                version: 0,
-              })
-            );
-          } catch (e) {
-            console.error("Error storing permissions:", e);
-            // Silent error
-          }
-        }
-
-        // Location data is now handled by TanStack Query and Zustand store
-        // The LocationInitializer component will handle this on page load
-      }
-
-      // Get metadata for redirection
-      const isVendorOnboarded =
-        (response.data.account_type || response.data.active_role) ===
-          "vendor" &&
-        "isOnboarded" in response.data &&
-        response.data.isOnboarded === true;
-
-      // Show redirecting state before NextAuth call
+      // Session cookie is set. Read it back for post-login routing decisions.
+      // Permissions are loaded from the API by PermissionProvider (not the JWT).
+      clearOnboardingBrowserState();
       setRedirecting(true);
 
-      // Establish NextAuth session
-      try {
-        const userData = response.data.user;
-        const account_type = (response.data.account_type ||
-          response.data.active_role ||
-          "vendor") as UserType;
-        const active_role = (response.data.active_role || "") as StaffRole;
-        const vendorLocationId = response.data.vendor_location_id
-          ? String(response.data.vendor_location_id)
-          : null;
-        const permissions = JSON.stringify(response.data.permissions || []);
+      const session = await getSession();
+      const account_type = (session?.user?.account_type || "vendor") as UserType;
+      const isVendorOnboarded =
+        account_type === "vendor" && Boolean(session?.user?.isOnboarded);
 
-        // Location data is now handled by TanStack Query and Zustand store
-        // No need to serialize location data for NextAuth
-
-        const hasPaymentProvider = Boolean(
-          response.data.has_payment_provider
-        );
-
-        const result = await signIn("credentials", {
-          redirect: false,
-          email: data.email,
-          password: data.password,
-          remember: data.remember,
-          token: response.data.token,
-          active_role,
-          account_type,
-          userId: userData.uuid?.toString(),
-          uuid: userData.uuid || null,
-          isOnboarded: isVendorOnboarded.toString(),
-          registration: "false",
-          domain_name: domain || undefined,
-          first_name: userData.first_name,
-          last_name: userData.last_name,
-          avatar: userData.avatar,
-          on_boarding_step: response.data.on_boarding_step?.toString(),
-          vendor_location_id: vendorLocationId,
-          event_id: response.data.event_id
-            ? String(response.data.event_id)
-            : undefined,
-          status: userData.status,
-          permissions,
-          has_payment_provider: String(hasPaymentProvider),
-        });
-
-        if (result?.error) {
-          throw new Error(result.error);
-        }
-
-        try {
-          if (stayOnPage) {
-            const next =
-              callbackUrl ||
-              `${window.location.pathname}${window.location.search}` ||
-              "/vendor/door-scan";
-            window.location.replace(next);
-            return;
-          }
-
-          router.push(
-            resolvePostLoginRedirect({
-              accountType: account_type,
-              isVendorOnboarded,
-              callbackUrl,
-            }),
-          );
-        } catch (error) {
-          console.error("Error redirecting:", error);
-          setRedirecting(false);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Error in NextAuth session:", error);
-        setLoading(false);
-        setRedirecting(false);
+      if (stayOnPage) {
+        const next =
+          callbackUrl ||
+          `${window.location.pathname}${window.location.search}` ||
+          "/vendor/door-scan";
+        window.location.replace(next);
+        return;
       }
+
+      router.push(
+        resolvePostLoginRedirect({
+          accountType: account_type,
+          isVendorOnboarded,
+          callbackUrl,
+        }),
+      );
     } catch (error) {
       console.error("Error in login form:", error);
+      toast.error("Something went wrong while signing in. Please try again.");
       setLoading(false);
       setRedirecting(false);
     }

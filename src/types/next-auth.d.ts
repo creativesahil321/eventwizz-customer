@@ -7,7 +7,8 @@ declare module "next-auth" {
       account_type: UserType;
       active_role?: string;
       isOnboarded?: boolean;
-      token?: string;
+      // NOTE: no `token` — the Laravel token is server-only (HttpOnly JWT
+      // cookie) and is never exposed on the client session.
       uuid?: string;
       name?: string | null;
       first_name?: string | null;

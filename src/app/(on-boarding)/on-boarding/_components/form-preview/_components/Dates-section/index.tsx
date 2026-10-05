@@ -72,7 +72,6 @@ import type { HeadingEmphasis } from "@/lib/heading-emphasis";
 interface SessionUser {
   account_type: string;
   active_role: string;
-  token: string;
   [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
@@ -698,10 +697,9 @@ export default function DatesSection({
       const user = session.user as SessionUser;
       const accountType = user.account_type;
       const activeRole = user.active_role;
-      const token = user.token;
 
-      // Check if user is a customer with valid token
-      if (accountType === "customer" && activeRole === "customer" && token) {
+      // Check if user is a signed-in customer
+      if (accountType === "customer" && activeRole === "customer") {
         // User is a customer, make POST API call to initialize cart
         const cartData: CartRequest = {
           slug: normalizeSlug(eventData.event_slug),
@@ -797,8 +795,7 @@ export default function DatesSection({
     const isCustomer =
       status === "authenticated" &&
       user?.account_type === "customer" &&
-      user?.active_role === "customer" &&
-      Boolean(user?.token);
+      user?.active_role === "customer";
 
     if (!isCustomer) {
       savePendingBooking({

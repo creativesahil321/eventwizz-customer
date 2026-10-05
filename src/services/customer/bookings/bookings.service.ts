@@ -5,10 +5,9 @@
  */
 
 import axios from "axios";
-import { getSession } from "next-auth/react";
 import { api } from "../../core/api-client";
 import { API_ENDPOINTS } from "../../core/endpoints";
-import { env } from "@/env";
+import { backendProxyHeaders, backendProxyUrl } from "@/lib/backend/backend-transport";
 import { useDomainStore } from "@/store/domain.store";
 import {
   BookingsQueryParams,
@@ -310,20 +309,15 @@ export const bookingsService = {
       bookingId.toString()
     );
 
-    const session = await getSession();
-    const token = session?.user?.token as string | undefined;
     const domain = useDomainStore.getState().domain;
 
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    const headers: Record<string, string> = backendProxyHeaders();
     if (domain) {
       headers["X-Domain"] = domain;
     }
 
     const response = await axios.get<Blob>(
-      `${env.NEXT_PUBLIC_API_URL}${endpoint}`,
+      backendProxyUrl(endpoint),
       {
         responseType: "blob",
         headers,

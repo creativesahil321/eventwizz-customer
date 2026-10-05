@@ -39,6 +39,7 @@ import {
   isVendorDoorEntryCallback,
 } from "@/lib/auth/safe-callback-url";
 import { getFirstAccessibleVendorPath } from "@/config/menus/first-accessible-vendor-route";
+import { usePermissions } from "@/hooks/usePermission";
 import {
   LocationActiveEventsCount,
   formatLiveEventsLabel,
@@ -48,6 +49,7 @@ export default function WelcomeLocationSelectionPage() {
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { data: session, status: sessionStatus } = useSession();
+  const { permissions: storePermissions } = usePermissions();
   const { mutate: switchLocation, isPending } = useSwitchLocation();
   const router = useRouter();
 
@@ -94,9 +96,8 @@ export default function WelcomeLocationSelectionPage() {
           router.push(resume);
           return;
         }
-        const perms = session?.user?.permissions;
         const next = getFirstAccessibleVendorPath(
-          Array.isArray(perms) ? perms : undefined,
+          Array.isArray(storePermissions) ? storePermissions : undefined,
         );
         router.push(next);
       },
