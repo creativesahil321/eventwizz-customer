@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import { usePermissionStore } from "@/store/permission.store";
 import { logout } from "@/lib/auth/logout";
+import { usePermissionLoadTimeout } from "@/hooks/use-permission-load-timeout";
 import {
   isSupportConversationPath,
   isSupportWorkspacePath,
@@ -42,31 +43,26 @@ export default function PageWrapper({
 
     if (!isAuthenticated) {
       router.replace("/auth/login");
-      return;
     }
+  }, [isAuthenticated, isSessionChecked, isDoorScan, router]);
 
-    // Customers do not use permissions; skip permission check for them
-    if (isCustomer) return;
-
-    // For vendor/admin: handle missing permissions (e.g. localStorage cleared)
-    if (isAuthenticated && !permissionsLoaded) {
-      const performSecurityLogout = async () => {
-        try {
-          await logout({ securityViolation: true });
-        } catch {
-          window.location.href = "/auth/login";
-        }
-      };
-      performSecurityLogout();
-    }
-  }, [
-    isAuthenticated,
-    isSessionChecked,
-    permissionsLoaded,
-    isCustomer,
-    isDoorScan,
-    router,
-  ]);
+  // Vendor/admin: permissions load from the API after login, so wait for them
+  // and only log out if they never arrive (customers don't use permissions).
+  usePermissionLoadTimeout(
+    isSessionChecked &&
+      !isDoorScan &&
+      isAuthenticated &&
+      !isCustomer &&
+      !permissionsLoaded,
+    () => {
+      console.warn(
+        "[PageWrapper] Security violation: permissions never loaded",
+      );
+      logout({ securityViolation: true }).catch(() => {
+        window.location.href = "/auth/login";
+      });
+    },
+  );
 
   return (
     <main

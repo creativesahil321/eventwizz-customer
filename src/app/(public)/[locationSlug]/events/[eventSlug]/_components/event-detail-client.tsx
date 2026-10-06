@@ -97,7 +97,11 @@ export default function EventDetailClient({
   host,
 }: EventDetailClientProps) {
   const { formatCompact: formatPriceUnit } = useCurrencyFormat();
-  const { data } = useEventDetail(eventSlug, host);
+  // Trust the SSR-prefetched snapshot while browsing — no client refetch on
+  // mount. Live availability (price / sold_out) is re-validated at checkout,
+  // which forces its own fetch (see cart-manager). This keeps the event page
+  // a pure server-rendered paint with zero client data calls.
+  const { data } = useEventDetail(eventSlug, host, { refetchOnMount: false });
   const searchParams = useSearchParams();
   const roomIdParam = searchParams.get("roomId");
 

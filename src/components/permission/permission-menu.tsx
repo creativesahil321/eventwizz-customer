@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/store/auth.store";
 import { usePathname, useRouter } from "next/navigation";
 import { logout } from "@/lib/auth/logout";
+import { usePermissionLoadTimeout } from "@/hooks/use-permission-load-timeout";
 
 interface PermissionMenuProps {
   menus: MenuItemProps[];
@@ -45,35 +46,26 @@ export function PermissionMenu({
     if (isDoorScan) return;
     if (!isAuthenticated) {
       router.replace("/auth/login");
-      return;
     }
-    if (isCustomer) return;
+  }, [isAuthenticated, isSessionChecked, isDoorScan, router]);
 
-    if (isAuthenticated && !isLoaded) {
-      const handleSecurityViolation = async () => {
-        try {
-          console.warn(
-            "[Permission Menu] Security violation detected: Missing permissions",
-          );
-          await logout();
-        } catch (error) {
-          console.error(
-            "[Permission Menu] Error handling security violation:",
-            error,
-          );
-          window.location.href = "/auth/login?error=security_violation";
-        }
-      };
-      handleSecurityViolation();
-    }
-  }, [
-    isAuthenticated,
-    isSessionChecked,
-    isLoaded,
-    isCustomer,
-    isDoorScan,
-    router,
-  ]);
+  // Vendor/admin: permissions load from the API after login, so wait for them
+  // and only log out if they never arrive (same rule as PageWrapper).
+  usePermissionLoadTimeout(
+    isSessionChecked &&
+      !isDoorScan &&
+      isAuthenticated &&
+      !isCustomer &&
+      !isLoaded,
+    () => {
+      console.warn(
+        "[Permission Menu] Security violation detected: permissions never loaded",
+      );
+      logout().catch(() => {
+        window.location.href = "/auth/login?error=security_violation";
+      });
+    },
+  );
 
   // Customers: no roles/permissions – show all menus immediately, no loading
   const filteredMenus = useMemo(() => {
