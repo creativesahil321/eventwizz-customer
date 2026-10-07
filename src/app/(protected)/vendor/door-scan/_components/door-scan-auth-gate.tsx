@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { logout } from "@/lib/auth/logout";
 import { DoorScanLoginScreen } from "./door-scan-login-screen";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -27,7 +28,9 @@ export function DoorScanAuthGate({ children }: { children: React.ReactNode }) {
     if (accountType === "vendor") return;
     if (signedOutWrongRole.current) return;
     signedOutWrongRole.current = true;
-    void signOut({ redirect: false });
+    // Door Scan is vendor-only and signs staff in on this page, so end the
+    // other account here and stay to show the Door Scan login.
+    void logout({ redirectTo: false });
   }, [accountType, status]);
 
   if (status === "loading") {

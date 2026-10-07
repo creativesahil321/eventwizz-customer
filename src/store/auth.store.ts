@@ -1,11 +1,8 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { authService } from "@/services/common/auth/auth.service";
 import { UserType, StaffRole } from "@/types/auth.types";
 import type { Session } from "next-auth";
-import { setLogoutInProgress } from "@/services/core/api-client";
-import { AI_COLLECT_DRAFT_STORAGE_KEY } from "@/app/(on-boarding)/on-boarding/_lib/ai-collect-draft-cache";
 
 /**
  * User data interface with properly typed fields to avoid 'any'
@@ -43,7 +40,6 @@ interface AuthState {
   setSession: (session: Session | null) => void;
   markSessionChecked: () => void;
   login: (userData: AuthUser) => void;
-  logout: (securityViolation?: boolean) => Promise<void>;
   clearError: () => void;
   verifySession: () => Promise<boolean>;
   updateUser: (userData: Partial<AuthUser>) => void;
@@ -51,8 +47,6 @@ interface AuthState {
 
 // Constants
 const AUTH_STORE_NAME = "auth-storage";
-/** Session/local key used by onboarding to persist AI vs manual choice — cleared on logout */
-const ONBOARDING_MODE_STORAGE_KEY = "onboarding_mode";
 /**
  * The Laravel token is intentionally NOT kept in this store (or any browser
  * storage). It lives only in the HttpOnly NextAuth cookie; browser API calls go
@@ -238,119 +232,6 @@ export const useAuthStore = create<AuthState>()(
         // Session validity/expiry is owned by NextAuth (HttpOnly cookie); this
         // only mirrors whether the app currently considers the user signed in.
         return get().isAuthenticated;
-      },
-
-      /**
-       * Logs out a user and clears all authentication and permission data
-       * Performs comprehensive cleanup to ensure complete session termination
-       *
-       * @param securityViolation - If true, performs a more aggressive cleanup for security concerns
-       * @returns Promise that resolves when logout process completes
-       */
-      logout: async (securityViolation = false): Promise<void> => {
-        // Set logout in progress to prevent unauthorized toasts
-        setLogoutInProgress(true);
-
-        // Clear onboarding mode from storage so next login starts fresh at mode selection
-        if (typeof window !== "undefined") {
-          try {
-            sessionStorage.removeItem(ONBOARDING_MODE_STORAGE_KEY);
-            localStorage.removeItem(ONBOARDING_MODE_STORAGE_KEY);
-            sessionStorage.removeItem(AI_COLLECT_DRAFT_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
-        }
-
-        // Clear backend auth data through service
-        try {
-          await authService.clearAuthData();
-        } catch (error) {
-          console.error("[Auth Store] Error clearing auth data:", error);
-        }
-
-        // For security violations, perform complete storage cleanup
-        if (securityViolation && typeof window !== "undefined") {
-          try {
-            // Clear all storage
-            localStorage.clear();
-            sessionStorage.clear();
-
-            // Clear all cookies
-            document.cookie.split(";").forEach((cookie) => {
-              const eqPos = cookie.indexOf("=");
-              const name =
-                eqPos > -1 ? cookie.slice(0, eqPos).trim() : cookie.trim();
-              document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-            });
-
-            console.warn(
-              "[Auth Store] Security violation: Performed complete storage cleanup"
-            );
-          } catch (error) {
-            console.error("[Auth Store] Error during security cleanup:", error);
-          }
-        }
-
-        // Clear React Query cache
-        try {
-          // Prefer the live client registered by RootQueryProvider; fall back
-          // to the legacy module singleton if no provider has mounted.
-          const { getActiveQueryClient } = await import(
-            "@/providers/query-provider/active-query-client"
-          );
-          const queryClient =
-            getActiveQueryClient() ??
-            (await import("@/providers/query-provider/queryClient")).default;
-          if (queryClient) {
-            // Reset all query cache data
-            queryClient.clear();
-          }
-        } catch (importError) {
-          console.error(
-            "[Auth Store] Error importing query client:",
-            importError
-          );
-        }
-
-        // Reset all Zustand stores using the centralized utility
-        try {
-          const { resetAllStores } = await import("@/lib/utils");
-          await resetAllStores();
-        } catch (error) {
-          console.error("[Auth Store] Error resetting stores:", error);
-        }
-
-        // Reset auth state
-        set((state) => {
-          state.user = null;
-          state.isAuthenticated = false;
-          state.account_type = null;
-          state.active_role = null;
-          state.vendor_location_id = null;
-          state.isOnboarded = false;
-          state.loading = false;
-          state.error = null;
-        });
-
-        // Persist middleware rewrites auth-storage after set() — wipe again so
-        // the next account does not inherit onboarding_mode / rooms / location.
-        try {
-          const { clearVendorBrowserSession } = await import(
-            "@/lib/clear-vendor-browser-session"
-          );
-          clearVendorBrowserSession();
-        } catch (error) {
-          console.error("[Auth Store] Error clearing browser session:", error);
-        }
-
-        // For security violations, hard redirect to login
-        if (securityViolation && typeof window !== "undefined") {
-          window.location.href = "/auth/login?error=security_violation";
-        } else if (typeof window !== "undefined") {
-          // Add redirect for normal logouts too
-          window.location.href = "/auth/login";
-        }
       },
 
       /**

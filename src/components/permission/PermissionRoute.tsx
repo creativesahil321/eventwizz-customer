@@ -9,7 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/store/auth.store";
-import { getLogoutInProgress } from "@/services/core/api-client";
+import { getLogoutInProgress } from "@/lib/auth/logout-state";
 
 type PermissionRouteProps = {
   children: ReactNode;

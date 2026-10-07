@@ -4,6 +4,7 @@ import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { eventsService } from "@/services/vendor/events/events.service";
 import type { EventOverviewResponse } from "@/services/vendor/events/type";
 import { useSession } from "next-auth/react";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 // Query keys for infinite event overview
 export const eventOverviewInfiniteKeys = {
@@ -76,8 +77,7 @@ export function useEventOverviewInfinite({
       return undefined;
     },
     enabled: enabledProp !== false && hasSession && !!eventId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: false,
+    ...FRESHNESS.operational,
     placeholderData: keepPreviousData,
   });
 }

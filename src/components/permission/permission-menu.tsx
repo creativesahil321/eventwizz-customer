@@ -3,12 +3,9 @@
 import { MenuItemProps } from "@/config/menus/types";
 import { usePermissionStore } from "@/store/permission.store";
 import { hasMenuPermission } from "@/services/common/permissions/utils";
-import { ReactNode, useMemo, useEffect } from "react";
+import { ReactNode, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/store/auth.store";
-import { usePathname, useRouter } from "next/navigation";
-import { logout } from "@/lib/auth/logout";
-import { usePermissionLoadTimeout } from "@/hooks/use-permission-load-timeout";
 
 interface PermissionMenuProps {
   menus: MenuItemProps[];
@@ -17,8 +14,9 @@ interface PermissionMenuProps {
 }
 
 /**
- * Component that filters menu items based on user permissions
- * Includes security mechanisms to prevent unauthorized access when localStorage is manipulated
+ * Filters menu items by the user's permissions. Auth redirects and the
+ * "permissions never loaded" logout live in PageWrapper, which wraps every
+ * protected page — this component only renders.
  *
  * @param menus The original menu array
  * @param render Render function that receives filtered menus
@@ -30,42 +28,11 @@ export function PermissionMenu({
   loadingFallback,
 }: PermissionMenuProps) {
   const { permissions, isLoaded } = usePermissionStore();
-  const { isAuthenticated, isSessionChecked, active_role, account_type } =
-    useAuthStore();
-  const router = useRouter();
-  const pathname = usePathname();
-  const isDoorScan = pathname?.startsWith("/vendor/door-scan");
+  const { isAuthenticated, active_role, account_type } = useAuthStore();
   const isCustomer =
     account_type === "customer" ||
     active_role === "customer" ||
     active_role === "Customer";
-
-  // Security check: Handle auth state changes and redirects (customers skip permission requirement)
-  useEffect(() => {
-    if (!isSessionChecked) return;
-    if (isDoorScan) return;
-    if (!isAuthenticated) {
-      router.replace("/auth/login");
-    }
-  }, [isAuthenticated, isSessionChecked, isDoorScan, router]);
-
-  // Vendor/admin: permissions load from the API after login, so wait for them
-  // and only log out if they never arrive (same rule as PageWrapper).
-  usePermissionLoadTimeout(
-    isSessionChecked &&
-      !isDoorScan &&
-      isAuthenticated &&
-      !isCustomer &&
-      !isLoaded,
-    () => {
-      console.warn(
-        "[Permission Menu] Security violation detected: permissions never loaded",
-      );
-      logout().catch(() => {
-        window.location.href = "/auth/login?error=security_violation";
-      });
-    },
-  );
 
   // Customers: no roles/permissions – show all menus immediately, no loading
   const filteredMenus = useMemo(() => {

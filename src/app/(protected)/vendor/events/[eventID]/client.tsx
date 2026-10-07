@@ -40,7 +40,17 @@ export default function EventClientWrapper({
   eventId,
 }: EventClientWrapperProps) {
   const isRoomsForFetch = resolveVendorEventIsRoomsForFetch(eventId);
-  const { eventData, isLoading } = useEventData(eventId, isRoomsForFetch);
+  // The editor fills its form ONCE, so it must start from the server's current
+  // state — sold counts change as customers book, and the "capacity ≥ sold"
+  // validation depends on them. Always refetch on entry and wait for it.
+  const {
+    eventData,
+    isLoading: isQueryLoading,
+    isFetching,
+    isFetchedAfterMount,
+  } = useEventData(eventId, isRoomsForFetch, { alwaysFresh: true });
+  // Cached copy on screen while the entry refetch runs → wait for the fresh one.
+  const isLoading = isQueryLoading || (isFetching && !isFetchedAfterMount);
   const currentVendorLocationId = useHeaderLocationId();
   const selectedLocation = useLocationStore((s) => s.selectedLocation);
 

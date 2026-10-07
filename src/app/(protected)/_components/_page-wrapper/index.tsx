@@ -48,6 +48,7 @@ export default function PageWrapper({
 
   // Vendor/admin: permissions load from the API after login, so wait for them
   // and only log out if they never arrive (customers don't use permissions).
+  // This is the ONLY permission watchdog — PageWrapper wraps every protected page.
   usePermissionLoadTimeout(
     isSessionChecked &&
       !isDoorScan &&
@@ -58,9 +59,7 @@ export default function PageWrapper({
       console.warn(
         "[PageWrapper] Security violation: permissions never loaded",
       );
-      logout({ securityViolation: true }).catch(() => {
-        window.location.href = "/auth/login";
-      });
+      void logout({ reason: "security_violation" });
     },
   );
 

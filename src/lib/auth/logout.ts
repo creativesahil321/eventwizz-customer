@@ -1,90 +1,102 @@
-/**
- * Centralized logout utility for the application
- * Provides a single function to handle all logout operations across the app
- */
-
-import { resetAllStores } from "@/lib/utils";
-import { setLogoutInProgress } from "@/services/core/api-client";
-import { clearVendorBrowserSession } from "@/lib/clear-vendor-browser-session";
+import { signOut } from "next-auth/react";
+import { backendProxyHeaders } from "@/lib/backend/backend-transport";
+import { clearClientSession } from "@/lib/auth/client-session";
+import { setLogoutInProgress } from "@/lib/auth/logout-state";
 
 /**
- * Performs a complete logout with proper cleanup of all application state
- * @param {Object} options Logout options
- * @param {boolean} options.securityViolation Whether the logout is due to a security violation
- * @param {boolean} options.redirectToLogin Whether to redirect to login page after logout
- * @returns {Promise<void>}
+ * THE logout for the whole app (every tenant: admin, vendor, staff, customer,
+ * Door Scan). Nothing else may call `signOut()` or clear auth state directly.
+ *
+ *   1. Server   POST /api/auth/logout — revoke the Laravel token(s), expire all
+ *               HttpOnly auth cookies (session + impersonation backup).
+ *   2. NextAuth signOut()             — end the client session and notify the
+ *               app's other open tabs.
+ *   3. Browser  clearClientSession()  — query cache, stores, storage.
+ *   4. Navigate (replace, so Back cannot return to a protected page).
+ *
+ * Idempotent: concurrent calls (a burst of 401s, a watchdog and a click) share
+ * one run. Never throws — each step is best effort and the redirect always
+ * happens, so a user can never be left half signed in.
  */
-export async function logout({
-  securityViolation = false,
-  redirectToLogin = true,
-}: {
-  securityViolation?: boolean;
-  redirectToLogin?: boolean;
-} = {}): Promise<void> {
+
+export type LogoutReason =
+  /** User clicked "Log out". */
+  | "user"
+  /** The backend rejected the session (401). */
+  | "session_expired"
+  /** Tampering / repeated auth failures — also wipes all localStorage. */
+  | "security_violation";
+
+export interface LogoutOptions {
+  reason?: LogoutReason;
+  /**
+   * Where to go afterwards. Defaults to this tenant's sign-in page for the
+   * reason. `false` stays on the current page (it renders its own sign-in).
+   */
+  redirectTo?: string | false;
+}
+
+/** Login-page `?error=` codes; `url-utils` maps them to friendly messages. */
+const LOGOUT_ERROR_CODES = {
+  session_expired: "session_expired",
+  security_violation: "security_violation",
+} as const;
+
+let inFlight: Promise<void> | null = null;
+
+export function logout(options: LogoutOptions = {}): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  inFlight ??= runLogout(options).finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function runLogout({
+  reason = "user",
+  redirectTo,
+}: LogoutOptions): Promise<void> {
+  setLogoutInProgress(true);
+
+  await attempt("server", () =>
+    fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: backendProxyHeaders(),
+    }),
+  );
+  await attempt("nextauth", () => signOut({ redirect: false }));
+  await attempt("client", () =>
+    clearClientSession({ wipeAllStorage: reason === "security_violation" }),
+  );
+
+  const destination =
+    redirectTo === undefined ? defaultDestination(reason) : redirectTo;
+  if (destination) {
+    window.location.replace(destination);
+    return;
+  }
+  // Staying on the page: it must work normally again.
+  setLogoutInProgress(false);
+}
+
+/**
+ * `/auth/login` is the sign-in page on every tenant domain (it adapts to the
+ * domain's website role). Door Scan signs staff in on its own page.
+ */
+function defaultDestination(reason: LogoutReason): string {
+  if (window.location.pathname.startsWith("/vendor/door-scan")) {
+    return "/vendor/door-scan";
+  }
+  return reason === "user"
+    ? "/auth/login"
+    : `/auth/login?error=${LOGOUT_ERROR_CODES[reason]}`;
+}
+
+async function attempt(step: string, fn: () => unknown): Promise<void> {
   try {
-    // Set logout in progress to prevent unauthorized toasts during logout
-    setLogoutInProgress(true);
-
-    // 1. Import auth store dynamically to avoid circular dependencies
-    const authStore = await import("@/store/auth.store");
-
-    // 2. Call the auth store logout method (which already has complete logic)
-    await authStore.useAuthStore.getState().logout(securityViolation);
-
-    // 3. If redirect is disabled in options but enabled in the function call,
-    // we need to prevent the automatic redirect that happens in the auth store
-    if (!redirectToLogin && typeof window !== "undefined") {
-      // Prevent the redirect by intercepting navigation
-      window.history.pushState(null, "", window.location.href);
-
-      // This is a last resort if the auth store's logout has already initiated a redirect
-      window.addEventListener("popstate", function preventRedirect(e) {
-        e.preventDefault();
-        window.history.pushState(null, "", window.location.href);
-        window.removeEventListener("popstate", preventRedirect);
-      });
-    }
-
-    return Promise.resolve();
+    await fn();
   } catch (error) {
-    console.error("[Logout Utility] Error during logout:", error);
-
-    // Fallback manual logout if the auth store method fails
-    try {
-      // Reset all Zustand stores
-      await resetAllStores();
-
-      // Clear storage
-      if (typeof window !== "undefined") {
-        clearVendorBrowserSession();
-        localStorage.clear();
-        sessionStorage.clear();
-
-        // Clear cookies
-        document.cookie.split(";").forEach((cookie) => {
-          const eqPos = cookie.indexOf("=");
-          const name =
-            eqPos > -1 ? cookie.slice(0, eqPos).trim() : cookie.trim();
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-        });
-
-        // Redirect to login if enabled
-        if (redirectToLogin) {
-          const redirectUrl = securityViolation
-            ? "/auth/login?error=security_violation"
-            : "/auth/login";
-          window.location.href = redirectUrl;
-        }
-      }
-    } catch (fallbackError) {
-      console.error("[Logout Utility] Fallback logout failed:", fallbackError);
-
-      // Last resort redirect
-      if (redirectToLogin && typeof window !== "undefined") {
-        window.location.href = "/auth/login";
-      }
-    }
-
-    return Promise.reject(error);
+    console.error(`[logout] ${step} step failed:`, error);
   }
 }

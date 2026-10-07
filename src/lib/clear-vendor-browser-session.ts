@@ -1,4 +1,8 @@
 /**
+ * THE registry of browser storage owned by a signed-in account. Logout and
+ * impersonation exit wipe exactly these keys (via `clearClientSession`), so a
+ * new key that holds per-account data must be added here — nowhere else.
+ *
  * Browser leftovers after logout (sessionStorage especially) survive a same-tab
  * redirect to /auth/login. That leaks `onboarding_mode` / `onboarding_is_rooms`
  * into the next account and skips mode selection / room questions.
@@ -20,6 +24,10 @@ const SHARED_CLIENT_KEYS = [
   "impersonation-session",
   "extended-webhook-key",
   "nextauth.message",
+  // Legacy auth keys from before the token moved to the HttpOnly cookie.
+  "token",
+  "user_id",
+  "uuid",
 ] as const;
 
 const PERSIST_KEYS = [
@@ -34,6 +42,12 @@ const PERSIST_KEYS = [
 ] as const;
 
 const KEY_PREFIXES = ["vendor_event_is_rooms:"] as const;
+
+/** Per-event unsaved preview drafts (localStorage) — dropped on logout only. */
+const ACCOUNT_KEY_PREFIXES = ["vendor-event-preview-draft:"] as const;
+
+/** IndexedDB databases holding account data (preview-draft files). */
+const ACCOUNT_INDEXED_DBS = ["eventwizz-vendor-preview"] as const;
 
 function removeKey(storage: Storage, key: string) {
   try {
@@ -92,6 +106,16 @@ export function clearVendorBrowserSession(): void {
   }
   for (const key of PERSIST_KEYS) {
     removeFromBoth(key);
+  }
+  for (const prefix of ACCOUNT_KEY_PREFIXES) {
+    removeByPrefix(window.localStorage, prefix);
+  }
+  for (const name of ACCOUNT_INDEXED_DBS) {
+    try {
+      window.indexedDB?.deleteDatabase(name);
+    } catch {
+      // ignore — unavailable in some private modes
+    }
   }
 
   try {

@@ -657,13 +657,23 @@ export default function DrinksTab() {
             </div>
 
             <div className="space-y-6">
-              {packageFields.map((field, index) => (
+              {packageFields.map((field, index) => {
+                const soldQuantity = watchedDrinkPackages?.[index]?.sold_quantity ?? 0;
+                const isSavedPackage = typeof watchedDrinkPackages?.[index]?.id === "number";
+                return (
                 <div
                   key={field.id}
                   className="space-y-4 border border-[#E5E7EB] p-6 rounded-md bg-white"
                 >
                   <div className="flex justify-between items-center">
-                    <h4 className="font-medium">Package {index + 1}</h4>
+                    <div className="flex items-center gap-3">
+                      <h4 className="font-medium">Package {index + 1}</h4>
+                      {isSavedPackage ? (
+                        <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full border border-blue-100">
+                          Sold: {soldQuantity}
+                        </span>
+                      ) : null}
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
@@ -800,6 +810,11 @@ export default function DrinksTab() {
                         <FormLabel className="text-sm font-medium">
                           Available quantity{" "}
                           <span className="text-red-500">*</span>
+                          {soldQuantity > 0 && (
+                            <span className="text-xs font-normal text-gray-500 ml-2">
+                              (Minimum: {soldQuantity} sold)
+                            </span>
+                          )}
                         </FormLabel>
                         <FormControl>
                           <Input
@@ -807,7 +822,7 @@ export default function DrinksTab() {
                             {...field}
                             className="h-10 bg-[#F9FAFB] border-[#E5E7EB]"
                             placeholder="e.g. 100"
-                            min="1"
+                            min={Math.max(1, soldQuantity)}
                             max={DRINK_PACKAGE_QTY_MAX}
                             onFocus={() =>
                               handleFieldFocus(
@@ -831,7 +846,8 @@ export default function DrinksTab() {
                     )}
                   />
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
             </>

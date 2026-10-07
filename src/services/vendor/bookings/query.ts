@@ -24,6 +24,7 @@ import type {
   DoorEntryCheckInPayload,
   DoorEntryCheckInResponse,
 } from "./type";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 /**
  * Query keys factory for vendor bookings
@@ -154,12 +155,11 @@ export const useVendorRescheduleData = (
     queryFn: () =>
       vendorBookingsService.getRescheduleData(bookingId, bookingDateId),
     enabled: enabled && !!bookingId && !!bookingDateId,
-    staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh
-    gcTime: 5 * 60 * 1000, // 5 minutes - cache persists
-    retry: 1, // Retry once on failure
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnMount: false, // Don't refetch on mount if data exists
-    refetchOnReconnect: false, // Don't refetch on reconnect
+    // Dates and remaining capacity change as customers book: never reuse a
+    // cached copy for a reschedule decision.
+    ...FRESHNESS.live,
+    gcTime: 5 * 60 * 1000,
+    retry: 1,
   });
 };
 

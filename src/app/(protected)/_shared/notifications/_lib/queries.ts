@@ -13,6 +13,7 @@ import {
   profileKeys,
   useProfileData,
 } from "@/app/(protected)/_shared/profile/_lib";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 // Query keys
 export const notificationKeys = {
@@ -46,7 +47,7 @@ export const useNotifications = (filters: NotificationFilters = {}) => {
     queryFn: () => notificationService.getNotifications(filters),
     // Keep previous list visible while search/filter refetches — avoids full-page skeleton flash
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    ...FRESHNESS.operational,
     gcTime: 1000 * 60 * 10, // 10 minutes
   });
 };

@@ -1299,6 +1299,12 @@ export const stepSixSchema = z
           message: `Available quantity cannot exceed ${DRINK_PACKAGE_QTY_MAX}`,
           path: ["packages", index, "available_quantity"],
         });
+      } else if (pkg.sold_quantity && qty < pkg.sold_quantity) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Available quantity cannot be less than sold packages (${pkg.sold_quantity})`,
+          path: ["packages", index, "available_quantity"],
+        });
       }
     });
   });

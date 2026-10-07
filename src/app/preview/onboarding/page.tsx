@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar, Globe, Loader2, MapPin } from "lucide-react";
-import { RootQueryProvider } from "@/providers/query-provider";
 import { PreviewProvider } from "@/contexts/preview-context";
 import { PreviewDeviceToolbar } from "@/components/preview/preview-device-toolbar";
 import { PreviewDeviceFrame } from "@/components/preview/preview-device-frame";
@@ -75,13 +74,13 @@ const TAB_META: Record<
 };
 
 /* ──────────────────────────── entry ──────────────────────────── */
+// Uses the app-wide QueryClient from the root layout. A nested provider here
+// split the cache and hijacked the active-client handle logout clears.
 export default function OnboardingPreviewPage() {
   return (
-    <RootQueryProvider>
-      <Suspense fallback={<OnboardingPreviewLoadingShell />}>
-        <OnboardingPreviewContent />
-      </Suspense>
-    </RootQueryProvider>
+    <Suspense fallback={<OnboardingPreviewLoadingShell />}>
+      <OnboardingPreviewContent />
+    </Suspense>
   );
 }
 

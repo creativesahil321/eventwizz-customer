@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { vendorBookingsService } from "../bookings.service";
 import type { VendorBookingDetailResponse } from "../bookings.service";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 /**
  * Hook to fetch a specific vendor booking by ID
@@ -12,7 +13,7 @@ export const useVendorBookingById = (id: number | string) => {
     queryKey: ["vendor-booking-history", "detail", id],
     queryFn: () => vendorBookingsService.getBookingById(id),
     enabled: !!id,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 };

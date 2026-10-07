@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "@/assets/css/tailwind.css";
 import {
   fetchServerThemeCached,
@@ -11,7 +12,6 @@ import { authOptions } from "@/lib/auth/authOptions";
 import { Providers } from "./providers";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { getDefaultThemeCSS } from "@/services/common/theme/constants/theme";
-import PermissionPreloader from "./permission-preloader";
 import { ServerContextProvider } from "@/lib/server-context";
 import { appConfig } from "@/config/app";
 import { GoogleTagManager } from "@next/third-parties/google";
@@ -219,6 +219,8 @@ export default async function RootLayout({
               href={themeGoogleFontsHref}
               media="print"
               data-async-font=""
+              // The inline script below flips media to "all" before hydration.
+              suppressHydrationWarning
             />
             <noscript>
               {/* eslint-disable-next-line @next/next/no-page-custom-font */}
@@ -234,6 +236,7 @@ export default async function RootLayout({
             href={href}
             media="print"
             data-async-font=""
+            suppressHydrationWarning
           />
         ))}
         {themeCustomFontStylesheetUrls.map((href) => (
@@ -243,12 +246,15 @@ export default async function RootLayout({
           </noscript>
         ))}
         {(themeGoogleFontsHref || themeCustomFontStylesheetUrls.length > 0) && (
-          <script
+          <Script
+            id="async-font-activator"
+            strategy="beforeInteractive"
             // Flip async font stylesheets to media="all" once loaded, so they
-            // style the page without blocking the initial render.
+            // style the page without blocking the initial render. Runs again on
+            // DOMContentLoaded in case it executes before the <link>s are parsed.
             dangerouslySetInnerHTML={{
               __html:
-                "(function(){function a(l){l.media='all'}document.querySelectorAll('link[data-async-font]').forEach(function(l){if(l.sheet){a(l)}else{l.addEventListener('load',function(){a(l)})}})})()",
+                "(function(){function a(l){l.media='all'}function r(){document.querySelectorAll('link[data-async-font]').forEach(function(l){if(l.media==='all')return;if(l.sheet){a(l)}else{l.addEventListener('load',function(){a(l)})}})}r();if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',r)}})()",
             }}
           />
         )}
@@ -256,7 +262,6 @@ export default async function RootLayout({
       <body className="antialiased" suppressHydrationWarning={true}>
         <ServerContextProvider value={{ theme: initialTheme, host, subdomain }}>
           <Providers session={session} initialTheme={initialTheme}>
-            <PermissionPreloader />
             <NuqsAdapter>{children}</NuqsAdapter>
           </Providers>
         </ServerContextProvider>

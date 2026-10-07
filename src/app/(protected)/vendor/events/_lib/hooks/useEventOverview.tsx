@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { eventsService } from "@/services/vendor/events/events.service";
 import { EventOverviewResponse } from "@/services/vendor/events/type";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 // Define query key for event overview
 export const eventOverviewKeys = {
@@ -52,8 +53,7 @@ export function useEventOverview({
         return response as unknown as EventOverviewResponse;
       },
       enabled: enabledProp !== false && hasSession && !!isValidEventId,
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      refetchOnWindowFocus: false,
+      ...FRESHNESS.operational,
     });
   return {
     overviewData: data as EventOverviewResponse,

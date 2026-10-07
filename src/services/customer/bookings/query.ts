@@ -23,6 +23,7 @@ import {
   BookingPaymentPayload,
   BookingPaymentResponse,
 } from "./type";
+import { FRESHNESS } from "@/lib/query-freshness";
 // Toast notifications are handled at root level by API client interceptor
 
 /**
@@ -116,7 +117,7 @@ export const useBooking = (id: number, enabled = true) => {
     queryKey: bookingsKeys.detail(id),
     queryFn: () => bookingsService.getBooking(id),
     enabled: enabled && !!id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 };
@@ -165,7 +166,7 @@ export const useMenuItems = (
       );
     },
     enabled: enabled && !!bookingId && !!date && !!tableId,
-    staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh, prevents duplicate calls
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000, // 10 minutes - cache persists for switching back
   });
 };

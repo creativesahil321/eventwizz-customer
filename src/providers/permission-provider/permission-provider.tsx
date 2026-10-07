@@ -4,7 +4,6 @@ import { ReactNode, useEffect, useState, useRef } from "react";
 import {
   usePermissionStore,
   getPermissionStatus,
-  hydratePermissionsSync,
 } from "@/store/permission.store";
 import { useSession } from "next-auth/react";
 import { useLoadPermissions } from "@/services/common/permissions/hooks";
@@ -23,22 +22,11 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   const [handled, setHandled] = useState(false);
   const prevStatusRef = useRef(sessionStatus);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const initializedRef = useRef(false);
 
   // Use the API fallback mechanism when needed (only for vendor/admin)
   const { refetchPermissions } = useLoadPermissions();
 
   const isCustomer = session?.user?.account_type === "customer";
-
-  // Synchronously hydrate permissions on mount (skip for customers)
-  useEffect(() => {
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      if (!isCustomer) {
-        hydratePermissionsSync();
-      }
-    }
-  }, [isCustomer]);
 
   // Effect to sync permissions – completely skipped for customers
   useEffect(() => {

@@ -9,7 +9,7 @@ import {
 } from "@/types/api.types";
 import { api } from "../../core/api-client";
 import { API_ENDPOINTS } from "../../core/endpoints";
-import { signIn, signOut, getSession } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { safeLocalStorage } from "@/lib/utils";
 import { env } from "@/env";
 
@@ -165,17 +165,6 @@ export const authService = {
   },
 
   // Clear auth data
-  clearAuthData: async () => {
-    // Clear localStorage for backward compatibility
-    safeLocalStorage.removeItem("token");
-    safeLocalStorage.removeItem("user_id");
-    safeLocalStorage.removeItem("uuid");
-    safeLocalStorage.removeItem("event_id");
-
-    // Sign out of NextAuth
-    return signOut({ redirect: false });
-  },
-
   // Get stored UUID - now using NextAuth session where possible
   getStoredUuid: async () => {
     // Try to get from NextAuth session first

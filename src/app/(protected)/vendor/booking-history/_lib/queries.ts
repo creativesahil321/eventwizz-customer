@@ -18,6 +18,7 @@ import {
   parseSavedAmount,
 } from "@/lib/booking-saved-amount";
 import { AdminHistoryParams, History, type HistoryEventDate } from "./types";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 // Query keys for booking history
 export const bookingHistoryKeys = {
@@ -247,8 +248,7 @@ export const useHistory = (
       };
     },
     placeholderData: keepPreviousData,
-    staleTime: 60_000, // 1 minute — bookings change as customers pay
-    refetchOnWindowFocus: true,
+    ...FRESHNESS.operational,
     ...options,
   });
 };

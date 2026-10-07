@@ -5,6 +5,7 @@ import {
   eventsService,
   eventKeys,
 } from "@/services/common/events/events.service";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 /**
  * Hook for fetching location data with events
@@ -14,6 +15,6 @@ export function useLocationData(slug: string, domain: string) {
   return useQuery({
     queryKey: eventKeys.location(slug, domain),
     queryFn: () => eventsService.getLocationWithEvents(slug, domain),
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    ...FRESHNESS.publicView,
   });
 }

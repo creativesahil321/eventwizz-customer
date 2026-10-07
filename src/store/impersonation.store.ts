@@ -17,7 +17,6 @@ export interface AdminSessionBackup {
   account_type: string;
   active_role?: string;
   status?: string;
-  permissions: string[];
   vendor_location_id?: string | null;
 }
 
@@ -91,12 +90,14 @@ export const useImpersonationStore = create<ImpersonationState>()(
     })),
     {
       name: STORE_NAME,
-      version: 1,
-      // v0 stored the admin's raw Laravel token in sessionStorage — drop it.
+      version: 2,
+      // v0 stored the admin's raw Laravel token, v1 the admin's permissions —
+      // neither may live in browser storage (permissions come from the API).
       migrate: (persisted) => {
         const state = persisted as { originalAdmin?: Record<string, unknown> | null };
         if (state?.originalAdmin && typeof state.originalAdmin === "object") {
           delete state.originalAdmin.token;
+          delete state.originalAdmin.permissions;
         }
         return persisted as ImpersonationState;
       },

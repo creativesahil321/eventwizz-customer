@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useLayoutEffect } from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 import { SessionProvider, useSession } from "next-auth/react";
 import { Session } from "next-auth";
 import { RootQueryProvider } from "@/providers/query-provider";
@@ -15,6 +15,8 @@ import { PermissionProvider } from "@/providers/permission-provider/permission-p
 import dynamic from "next/dynamic";
 import { ChatBotProvider } from "@/components/chat/chat-bot-provider";
 import { env } from "@/env";
+import { clearClientSession } from "@/lib/auth/client-session";
+import { getLogoutInProgress } from "@/lib/auth/logout-state";
 
 // Dynamically import the permission debug component (only in development)
 const PermissionDebug =
@@ -85,9 +87,22 @@ function SessionValidator() {
   const { data: session, status } = useSession();
   const { setSession, markSessionChecked } = useAuthStore();
   const { setPermissions } = usePermissionStore();
+  const wasAuthenticated = useRef(false);
 
   useEffect(() => {
     if (status === "loading") return; // Still loading
+
+    // The session ended without this tab's logout() running (logout in another
+    // tab, or expiry): drop the previous account's cached data here too.
+    // Only on that transition, so a guest's storefront cart is never touched.
+    if (
+      status === "unauthenticated" &&
+      wasAuthenticated.current &&
+      !getLogoutInProgress()
+    ) {
+      void clearClientSession();
+    }
+    wasAuthenticated.current = status === "authenticated";
 
     if (status === "authenticated" && session?.user) {
       setSession(session);

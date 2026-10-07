@@ -12,14 +12,18 @@ import { impersonationService } from "@/services/admin/impersonation/impersonati
 import type { ImpersonateVendorData } from "@/services/admin/impersonation/types";
 import { fetchProfileData } from "@/app/(protected)/_shared/profile/_lib/queries";
 import { backendProxyHeaders } from "@/lib/backend/backend-transport";
+import { restoreAdminAfterImpersonation } from "@/lib/auth/impersonation-session";
+import { logout } from "@/lib/auth/logout";
+import { toast } from "sonner";
 
 /**
- * Server-side admin session backup/restore (HttpOnly cookie). The admin's
- * Laravel token never passes through browser JavaScript or storage.
+ * Back up the admin session cookie server-side (HttpOnly) before it is
+ * replaced by the vendor's. The admin's Laravel token never passes through
+ * browser JavaScript or storage.
  */
-async function adminSessionCookie(action: "backup" | "restore"): Promise<boolean> {
+async function backupAdminSessionCookie(): Promise<boolean> {
   try {
-    const res = await fetch(`/api/auth/impersonation/${action}`, {
+    const res = await fetch("/api/auth/impersonation/backup", {
       method: "POST",
       credentials: "same-origin",
       headers: backendProxyHeaders(),
@@ -85,7 +89,6 @@ function isStaleSessionError(message: string): boolean {
 export function useStartImpersonation() {
   const authStore = useAuthStore.getState;
   const impersonationStore = useImpersonationStore.getState;
-  const permissionStore = usePermissionStore.getState;
 
   return useMutation({
     mutationFn: async ({
@@ -142,7 +145,6 @@ export function useStartImpersonation() {
         account_type: admin.account_type ?? "admin",
         active_role: admin.active_role ?? undefined,
         status: admin.user?.status,
-        permissions: permissionStore().permissions,
       };
 
       // 2. Call backend
@@ -173,7 +175,7 @@ export function useStartImpersonation() {
 
       // 3. Back up the admin session cookie BEFORE it is replaced. Without a
       //    backup the admin could not be restored, so abort cleanly.
-      if (!(await adminSessionCookie("backup"))) {
+      if (!(await backupAdminSessionCookie())) {
         try {
           await impersonationService.exitImpersonation();
         } catch {
@@ -231,28 +233,24 @@ export function useStartImpersonation() {
 }
 
 /**
- * Hook for exiting vendor impersonation and restoring admin session.
+ * Hook for exiting vendor impersonation and restoring the admin session.
  *
- * Flow:
- * 1. Notify backend (logs exit event + invalidates impersonation token)
- * 2. Read the non-secret admin profile from the impersonation store
- * 3. Restore the backed-up admin session cookie (server-side)
- * 4. Restore Zustand stores (auth, permissions)
- * 5. Clear impersonation state
- * 6. Navigate to admin panel
+ * 1. Notify the backend (audit log + invalidates the impersonation token).
+ * 2. Swap the admin's backed-up session cookie back in and drop all of the
+ *    vendor's client state (`restoreAdminAfterImpersonation`).
+ * 3. Hard-navigate: the admin's role comes from the restored session and the
+ *    permissions from the API — never from browser storage.
+ *
+ * If the admin session cannot be restored, the user is logged out (both
+ * sessions end) rather than left inside the vendor account.
  */
 export function useExitImpersonation() {
   return useMutation({
     mutationFn: async () => {
-      const store = useImpersonationStore.getState();
-
-      if (!store.isImpersonating || !store.originalAdmin) {
+      if (!useImpersonationStore.getState().isImpersonating) {
         throw new Error("No active impersonation session to exit.");
       }
 
-      const adminBackup = store.originalAdmin;
-
-      // 1. Notify backend (non-blocking — don't fail if backend is unreachable)
       try {
         await impersonationService.exitImpersonation();
       } catch {
@@ -261,70 +259,21 @@ export function useExitImpersonation() {
         );
       }
 
-      // 2. Restore the admin session cookie that was backed up server-side
-      if (!(await adminSessionCookie("restore"))) {
-        store.endImpersonation();
-        throw new Error(
-          "Failed to restore admin session. Please log in again."
-        );
-      }
-
-      // 3. Restore Zustand auth store from the non-secret backup
-      useAuthStore.getState().login({
-        uuid: adminBackup.uuid,
-        email: adminBackup.email,
-        first_name: adminBackup.first_name,
-        last_name: adminBackup.last_name,
-        avatar: adminBackup.avatar,
-        status: adminBackup.status ?? "active",
-        account_type: adminBackup.account_type as "admin",
-        active_role: adminBackup.active_role,
-      });
-
-      // 3a. The admin NextAuth session stores first_name/last_name as "" at
-      //     login time (the login response may not include them). Fetch the
-      //     profile API now (using the restored admin session) so the header
-      //     shows the real name immediately after redirect, without waiting
-      //     for the profile page to load.
-      try {
-        const profileResponse = await fetchProfileData();
-        const profileData = (profileResponse as unknown as { data?: { first_name?: string; last_name?: string; avatar?: string } })?.data;
-        if (profileData?.first_name || profileData?.last_name) {
-          useAuthStore.getState().updateUser({
-            first_name: profileData.first_name ?? adminBackup.first_name,
-            last_name: profileData.last_name ?? adminBackup.last_name,
-            ...(profileData.avatar ? { avatar: profileData.avatar } : {}),
-          });
-        }
-      } catch {
-        // Non-critical — silently fall back to the backup values
-      }
-
-      // 4. Restore admin permissions
-      usePermissionStore.getState().setPermissions(adminBackup.permissions);
-
-      // 5. Clear impersonation state
-      store.endImpersonation();
-
-      // 6. Clear vendor-specific localStorage data
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.removeItem("location-storage");
-          localStorage.removeItem("vendor_location_id");
-        } catch {
-          // Silent — non-critical
-        }
+      if (!(await restoreAdminAfterImpersonation())) {
+        throw new Error("Failed to restore admin session.");
       }
     },
 
     onSuccess: () => {
       // Toast handled by Axios response interceptor.
-      window.location.href = "/admin/dashboard";
+      window.location.replace("/admin/dashboard");
     },
 
     onError: () => {
-      // Toast handled by Axios interceptor; redirect to admin as fallback.
-      window.location.href = "/admin/dashboard";
+      toast.error(
+        "Could not restore your admin session. Please sign in again."
+      );
+      void logout({ reason: "session_expired" });
     },
   });
 }

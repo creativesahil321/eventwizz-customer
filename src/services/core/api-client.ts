@@ -24,9 +24,9 @@ import { humanizeApiToastMessage } from "@/lib/api-toast-message";
 import {
   BACKEND_PROXY_BASE,
   BACKEND_PROXY_HEADER,
-  backendProxyHeaders,
   fetchTransferToken,
 } from "@/lib/backend/backend-transport";
+import { getLogoutInProgress } from "@/lib/auth/logout-state";
 // Browser environment check
 const isBrowser = typeof window !== "undefined";
 
@@ -84,13 +84,6 @@ const httpErrorToastId = (
   return suffix ? `${base}:${suffix}` : base;
 };
 
-// Auth store state interface
-interface AuthStoreState {
-  user: Record<string, unknown>;
-  login: (user: Record<string, unknown>) => void;
-  logout: (securityViolation?: boolean) => Promise<void>;
-}
-
 // API error response interface
 interface ApiErrorResponse {
   message?: string;
@@ -103,17 +96,6 @@ interface ApiErrorResponse {
 // Security constants
 const SECURITY_VIOLATION_KEY = "security_violation_count";
 const MAX_SECURITY_VIOLATIONS = 3;
-
-// Logout state tracking
-let isLogoutInProgress = false;
-
-// Function to set logout status
-export const setLogoutInProgress = (status: boolean): void => {
-  isLogoutInProgress = status;
-};
-
-// Function to check if logout is in progress
-export const getLogoutInProgress = (): boolean => isLogoutInProgress;
 
 /**
  * Nested counter so concurrent AI bulk-apply (or similar) flows can suppress
@@ -327,96 +309,37 @@ const handleUnauthorizedAccess = async (
   message: string,
   isSecurityViolation: boolean = false
 ): Promise<void> => {
-  if (isBrowser && !isLogoutInProgress) {
-    // During impersonation, a 401 on the vendor token means the impersonation
-    // token expired. Restore admin session instead of a full destructive logout.
-    try {
-      const impersonation = getImpersonationStatus();
-      if (impersonation.isImpersonating) {
-        safeToast.warning(
-          "Impersonation session expired. Restoring admin session…"
-        );
-        // Dynamic import to avoid circular deps
-        const { useImpersonationStore } = await import(
-          "@/store/impersonation.store"
-        );
-        const store = useImpersonationStore.getState();
-        const admin = store.originalAdmin;
-        if (admin) {
-          // The admin session cookie was backed up server-side (HttpOnly).
-          const restored = await fetch("/api/auth/impersonation/restore", {
-            method: "POST",
-            credentials: "same-origin",
-            headers: backendProxyHeaders(),
-          });
-          if (restored.ok) {
-            const authStore =
-              useAuthStore.getState() as unknown as AuthStoreState;
-            authStore.login({
-              uuid: admin.uuid,
-              email: admin.email,
-              first_name: admin.first_name,
-              last_name: admin.last_name,
-              avatar: admin.avatar,
-              status: admin.status ?? "active",
-              account_type: admin.account_type,
-              active_role: admin.active_role,
-            } as Record<string, unknown>);
+  if (isBrowser && !getLogoutInProgress()) {
+    // Dynamic imports: these modules import this client.
+    const { logout } = await import("@/lib/auth/logout");
 
-            const { usePermissionStore } = await import(
-              "@/store/permission.store"
-            );
-            usePermissionStore.getState().setPermissions(admin.permissions);
-            store.endImpersonation();
-            window.location.href = "/admin/dashboard";
-            return;
-          }
-        }
-        // If no admin backup, fall through to standard logout
-        store.endImpersonation();
+    // During impersonation, a 401 on the vendor token means the impersonation
+    // token expired: return the admin to their own session instead of logging
+    // them out completely.
+    if (getImpersonationStatus().isImpersonating) {
+      safeToast.warning(
+        "Impersonation session expired. Restoring admin session…"
+      );
+      const { restoreAdminAfterImpersonation } = await import(
+        "@/lib/auth/impersonation-session"
+      );
+      if (await restoreAdminAfterImpersonation()) {
+        window.location.replace("/admin/dashboard");
+        return;
       }
-    } catch {
-      // Fall through to standard logout
+      // No restorable admin session — fall through to a normal logout.
     }
 
-    // Set logout in progress to prevent further 401 toasts
-    setLogoutInProgress(true);
-
-    // Record security violation if applicable
+    let reason: "session_expired" | "security_violation" = "session_expired";
     if (isSecurityViolation) {
-      const violationCount = recordSecurityViolation();
-
-      // If max violations reached, perform aggressive cleanup
-      if (violationCount >= MAX_SECURITY_VIOLATIONS) {
-        safeToast.error(
-          "[Security] Maximum security violations reached. Performing aggressive cleanup."
-        );
-
-        try {
-          const store = useAuthStore.getState() as unknown as AuthStoreState;
-          await store.logout(true); // Pass true to indicate security violation
-          return;
-        } catch (e) {
-          console.error(
-            "[Security] Error during security violation logout:",
-            e
-          );
-          // Fall through to standard logout as backup
-        }
+      if (recordSecurityViolation() >= MAX_SECURITY_VIOLATIONS) {
+        reason = "security_violation";
       }
     } else {
-      // Clear security violations on normal unauthorized responses
       clearSecurityViolations();
     }
 
-    try {
-      const store = useAuthStore.getState() as unknown as AuthStoreState;
-      await store.logout();
-    } catch (e) {
-      console.error("Error during logout:", e);
-      // Force redirect as fallback
-      window.location.href = "/auth/login";
-    }
+    await logout({ reason });
   }
 };
 
@@ -551,7 +474,7 @@ apiClient.interceptors.response.use(
             (responseData?.code === "invalid_token" ||
               isInvalidAuthTokenMessage(String(message)))
           ) {
-            if (!suppressErrorToast && !isLogoutInProgress) {
+            if (!suppressErrorToast && !getLogoutInProgress()) {
               safeToast.error(
                 typeof message === "string" && message.trim()
                   ? message
@@ -680,7 +603,7 @@ apiClient.interceptors.response.use(
             const suppressErrorToast = (
               error.config as RequestOptions | undefined
             )?.suppressErrorToast;
-            if (!suppressErrorToast && !isLogoutInProgress) {
+            if (!suppressErrorToast && !getLogoutInProgress()) {
               safeToast.error(
                 typeof message === "string" && message.trim()
                   ? message
@@ -698,12 +621,12 @@ apiClient.interceptors.response.use(
           if (suppressNotFoundToast) break;
           // Handle not found - show error toast with message from response
           const notFoundData = error.response.data as ApiErrorResponse;
-          if (notFoundData?.message && !isLogoutInProgress) {
+          if (notFoundData?.message && !getLogoutInProgress()) {
             safeToast.error(
               notFoundData.message,
               httpErrorToastId(404, error.config),
             );
-          } else if (!isLogoutInProgress) {
+          } else if (!getLogoutInProgress()) {
             safeToast.error(
               "Resource not found",
               httpErrorToastId(404, error.config),
@@ -724,7 +647,7 @@ apiClient.interceptors.response.use(
             errorData.errors.length > 0
           ) {
             errorData.errors.forEach((errorMessage: string) => {
-              if (!isLogoutInProgress) {
+              if (!getLogoutInProgress()) {
                 safeToast.error(
                   errorMessage,
                   httpErrorToastId(422, error.config, errorMessage),
@@ -733,7 +656,7 @@ apiClient.interceptors.response.use(
             });
           } else if (errorData?.message) {
             // Handle single error message
-            if (!isLogoutInProgress) {
+            if (!getLogoutInProgress()) {
               safeToast.error(
                 errorData.message,
                 httpErrorToastId(422, error.config),
@@ -751,19 +674,19 @@ apiClient.interceptors.response.use(
             conflictData.errors.length > 0
           ) {
             conflictData.errors.forEach((errorMessage: string) => {
-              if (!isLogoutInProgress) {
+              if (!getLogoutInProgress()) {
                 safeToast.error(
                   errorMessage,
                   httpErrorToastId(409, error.config, errorMessage),
                 );
               }
             });
-          } else if (conflictData?.message && !isLogoutInProgress) {
+          } else if (conflictData?.message && !getLogoutInProgress()) {
             safeToast.error(
               conflictData.message,
               httpErrorToastId(409, error.config),
             );
-          } else if (!isLogoutInProgress) {
+          } else if (!getLogoutInProgress()) {
             safeToast.error(
               "This action conflicts with the current booking state. Refresh the page and try again.",
               httpErrorToastId(409, error.config),
@@ -775,7 +698,7 @@ apiClient.interceptors.response.use(
           // Handle other errors - show toast for non-422 errors
           if (
             !suppressErrorToast &&
-            !isLogoutInProgress &&
+            !getLogoutInProgress() &&
             error.response.status !== 422
           ) {
             safeToast.error(

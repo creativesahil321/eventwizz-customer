@@ -7,6 +7,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { dashboardService } from "./dashboard.service";
 import type { CustomerDashboardResponse, NearbyEventsResponse } from "./type";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 export const dashboardKeys = {
   all: ["customer", "dashboard"] as const,
@@ -22,7 +23,7 @@ export const useCustomerDashboard = () => {
   return useQuery<CustomerDashboardResponse>({
     queryKey: dashboardKeys.statistics(),
     queryFn: () => dashboardService.getStatistics(),
-    staleTime: 2 * 60 * 1000,
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });
@@ -54,7 +55,7 @@ export const useNearbyEvents = (
         ...(country && { country }),
       }),
     enabled: lat !== null && lng !== null,
-    staleTime: 5 * 60 * 1000,
+    ...FRESHNESS.publicView,
     gcTime: 15 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });

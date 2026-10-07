@@ -36,6 +36,10 @@ export const API_ENDPOINTS = {
     REGISTER: "/auth/register",
     CREATE_ACCOUNT: "/auth/register/create-an-account",
     LOGIN: "/auth/login",
+    /** Revokes the bearer token it is called with (Sanctum). */
+    LOGOUT: "/auth/logout",
+    /** Trusted identity: authoritative account_type/active_role/permissions. */
+    ME: "/auth/me",
     SOCIAL_AUTH: "/social-auth/login/callback", // Single endpoint for OAuth login/register
     RESET_PASSWORD: "/auth/reset-password",
     FORGET_PASSWORD: "/auth/forgot-password",

@@ -24,7 +24,11 @@ export async function POST(req: NextRequest) {
   // Invalid backups were expired on `res`; carry those cookie deletions over.
   const fail = NextResponse.json(
     { ok: false, reason: result },
-    { status: result === "no-backup" ? 404 : 403, headers: NO_STORE },
+    {
+      status:
+        result === "no-backup" ? 404 : result === "no-session" ? 401 : 403,
+      headers: NO_STORE,
+    },
   );
   for (const c of res.cookies.getAll()) fail.cookies.set(c);
   return fail;

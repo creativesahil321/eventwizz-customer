@@ -5,6 +5,7 @@ import FacebookProvider from "next-auth/providers/facebook";
 import { authService } from "@/services/common/auth/auth.service";
 import { env } from "@/env";
 import { UserType } from "@/types/auth.types";
+import { fetchTrustedIdentity } from "@/lib/auth/trusted-identity";
 import {
   OAuthTenantInfo,
   storeOAuthTenantInfo,
@@ -218,20 +219,27 @@ export const authOptions: NextAuthOptions = {
           const has_payment_provider =
             typedCredentials.has_payment_provider === "true";
 
-          const active_role = typedCredentials.active_role;
-          const account_type = typedCredentials.account_type;
-
           const eventId = typedCredentials.event_id
             ? isNaN(Number(typedCredentials.event_id))
               ? typedCredentials.event_id
               : Number(typedCredentials.event_id)
             : undefined;
 
+          // TRUSTED IDENTITY: account_type / active_role come from `/auth/me`,
+          // NOT from the request body. The `account_type`/`active_role`/
+          // `permissions` in the credentials are ignored (a client cannot grant
+          // itself a role). Fall back to the body only if /me is unreachable.
+          const trusted = await fetchTrustedIdentity(typedCredentials.token);
+          const account_type = (trusted?.account_type ??
+            typedCredentials.account_type) as UserType;
+          const active_role =
+            trusted?.active_role ?? typedCredentials.active_role;
+
           return {
             id: typedCredentials.userId || String(Date.now()),
             email: typedCredentials.email,
-            account_type: account_type as UserType,
-            active_role: active_role,
+            account_type,
+            active_role,
             token: typedCredentials.token,
             isOnboarded,
             uuid: typedCredentials.uuid,
@@ -244,9 +252,9 @@ export const authOptions: NextAuthOptions = {
             vendor_location_id: typedCredentials.vendor_location_id,
             event_id: eventId,
             status: typedCredentials.status,
-            permissions: typedCredentials.permissions
-              ? JSON.parse(typedCredentials.permissions)
-              : [],
+            // Permissions never come from the client — the store loads them
+            // from the API (`/auth/user/permissions`).
+            permissions: [],
             has_payment_provider,
           } as unknown as import("next-auth").User;
         }
@@ -276,8 +284,7 @@ export const authOptions: NextAuthOptions = {
           // Cast response to include user_type
           const data = response.data as LoginResponse;
 
-          const { user, token, active_role } = data;
-          const account_type = data.account_type;
+          const { user, token } = data;
 
           // Extract event_id and vendor_location_id
           const { event_id, vendor_location_id } = data;
@@ -287,12 +294,20 @@ export const authOptions: NextAuthOptions = {
           const isOnboarded =
             "isOnboarded" in data ? !!data.isOnboarded : false;
 
+          // TRUSTED IDENTITY: account_type / active_role come from `/auth/me`,
+          // not from the login response. /me overwrites them before the session
+          // is trusted; the login values are only a fallback if /me is down.
+          const trusted = await fetchTrustedIdentity(token);
+          const account_type = (trusted?.account_type ??
+            data.account_type) as UserType;
+          const active_role = trusted?.active_role ?? data.active_role;
+
           return {
             id: user.id?.toString() || String(Date.now()),
             email: user.email,
             name: user.name,
-            account_type: account_type as UserType,
-            active_role: active_role,
+            account_type,
+            active_role,
             token: token,
             avatar: user.avatar,
             isOnboarded,
@@ -303,7 +318,9 @@ export const authOptions: NextAuthOptions = {
             vendor_location_id: vendor_location_id || data.vendor_location_id,
             event_id: event_id || data.event_id, // Use the extracted value or fallback
             status: user.status,
-            permissions: data.permissions || [],
+            // Permissions never come from the client — the store loads them
+            // from the API (`/auth/user/permissions`).
+            permissions: [],
             has_payment_provider: data.has_payment_provider ?? false,
           } as unknown as import("next-auth").User;
         } catch {
@@ -386,14 +403,10 @@ export const authOptions: NextAuthOptions = {
           token.avatar = session.avatar;
         }
 
-        // Update standardized fields if provided
-        if (session?.account_type !== undefined) {
-          token.account_type = session.account_type;
-        }
-
-        if (session?.active_role !== undefined) {
-          token.active_role = session.active_role;
-        }
+        // account_type / active_role / permissions are TRUSTED FIELDS: they may
+        // only be set server-side from `/auth/me` in `authorize()`. A session
+        // update from the browser must NOT be able to change them, so they are
+        // intentionally not read here.
 
         // Existing fields
         if (session?.isOnboarded !== undefined) {
@@ -545,9 +558,20 @@ export const authOptions: NextAuthOptions = {
             } = response.data;
 
             // Apply your existing user data structure
+            // TRUSTED IDENTITY: resolve account_type/active_role from `/auth/me`
+            // rather than the client tenant info. Falls back to the social-auth
+            // response only if /me is unreachable.
+            const trusted = await fetchTrustedIdentity(token);
+            const resolvedAccountType =
+              trusted?.account_type ||
+              active_role ||
+              tenantInfo.account_type ||
+              "vendor";
+            const resolvedActiveRole = trusted?.active_role || active_role;
+
             Object.assign(user, {
-              account_type: active_role || tenantInfo.account_type || "vendor", // ✅ Prioritize backend response over frontend tenant info
-              active_role: active_role,
+              account_type: resolvedAccountType,
+              active_role: resolvedActiveRole,
               token: token,
               isOnboarded: isOnboarded || false,
               uuid: userData.uuid,
@@ -557,7 +581,8 @@ export const authOptions: NextAuthOptions = {
               vendor_location_id: vendor_location_id
                 ? String(vendor_location_id)
                 : undefined,
-              permissions: permissions || [],
+              // Permissions are loaded client-side from the API, not the JWT.
+              permissions: [],
               status: userData.status,
             });
 

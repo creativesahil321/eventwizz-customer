@@ -6,6 +6,7 @@ import {
   eventKeys,
 } from "@/services/common/events/events.service";
 import { useIsPreviewMode } from "@/contexts/preview-context";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 /** Per-observer freshness overrides (e.g. checkout wants live data on mount). */
 export type EventDetailQueryOptions = {
@@ -24,7 +25,7 @@ export function useEventDetail(
     queryKey: eventKeys.eventDetail(slug, domain),
     queryFn: () => eventsService.getEventDetail(slug, domain),
     enabled: !isPreviewMode && Boolean(slug) && Boolean(domain),
-    staleTime: options?.staleTime ?? 1000 * 60 * 5, // 5 minutes
+    staleTime: options?.staleTime ?? FRESHNESS.publicView.staleTime,
     ...(options?.refetchOnMount !== undefined
       ? { refetchOnMount: options.refetchOnMount }
       : {}),

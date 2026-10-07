@@ -1,6 +1,8 @@
 "use client";
 
+import { useContext } from "react";
 import CommonHeader from "@/components/shared/common-header";
+import { ServerContext } from "@/lib/server-context";
 import { useQuery } from "@tanstack/react-query";
 import {
   eventsService,
@@ -13,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ThemeSchema } from "@/types/theme.types";
 import { LocationPageView } from "./LocationPage/location-page-view";
 import { PUBLIC_CHROME_CONTAINER_CLASS } from "@/lib/public-rhythm";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 interface SingleLocationHomeProps {
   location: ThemeLocationData;
@@ -28,12 +31,16 @@ export function SingleLocationHome({
   settings,
 }: SingleLocationHomeProps) {
   const slug = location.slug;
-  const domain = getDomain() ?? "";
+  // getDomain() needs `window`, so during SSR fall back to the request host —
+  // the same value page.tsx prefetched under. Without it the SSR pass rendered
+  // the skeleton while the client rendered the page (hydration mismatch).
+  const { host } = useContext(ServerContext);
+  const domain = getDomain() ?? host ?? "";
 
   const { data, isLoading } = useQuery({
     queryKey: eventKeys.location(slug, domain),
     queryFn: () => eventsService.getLocationWithEvents(slug, domain),
-    staleTime: 1000 * 60 * 5,
+    ...FRESHNESS.publicView,
     enabled: Boolean(slug) && Boolean(domain),
   });
 

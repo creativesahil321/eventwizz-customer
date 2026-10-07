@@ -75,13 +75,7 @@ export function useLoadPermissions() {
       console.warn(
         "[Permissions] Potential security violation: Multiple permission access failures"
       );
-      try {
-        await logout({ securityViolation: true });
-      } catch (error) {
-        console.error("[Permissions] Error during security logout:", error);
-        // Force redirect as fallback
-        window.location.href = "/auth/login?error=security_violation";
-      }
+      await logout({ reason: "security_violation" });
     }, []);
 
   // Effect to load permissions if they're not in Zustand store

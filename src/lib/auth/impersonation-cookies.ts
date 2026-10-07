@@ -65,21 +65,41 @@ export async function backupAdminSession(
   return "ok";
 }
 
-/** Swap the backed-up admin session back in and delete the backup. */
-export async function restoreAdminSession(
-  req: NextRequest,
-  res: NextResponse,
-): Promise<"ok" | "no-backup" | "invalid-backup"> {
-  const backup = chunksOf(req, ADMIN_BACKUP_COOKIE);
-  if (!backup.length) return "no-backup";
-
-  // The backup is encrypted with NEXTAUTH_SECRET, so it cannot be forged —
-  // still, only ever restore a session that decrypts to an admin.
-  const backupJwt = await getToken({
+function decodeAdminBackup(req: NextRequest) {
+  return getToken({
     req,
     secret: env.NEXTAUTH_SECRET,
     cookieName: ADMIN_BACKUP_COOKIE,
   }).catch(() => null);
+}
+
+/** The admin's Laravel token held in the backup cookie (for revocation). */
+export async function getAdminBackupToken(
+  req: NextRequest,
+): Promise<string | null> {
+  const backupJwt = await decodeAdminBackup(req);
+  const token = backupJwt?.token;
+  return typeof token === "string" && token ? token : null;
+}
+
+/** Swap the backed-up admin session back in and delete the backup. */
+export async function restoreAdminSession(
+  req: NextRequest,
+  res: NextResponse,
+): Promise<"ok" | "no-backup" | "no-session" | "invalid-backup"> {
+  const backup = chunksOf(req, ADMIN_BACKUP_COOKIE);
+  if (!backup.length) return "no-backup";
+
+  // Only an ongoing (impersonation) session can be swapped back. Without this,
+  // a backup that outlived a logout could resurrect the admin session.
+  if (!(await getSessionJwtFromRequest(req))) {
+    for (const c of backup) expire(res, c.name);
+    return "no-session";
+  }
+
+  // The backup is encrypted with NEXTAUTH_SECRET, so it cannot be forged —
+  // still, only ever restore a session that decrypts to an admin.
+  const backupJwt = await decodeAdminBackup(req);
   if (!backupJwt || backupJwt.account_type !== "admin") {
     for (const c of backup) expire(res, c.name);
     return "invalid-backup";
@@ -97,4 +117,14 @@ export async function restoreAdminSession(
     if (!restoredNames.has(current.name)) expire(res, current.name);
   }
   return "ok";
+}
+
+/**
+ * Expire every HttpOnly auth cookie on logout: the session (all chunks) and
+ * the impersonation admin backup. Browser JS cannot clear these.
+ */
+export function clearAuthCookies(req: NextRequest, res: NextResponse): void {
+  for (const prefix of [SESSION_COOKIE_NAME, ADMIN_BACKUP_COOKIE]) {
+    for (const c of chunksOf(req, prefix)) expire(res, c.name);
+  }
 }

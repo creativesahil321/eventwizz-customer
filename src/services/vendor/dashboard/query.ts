@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { vendorDashboardService } from "./dashboard.service";
 import type { VendorDashboardResponse } from "./type";
 import type { DashboardDateRangeParams } from "./type";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 export const vendorDashboardKeys = {
   all: ["vendor", "dashboard"] as const,
@@ -39,7 +40,7 @@ export function useVendorDashboardBookings(
         dateRange,
       }),
     enabled,
-    staleTime: 2 * 60 * 1000,
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });
@@ -54,7 +55,7 @@ export function useVendorDashboardCommissions(
     queryKey: vendorDashboardKeys.commissions(dateRange),
     queryFn: () => vendorDashboardService.getCommissionsStatistics(dateRange),
     enabled,
-    staleTime: 2 * 60 * 1000,
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });

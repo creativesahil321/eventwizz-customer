@@ -8,6 +8,7 @@ import type {
   VendorBookingRoomFilterOption,
 } from "@/services/vendor/bookings/bookings.service";
 import { UseMenuChoicesQueryParams } from "../_lib/types";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 export const menuChoicesKeys = {
   all: ["menu-choices"] as const,
@@ -105,8 +106,7 @@ export const useCustomerMenuChoicesList = (
       };
     },
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 2,
-    refetchOnWindowFocus: false,
+    ...FRESHNESS.operational,
     ...options,
   });
 };

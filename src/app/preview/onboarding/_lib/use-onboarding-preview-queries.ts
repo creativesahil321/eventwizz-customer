@@ -22,6 +22,8 @@ export function useOnboardingPreviewMainQuery() {
     queryFn: () =>
       siteEssentialsService.getSiteEssentials({ is_onboarding: true }),
     staleTime: 1000 * 60 * 5,
+    // Reviewing the site must show what onboarding just saved.
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
 }
@@ -40,6 +42,8 @@ export function useOnboardingPreviewLocationQuery(
       }),
     enabled: enabled && Boolean(slug?.trim()),
     staleTime: 1000 * 60 * 5,
+    // Reviewing the site must show what onboarding just saved.
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
 }
@@ -58,6 +62,8 @@ export function useOnboardingPreviewEventQuery(
       }) as Promise<OnboardingPreviewEventData>,
     enabled: enabled && Boolean(eventSlug?.trim()),
     staleTime: 1000 * 60 * 5,
+    // Reviewing the site must show what onboarding just saved.
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
 }

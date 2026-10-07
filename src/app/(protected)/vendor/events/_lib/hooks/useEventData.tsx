@@ -183,6 +183,8 @@ export function useEventData(
     isError,
     error,
     refetch,
+    isFetching,
+    isFetchedAfterMount,
   } = useQuery({
     queryKey: [
       ...eventKeys.data(eventId),
@@ -227,6 +229,9 @@ export function useEventData(
     isError,
     error,
     refetch,
+    isFetching,
+    /** True once data was fetched since this component mounted (not cache). */
+    isFetchedAfterMount,
     invalidateCache: invalidateCache.mutateAsync,
   };
 }

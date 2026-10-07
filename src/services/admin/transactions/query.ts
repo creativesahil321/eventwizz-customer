@@ -10,6 +10,7 @@ import type {
   AdminTransactionsParams,
   AdminTransactionsResponse,
 } from "./types";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 export const adminTransactionsKeys = {
   all: ["admin", "transactions"] as const,
@@ -38,7 +39,7 @@ export function useAdminTransactions(params: AdminTransactionsParams = {}) {
     queryKey: adminTransactionsKeys.list(queryParams),
     queryFn: () => adminTransactionsService.getTransactions(queryParams),
     placeholderData: keepPreviousData,
-    staleTime: 2 * 60 * 1000,
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000,
   });
 }

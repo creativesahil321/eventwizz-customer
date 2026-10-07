@@ -97,6 +97,64 @@ function withPreviewMediaDeep(value: unknown): unknown {
   return value;
 }
 
+/**
+ * Values only the backend knows — they change when customers book. A stored
+ * draft is a snapshot from when the vendor last previewed, so these must
+ * always come from the fresh API payload, or the editor shows stale sold
+ * counts and its "capacity ≥ sold" validation checks against old numbers.
+ */
+const SERVER_OWNED_KEYS = new Set([
+  "sold_quantity",
+  "sold_tickets",
+  "sold_tables",
+  "has_bookings",
+]);
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    !(typeof File !== "undefined" && value instanceof File) &&
+    !isPreviewFileMarker(value)
+  );
+}
+
+/**
+ * Copy server-owned values from `saved` into the matching parts of `draft`.
+ * Array items are matched by `id` (saved items always have one; new unsaved
+ * items have none and nothing sold), so reordering or removing rows is safe.
+ */
+function restoreServerOwnedValues(draft: unknown, saved: unknown): unknown {
+  if (Array.isArray(draft)) {
+    const savedById = new Map<string, unknown>();
+    if (Array.isArray(saved)) {
+      for (const item of saved) {
+        const id = isPlainRecord(item) ? item.id : undefined;
+        if (id !== undefined && id !== null) savedById.set(String(id), item);
+      }
+    }
+    return draft.map((item) => {
+      const id = isPlainRecord(item) ? item.id : undefined;
+      const match =
+        id !== undefined && id !== null ? savedById.get(String(id)) : undefined;
+      return restoreServerOwnedValues(item, match);
+    });
+  }
+  if (!isPlainRecord(draft) || !isPlainRecord(saved)) return draft;
+
+  const next: Record<string, unknown> = { ...draft };
+  for (const key of Object.keys(next)) {
+    if (!SERVER_OWNED_KEYS.has(key)) {
+      next[key] = restoreServerOwnedValues(next[key], saved[key]);
+    }
+  }
+  for (const key of SERVER_OWNED_KEYS) {
+    if (key in saved) next[key] = saved[key];
+  }
+  return next;
+}
+
 /** Overlay unsaved editor values onto the last saved payload. Keeps File objects. */
 export function applyVendorEventDraft<T extends Record<string, unknown>>(
   saved: T | null | undefined,
@@ -164,7 +222,7 @@ export function applyVendorEventDraft<T extends Record<string, unknown>>(
     liveForm.stepOne?.vendor_location_id ??
     (base as { vendor_location_id?: unknown }).vendor_location_id;
 
-  return next as T;
+  return restoreServerOwnedValues(next, base) as T;
 }
 
 /**

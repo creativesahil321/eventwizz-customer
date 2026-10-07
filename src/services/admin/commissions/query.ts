@@ -6,6 +6,7 @@ import type {
   CommissionStatusTab,
   PaidStatus,
 } from "./types";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 function parseIntSafe(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -45,7 +46,7 @@ export function useAdminCommissions(
   return useQuery<AdminCommissionsResponse>({
     queryKey: adminCommissionsKeys.list(params),
     queryFn: () => adminCommissionsService.getCommissions(params),
-    staleTime: 2 * 60 * 1000,
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000,
     placeholderData: (previous) => previous,
   });

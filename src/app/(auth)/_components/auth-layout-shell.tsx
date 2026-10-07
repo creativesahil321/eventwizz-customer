@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { logout } from "@/lib/auth/logout";
 import { useEffect, useState } from "react";
 import { AuthContent } from "./auth-content";
 import { AuthSkeleton } from "./auth-skeleton";
@@ -45,10 +46,12 @@ export function AuthLayoutShell({
     router.replace(doorScanReturn);
   }, [doorScanReturn, router]);
 
+  // Safety net: arriving at the login page after a security logout while a
+  // session still exists ends it completely (we are already on the login page).
   useEffect(() => {
     if (!isSecurityViolation || status !== "authenticated") return;
     setIsSigningOutSecurity(true);
-    signOut({ redirect: false }).finally(() => {
+    logout({ reason: "security_violation", redirectTo: false }).finally(() => {
       setIsSigningOutSecurity(false);
     });
   }, [isSecurityViolation, status]);

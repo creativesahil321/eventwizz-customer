@@ -9,6 +9,7 @@ import type {
   AdminDashboardParams,
   AdminDashboardResponse,
 } from "./types";
+import { FRESHNESS } from "@/lib/query-freshness";
 
 export const adminDashboardKeys = {
   all: ["admin", "dashboard"] as const,
@@ -55,7 +56,7 @@ export function useAdminDashboard(
   return useQuery<AdminDashboardResponse>({
     queryKey: adminDashboardKeys.detail(params),
     queryFn: () => adminDashboardService.getDashboard(params),
-    staleTime: 2 * 60 * 1000,
+    ...FRESHNESS.operational,
     gcTime: 10 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });
