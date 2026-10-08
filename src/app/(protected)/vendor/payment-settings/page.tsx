@@ -25,7 +25,7 @@ export default function SettingsPage() {
                 </h1>
               </div>
               <p className="text-muted-foreground mt-2">
-                Checkout payments (Stripe, PayPal, TrueLayer) for this venue.
+                Checkout payments (Stripe, PayPal) for this venue.
                 Set a default account for each provider. GoCardless is used
                 separately for EventWizz platform fees when enabled.
               </p>

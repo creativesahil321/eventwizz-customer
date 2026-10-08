@@ -33,6 +33,10 @@ import { useRouter } from "next/navigation";
 import { RescheduleDateModal } from "./reschedule-date-modal";
 import { SingleDatePaymentModal } from "./single-date-payment-modal";
 import { toast } from "sonner";
+import {
+  isPaymentAlreadyProcessing,
+  PAYMENT_ALREADY_PROCESSING_MESSAGE,
+} from "@/lib/payment-already-processing";
 import { useDeleteAddOns } from "@/services/customer/bookings/hooks/useDeleteAddOns";
 import {
   useRescheduleBooking,
@@ -229,6 +233,18 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
   const [selectedPaymentGatewayId, setSelectedPaymentGatewayId] = useState<
     number | null
   >(null);
+  const [paymentAlreadyProcessing, setPaymentAlreadyProcessing] =
+    useState(false);
+
+  const lockPaymentInProgress = useCallback(() => {
+    setPaymentAlreadyProcessing(true);
+    void queryClient.invalidateQueries({
+      queryKey: bookingsKeys.bookingDetails(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: bookingsKeys.lists(),
+    });
+  }, [queryClient]);
 
   const availablePaymentGateways = useMemo(
     () =>
@@ -365,6 +381,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
   // Handle Reschedule
   const handleRescheduleClick = (dateInfo: BookingDate) => {
+    if (paymentAlreadyProcessing) return;
     setSelectedDateForReschedule(dateInfo);
     setRescheduleModalOpen(true);
   };
@@ -402,13 +419,19 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
         setSelectedDateForReschedule(null);
       },
       onError: (error) => {
-        // Error toasts are handled by API interceptor
+        if (isPaymentAlreadyProcessing(error)) {
+          lockPaymentInProgress();
+          setRescheduleModalOpen(false);
+          setSingleDatePaymentModalOpen(false);
+          return;
+        }
         console.error("Error rescheduling booking:", error);
       },
     });
   };
 
   const handleSingleDatePaymentClick = (dateInfo: BookingDate) => {
+    if (paymentAlreadyProcessing) return;
     setSelectedDateForPayment(dateInfo);
     setSelectedRescheduleRequest(null); // Clear reschedule request for regular payment
     setSingleDatePaymentModalOpen(true);
@@ -497,6 +520,11 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
         setSelectedRescheduleRequest(null);
       },
       onError: (error) => {
+        if (isPaymentAlreadyProcessing(error)) {
+          lockPaymentInProgress();
+          setSingleDatePaymentModalOpen(false);
+          return;
+        }
         console.error("Error processing payment:", error);
       },
     });
@@ -542,6 +570,11 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
   return (
     <div className="space-y-6">
+      {paymentAlreadyProcessing ? (
+        <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+          {PAYMENT_ALREADY_PROCESSING_MESSAGE}
+        </p>
+      ) : null}
       {/* Event Dates Accordion */}
       {bookingData.dates && bookingData.dates.length > 0 && (
         <div>
@@ -568,6 +601,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
             {bookingData.dates.length > 1 &&
               summary.outstanding > 0 &&
               bookingData.canPayNow !== false &&
+              !paymentAlreadyProcessing &&
               firstPayableUnpaidDate && (
                 <Button
                   onClick={() =>
@@ -724,6 +758,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                       {(() => {
                         const pendingAmount = getPendingAmount(dateInfo);
                         const showPayRow =
+                          !paymentAlreadyProcessing &&
                           dateInfo.canPayNow !== false &&
                           (dateInfo.paymentStatus === "pending" ||
                             dateInfo.paymentStatus === "partial") &&
@@ -831,6 +866,8 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
 
                                     {/* Action Button */}
                                     <div className="flex gap-2">
+                                      {paymentAlreadyProcessing &&
+                                      request.unpaid_amount > 0 ? null : (
                                       <Button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -846,6 +883,7 @@ export default function BookingInfoTab({ bookingData }: BookingInfoTabProps) {
                                           ? "Accept & Pay Now"
                                           : "Accept Reschedule"}
                                       </Button>
+                                      )}
                                     </div>
                                   </div>
                                 </div>

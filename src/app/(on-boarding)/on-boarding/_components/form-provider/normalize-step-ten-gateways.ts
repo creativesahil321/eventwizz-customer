@@ -1,10 +1,10 @@
 /**
  * Persistence GET returns payment gateways nested as:
- *   { online: { stripe, paypal, ... }, offline: { truelayer } }
+ *   { online: { stripe, paypal, ... }, offline: [] }
  * with credential fields (`key` / `secret` / `setup_status`).
  *
  * The step-10 form expects a flat shape:
- *   { stripe: { status, account_id }, paypal: {...}, truelayer: {...} }
+ *   { stripe: { status, account_id }, paypal: {...} }
  */
 
 export type OnboardingGatewayStatus =
@@ -21,7 +21,6 @@ export type OnboardingGatewayUi = {
     bank_name?: string;
     account_masked?: string;
   };
-  /** Preserved for TrueLayer connected UI (not required for connect gating). */
   webhook_url?: string;
   public_key?: string;
 };
@@ -29,10 +28,38 @@ export type OnboardingGatewayUi = {
 export type OnboardingPaymentGatewaysUi = {
   stripe?: OnboardingGatewayUi;
   paypal?: OnboardingGatewayUi;
-  truelayer?: OnboardingGatewayUi;
   worldpay?: OnboardingGatewayUi;
   klarna?: OnboardingGatewayUi;
 };
+
+export type BankTransferOnboardingOffer = {
+  id?: number | null;
+  online_account_id?: number | null;
+  key?: string;
+  secret?: string;
+};
+
+function optionalId(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function readBankTransferOffer(
+  paymentGateways: unknown,
+): BankTransferOnboardingOffer | undefined {
+  if (!isRecord(paymentGateways) || !("bank_transfer" in paymentGateways)) {
+    return undefined;
+  }
+  const raw = paymentGateways.bank_transfer;
+  if (!isRecord(raw)) return { id: null, online_account_id: null };
+  return {
+    id: optionalId(raw.id),
+    online_account_id: optionalId(raw.online_account_id),
+    ...(nonEmptyString(raw.key) ? { key: nonEmptyString(raw.key) } : {}),
+    ...(nonEmptyString(raw.secret) ? { secret: nonEmptyString(raw.secret) } : {}),
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -84,7 +111,6 @@ function mapApiGatewayEntry(raw: unknown): OnboardingGatewayUi {
     credentialPresent(raw.key) ||
     credentialPresent(raw.secret) ||
     credentialPresent(raw.client_secret) ||
-    credentialPresent(raw.merchant_account_id) ||
     credentialPresent(raw.account_id);
 
   let status: OnboardingGatewayStatus = explicitStatus;
@@ -99,7 +125,6 @@ function mapApiGatewayEntry(raw: unknown): OnboardingGatewayUi {
     if (
       setupStatus === "connected" ||
       setupStatus === "ready" ||
-      raw.is_ready_for_bank_pay === true ||
       hasCredentials
     ) {
       status = "active";
@@ -113,10 +138,7 @@ function mapApiGatewayEntry(raw: unknown): OnboardingGatewayUi {
   }
 
   const accountId =
-    nonEmptyString(raw.account_id) ||
-    nonEmptyString(raw.merchant_account_id) ||
-    nonEmptyString(raw.key) ||
-    "";
+    nonEmptyString(raw.account_id) || nonEmptyString(raw.key) || "";
 
   const bank = isRecord(raw.bank)
     ? {
@@ -141,11 +163,6 @@ function mapApiGatewayEntry(raw: unknown): OnboardingGatewayUi {
 const EMPTY_GATEWAYS: OnboardingPaymentGatewaysUi = {
   stripe: { status: undefined, account_id: "" },
   paypal: { status: undefined, account_id: "" },
-  truelayer: {
-    status: undefined,
-    account_id: "",
-    bank: { bank_name: undefined, account_masked: undefined },
-  },
   worldpay: { status: undefined, account_id: "" },
   klarna: { status: undefined, account_id: "" },
 };
@@ -162,23 +179,16 @@ export function normalizeStepTenPaymentGatewaysFromApi(
   }
 
   const online = isRecord(raw.online) ? raw.online : null;
-  const offline = isRecord(raw.offline) ? raw.offline : null;
-  const nested = Boolean(online || offline);
+  const nested = Boolean(online || Array.isArray(raw.offline));
 
   const pick = (name: keyof OnboardingPaymentGatewaysUi) => {
-    if (nested) {
-      if (name === "truelayer") {
-        return offline?.truelayer ?? raw.truelayer;
-      }
-      return online?.[name] ?? raw[name];
-    }
+    if (nested) return online?.[name] ?? raw[name];
     return raw[name];
   };
 
   return {
     stripe: mapApiGatewayEntry(pick("stripe")),
     paypal: mapApiGatewayEntry(pick("paypal")),
-    truelayer: mapApiGatewayEntry(pick("truelayer")),
     worldpay: mapApiGatewayEntry(pick("worldpay")),
     klarna: mapApiGatewayEntry(pick("klarna")),
   };
@@ -193,13 +203,7 @@ export function normalizeStepTenFromApi(
   const paymentGateways = normalizeStepTenPaymentGatewaysFromApi(
     stepTen.payment_gateways,
   );
-
-  const hasBank = paymentGateways.truelayer?.status === "active";
-  const hasCard =
-    paymentGateways.stripe?.status === "active" ||
-    paymentGateways.paypal?.status === "active" ||
-    paymentGateways.worldpay?.status === "active" ||
-    paymentGateways.klarna?.status === "active";
+  const bankTransfer = readBankTransferOffer(stepTen.payment_gateways);
 
   let acceptPaymentMethod = stepTen.accept_payment_method;
   if (
@@ -207,14 +211,13 @@ export function normalizeStepTenFromApi(
     acceptPaymentMethod !== "payment_gateway" &&
     acceptPaymentMethod !== "both"
   ) {
-    if (hasBank && hasCard) acceptPaymentMethod = "both";
-    else if (hasBank) acceptPaymentMethod = "bank_transfer";
-    else acceptPaymentMethod = "payment_gateway";
+    acceptPaymentMethod = "payment_gateway";
   }
 
   return {
     ...stepTen,
     payment_gateways: paymentGateways,
     accept_payment_method: acceptPaymentMethod,
+    bank_transfer: bankTransfer,
   };
 }

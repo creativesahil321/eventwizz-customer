@@ -100,5 +100,4 @@ export const PAYMENT_METHOD_ICONS: Record<string, string> = {
   paypal: "Wallet",
   worldpay: "CreditCard",
   klarna: "ShoppingBag",
-  truelayer: "Building2",
 };

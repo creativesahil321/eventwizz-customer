@@ -21,10 +21,11 @@ export default function PaymentGatewayReturnPage() {
       const fromSettings = localStorage.getItem("settings_payment_setup");
 
       // Get gateway from URL params
-      const gateway = searchParams.get("gateway") as
-        | "stripe"
-        | "paypal"
-        | "truelayer";
+      const gatewayParam = searchParams.get("gateway");
+      const gateway =
+        gatewayParam === "stripe" || gatewayParam === "paypal"
+          ? gatewayParam
+          : null;
 
       if (!gateway) {
         setStatus("error");
@@ -44,10 +45,8 @@ export default function PaymentGatewayReturnPage() {
         if (!accountId) {
           if (gateway === "stripe") {
             accountId = localStorage.getItem("stripe_account_id") || "";
-          } else if (gateway === "paypal") {
+          } else {
             accountId = localStorage.getItem("paypal_merchant_id") || "";
-          } else if (gateway === "truelayer") {
-            accountId = "";
           }
         }
 

@@ -223,7 +223,7 @@ export const RESOURCE_PERMISSION_RULES: ResourcePermissionRule[] = [
     primaryPermission: "read-account",
     requiredPermissions: ["read-account", "update-account", "read-payment"],
     patterns: [
-      /\b(bank accounts?|stripe credentials?|paypal keys?|truelayer credentials?|payment keys?)\b/i,
+      /\b(bank accounts?|stripe credentials?|paypal keys?|payment keys?)\b/i,
     ],
   },
   {

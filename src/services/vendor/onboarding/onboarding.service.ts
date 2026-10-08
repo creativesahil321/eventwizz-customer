@@ -1526,7 +1526,7 @@ export const onboardingService = {
   },
 
   connectPaymentGateway: async (
-    paymentGateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna",
+    paymentGateway: "stripe" | "paypal" | "worldpay" | "klarna",
     credentials: { key: string; secret: string },
   ): Promise<{
     status: boolean;
@@ -1548,8 +1548,6 @@ export const onboardingService = {
       verification?: {
         stripe_account_verified_at?: string | null;
         paypal_oauth_verified_at?: string | null;
-        truelayer_oauth_verified_at?: string | null;
-        truelayer_env?: string | null;
         charges_enabled?: boolean;
         payouts_enabled?: boolean;
         manual_webhook?: boolean;
@@ -1593,8 +1591,6 @@ export const onboardingService = {
           verification?: {
             stripe_account_verified_at?: string | null;
             paypal_oauth_verified_at?: string | null;
-            truelayer_oauth_verified_at?: string | null;
-            truelayer_env?: string | null;
             charges_enabled?: boolean;
             payouts_enabled?: boolean;
             manual_webhook?: boolean;
@@ -1628,13 +1624,13 @@ export const onboardingService = {
 
   /**
    * Handle payment gateway return after vendor completes onboarding
-   * Common function for all payment gateways (Stripe, PayPal, TrueLayer, etc.)
-   * @param gateway Payment gateway name: "stripe" | "paypal" | "truelayer" | "worldpay" | "klarna"
+   * Common function for all payment gateways (Stripe, PayPal, and others).
+   * @param gateway Payment gateway name: "stripe" | "paypal" | "worldpay" | "klarna"
    * @param returnParams Additional parameters from the return URL (account_id, merchant_id, etc.)
    * @returns API response with connection status
    */
   handlePaymentGatewayReturn: async (
-    gateway: "stripe" | "paypal" | "truelayer" | "worldpay" | "klarna",
+    gateway: "stripe" | "paypal" | "worldpay" | "klarna",
     returnParams?: Record<string, string>
   ): Promise<{
     success?: boolean;

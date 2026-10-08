@@ -802,6 +802,8 @@ export interface BookingPaymentGatewayInfo {
   gateway: string;
   payment_id: number;
   stripe?: BookingPaymentStripeDetails;
+  /** Bank Transfer. Same credential shape as `stripe`. */
+  stripe_bank?: BookingPaymentStripeDetails;
   /** Present when gateway is "paypal". */
   paypal?: {
     redirect_url: string;
@@ -846,7 +848,7 @@ export interface BookingPaymentResponseData {
   amount: number;
   payment?: BookingPaymentGatewayInfo;
   settlement?: BookingPaymentSettlement;
-  /** Legacy redirect-based gateways (PayPal, TrueLayer, etc.) */
+  /** Legacy redirect-based gateways (PayPal and other hosted checkouts). */
   redirect_url?: string;
   /** Legacy flat fields — kept for backward compatibility */
   payment_id?: number;

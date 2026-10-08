@@ -47,7 +47,7 @@ export interface LoginResponse {
     isOnboarded?: boolean;
     event_id?: number;
     permissions?: string[];
-    /** True if vendor has connected at least one payment gateway (Stripe/PayPal/TrueLayer). */
+    /** True if vendor has connected at least one payment gateway (Stripe or PayPal). */
     has_payment_provider?: boolean;
   };
 }

@@ -31,12 +31,6 @@ export const PAYMENT_GATEWAYS = {
     description: "Buy now, pay later",
     processing_time: "Instant approval",
   },
-  TRUELAYER: {
-    id: 5,
-    name: "TrueLayer",
-    description: "Pay directly from your bank",
-    processing_time: "1-2 business days",
-  },
 } as const;
 
 // Validation Constants

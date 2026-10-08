@@ -43,14 +43,13 @@ interface ImpersonationState {
 const STORE_NAME = "impersonation-session";
 
 /**
- * sessionStorage-backed store for impersonation state.
+ * localStorage-backed store for impersonation state.
  *
- * Why sessionStorage instead of localStorage:
- * - Tab-scoped: closing the tab automatically ends impersonation
- * - No cross-tab leaks: opening a new tab won't carry impersonation state
- * - Auto-cleanup: browser clears sessionStorage on tab/window close
- * - Small footprint: ~1.5KB total (admin backup + vendor info)
- * - No collision with existing localStorage stores
+ * localStorage (not sessionStorage) so the banner persists across new tabs and
+ * hard reloads. The store holds only non-sensitive display data — the admin's
+ * token and permissions are NOT here (token lives in the HttpOnly JWT cookie;
+ * permissions are fetched from the API). clearClientSession() wipes this on
+ * logout so stale state cannot survive a sign-out.
  */
 export const useImpersonationStore = create<ImpersonationState>()(
   persist(
@@ -90,9 +89,11 @@ export const useImpersonationStore = create<ImpersonationState>()(
     })),
     {
       name: STORE_NAME,
-      version: 2,
-      // v0 stored the admin's raw Laravel token, v1 the admin's permissions —
-      // neither may live in browser storage (permissions come from the API).
+      version: 3,
+      // v0 stored the admin's raw Laravel token.
+      // v1 stored the admin's permissions.
+      // v2 removed both but used sessionStorage (state lost on new tabs).
+      // v3 moves to localStorage so the banner survives new tabs / hard reloads.
       migrate: (persisted) => {
         const state = persisted as { originalAdmin?: Record<string, unknown> | null };
         if (state?.originalAdmin && typeof state.originalAdmin === "object") {
@@ -114,7 +115,7 @@ export const useImpersonationStore = create<ImpersonationState>()(
             },
           };
         }
-        return sessionStorage;
+        return localStorage;
       }),
     }
   )

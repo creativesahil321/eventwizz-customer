@@ -1325,7 +1325,6 @@ const paymentGatewaySchema = z.object({
 const paymentGatewaysSchema = z.object({
   stripe: paymentGatewaySchema.optional(),
   paypal: paymentGatewaySchema.optional(),
-  truelayer: paymentGatewaySchema.optional(),
   worldpay: paymentGatewaySchema.optional(),
   klarna: paymentGatewaySchema.optional(),
 });
@@ -1338,6 +1337,15 @@ export const stepTenSchema = z.object({
     required_error: "Choose how guests can pay.",
   }),
   payment_gateways: paymentGatewaysSchema.optional(),
+  /** Hydrated for the Bank Transfer add-on. Not posted with step 10. */
+  bank_transfer: z
+    .object({
+      id: z.number().nullable().optional(),
+      online_account_id: z.number().nullable().optional(),
+      key: z.string().nullable().optional(),
+      secret: z.string().nullable().optional(),
+    })
+    .optional(),
   is_skipped: z.boolean().default(false),
 })
   .superRefine((data, ctx) => {
@@ -1346,7 +1354,6 @@ export const stepTenSchema = z.object({
       const hasAnyGatewayActive =
         isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
         isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
         isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
         isGatewayStatusActive(data.payment_gateways?.klarna?.status);
 

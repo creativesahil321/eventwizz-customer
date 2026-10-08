@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   Building2,
   Check,
   CheckCircle2,
-  Copy,
   CreditCard,
   ExternalLink,
   Info,
@@ -19,9 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
-import { toast } from "sonner";
 import type { PaymentGatewayCredentials } from "@/services/vendor/payment-gateway/types";
-import { env } from "@/env";
 import { guidedInsetSectionSurfaceClass } from "../../guided-section-surface";
 import { guidedOnboardingSkipButtonClass } from "../../guided-sticky-approval-bar";
 
@@ -31,15 +28,6 @@ export function maskCredential(value?: string): string {
   if (!value) return "••••••••";
   if (value.length <= 10) return `${value.slice(0, 2)}••••••••`;
   return `${value.slice(0, 6)}••••••••${value.slice(-4)}`;
-}
-
-function truelayerWebhookUrl(accountId?: string): string {
-  const base = (env.NEXT_PUBLIC_API_URL || "https://api.eventwizz.com").replace(
-    /\/$/,
-    "",
-  );
-  const suffix = accountId ? encodeURIComponent(accountId) : "your-account";
-  return `${base}/webhooks/truelayer/${suffix}`;
 }
 
 function SectionCard({
@@ -106,19 +94,6 @@ function PayPalIcon({ className }: { className?: string }) {
       )}
     >
       P
-    </div>
-  );
-}
-
-function TrueLayerIcon({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        "flex h-10 w-10 items-center justify-center rounded-lg bg-teal-600 text-white",
-        className,
-      )}
-    >
-      <Building2 className="h-5 w-5" />
     </div>
   );
 }
@@ -249,119 +224,6 @@ function ConnectedRow({
         )}
         Remove
       </button>
-    </div>
-  );
-}
-
-function WebhookBox({
-  accountId,
-  url: urlProp,
-  hint,
-  publicKey,
-  providerLabel = "TrueLayer",
-  consoleHref = "https://console.truelayer.com/",
-  consoleLabel = "Open TrueLayer Console",
-}: {
-  accountId?: string;
-  url?: string | null;
-  hint?: string | null;
-  publicKey?: string | null;
-  providerLabel?: string;
-  consoleHref?: string;
-  consoleLabel?: string;
-}) {
-  const url = useMemo(
-    () => urlProp || truelayerWebhookUrl(accountId),
-    [accountId, urlProp],
-  );
-  const [copied, setCopied] = useState<"url" | "key" | null>(null);
-
-  if (!url && !publicKey) return null;
-
-  const handleCopy = async (value: string, kind: "url" | "key") => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(kind);
-      toast.success(
-        kind === "url"
-          ? "Webhook URL copied to clipboard"
-          : "Public key copied to clipboard",
-      );
-      setTimeout(() => setCopied(null), 2000);
-    } catch {
-      toast.error("Unable to copy. Please try again.");
-    }
-  };
-
-  return (
-    <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-      <div className="mb-2 flex items-start gap-2">
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-        <div>
-          <p className="text-sm font-semibold text-white">
-            One more step: add this webhook in {providerLabel}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-400">
-            {hint ||
-              `Copy this URL and paste it into your ${providerLabel} account under Settings → Webhooks. This lets us confirm payments in real time.`}
-          </p>
-        </div>
-      </div>
-      {url ? (
-        <div className="mt-3 flex gap-2">
-          <input
-            readOnly
-            value={url}
-            className="h-10 flex-1 truncate rounded-lg border border-white/10 bg-black/40 px-3 text-xs text-slate-300 outline-none"
-          />
-          <Button
-            type="button"
-            onClick={() => void handleCopy(url, "url")}
-            className="h-10 shrink-0 rounded-lg bg-[var(--color-primary,#3b82f6)] px-4 text-white hover:opacity-90"
-          >
-            {copied === "url" ? (
-              <Check className="mr-1.5 h-4 w-4" />
-            ) : (
-              <Copy className="mr-1.5 h-4 w-4" />
-            )}
-            Copy
-          </Button>
-        </div>
-      ) : null}
-      {publicKey ? (
-        <div className="mt-3 space-y-2">
-          <p className="text-xs font-medium text-slate-300">
-            Signing public key
-          </p>
-          <textarea
-            readOnly
-            value={publicKey}
-            rows={4}
-            className="w-full resize-none rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-slate-300 outline-none"
-          />
-          <Button
-            type="button"
-            onClick={() => void handleCopy(publicKey, "key")}
-            className="h-9 rounded-lg bg-white/10 px-3 text-white hover:bg-white/15"
-          >
-            {copied === "key" ? (
-              <Check className="mr-1.5 h-4 w-4" />
-            ) : (
-              <Copy className="mr-1.5 h-4 w-4" />
-            )}
-            Copy public key
-          </Button>
-        </div>
-      ) : null}
-      <a
-        href={consoleHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-sky-400 hover:text-sky-300"
-      >
-        {consoleLabel}
-        <ExternalLink className="h-3.5 w-3.5" />
-      </a>
     </div>
   );
 }
@@ -502,21 +364,17 @@ function CredentialsConnectPanel({
 export type PaymentSetupLayoutProps = {
   stripeConnected: boolean;
   paypalConnected: boolean;
-  truelayerConnected: boolean;
   stripeAccountId?: string;
   paypalAccountId?: string;
-  truelayerAccountId?: string;
-  truelayerWebhookUrl?: string | null;
-  truelayerWebhookHint?: string | null;
-  truelayerPublicKey?: string | null;
+  /** Rendered inside the existing bank-transfer card. Hidden, with the divider, when omitted. */
+  bankTransfer?: React.ReactNode;
+  bankTransferConnected?: boolean;
   loading?: boolean;
-  disconnecting?: CardProvider | "truelayer" | null;
+  disconnecting?: CardProvider | null;
   onConnectStripe: (credentials: PaymentGatewayCredentials) => void;
   onConnectPayPal: (credentials: PaymentGatewayCredentials) => void;
-  onConnectTrueLayer: (credentials: PaymentGatewayCredentials) => void;
   onDisconnectStripe: () => void;
   onDisconnectPayPal: () => void;
-  onDisconnectTrueLayer: () => void;
   onSkip: () => void;
   onFinish: () => void;
   finishDisabled?: boolean;
@@ -527,21 +385,16 @@ export type PaymentSetupLayoutProps = {
 export function PaymentSetupLayout({
   stripeConnected,
   paypalConnected,
-  truelayerConnected,
   stripeAccountId,
   paypalAccountId,
-  truelayerAccountId,
-  truelayerWebhookUrl,
-  truelayerWebhookHint,
-  truelayerPublicKey,
+  bankTransfer,
+  bankTransferConnected = false,
   loading = false,
   disconnecting = null,
   onConnectStripe,
   onConnectPayPal,
-  onConnectTrueLayer,
   onDisconnectStripe,
   onDisconnectPayPal,
-  onDisconnectTrueLayer,
   onSkip,
   onFinish,
   finishDisabled = false,
@@ -552,12 +405,8 @@ export function PaymentSetupLayout({
   const [selectedCard, setSelectedCard] = useState<CardProvider | null>(
     stripeConnected ? "stripe" : paypalConnected ? "paypal" : null,
   );
-  // Bank transfers are optional — show the compact "Connect TrueLayer" row
-  // until the vendor opts in, instead of an open credentials form.
-  const [bankFormOpen, setBankFormOpen] = useState(false);
 
   const showCardPicker = !cardConnected;
-  const showBankConnect = !truelayerConnected && bankFormOpen;
 
   return (
     <div className="w-full space-y-3">
@@ -678,93 +527,46 @@ export function PaymentSetupLayout({
         )}
       </SectionCard>
 
-      {/* AND / OR */}
-      <div className="my-3 flex items-center gap-3">
-        <div className="h-px flex-1 bg-white/10" />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-          And / or
-        </span>
-        <div className="h-px flex-1 bg-white/10" />
-      </div>
-
-      {/* 2. Bank transfer */}
-      <SectionCard connected={truelayerConnected}>
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          {truelayerConnected ? (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
-              <Check className="h-4 w-4" />
+      {bankTransfer ? (
+        <>
+          <div className="my-3 flex items-center gap-3">
+            <div className="h-px flex-1 bg-white/10" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              And / or
             </span>
-          ) : (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-slate-300">
-              <Building2 className="h-4 w-4" />
-            </span>
-          )}
-          <h2 className="text-base font-semibold text-white">
-            2. Bank transfers
-          </h2>
-          <OptionalBadge />
-          {truelayerConnected && <ConnectedBadge />}
-        </div>
-        <p className="mb-3 text-sm text-slate-400">
-          Let guests pay by bank transfer with TrueLayer. Fees are usually lower
-          than cards.
-        </p>
+            <div className="h-px flex-1 bg-white/10" />
+          </div>
 
-        {truelayerConnected ? (
-          <>
-            <ConnectedRow
-              icon={<TrueLayerIcon />}
-              title="TrueLayer linked"
-              detailLabel="Client ID"
-              detailValue={truelayerAccountId}
-              onDisconnect={onDisconnectTrueLayer}
-              disconnecting={disconnecting === "truelayer"}
-            />
-            <WebhookBox
-              accountId={truelayerAccountId}
-              url={truelayerWebhookUrl}
-              hint={truelayerWebhookHint}
-              publicKey={truelayerPublicKey}
-            />
-          </>
-        ) : showBankConnect ? (
-          <CredentialsConnectPanel
-            title="Connect a TrueLayer account"
-            description="Enter your TrueLayer Client ID and secret from Console → Applications. We check them, then store them securely."
-            helpHref="https://console.truelayer.com/"
-            helpLabel="Open TrueLayer Console"
-            keyLabel="Client ID"
-            keyPlaceholder="sandbox-… or live Client ID"
-            secretLabel="Client secret"
-            secretPlaceholder="Your client secret"
-            onConnect={onConnectTrueLayer}
-            onCancel={() => setBankFormOpen(false)}
-            connecting={loading}
-            cancelLabel="Cancel"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setBankFormOpen(true)}
-            disabled={loading}
-            className="flex w-full items-center gap-3 rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-4 text-left transition-colors hover:border-white/25 hover:bg-white/[0.04]"
-          >
-            <TrueLayerIcon />
-            <div>
-              <p className="font-medium text-white">Connect TrueLayer</p>
-              <p className="text-xs text-slate-400">
-                Optional — bank transfers with lower fees
-              </p>
+          <SectionCard connected={bankTransferConnected}>
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              {bankTransferConnected ? (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                  <Check className="h-4 w-4" />
+                </span>
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-slate-300">
+                  <Building2 className="h-4 w-4" />
+                </span>
+              )}
+              <h2 className="text-base font-semibold text-white">
+                2. Bank transfers
+              </h2>
+              <OptionalBadge />
+              {bankTransferConnected ? <ConnectedBadge /> : null}
             </div>
-          </button>
-        )}
-      </SectionCard>
+            <p className="mb-3 text-sm text-slate-400">
+              Let customers pay straight from their bank account.
+            </p>
+            {bankTransfer}
+          </SectionCard>
+        </>
+      ) : null}
 
       {/* Footer */}
       {showFooter && (
         <div className="mt-6 flex w-full min-w-0 flex-col items-center justify-center gap-3 border-t border-white/[0.08] pt-5">
           <p className="text-center text-xs text-slate-400">
-            {cardConnected || truelayerConnected
+            {cardConnected || bankTransferConnected
               ? "You're ready to continue to domain."
               : "Link at least one payment account, or skip payment and continue to domain."}
           </p>

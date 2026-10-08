@@ -5,7 +5,10 @@ import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { invalidateCustomerBookingsList } from "@/services/customer/bookings/query";
+import {
+  bookingsKeys,
+  invalidateCustomerBookingsList,
+} from "@/services/customer/bookings/query";
 import {
   CheckCircle,
   Calendar,
@@ -17,6 +20,7 @@ import {
 } from "lucide-react";
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
 import {
+  confirmBankTransferPayment,
   confirmStripePaymentBackup,
   fetchPaymentSuccessReceipt,
   type PaymentSuccessReceipt,
@@ -42,7 +46,14 @@ type PageView =
   | { type: "success"; data: PaymentSuccessReceipt }
   | { type: "pending" }
   | { type: "not_found" }
-  | { type: "error" };
+  | { type: "error" }
+  | { type: "bank_processing" }
+  | { type: "bank_declined" };
+
+function customerGatewayLabel(gateway: string): string {
+  if (gateway.trim().toLowerCase() === "stripe_bank") return "Bank Transfer";
+  return gateway;
+}
 
 function InvalidateCustomerBookingsOnMount() {
   const queryClient = useQueryClient();
@@ -105,9 +116,11 @@ function PaymentSuccessContent() {
   const { format: formatMoney } = useCurrencyFormat();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const bookingNumber = searchParams.get("booking_number")?.trim() || null;
   const sessionId = searchParams.get("session_id")?.trim() || null;
+  const isBankTransferReturn = searchParams.get("gateway") === "stripe_bank";
   const { isClient, status, isCustomer } = usePaymentSuccessAuth(
     bookingNumber,
     Boolean(bookingNumber || sessionId),
@@ -119,6 +132,7 @@ function PaymentSuccessContent() {
   });
 
   useEffect(() => {
+    if (isBankTransferReturn) return;
     if (!isClient || status === "loading") return;
 
     if (!bookingNumber && !sessionId) {
@@ -230,7 +244,79 @@ function PaymentSuccessContent() {
       cancelled = true;
       if (pollTimer) clearTimeout(pollTimer);
     };
-  }, [isClient, status, isCustomer, bookingNumber, sessionId, searchParams]);
+  }, [isClient, status, isCustomer, bookingNumber, sessionId, searchParams, isBankTransferReturn]);
+
+  useEffect(() => {
+    if (!isBankTransferReturn) return;
+    if (!isClient || status === "loading") return;
+    if (status === "unauthenticated" || !isCustomer) return;
+
+    const bookingId = parsePositiveInt(searchParams.get("booking_id"));
+    const paymentIntentId =
+      searchParams.get("payment_intent") ??
+      searchParams.get("payment_intent_id");
+
+    if (!bookingId || !paymentIntentId) {
+      setView({ type: "error" });
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
+    const maxAttempts = 20;
+
+    const poll = async () => {
+      if (cancelled) return;
+      const result = await confirmBankTransferPayment({
+        bookingId,
+        paymentIntentId,
+      });
+      if (cancelled) return;
+
+      if (result.kind === "paid") {
+        void invalidateCustomerBookingsList(queryClient);
+        void queryClient.invalidateQueries({
+          queryKey: bookingsKeys.bookingDetails(),
+        });
+        void queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+        setView({ type: "success", data: result.data });
+        return;
+      }
+
+      if (result.kind === "requires_payment_method") {
+        setView({ type: "bank_declined" });
+        return;
+      }
+
+      if (result.kind === "processing") {
+        attempts += 1;
+        setView({ type: "bank_processing" });
+        if (attempts >= maxAttempts) return;
+        pollTimer = setTimeout(() => {
+          void poll();
+        }, 3000);
+        return;
+      }
+
+      setView({ type: "error" });
+    };
+
+    setView({ type: "bank_processing" });
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, [
+    isBankTransferReturn,
+    isClient,
+    status,
+    isCustomer,
+    searchParams,
+    queryClient,
+  ]);
 
   if (view.type === "not_found") {
     notFound();
@@ -251,6 +337,63 @@ function PaymentSuccessContent() {
             : "Processing your payment..."
         }
       />
+    );
+  }
+
+  if (view.type === "bank_processing") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Bank transfer in progress
+          </h1>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Your bank transfer is being processed. We&apos;ll confirm your
+            booking as soon as your bank completes the payment.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => router.push("/customer/bookings")}
+          >
+            My Bookings
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (view.type === "bank_declined") {
+    const retryBookingId = parsePositiveInt(searchParams.get("booking_id"));
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Bank transfer not completed
+          </h1>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Your bank transfer wasn&apos;t completed. Please try again.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button
+              onClick={() =>
+                router.push(
+                  retryBookingId
+                    ? `/customer/bookings/${retryBookingId}`
+                    : "/customer/bookings",
+                )
+              }
+            >
+              Try again
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push("/customer/bookings")}
+            >
+              My Bookings
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -394,7 +537,7 @@ function PaymentSuccessContent() {
                     <span>Payment Method</span>
                   </div>
                   <p className="font-semibold text-gray-900 capitalize">
-                    {paymentData.gateway}
+                    {customerGatewayLabel(paymentData.gateway)}
                   </p>
                 </div>
 

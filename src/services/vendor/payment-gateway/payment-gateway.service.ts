@@ -1,5 +1,12 @@
 import { api } from "@/services/core/api-client";
 import { API_ENDPOINTS } from "@/services/core/endpoints";
+import {
+  bankTransferFieldErrors,
+  buildBankTransferConnectBody,
+  readBankTransferFailure,
+  type BankTransferConnectInput,
+  type BankTransferConnectResult,
+} from "@/services/vendor/payment-gateway/bank-transfer";
 
 /** Single account for a gateway (vendor can have multiple accounts per gateway; only one active at a time) */
 export interface PaymentGatewayAccount {
@@ -22,7 +29,7 @@ export interface PaymentGatewayAccount {
 export type PaymentGatewayCanAdd = {
   stripe?: boolean;
   paypal?: boolean;
-  truelayer?: boolean;
+  stripe_bank?: boolean;
 };
 
 /** Response shape for GET /vendor/payment-gateway - keyed by gateway name, value is array of accounts */
@@ -126,10 +133,10 @@ export const vendorPaymentGatewayService = {
 
   /**
    * Connect a payment gateway via POST /vendor/onboarding/payment-gateway-connect.
-   * Stripe / PayPal / TrueLayer require credentials `{ key, secret }`.
+   * Stripe / PayPal require credentials `{ key, secret }`.
    */
   connectPaymentGateway: async (
-    gateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna",
+    gateway: "stripe" | "paypal" | "worldpay" | "klarna",
     credentials: { key: string; secret: string },
   ): Promise<{
     status: boolean;
@@ -151,8 +158,6 @@ export const vendorPaymentGatewayService = {
       verification?: {
         stripe_account_verified_at?: string | null;
         paypal_oauth_verified_at?: string | null;
-        truelayer_oauth_verified_at?: string | null;
-        truelayer_env?: string | null;
         charges_enabled?: boolean;
         payouts_enabled?: boolean;
         manual_webhook?: boolean;
@@ -196,8 +201,6 @@ export const vendorPaymentGatewayService = {
           verification?: {
             stripe_account_verified_at?: string | null;
             paypal_oauth_verified_at?: string | null;
-            truelayer_oauth_verified_at?: string | null;
-            truelayer_env?: string | null;
             charges_enabled?: boolean;
             payouts_enabled?: boolean;
             manual_webhook?: boolean;
@@ -277,7 +280,7 @@ export const vendorPaymentGatewayService = {
    * @param accountId The stripe_account_id or merchant_id returned from connect
    */
   handlePaymentGatewayReturn: async (
-    gateway: "stripe" | "paypal" | "truelayer" | "worldpay" | "klarna",
+    gateway: "stripe" | "paypal" | "worldpay" | "klarna",
     accountId: string
   ): Promise<{
     status: boolean;
@@ -344,8 +347,60 @@ export const vendorPaymentGatewayService = {
    * Disconnect a payment gateway
    * @param gateway Payment gateway to disconnect
    */
+  connectBankTransfer: async (
+    input: BankTransferConnectInput,
+  ): Promise<BankTransferConnectResult> => {
+    const url =
+      input.scope === "onboarding"
+        ? API_ENDPOINTS.VENDOR.ONBOARDING.PAYMENT_GATEWAYS
+        : API_ENDPOINTS.VENDOR.PAYMENT_GATEWAYS.CONNECT;
+    try {
+      const response = await api.post<{
+        status: boolean;
+        message: string;
+        errors?: unknown;
+        data?: { account?: BankTransferConnectResult["account"] };
+      }>(url, buildBankTransferConnectBody(input), {
+        returnFullResponse: true,
+        suppressErrorToast: true,
+      });
+      return {
+        status: response.status,
+        message: response.message ?? "",
+        fieldErrors: response.status
+          ? {}
+          : bankTransferFieldErrors(response.errors),
+        account: response.data?.account,
+      };
+    } catch (error) {
+      return { status: false, ...readBankTransferFailure(error) };
+    }
+  },
+
+  deleteOnboardingPaymentGateway: async (
+    accountId: number,
+  ): Promise<{ status: boolean; message: string }> => {
+    try {
+      const url = API_ENDPOINTS.VENDOR.ONBOARDING.DELETE_PAYMENT_GATEWAY.replace(
+        "{id}",
+        String(accountId),
+      );
+      return await api.delete<{ status: boolean; message: string }>(url, {
+        returnFullResponse: true,
+      });
+    } catch (error) {
+      return {
+        status: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to remove bank transfer",
+      };
+    }
+  },
+
   disconnectPaymentGateway: async (
-    gateway: "truelayer" | "stripe" | "paypal" | "worldpay" | "klarna"
+    gateway: "stripe" | "paypal" | "worldpay" | "klarna"
   ): Promise<{
     status: boolean;
     message: string;

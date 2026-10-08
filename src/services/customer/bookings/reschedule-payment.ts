@@ -26,6 +26,7 @@ function toCheckoutPaymentShape(
       payment: {
         gateway: payment.gateway,
         stripe: payment.stripe,
+        stripe_bank: payment.stripe_bank,
         paypal: payment.paypal,
         redirect_url: payment.redirect_url,
       },

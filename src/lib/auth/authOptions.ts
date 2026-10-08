@@ -22,6 +22,25 @@ declare global {
   var __OAUTH_ERROR_MESSAGE: string | undefined;
 }
 
+/**
+ * Pull a user-safe message out of whatever `authService.login` rejected with:
+ * - the api-client interceptor rejects `status:false` with the plain response
+ *   body ({ status, message, … });
+ * - a non-2xx HTTP response (e.g. 429 "Too many attempts…") rejects with an
+ *   AxiosError whose `response.data.message` carries the real message;
+ * - inner `throw new Error(…)` from the authorize block is already an Error.
+ * Returns null when nothing useful is present (caller falls back to generic).
+ */
+function extractAuthErrorMessage(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const nested = (err as { response?: { data?: { message?: unknown } } })
+    .response?.data?.message;
+  if (typeof nested === "string" && nested.trim()) return nested;
+  const direct = (err as { message?: unknown }).message;
+  if (typeof direct === "string" && direct.trim()) return direct;
+  return null;
+}
+
 // Define Custom User Interface
 interface CustomUser {
   id?: string; // Keep id for internal use but don't store in session
@@ -102,47 +121,9 @@ declare module "next-auth/providers/credentials" {
   }
 }
 
-// Extend the JWT and Session types
-declare module "next-auth" {
-  interface JWT {
-    account_type: string;
-    active_role?: string;
-    user_id?: string;
-    isOnboarded?: boolean;
-    token?: string;
-    uuid?: string;
-    first_name?: string;
-    last_name?: string;
-    avatar?: string;
-    on_boarding_step?: number;
-    vendor_location_id?: string | null;
-    event_id?: string | number | null;
-    status?: string;
-    permissions?: string[];
-  }
-
-  interface Session {
-    user: {
-      last_completed_step: any;
-      name: string | null;
-      email: string | null;
-      account_type: string;
-      active_role?: string;
-      user_id?: string;
-      isOnboarded: boolean;
-      /** Laravel token is server-only (JWT cookie) — never sent to the browser. */
-      uuid: string | undefined;
-      first_name?: string;
-      last_name?: string;
-      avatar?: string;
-      on_boarding_step?: number;
-      vendor_location_id?: string | null;
-      event_id?: string | number | null;
-      status?: string;
-      permissions?: string[];
-    };
-  }
-}
+// JWT and Session augmentations live in `src/types/next-auth.d.ts` — the
+// single source of truth. Declaring them again here would conflict via
+// interface merging (TS2717).
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -323,8 +304,15 @@ export const authOptions: NextAuthOptions = {
             permissions: [],
             has_payment_provider: data.has_payment_provider ?? false,
           } as unknown as import("next-auth").User;
-        } catch {
-          throw new Error("Invalid email or password.");
+        } catch (err) {
+          // Preserve the backend's message when it carries one — the backend
+          // now generalises privacy-sensitive details itself (wrong password
+          // and unknown email both return "Invalid credentials."). This also
+          // surfaces the HTTP 429 rate-limit message ("Too many attempts…")
+          // so the user understands why sign-in is blocked.
+          throw new Error(
+            extractAuthErrorMessage(err) || "Invalid email or password.",
+          );
         }
       },
     }),

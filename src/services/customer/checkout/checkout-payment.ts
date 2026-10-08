@@ -68,6 +68,34 @@ export function buildCheckoutStripeSession(
   };
 }
 
+/** Bank Transfer uses `payment.stripe_bank`, never the card publishable key. */
+export function buildBankTransferSession(
+  data: CheckoutResponseData,
+): CheckoutStripePaymentSession | null {
+  const bank = data.payment?.stripe_bank;
+  if (
+    data.payment?.gateway !== "stripe_bank" ||
+    !bank?.client_secret ||
+    !bank.publishable_key ||
+    !bank.payment_intent_id ||
+    data.booking_id == null
+  ) {
+    return null;
+  }
+
+  return {
+    bookingNumber: data.booking_number,
+    bookingId: data.booking_id,
+    amount: data.amount,
+    dueLater: data.due_later ?? null,
+    gateway: "stripe_bank",
+    clientSecret: bank.client_secret,
+    publishableKey: bank.publishable_key,
+    paymentIntentId: bank.payment_intent_id,
+    expiresAt: normalizeExpiresAt(bank.expires_at),
+  };
+}
+
 /** Merge a refreshed checkout/resume session with any stored session.
  *  Keeps the stored absolute `expiresAt` when the API omits it (common on /resume). */
 export function mergeStripePaymentSession(
@@ -83,7 +111,7 @@ export function mergeStripePaymentSession(
 }
 
 /**
- * Resolves the hosted-checkout URL for redirect-based gateways (PayPal, TrueLayer, …).
+ * Resolves the hosted-checkout URL for redirect-based gateways (PayPal and others).
  *
  * The backend nests the URL differently per gateway:
  *  - PayPal:  `data.payment.paypal.redirect_url`
@@ -108,6 +136,11 @@ export function resolveCheckoutPaymentAction(
   const session = buildCheckoutStripeSession(data);
   if (session) {
     return { type: "stripe", session };
+  }
+
+  const bankSession = buildBankTransferSession(data);
+  if (bankSession) {
+    return { type: "stripe", session: bankSession };
   }
 
   const redirectUrl = resolveCheckoutRedirectUrl(data);

@@ -54,7 +54,7 @@ export function VendorGlobalAlerts() {
       {showPaymentGatewayBanner ? (
         <GlobalInfoBanner className="border-b border-sky-200 bg-sky-50 text-sky-950">
           You haven&apos;t connected a payment gateway yet. Customers need
-          Stripe, PayPal, or TrueLayer to pay for bookings.{" "}
+          Stripe or PayPal to pay for bookings.{" "}
           <Link
             href="/vendor/payment-settings"
             className="font-semibold underline underline-offset-2 hover:text-sky-800"

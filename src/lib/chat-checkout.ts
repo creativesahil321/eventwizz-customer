@@ -38,6 +38,10 @@ import type { ApiEventCartData } from "@/lib/types/cart.types";
 import type { CouponStripSource } from "@/lib/coupon-strip-props";
 import { useCartEditStore } from "@/store/cart-edit.store";
 import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
+import {
+  isPaymentAlreadyProcessing,
+  PAYMENT_ALREADY_PROCESSING_MESSAGE,
+} from "@/lib/payment-already-processing";
 import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { normalizeSlug } from "@/lib/utils";
 
@@ -82,9 +86,9 @@ export type ChatCartSyncResult =
 const CHAT_GATEWAY_LABELS: Record<string, string> = {
   stripe: "Pay with card",
   paypal: "Pay with PayPal",
-  truelayer: "Pay by bank transfer",
   worldpay: "Pay with WorldPay",
   klarna: "Pay with Klarna",
+  stripe_bank: "Bank Transfer",
 };
 
 export function listChatPaymentGateways(
@@ -95,7 +99,15 @@ export function listChatPaymentGateways(
   for (const gateway of event?.payment_gateways ?? []) {
     const id = Number(gateway.id);
     const slug = String(gateway.slug ?? "").trim().toLowerCase();
-    if (!Number.isFinite(id) || id <= 0 || !slug || seen.has(slug)) continue;
+    if (
+      !Number.isFinite(id) ||
+      id <= 0 ||
+      !slug ||
+      seen.has(slug) ||
+      !CHAT_GATEWAY_LABELS[slug]
+    ) {
+      continue;
+    }
     seen.add(slug);
     list.push({
       id,
@@ -1212,6 +1224,13 @@ export async function runChatCheckout(options: {
     }
     return { ok: true, action, payload };
   } catch (error) {
+    if (isPaymentAlreadyProcessing(error)) {
+      return {
+        ok: false,
+        reason: "checkout",
+        message: PAYMENT_ALREADY_PROCESSING_MESSAGE,
+      };
+    }
     const message =
       error instanceof Error
         ? error.message

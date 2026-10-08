@@ -6,6 +6,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import { toast } from "sonner";
+import { isPaymentAlreadyProcessingMessage } from "@/lib/payment-already-processing";
 import { ApiError } from "@/types/api.types";
 import { env } from "@/env";
 import { useAuthStore } from "@/store/auth.store";
@@ -396,6 +397,11 @@ apiClient.interceptors.response.use(
         return response;
       }
 
+      if (isPaymentAlreadyProcessingMessage(message)) {
+        safeToast.info(message);
+        return Promise.reject(response.data);
+      }
+
       // For other status:false responses, show error toast
       safeToast.error(
         humanizeApiToastMessage(response.data.message || "Something went wrong"),
@@ -639,6 +645,13 @@ apiClient.interceptors.response.use(
             error.config as RequestOptions | undefined
           )?.suppressErrorToast;
           if (suppressValidationToast) break;
+          const processingMessage = (
+            error.response.data as ApiErrorResponse | undefined
+          )?.message;
+          if (isPaymentAlreadyProcessingMessage(processingMessage)) {
+            safeToast.info(processingMessage);
+            break;
+          }
           // Handle validation errors
           const errorData = error.response.data as ApiErrorResponse;
           if (

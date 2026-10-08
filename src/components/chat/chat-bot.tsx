@@ -171,6 +171,7 @@ const CheckoutStripePaymentModal = dynamic(
   { ssr: false },
 );
 import { saveAuthCallbackUrl } from "@/lib/auth/safe-callback-url";
+import { PAYMENT_ALREADY_PROCESSING_MESSAGE } from "@/lib/payment-already-processing";
 import {
   isChatBotHiddenOnPath,
   isCustomerFacingChatSurface,
@@ -2079,6 +2080,8 @@ export function ChatBot() {
               },
             ]
           : [];
+      const paymentAlreadyProcessing =
+        result.message.trim() === PAYMENT_ALREADY_PROCESSING_MESSAGE;
       const content =
         result.message.trim() ||
         "Payment couldn’t be started. Visit the event page to finish.";
@@ -2087,8 +2090,9 @@ export function ChatBot() {
         {
           role: "assistant",
           content,
-          quickActions:
-            loginActions.length > 0
+          quickActions: paymentAlreadyProcessing
+            ? undefined
+            : loginActions.length > 0
               ? loginActions
               : recovery
                 ? toUiQuickActions(recovery)

@@ -155,3 +155,59 @@ export async function confirmStripePaymentBackup(params: {
 
   return undefined;
 }
+
+export type BankTransferConfirmResult =
+  | { kind: "paid"; data: PaymentSuccessReceipt }
+  | { kind: "processing" }
+  | { kind: "requires_payment_method" }
+  | { kind: "error"; message?: string };
+
+/**
+ * Confirms a Bank Transfer return. HTTP 422 with stripe_status "processing"
+ * means the bank has not finished — it is not a failed payment.
+ */
+export async function confirmBankTransferPayment(params: {
+  bookingId: number;
+  paymentIntentId: string;
+}): Promise<BankTransferConfirmResult> {
+  try {
+    const response = await api.post<{
+      status: boolean;
+      message?: string;
+      data?: PaymentSuccessReceipt & { stripe_status?: string };
+    }>(
+      API_ENDPOINTS.CUSTOMER.PAYMENT.STRIPE_SUCCESS,
+      {
+        booking_id: params.bookingId,
+        payment_intent_id: params.paymentIntentId,
+      },
+      SILENT_REQUEST,
+    );
+
+    if (response.status === true && response.data) {
+      const receipt = toReceipt(response.data);
+      if (!receipt.transaction_id) {
+        receipt.transaction_id = params.paymentIntentId;
+      }
+      return { kind: "paid", data: receipt };
+    }
+
+    return { kind: "error", message: response.message };
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 422) {
+      const body = error.response.data as
+        | {
+            message?: string;
+            data?: { stripe_status?: string };
+          }
+        | undefined;
+      const stripeStatus = body?.data?.stripe_status;
+      if (stripeStatus === "processing") return { kind: "processing" };
+      if (stripeStatus === "requires_payment_method") {
+        return { kind: "requires_payment_method" };
+      }
+      return { kind: "error", message: body?.message };
+    }
+    return { kind: "error" };
+  }
+}

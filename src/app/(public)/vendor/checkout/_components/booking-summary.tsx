@@ -51,6 +51,10 @@ import { invalidateCustomerBookingsList } from "@/services/customer/bookings/que
 import { buildCheckoutStripeSession, mergeStripePaymentSession } from "@/services/customer/checkout/checkout-payment";
 import { getStripePromise } from "@/lib/stripe/stripe-loader";
 import { handleCheckoutError } from "@/services/customer/checkout/utils";
+import {
+  isPaymentAlreadyProcessing,
+  PAYMENT_ALREADY_PROCESSING_MESSAGE,
+} from "@/lib/payment-already-processing";
 import { useCheckoutPaymentUiStore } from "@/store/checkout-payment-ui.store";
 import { useCheckoutPromoStore } from "@/store/checkout-promo.store";
 import { useCartEditStore } from "@/store/cart-edit.store";
@@ -154,6 +158,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
   }, []);
 
   const { selectedGateway, setSelectedGateway } = usePaymentGatewaySelection();
+  const [paymentAlreadyProcessing, setPaymentAlreadyProcessing] =
+    useState(false);
   const processCheckoutMutation = useProcessCheckout();
   const resumeCheckoutMutation = useResumeCheckout();
   const queryClient = useQueryClient();
@@ -568,6 +574,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
         window.location.href = paymentAction.url;
       } catch (error) {
         toast.dismiss("resume-payment");
+        if (isPaymentAlreadyProcessing(error)) {
+          setPaymentAlreadyProcessing(true);
+          queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+          void invalidateCustomerBookingsList(queryClient);
+          return;
+        }
         if (error instanceof Error) {
           handleCheckoutError(error);
         } else {
@@ -584,11 +596,13 @@ export default function BookingSummary({}: BookingSummaryProps) {
       stripePaymentSession,
       setStripePaymentSession,
       currentEventApiData?.payment_gateways,
+      queryClient,
     ],
   );
 
   // Checkout handler
   const handleProceedToPayment = async () => {
+    if (paymentAlreadyProcessing) return;
     if (
       isProcessing ||
       processCheckoutMutation.isPending ||
@@ -711,6 +725,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
 
       window.location.href = paymentAction.url;
     } catch (error) {
+      if (isPaymentAlreadyProcessing(error)) {
+        setPaymentAlreadyProcessing(true);
+        queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+        void invalidateCustomerBookingsList(queryClient);
+        return;
+      }
       if (error instanceof Error) {
         handleCheckoutError(error);
       } else {
@@ -1195,6 +1215,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
             </span>{" "}
             is reserved. Complete payment to confirm your booking.
           </p>
+          {paymentAlreadyProcessing ? (
+            <p className="mt-4 text-sm text-[color:var(--checkout-foreground)]">
+              {PAYMENT_ALREADY_PROCESSING_MESSAGE}
+            </p>
+          ) : (
           <Button
             type="button"
             onClick={() => void resumePendingPayment(selectedGateway)}
@@ -1209,6 +1234,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
               {formatMoney(stripePaymentSession?.amount ?? 0)}
             </span>
           </Button>
+          )}
         </div>
         {stripePaymentModal}
       </>
@@ -1310,6 +1336,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
           selectedGateway={selectedGateway}
           onGatewaySelect={setSelectedGateway}
           disabled={
+            paymentAlreadyProcessing ||
             isProcessing ||
             processCheckoutMutation.isPending ||
             resumeCheckoutMutation.isPending
@@ -1543,7 +1570,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
           </p>
         </div>
       ) : null}
-      {availableDates.length > 0 && (
+      {availableDates.length > 0 && paymentAlreadyProcessing ? (
+        <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+          {PAYMENT_ALREADY_PROCESSING_MESSAGE}
+        </p>
+      ) : null}
+      {availableDates.length > 0 && !paymentAlreadyProcessing && (
         <div className="hidden lg:block">
           <Button
             size="lg"
@@ -1710,6 +1742,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
                 )}
               </button>
 
+              {paymentAlreadyProcessing ? (
+                <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+                  {PAYMENT_ALREADY_PROCESSING_MESSAGE}
+                </p>
+              ) : (
               <Button
                 onClick={handleCheckoutCtaClick}
                 disabled={ctaState.disabled}
@@ -1732,6 +1769,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
                   </div>
                 )}
               </Button>
+              )}
               {ctaState.needsGatewaySelection ? (
                 <p className="text-center text-[11px] leading-snug text-[color:var(--checkout-muted-foreground)]">
                   Tap Pay to choose your payment method

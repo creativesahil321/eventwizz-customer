@@ -79,12 +79,14 @@ export const API_ENDPOINTS = {
       /** Preview only: `/true` or `/false` does not commit event `is_rooms`. */
       GET_ALL_STEPS: "/vendor/onboarding/steps/{location_id}/{is_rooms}",
       PAYMENT_GATEWAYS: "/vendor/onboarding/payment-gateway-connect",
+      DELETE_PAYMENT_GATEWAY: "/vendor/onboarding/payment-gateway/{id}",
       PAYMENT_RETURN: "/vendor/onboarding/return",
       // Per-room step store. Room CRUD lives on VENDOR.ROOMS / ROOMS_STORE / ROOM_BY_ID.
       ROOM_STEP_STORE: "/vendor/onboarding/rooms/{room_id}/store",
     },
     PAYMENT_GATEWAYS: {
       GET_ALL: "/vendor/payment-gateway",
+      CONNECT: "/vendor/payment-gateway/connect",
       ENABLE_DISABLE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}/is-enabled",
       DISCONNECT: "/vendor/payment-gateway/disconnect",
       DELETE_PAYMENT_GATEWAY: "/vendor/payment-gateway/{id}",

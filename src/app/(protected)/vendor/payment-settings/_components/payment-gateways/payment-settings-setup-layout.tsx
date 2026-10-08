@@ -2,10 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Building2,
   Check,
   CheckCircle2,
-  Copy,
   CreditCard,
   ExternalLink,
   Info,
@@ -23,10 +21,10 @@ import { toast } from "sonner";
 import type { PaymentGatewayAccount } from "@/services/vendor/payment-gateway/payment-gateway.service";
 import type { PaymentGatewayCredentials } from "@/services/vendor/payment-gateway/types";
 
-export type GatewayKind = "stripe" | "paypal" | "truelayer";
+export type GatewayKind = "stripe" | "paypal";
 
 export const MAX_ACCOUNTS_PER_GATEWAY = 2;
-export const MAX_TOTAL_ACCOUNTS = 6;
+export const MAX_TOTAL_ACCOUNTS = 4;
 
 function maskCredential(value?: string): string {
   if (!value) return "••••••••";
@@ -77,14 +75,6 @@ function ConnectedBadge({ count }: { count?: number }) {
   );
 }
 
-function OptionalBadge() {
-  return (
-    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-      Optional
-    </span>
-  );
-}
-
 function StripeIcon({ className }: { className?: string }) {
   return (
     <div
@@ -107,19 +97,6 @@ function PayPalIcon({ className }: { className?: string }) {
       )}
     >
       P
-    </div>
-  );
-}
-
-function TrueLayerIcon({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        "flex h-10 w-10 items-center justify-center rounded-lg bg-teal-600 text-white",
-        className,
-      )}
-    >
-      <Building2 className="h-5 w-5" />
     </div>
   );
 }
@@ -216,105 +193,6 @@ function AccountRow({
           </button>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function WebhookBox({
-  url,
-  hint,
-  publicKey,
-}: {
-  url?: string | null;
-  hint?: string | null;
-  publicKey?: string | null;
-}) {
-  const [copied, setCopied] = useState<"url" | "key" | null>(null);
-
-  if (!url && !publicKey) return null;
-
-  const handleCopy = async (value: string, kind: "url" | "key") => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(kind);
-      toast.success(
-        kind === "url" ? "Webhook URL copied to clipboard" : "Public key copied to clipboard",
-      );
-      setTimeout(() => setCopied(null), 2000);
-    } catch {
-      toast.error("Unable to copy. Please try again.");
-    }
-  };
-
-  return (
-    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-      <div className="mb-2 flex items-start gap-2">
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-        <div>
-          <p className="text-sm font-semibold text-slate-900">
-            One more step: add this webhook in TrueLayer
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-600">
-            {hint ||
-              "Copy the URL below, then paste it in TrueLayer Console under Payments → Settings → Webhook URI."}
-          </p>
-        </div>
-      </div>
-      {url ? (
-        <div className="mt-3 flex gap-2">
-          <input
-            readOnly
-            value={url}
-            className="h-10 flex-1 truncate rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none"
-          />
-          <Button
-            type="button"
-            variant="event-primary"
-            onClick={() => void handleCopy(url, "url")}
-            className="h-10 shrink-0 rounded-lg px-4"
-          >
-            {copied === "url" ? (
-              <Check className="mr-1.5 h-4 w-4" />
-            ) : (
-              <Copy className="mr-1.5 h-4 w-4" />
-            )}
-            Copy
-          </Button>
-        </div>
-      ) : null}
-      {publicKey ? (
-        <div className="mt-3 space-y-2">
-          <p className="text-xs font-medium text-slate-700">Signing public key</p>
-          <textarea
-            readOnly
-            value={publicKey}
-            rows={3}
-            className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[11px] leading-relaxed text-slate-700 outline-none"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void handleCopy(publicKey, "key")}
-            className="h-9 rounded-lg border-slate-200 bg-slate-100 px-3 text-slate-800 hover:bg-slate-200 hover:text-slate-900"
-          >
-            {copied === "key" ? (
-              <Check className="mr-1.5 h-3.5 w-3.5" />
-            ) : (
-              <Copy className="mr-1.5 h-3.5 w-3.5" />
-            )}
-            Copy public key
-          </Button>
-        </div>
-      ) : null}
-      <a
-        href="https://console.truelayer.com/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-sky-600 hover:text-sky-700"
-      >
-        Open TrueLayer Console
-        <ExternalLink className="h-3.5 w-3.5" />
-      </a>
     </div>
   );
 }
@@ -579,18 +457,14 @@ function GatewayBlock({
 export type PaymentSettingsSetupLayoutProps = {
   stripeAccounts: PaymentGatewayAccount[];
   paypalAccounts: PaymentGatewayAccount[];
-  truelayerAccounts: PaymentGatewayAccount[];
   canAddStripe?: boolean;
   canAddPayPal?: boolean;
-  canAddTrueLayer?: boolean;
   loading?: boolean;
   connectingGateway?: GatewayKind | null;
   enablingAccountId?: number | null;
   disconnectingAccountId?: number | null;
-  truelayerConnectHint?: string | null;
   onConnectStripe: (credentials: PaymentGatewayCredentials) => void;
   onConnectPayPal: (credentials: PaymentGatewayCredentials) => void;
-  onConnectTrueLayer: (credentials: PaymentGatewayCredentials) => void;
   onMakeDefault: (accountId: number) => void;
   onDisconnect: (accountId: number) => void;
 };
@@ -598,30 +472,24 @@ export type PaymentSettingsSetupLayoutProps = {
 export function PaymentSettingsSetupLayout({
   stripeAccounts,
   paypalAccounts,
-  truelayerAccounts,
   canAddStripe = false,
   canAddPayPal = false,
-  canAddTrueLayer = false,
   loading = false,
   connectingGateway = null,
   enablingAccountId = null,
   disconnectingAccountId = null,
-  truelayerConnectHint = null,
   onConnectStripe,
   onConnectPayPal,
-  onConnectTrueLayer,
   onMakeDefault,
   onDisconnect,
 }: PaymentSettingsSetupLayoutProps) {
   const totalAccounts = useMemo(
-    () =>
-      stripeAccounts.length + paypalAccounts.length + truelayerAccounts.length,
-    [paypalAccounts.length, stripeAccounts.length, truelayerAccounts.length],
+    () => stripeAccounts.length + paypalAccounts.length,
+    [paypalAccounts.length, stripeAccounts.length],
   );
 
   const cardConnected =
     stripeAccounts.length > 0 || paypalAccounts.length > 0;
-  const bankConnected = truelayerAccounts.length > 0;
 
   const [adding, setAdding] = useState<GatewayKind | null>(null);
   const prevConnecting = useRef(connectingGateway);
@@ -648,8 +516,8 @@ export function PaymentSettingsSetupLayout({
         <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-900 sm:text-sm">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <p>
-            No accounts linked yet. Connect Stripe, PayPal or TrueLayer below
-            to accept payments.
+            No accounts linked yet. Connect Stripe or PayPal below to accept
+            payments.
           </p>
         </div>
       ) : null}
@@ -749,84 +617,6 @@ export function PaymentSettingsSetupLayout({
         </div>
       </SectionCard>
 
-      <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          And / or
-        </span>
-        <div className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      <SectionCard connected={bankConnected}>
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          {bankConnected ? (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              <Check className="h-4 w-4" />
-            </span>
-          ) : (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-              <Building2 className="h-4 w-4" />
-            </span>
-          )}
-          <h2 className="text-base font-semibold text-slate-900">
-            2. Bank transfers
-          </h2>
-          <OptionalBadge />
-          {bankConnected ? (
-            <ConnectedBadge count={truelayerAccounts.length} />
-          ) : null}
-        </div>
-        <p className="mb-5 text-sm text-slate-500">
-          Let customers pay by bank transfer with TrueLayer. Fees are usually
-          lower than cards. Up to {MAX_ACCOUNTS_PER_GATEWAY} accounts.
-        </p>
-
-        <GatewayBlock
-          title="TrueLayer"
-          subtitle="Open banking bank transfers"
-          icon={<TrueLayerIcon />}
-          accounts={truelayerAccounts}
-          detailLabel="Client ID"
-          canAdd={canAddTrueLayer}
-          totalAccounts={totalAccounts}
-          connecting={connectingGateway === "truelayer"}
-          enablingAccountId={enablingAccountId}
-          disconnectingAccountId={disconnectingAccountId}
-          showForm={adding === "truelayer"}
-          onAdd={() => setAdding("truelayer")}
-          onMakeDefault={onMakeDefault}
-          onDisconnect={onDisconnect}
-          extraPerAccount={(account) =>
-            account.webhook_url || account.public_key ? (
-              <WebhookBox
-                url={account.webhook_url}
-                hint={
-                  account.manual_webhook
-                    ? truelayerConnectHint ||
-                      "Copy the webhook URL below into TrueLayer Console under Payments → Settings → Webhook URI. If a public key is shown, upload it under Signing keys."
-                    : null
-                }
-                publicKey={account.public_key}
-              />
-            ) : null
-          }
-          connectPanel={
-            <CredentialsConnectPanel
-              title="Connect a TrueLayer account"
-              description="Enter your TrueLayer Client ID and secret from Console → Applications. We check them, then store them securely."
-              helpHref="https://console.truelayer.com/"
-              helpLabel="Open TrueLayer Console"
-              keyLabel="Client ID"
-              keyPlaceholder="sandbox-… or live Client ID"
-              secretLabel="Client secret"
-              secretPlaceholder="Your client secret"
-              connecting={connectingGateway === "truelayer"}
-              onCancel={() => setAdding(null)}
-              onConnect={onConnectTrueLayer}
-            />
-          }
-        />
-      </SectionCard>
 
       <p className="text-center text-xs text-slate-400">
         {totalAccounts} of {MAX_TOTAL_ACCOUNTS} accounts linked

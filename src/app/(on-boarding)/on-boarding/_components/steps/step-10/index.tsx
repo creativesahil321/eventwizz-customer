@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { PaymentSetupLayout, type CardProvider } from "./payment-setup-layout";
 import type { PaymentGatewayCredentials } from "@/services/vendor/payment-gateway/types";
 import { resolveConnectedAccountId } from "@/services/vendor/payment-gateway/types";
+import { BankTransferFields } from "@/components/payment/bank-transfer-fields";
+import type { BankTransferOnboardingOffer } from "../../form-provider/normalize-step-ten-gateways";
 
 export default function StepTen() {
   const {
@@ -44,16 +46,17 @@ export default function StepTen() {
     name: "stepTen",
   });
   const [loading, setLoading] = useState(false);
-  const [disconnecting, setDisconnecting] = useState<
-    CardProvider | "truelayer" | null
+  const [disconnecting, setDisconnecting] = useState<CardProvider | null>(null);
+  const [sessionOnlineAccountId, setSessionOnlineAccountId] = useState<
+    number | null
   >(null);
-  const [truelayerWebhookUrl, setTruelayerWebhookUrl] = useState<string | null>(
-    null,
-  );
-  const [truelayerWebhookHint, setTruelayerWebhookHint] = useState<
-    string | null
-  >(null);
-  const [truelayerPublicKey, setTruelayerPublicKey] = useState<string | null>(
+  const [sessionBankAccount, setSessionBankAccount] = useState<{
+    id: number;
+    key?: string;
+  } | null>(null);
+  const [bankRemoved, setBankRemoved] = useState(false);
+  const [bankConnecting, setBankConnecting] = useState(false);
+  const [bankDisconnectingId, setBankDisconnectingId] = useState<number | null>(
     null,
   );
   const { update: updateSession } = useSession();
@@ -74,15 +77,7 @@ export default function StepTen() {
     (
       gateways: StepTenType["payment_gateways"] | undefined,
     ): StepTenType["accept_payment_method"] => {
-      const hasBankTransferActive = isGatewayStatusActive(
-        gateways?.truelayer?.status,
-      );
-      const hasPaymentGatewayActive =
-        isGatewayStatusActive(gateways?.stripe?.status) ||
-        isGatewayStatusActive(gateways?.paypal?.status);
-
-      if (hasBankTransferActive && hasPaymentGatewayActive) return "both";
-      if (hasBankTransferActive) return "bank_transfer";
+      void gateways;
       return "payment_gateway";
     },
     [],
@@ -114,19 +109,11 @@ export default function StepTen() {
       deriveAcceptPaymentMethod(mappedGateways),
       { shouldValidate: true, shouldDirty: false },
     );
-
-    const truelayer = mappedGateways?.truelayer as
-      | { webhook_url?: string; public_key?: string }
-      | undefined;
-    // Prefer persistence values when present; keep in-session connect values otherwise.
-    setTruelayerWebhookUrl((prev) => truelayer?.webhook_url || prev);
-    setTruelayerPublicKey((prev) => truelayer?.public_key || prev);
   }, [eventId, form, persistedStepTen, deriveAcceptPaymentMethod]);
 
   const paymentGateways = form.watch("payment_gateways");
   const stripeStatus = form.watch("payment_gateways.stripe.status");
   const paypalStatus = form.watch("payment_gateways.paypal.status");
-  const truelayerStatus = form.watch("payment_gateways.truelayer.status");
 
   useEffect(() => {
     const gateways = form.getValues("payment_gateways");
@@ -141,7 +128,6 @@ export default function StepTen() {
   }, [
     stripeStatus,
     paypalStatus,
-    truelayerStatus,
     form,
     deriveAcceptPaymentMethod,
   ]);
@@ -152,11 +138,29 @@ export default function StepTen() {
   const paypalConnected = isGatewayStatusActive(
     paymentGateways?.paypal?.status,
   );
-  const truelayerConnected = isGatewayStatusActive(
-    paymentGateways?.truelayer?.status,
+  const hasConnectedGateway = stripeConnected || paypalConnected;
+
+  const bankOffer = (
+    persistedStepTen as { bank_transfer?: BankTransferOnboardingOffer } | null
+  )?.bank_transfer;
+  const bankFeatureOn = bankOffer != null;
+  const onlineAccountId =
+    sessionOnlineAccountId ?? bankOffer?.online_account_id ?? null;
+  const linkedBankId = bankRemoved
+    ? null
+    : (sessionBankAccount?.id ??
+      (typeof bankOffer?.id === "number" ? bankOffer.id : null));
+  const linkedBankKey = bankRemoved
+    ? undefined
+    : (sessionBankAccount?.key ?? bankOffer?.key);
+
+  const keepBankTransfer = useCallback(
+    <T extends StepTenType>(data: T): T => ({
+      ...data,
+      bank_transfer: globalForm.getValues("stepTen.bank_transfer"),
+    }),
+    [globalForm],
   );
-  const hasConnectedGateway =
-    stripeConnected || paypalConnected || truelayerConnected;
 
   const syncGlobalGateways = useCallback(() => {
     globalForm.setValue(
@@ -165,93 +169,30 @@ export default function StepTen() {
     );
   }, [form, globalForm]);
 
-  const handleDisconnect = async (gateway: CardProvider | "truelayer") => {
+  const handleDisconnect = async (gateway: CardProvider) => {
     setDisconnecting(gateway);
+    const clear = () => {
+      if (gateway === "stripe") {
+        form.setValue("payment_gateways.stripe", {
+          status: undefined,
+          account_id: "",
+        });
+      } else {
+        form.setValue("payment_gateways.paypal", {
+          status: undefined,
+          account_id: "",
+        });
+      }
+      syncGlobalGateways();
+    };
     try {
       await vendorPaymentGatewayService.disconnectPaymentGateway(gateway);
-
-      if (gateway === "stripe") {
-        form.setValue("payment_gateways.stripe", {
-          status: undefined,
-          account_id: "",
-        });
-      } else if (gateway === "paypal") {
-        form.setValue("payment_gateways.paypal", {
-          status: undefined,
-          account_id: "",
-        });
-      } else {
-        form.setValue("payment_gateways.truelayer", {
-          status: undefined,
-          account_id: "",
-          bank: undefined,
-        });
-        setTruelayerWebhookUrl(null);
-        setTruelayerWebhookHint(null);
-        setTruelayerPublicKey(null);
-      }
-      syncGlobalGateways();
+      clear();
     } catch (error) {
       console.error(`Disconnect ${gateway} error:`, error);
-      if (gateway === "stripe") {
-        form.setValue("payment_gateways.stripe", {
-          status: undefined,
-          account_id: "",
-        });
-      } else if (gateway === "paypal") {
-        form.setValue("payment_gateways.paypal", {
-          status: undefined,
-          account_id: "",
-        });
-      } else {
-        form.setValue("payment_gateways.truelayer", {
-          status: undefined,
-          account_id: "",
-          bank: undefined,
-        });
-        setTruelayerWebhookUrl(null);
-        setTruelayerWebhookHint(null);
-        setTruelayerPublicKey(null);
-      }
-      syncGlobalGateways();
+      clear();
     } finally {
       setDisconnecting(null);
-    }
-  };
-
-  const handleTrueLayerConnect = async (
-    credentials: PaymentGatewayCredentials,
-  ) => {
-    const loadingToast = toast.loading("Verifying TrueLayer credentials...");
-    try {
-      setLoading(true);
-
-      const response = await onboardingService.connectPaymentGateway(
-        "truelayer",
-        credentials,
-      );
-
-      toast.dismiss(loadingToast);
-      if (!response.status) return;
-
-      const account = response.data?.account;
-      const status = account?.account_status || "active";
-      const accountId = resolveConnectedAccountId(account);
-
-      form.setValue("payment_gateways.truelayer", {
-        status,
-        account_id: accountId,
-      });
-      syncGlobalGateways();
-      setTruelayerWebhookUrl(response.data?.webhook_url || null);
-      setTruelayerWebhookHint(response.data?.webhook_setup_hint || null);
-      setTruelayerPublicKey(response.data?.public_key || null);
-      void updateSession({ has_payment_provider: true });
-    } catch (error) {
-      toast.dismiss(loadingToast);
-      console.error("TrueLayer connection error:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -278,6 +219,9 @@ export default function StepTen() {
         status,
         account_id: accountId,
       });
+      if (typeof account?.id === "number") {
+        setSessionOnlineAccountId(account.id);
+      }
       syncGlobalGateways();
       void updateSession({ has_payment_provider: true });
     } catch (error) {
@@ -321,16 +265,66 @@ export default function StepTen() {
     }
   };
 
+  const handleBankConnect = async (input: {
+    sourceAccountId?: number;
+    publishableKey?: string;
+    secret?: string;
+  }) => {
+    setBankConnecting(true);
+    try {
+      const hasKeys =
+        (input.publishableKey?.trim().length ?? 0) > 0 ||
+        (input.secret?.trim().length ?? 0) > 0;
+      const result = await vendorPaymentGatewayService.connectBankTransfer({
+        scope: "onboarding",
+        sourceAccountId: hasKeys ? undefined : input.sourceAccountId,
+        credentials: hasKeys
+          ? {
+              publishableKey: input.publishableKey ?? "",
+              secret: input.secret ?? "",
+            }
+          : undefined,
+      });
+      if (result.status && typeof result.account?.id === "number") {
+        setBankRemoved(false);
+        setSessionBankAccount({
+          id: result.account.id,
+          key: result.account.key,
+        });
+        void onboardingService.notifyDataChanged();
+      }
+      return result;
+    } finally {
+      setBankConnecting(false);
+    }
+  };
+
+  const handleBankDisconnect = async (accountId: number) => {
+    setBankDisconnectingId(accountId);
+    try {
+      const result =
+        await vendorPaymentGatewayService.deleteOnboardingPaymentGateway(
+          accountId,
+        );
+      if (!result.status) return;
+      setBankRemoved(true);
+      setSessionBankAccount(null);
+      void onboardingService.notifyDataChanged();
+    } finally {
+      setBankDisconnectingId(null);
+    }
+  };
+
   const handleSkip = async () => {
     setLoading(true);
     try {
       form.setValue("is_skipped", true);
-      const skippedData: StepTenType = {
+      const skippedData: StepTenType = keepBankTransfer({
         ...form.getValues(),
         is_skipped: true,
         isApproved: true,
         event_id: form.getValues().event_id || (eventId as number),
-      };
+      });
       globalForm.setValue("stepTen", skippedData);
 
       const response = await onboardingService.storeStepTenData(skippedData);
@@ -381,24 +375,24 @@ export default function StepTen() {
       );
       data.is_skipped = false;
       data.isApproved = true;
-      globalForm.setValue("stepTen", data);
+      const stepPayload = keepBankTransfer(data);
+      globalForm.setValue("stepTen", stepPayload);
 
       data.event_id = data?.event_id as number;
 
       const hasAnyActiveGateway =
         isGatewayStatusActive(data.payment_gateways?.stripe?.status) ||
         isGatewayStatusActive(data.payment_gateways?.paypal?.status) ||
-        isGatewayStatusActive(data.payment_gateways?.truelayer?.status) ||
         isGatewayStatusActive(data.payment_gateways?.worldpay?.status) ||
         isGatewayStatusActive(data.payment_gateways?.klarna?.status);
 
       const response = await onboardingService.storeStepTenData({
-        ...data,
+        ...stepPayload,
         isApproved: true,
       });
 
       if (response && response.status) {
-        globalForm.setValue("stepTen", { ...data, isApproved: true });
+        globalForm.setValue("stepTen", { ...stepPayload, isApproved: true });
 
         // Navigate to step 11 in UI, but persist completed step as 10.
         void setActiveStep(11, { skipSessionSync: true });
@@ -429,10 +423,10 @@ export default function StepTen() {
             </OnboardingTitle>
             <p className="mx-auto max-w-xl text-sm leading-relaxed text-slate-400 sm:mx-0">
               Connect card payments with Stripe or PayPal, and optionally bank
-              transfers with TrueLayer. You don&apos;t have to set this up now —
-              skip and connect a provider anytime from Payment settings. Your
-              site still goes live; you just can&apos;t take bookings until a
-              provider is connected.
+              transfers. You don&apos;t have to set this up now. Skip and
+              connect a provider anytime from Payment settings. Your site still
+              goes live; you just can&apos;t take bookings until a provider is
+              connected.
             </p>
           </CardHeader>
 
@@ -495,15 +489,48 @@ export default function StepTen() {
                     <PaymentSetupLayout
                       stripeConnected={stripeConnected}
                       paypalConnected={paypalConnected}
-                      truelayerConnected={truelayerConnected}
                       stripeAccountId={paymentGateways?.stripe?.account_id}
                       paypalAccountId={paymentGateways?.paypal?.account_id}
-                      truelayerAccountId={
-                        paymentGateways?.truelayer?.account_id
+                      bankTransferConnected={typeof linkedBankId === "number"}
+                      bankTransfer={
+                        bankFeatureOn ? (
+                          <BankTransferFields
+                            variant="onboarding"
+                            hasOnlineAccount={stripeConnected || paypalConnected}
+                            sourceAccounts={
+                              typeof onlineAccountId === "number"
+                                ? [
+                                    {
+                                      id: onlineAccountId,
+                                      label: "Connected account",
+                                    },
+                                  ]
+                                : []
+                            }
+                            defaultSourceAccountId={
+                              typeof onlineAccountId === "number"
+                                ? onlineAccountId
+                                : null
+                            }
+                            linkedAccounts={
+                              typeof linkedBankId === "number"
+                                ? [
+                                    {
+                                      id: linkedBankId,
+                                      maskedKey: linkedBankKey,
+                                    },
+                                  ]
+                                : []
+                            }
+                            connecting={bankConnecting}
+                            disconnectingId={bankDisconnectingId}
+                            onConnect={handleBankConnect}
+                            onDisconnect={(accountId) =>
+                              void handleBankDisconnect(accountId)
+                            }
+                          />
+                        ) : undefined
                       }
-                      truelayerWebhookUrl={truelayerWebhookUrl}
-                      truelayerWebhookHint={truelayerWebhookHint}
-                      truelayerPublicKey={truelayerPublicKey}
                       loading={loading}
                       disconnecting={disconnecting}
                       onConnectStripe={(credentials) =>
@@ -512,14 +539,8 @@ export default function StepTen() {
                       onConnectPayPal={(credentials) =>
                         void handlePayPalConnect(credentials)
                       }
-                      onConnectTrueLayer={(credentials) =>
-                        void handleTrueLayerConnect(credentials)
-                      }
                       onDisconnectStripe={() => void handleDisconnect("stripe")}
                       onDisconnectPayPal={() => void handleDisconnect("paypal")}
-                      onDisconnectTrueLayer={() =>
-                        void handleDisconnect("truelayer")
-                      }
                       onSkip={() => void handleSkip()}
                       onFinish={() =>
                         void form.handleSubmit(onSubmit, onSubmitInvalid)()

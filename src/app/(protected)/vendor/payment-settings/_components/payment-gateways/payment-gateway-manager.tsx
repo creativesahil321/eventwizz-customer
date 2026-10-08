@@ -26,8 +26,11 @@ import {
   MAX_ACCOUNTS_PER_GATEWAY,
   MAX_TOTAL_ACCOUNTS,
   PaymentSettingsSetupLayout,
+  accountDisplayId,
   type GatewayKind,
 } from "./payment-settings-setup-layout";
+import { BankTransferFields } from "@/components/payment/bank-transfer-fields";
+import { Landmark } from "lucide-react";
 
 const PAYMENT_GATEWAYS_QUERY_KEY = ["vendor", "payment-gateways"] as const;
 
@@ -55,9 +58,7 @@ export function PaymentGatewayManager() {
     number | null
   >(null);
   const [accountToRemove, setAccountToRemove] = useState<number | null>(null);
-  const [truelayerConnectHint, setTruelayerConnectHint] = useState<
-    string | null
-  >(null);
+  const [bankConnecting, setBankConnecting] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: gatewaysData, isLoading, refetch } = useVendorPaymentGateways();
@@ -80,13 +81,23 @@ export function PaymentGatewayManager() {
     () => (paymentGateways.paypal ?? []).filter(isUsableAccount),
     [paymentGateways.paypal],
   );
-  const truelayerAccounts = useMemo(
-    () => (paymentGateways.truelayer ?? []).filter(isUsableAccount),
-    [paymentGateways.truelayer],
-  );
 
-  const totalAccounts =
-    stripeAccounts.length + paypalAccounts.length + truelayerAccounts.length;
+  const totalAccounts = stripeAccounts.length + paypalAccounts.length;
+  const bankTransferOffered = Object.prototype.hasOwnProperty.call(
+    paymentGateways,
+    "stripe_bank",
+  );
+  const bankAccounts = useMemo(
+    () => (paymentGateways.stripe_bank ?? []).filter(isUsableAccount),
+    [paymentGateways.stripe_bank],
+  );
+  const bankAccountIds = useMemo(
+    () => new Set(bankAccounts.map((account) => account.id)),
+    [bankAccounts],
+  );
+  const enabledStripeAccount = stripeAccounts.find(
+    (account) => account.is_enabled === true,
+  );
 
   const canAddStripe =
     canAdd.stripe === true &&
@@ -95,10 +106,6 @@ export function PaymentGatewayManager() {
   const canAddPayPal =
     canAdd.paypal === true &&
     paypalAccounts.length < MAX_ACCOUNTS_PER_GATEWAY &&
-    totalAccounts < MAX_TOTAL_ACCOUNTS;
-  const canAddTrueLayer =
-    canAdd.truelayer === true &&
-    truelayerAccounts.length < MAX_ACCOUNTS_PER_GATEWAY &&
     totalAccounts < MAX_TOTAL_ACCOUNTS;
 
   const removeAccountFromCache = useCallback(
@@ -186,7 +193,8 @@ export function PaymentGatewayManager() {
 
   const handleRemoveConfirm = useCallback(async () => {
     if (accountToRemove == null) return;
-    if (totalAccounts <= 1) {
+    const removingBankAccount = bankAccountIds.has(accountToRemove);
+    if (!removingBankAccount && totalAccounts <= 1) {
       toast.error("You must keep at least one payment account linked.");
       setAccountToRemove(null);
       return;
@@ -200,7 +208,7 @@ export function PaymentGatewayManager() {
         await vendorPaymentGatewayService.deletePaymentGateway(idToRemove);
       if (!res.status) return;
       removeAccountFromCache(idToRemove);
-      if (totalAccounts - 1 === 0) {
+      if (!removingBankAccount && totalAccounts - 1 === 0) {
         void updateSession({ has_payment_provider: false });
       }
       void refetch();
@@ -211,6 +219,7 @@ export function PaymentGatewayManager() {
     }
   }, [
     accountToRemove,
+    bankAccountIds,
     refetch,
     removeAccountFromCache,
     totalAccounts,
@@ -221,18 +230,9 @@ export function PaymentGatewayManager() {
     gateway: GatewayKind,
     credentials: PaymentGatewayCredentials,
   ) => {
-    const label =
-      gateway === "stripe"
-        ? "Stripe"
-        : gateway === "paypal"
-          ? "PayPal"
-          : "TrueLayer";
+    const label = gateway === "stripe" ? "Stripe" : "PayPal";
     const countByGateway =
-      gateway === "stripe"
-        ? stripeAccounts.length
-        : gateway === "paypal"
-          ? paypalAccounts.length
-          : truelayerAccounts.length;
+      gateway === "stripe" ? stripeAccounts.length : paypalAccounts.length;
 
     if (countByGateway >= MAX_ACCOUNTS_PER_GATEWAY) {
       toast.error(
@@ -262,10 +262,6 @@ export function PaymentGatewayManager() {
 
       if (!response.status) return;
 
-      if (gateway === "truelayer") {
-        setTruelayerConnectHint(response.data?.webhook_setup_hint || null);
-      }
-
       void refetch();
       void updateSession({ has_payment_provider: true });
     } catch (error) {
@@ -274,6 +270,35 @@ export function PaymentGatewayManager() {
     } finally {
       setLoading(false);
       setConnectingGateway(null);
+    }
+  };
+
+  const handleBankConnect = async (input: {
+    sourceAccountId?: number;
+    publishableKey?: string;
+    secret?: string;
+    replaceId?: number;
+  }) => {
+    setBankConnecting(true);
+    try {
+      const result = await vendorPaymentGatewayService.connectBankTransfer({
+        scope: "settings",
+        sourceAccountId: input.sourceAccountId,
+        replaceId: input.replaceId,
+        credentials:
+          input.publishableKey && input.secret
+            ? {
+                publishableKey: input.publishableKey,
+                secret: input.secret,
+              }
+            : undefined,
+      });
+      if (result.status) {
+        void refetch();
+      }
+      return result;
+    } finally {
+      setBankConnecting(false);
     }
   };
 
@@ -287,28 +312,68 @@ export function PaymentGatewayManager() {
         <PaymentSettingsSetupLayout
           stripeAccounts={stripeAccounts}
           paypalAccounts={paypalAccounts}
-          truelayerAccounts={truelayerAccounts}
           canAddStripe={canAddStripe}
           canAddPayPal={canAddPayPal}
-          canAddTrueLayer={canAddTrueLayer}
           loading={loading}
           connectingGateway={connectingGateway}
           enablingAccountId={enablingAccountId}
           disconnectingAccountId={disconnectingAccountId}
-          truelayerConnectHint={truelayerConnectHint}
           onConnectStripe={(credentials) =>
             void connectGateway("stripe", credentials)
           }
           onConnectPayPal={(credentials) =>
             void connectGateway("paypal", credentials)
           }
-          onConnectTrueLayer={(credentials) =>
-            void connectGateway("truelayer", credentials)
-          }
           onMakeDefault={(accountId) => void handleMakeDefault(accountId)}
           onDisconnect={(accountId) => setAccountToRemove(accountId)}
         />
       </div>
+
+      {bankTransferOffered ? (
+        <div className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-md sm:p-6">
+          <div className="mb-4 flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Landmark className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">
+                Bank Transfer
+              </h2>
+              <p className="text-sm text-slate-500">
+                Let customers pay straight from their bank account.
+              </p>
+            </div>
+          </div>
+          <BankTransferFields
+            variant="settings"
+            hasOnlineAccount={
+              stripeAccounts.length > 0 || paypalAccounts.length > 0
+            }
+            sourceAccounts={stripeAccounts.map((account) => ({
+              id: account.id,
+              label:
+                account.key ||
+                accountDisplayId(account) ||
+                `Account ${account.id}`,
+            }))}
+            defaultSourceAccountId={
+              enabledStripeAccount?.id ?? stripeAccounts[0]?.id ?? null
+            }
+            linkedAccounts={bankAccounts.map((account) => ({
+              id: account.id,
+              maskedKey: account.key,
+              isEnabled: account.is_enabled,
+            }))}
+            canAdd={canAdd.stripe_bank === true}
+            connecting={bankConnecting}
+            disconnectingId={disconnectingAccountId}
+            enablingAccountId={enablingAccountId}
+            onConnect={handleBankConnect}
+            onDisconnect={(accountId) => setAccountToRemove(accountId)}
+            onMakeDefault={(accountId) => void handleMakeDefault(accountId)}
+          />
+        </div>
+      ) : null}
 
       <AlertDialog
         open={accountToRemove != null}
@@ -318,8 +383,9 @@ export function PaymentGatewayManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this payment account?</AlertDialogTitle>
             <AlertDialogDescription>
-              Customers will no longer be able to pay with this account. You can
-              link it again later. You must keep at least one payment account.
+              {accountToRemove != null && bankAccountIds.has(accountToRemove)
+                ? "Customers will no longer be able to pay with this account. You can link it again later."
+                : "Customers will no longer be able to pay with this account. You can link it again later. You must keep at least one payment account."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

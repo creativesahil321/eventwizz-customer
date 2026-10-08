@@ -140,7 +140,7 @@ export type StripePaymentSuccessResponse = {
   data?: StripePaymentSuccessData;
 };
 
-/** Redirect-based gateway details (PayPal, TrueLayer, etc.).
+/** Redirect-based gateway details (PayPal and other hosted checkouts).
  *  Unlike Stripe (embedded modal), these hand off to a hosted checkout page. */
 export interface CheckoutRedirectDetails {
   /** Hosted checkout URL the customer is sent to. */
@@ -154,9 +154,11 @@ export interface CheckoutRedirectDetails {
 export interface CheckoutPaymentInfo {
   gateway: string;
   stripe?: CheckoutStripeDetails;
+  /** Bank Transfer. Same shape as `stripe`, from a different account key. */
+  stripe_bank?: CheckoutStripeDetails;
   /** Present when gateway is "paypal". */
   paypal?: CheckoutRedirectDetails;
-  /** Generic redirect payload for other hosted gateways (e.g. TrueLayer). */
+  /** Generic redirect payload for other hosted gateways. */
   redirect_url?: string;
 }
 
@@ -192,7 +194,7 @@ export interface CheckoutResponseData {
   amount: number;
   due_later?: number | null;
   payment: CheckoutPaymentInfo;
-  /** Legacy redirect-based gateways (PayPal, TrueLayer, etc.) */
+  /** Legacy redirect-based gateways (PayPal and other hosted checkouts). */
   redirect_url?: string;
   /** Legacy fields — kept for backward compatibility */
   booking_id?: number;

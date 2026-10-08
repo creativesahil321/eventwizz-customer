@@ -1,4 +1,4 @@
-/** Credentials for Stripe / PayPal / TrueLayer manual connect */
+/** Credentials for Stripe / PayPal manual connect */
 export type PaymentGatewayCredentials = {
   key: string;
   secret: string;
@@ -18,8 +18,6 @@ export type PaymentGatewayConnectAccount = {
 export type PaymentGatewayConnectVerification = {
   stripe_account_verified_at?: string | null;
   paypal_oauth_verified_at?: string | null;
-  truelayer_oauth_verified_at?: string | null;
-  truelayer_env?: string | null;
   charges_enabled?: boolean;
   payouts_enabled?: boolean;
   manual_webhook?: boolean;
@@ -32,7 +30,6 @@ export type PaymentGatewayConnectData = {
   webhook_url?: string | null;
   manual_webhook?: boolean;
   webhook_setup_hint?: string | null;
-  /** TrueLayer signing public key (PEM), when generated */
   public_key?: string | null;
   verification?: PaymentGatewayConnectVerification;
   account_id?: string;
@@ -47,11 +44,11 @@ export type PaymentGatewayConnectResponse = {
 };
 
 export type PaymentGatewayName =
-  | "truelayer"
   | "stripe"
   | "paypal"
   | "worldpay"
-  | "klarna";
+  | "klarna"
+  | "stripe_bank";
 
 export function formatPaymentGatewayConnectErrors(
   errors?: string[] | Record<string, string[]>,

@@ -47,9 +47,7 @@ const getPaymentIcon = (method: string) => {
     return CreditCard;
   }
   if (
-    methodLower.includes("bank") ||
-    methodLower.includes("transfer") ||
-    methodLower.includes("truelayer")
+    methodLower.includes("bank") || methodLower.includes("transfer")
   ) {
     return Building2;
   }

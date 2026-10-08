@@ -140,6 +140,7 @@ interface FormBodyProps {
   onHasExpressCheckout: (value: boolean) => void;
   onSubmit: () => void;
   onExpressConfirm: (event: StripeExpressCheckoutElementConfirmEvent) => void;
+  variant?: "card" | "bank";
 }
 
 function StripeFormBody({
@@ -153,6 +154,7 @@ function StripeFormBody({
   onHasExpressCheckout,
   onSubmit,
   onExpressConfirm,
+  variant = "card",
 }: FormBodyProps) {
   const { format: formatMoney } = useCurrencyFormat();
 
@@ -215,55 +217,73 @@ function StripeFormBody({
       </div>
 
       <div className="space-y-3">
-        <div className="checkout-stripe-express w-full min-h-[44px]">
-          <ExpressCheckoutElement
-            options={{
-              buttonTheme: { applePay: "black", googlePay: "black" },
-              buttonType: { applePay: "plain", googlePay: "buy" },
-              layout: { maxColumns: 2, maxRows: 2 },
-              paymentMethods: {
-                applePay: "always",
-                googlePay: "always",
-                link: "auto",
-                amazonPay: "auto",
-                paypal: "auto",
-              },
-            }}
-            onReady={({ availablePaymentMethods }) => {
-              onHasExpressCheckout(
-                Boolean(
-                  availablePaymentMethods &&
-                  Object.keys(availablePaymentMethods).length > 0,
-                ),
-              );
-            }}
-            onConfirm={onExpressConfirm}
-          />
-        </div>
-
-        {hasExpressCheckout ? (
-          <div className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-[color:var(--checkout-border)]" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--checkout-muted-foreground)]">
-                Or pay another way
-              </span>
-            </div>
+        {variant === "bank" ? (
+          <div className="checkout-stripe-payment w-full">
+            <PaymentElement
+              options={{
+                layout: { type: "accordion" },
+                business: { name: merchantName },
+              }}
+            />
           </div>
         ) : null}
+        {variant === "card" ? (
+          <>
+            <div className="checkout-stripe-express w-full min-h-[44px]">
+              <ExpressCheckoutElement
+                options={{
+                  buttonTheme: { applePay: "black", googlePay: "black" },
+                  buttonType: { applePay: "plain", googlePay: "buy" },
+                  layout: { maxColumns: 2, maxRows: 2 },
+                  paymentMethods: {
+                    applePay: "always",
+                    googlePay: "always",
+                    link: "auto",
+                    amazonPay: "auto",
+                    paypal: "auto",
+                  },
+                }}
+                onReady={({ availablePaymentMethods }) => {
+                  onHasExpressCheckout(
+                    Boolean(
+                      availablePaymentMethods &&
+                      Object.keys(availablePaymentMethods).length > 0,
+                    ),
+                  );
+                }}
+                onConfirm={onExpressConfirm}
+              />
+            </div>
 
-        <div className="checkout-stripe-payment w-full">
-          <PaymentElement
-            options={{
-              layout: { type: "tabs" },
-              wallets: { applePay: "never", googlePay: "never", link: "never" },
-              business: { name: merchantName },
-              fields: { billingDetails: { address: "auto" } },
-            }}
-          />
-        </div>
+            {hasExpressCheckout ? (
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-[color:var(--checkout-border)]" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--checkout-muted-foreground)]">
+                    Or pay another way
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="checkout-stripe-payment w-full">
+              <PaymentElement
+                options={{
+                  layout: { type: "tabs" },
+                  wallets: {
+                    applePay: "never",
+                    googlePay: "never",
+                    link: "never",
+                  },
+                  business: { name: merchantName },
+                  fields: { billingDetails: { address: "auto" } },
+                }}
+              />
+            </div>
+          </>
+        ) : null}
       </div>
 
       {errorMessage ? (
@@ -300,6 +320,11 @@ function StripeFormBody({
           )}
         </Button>
 
+        {variant === "bank" ? (
+          <p className="text-center text-[11px] leading-relaxed text-[color:var(--checkout-muted-foreground)]">
+            Pay securely from your bank app. No card needed.
+          </p>
+        ) : (
         <div className="rounded-xl border border-[color:var(--checkout-border)]/60 bg-[color:var(--checkout-muted)]/25 px-4 py-3">
           <div className="grid grid-cols-1 gap-1.5 text-center text-[10px] font-medium text-[color:var(--checkout-muted-foreground)] sm:grid-cols-3 sm:gap-0">
             <span className="inline-flex items-center justify-center gap-1.5">
@@ -316,6 +341,7 @@ function StripeFormBody({
             your payment information.
           </p>
         </div>
+        )}
       </div>
     </div>
   );
@@ -637,6 +663,82 @@ function CheckoutSessionForm({
   );
 }
 
+function customerSafePaymentMessage(message: string | null | undefined): string {
+  const text = message?.trim() || "Your bank transfer wasn't completed. Please try again.";
+  if (/stripe/i.test(text)) {
+    return "Your bank transfer wasn't completed. Please try again.";
+  }
+  return text;
+}
+
+function BankTransferForm({
+  session,
+  merchantName,
+  sessionSecondsLeft,
+  successReturnPath,
+}: FormProps) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [handedOff, setHandedOff] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements || handedOff) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const returnUrl = buildStripeReturnUrl(session, {
+        path: successReturnPath,
+      });
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: { return_url: returnUrl },
+      });
+
+      if (error) {
+        setErrorMessage(customerSafePaymentMessage(error.message));
+        return;
+      }
+
+      setHandedOff(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? customerSafePaymentMessage(error.message)
+          : "Your bank transfer wasn't completed. Please try again.";
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (handedOff) {
+    return (
+      <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        Your bank transfer is being processed. We&apos;ll confirm your booking
+        as soon as your bank completes the payment.
+      </p>
+    );
+  }
+
+  return (
+    <StripeFormBody
+      variant="bank"
+      session={session}
+      merchantName={merchantName}
+      sessionSecondsLeft={sessionSecondsLeft}
+      isReady={Boolean(stripe && elements)}
+      isSubmitting={isSubmitting}
+      errorMessage={errorMessage}
+      hasExpressCheckout={false}
+      onHasExpressCheckout={() => undefined}
+      onSubmit={() => void handleSubmit()}
+      onExpressConfirm={() => undefined}
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Public modal component
 // ---------------------------------------------------------------------------
@@ -668,7 +770,9 @@ export default function CheckoutStripePaymentModal({
     return getStripePromise(session.publishableKey);
   }, [session?.publishableKey]);
 
-  const isCheckoutSession = Boolean(session?.checkoutSessionId);
+  const isBankTransfer = session?.gateway === "stripe_bank";
+  const isCheckoutSession =
+    Boolean(session?.checkoutSessionId) && !isBankTransfer;
 
   // Options for Payment Intents (legacy Elements)
   const piElementsOptions = useMemo<StripeElementsOptions | null>(() => {
@@ -733,7 +837,9 @@ export default function CheckoutStripePaymentModal({
               Complete your payment
             </DialogTitle>
             <DialogDescription className="text-xs leading-relaxed">
-              Select a payment method below to confirm your booking.
+              {isBankTransfer
+                ? "Pay securely from your bank app. No card needed."
+                : "Select a payment method below to confirm your booking."}
             </DialogDescription>
           </DialogHeader>
 
@@ -744,6 +850,14 @@ export default function CheckoutStripePaymentModal({
                 Preparing secure checkout...
               </p>
             </div>
+          ) : isBankTransfer ? (
+            <Elements
+              key={session.paymentIntentId}
+              stripe={stripePromise}
+              options={piElementsOptions!}
+            >
+              <BankTransferForm {...formProps} />
+            </Elements>
           ) : isCheckoutSession ? (
             // ─── Checkout Sessions API (new) ────────────────────────────────
             <CheckoutElementsProvider

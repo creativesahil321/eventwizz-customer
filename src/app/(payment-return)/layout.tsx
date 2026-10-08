@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth/authOptions";
 import "@/assets/scss/app.scss";
 
 /**
- * Minimal layout for payment gateway return URLs (Stripe/PayPal/TrueLayer).
+ * Minimal layout for payment gateway return URLs (Stripe and PayPal).
  * No header, sidebar, or footer — clean standalone page like onboarding return,
  * so the OAuth popup shows only the processing/success/error UI.
  */

@@ -59,7 +59,7 @@ The Admin Dashboard consists of 18 core sections accessible from the admin porta
 
 4. **Transaction History** ([Open Transaction History](/admin/transactions)):
    - Centralized ledger of every customer booking and payment across all venues.
-   - Details: Booking number, Customer Name, Venue, Amount, Platform Fee, Payment Method (Stripe, PayPal, TrueLayer), Status (Completed, Pending, Refunded), Date.
+   - Details: Booking number, Customer Name, Venue, Amount, Platform Fee, Payment Method (Stripe, PayPal, Bank Transfer), Status (Completed, Pending, Refunded), Date.
 
 5. **Dispute Resolution Centre** ([Open Dispute Resolution](/admin/disputes)):
    - Centralised dispute mediation between customers and venues (e.g. cancellations, refund disputes, no-shows).
@@ -301,7 +301,7 @@ When a new vendor registers, they go through a **11-step onboarding** to create 
 7. **Other Packages** — **Drinks (optional)**. If no drink packages, you can remove this section. Otherwise: drinks title, description, drink packages with title, price, quantity.
 8. **Brochure info** — **Event location/address** (event address field), brochure PDFs, event flyer/FAQ PDFs, **price start from**, button text, downloads. This is where **event location** and **brochure** are set.
 9. **FAQs** — Frequently asked questions and answers for the event.
-10. **Payment** — **Payment gateways**: Connect **Stripe** (Stripe Connect), **PayPal**, **TrueLayer** (Pay by Bank), **WorldPay**, or **Klarna**. You need at least one connected to accept payments (or you can skip and set up later). After saving or skipping, you continue to Domain.
+10. **Payment** — **Payment gateways**: Connect **Stripe** (Stripe Connect), **PayPal**, **WorldPay**, or **Klarna**. Bank Transfer is an optional add-on after Stripe or PayPal is connected. You need at least one online provider connected to accept payments (or you can skip and set up later). After saving or skipping, you continue to Domain.
 11. **Domain** — Your venue gets a **subdomain** (e.g. yourvenue.eventwizz.com). Step 11 handles domain suggestion/selection, reminder email settings, and confirm domain. After finishing, onboarding is complete and you are redirected to the **vendor dashboard**.
 
 ### AI onboarding vs manual
@@ -316,7 +316,7 @@ When a new vendor registers, they go through a **11-step onboarding** to create 
 - **Event location**: Set in **Step 8 (Brochure info)** — event address and map.
 - **Brochure**: Step 8 — brochure PDF, event flyer PDF, FAQ PDF, and any extra downloads.
 - **Deposit system**: Step 5, per date — for tables (or “both”), you can enable deposit: type (amount/percentage), value, and due date. Customers pay deposit at checkout and the rest by the due date.
-- **Payment**: Step 10 — connect your **Stripe account** (and/or PayPal, TrueLayer, etc.) to receive payments.
+- **Payment**: Step 10 — connect your **Stripe account** (and/or PayPal) to receive payments. Bank Transfer can be added after an online provider is connected.
 - **Domain**: Step 11 — your **subdomain** is chosen/confirmed after payment; you confirm it in Step 11.
 
 ## Vendor Registration Process
@@ -382,7 +382,7 @@ After selecting a venue on the Welcome page, the vendor sees the **vendor dashbo
 
 19. **Dispute Resolution** (/vendor/dispute-resolution) — View and handle **disputes** (e.g. between vendor and customer). Platform may use this for dispute resolution flows.
 
-20. **Payment Settings** (/vendor/payment-settings) — **Connect payment providers**: Stripe Connect, PayPal, TrueLayer (Pay by Bank), WorldPay, Klarna. Connect or disconnect gateways; manage how you receive payments. This is **not** the same as Transactions (which only shows payment history).
+20. **Payment Settings** (/vendor/payment-settings) — **Connect payment providers**: Stripe Connect, PayPal, WorldPay, Klarna. Bank Transfer can be added after Stripe or PayPal is connected. Connect or disconnect gateways; manage how you receive payments. This is **not** the same as Transactions (which only shows payment history).
 
 ### Header (top bar)
 
@@ -647,7 +647,7 @@ The system automatically detects event themes and displays corresponding animati
 
 ### Onboarding Process (Summary)
 
-The full **11-step vendor onboarding** is described in the "Vendor Onboarding (Fresh Vendor)" section above. In short: (1) Venue info (2) Site/landing page (3) Event details and schedule (4) Packages and gallery (5) Dates with tickets/tables and per-date deposit options (6) Catering menu, optional (7) Drink packages, optional (8) Brochure info, event location/address, PDFs (9) FAQs (10) Payment — connect Stripe, PayPal, TrueLayer, WorldPay, or Klarna (or skip) (11) Domain — subdomain and reminders. After Step 11, the vendor is redirected to the vendor dashboard and the site is live. Vendors can use **AI-assisted** onboarding (AI generates steps 2–9; they review and apply, then do payment and domain) or **manual** (fill all 11 steps themselves).
+The full **11-step vendor onboarding** is described in the "Vendor Onboarding (Fresh Vendor)" section above. In short: (1) Venue info (2) Site/landing page (3) Event details and schedule (4) Packages and gallery (5) Dates with tickets/tables and per-date deposit options (6) Catering menu, optional (7) Drink packages, optional (8) Brochure info, event location/address, PDFs (9) FAQs (10) Payment — connect Stripe, PayPal, WorldPay, or Klarna (or skip); Bank Transfer is optional after an online provider is connected (11) Domain — subdomain and reminders. After Step 11, the vendor is redirected to the vendor dashboard and the site is live. Vendors can use **AI-assisted** onboarding (AI generates steps 2–9; they review and apply, then do payment and domain) or **manual** (fill all 11 steps themselves).
 
 ### Event Creation Process
 
@@ -1018,7 +1018,7 @@ Manual steps:
 7. **Brochure info** — PDFs, event address/map (event location lives here)
 8. **Other Packages** — drinks / add-ons
 9. **FAQs**
-10. **Payment** — connect Stripe / PayPal / TrueLayer (or skip and continue)
+10. **Payment** — connect Stripe / PayPal (or skip and continue). Bank Transfer is optional after an online provider is connected.
 11. **Domain** — booking subdomain, confirm domain, optional balance reminder emails
 
 ## After vendor login

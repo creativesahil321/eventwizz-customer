@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  CreditCard,
   Building2,
+  CreditCard,
   Smartphone,
   Clock,
   CheckCircle,
@@ -35,17 +35,6 @@ const PAYMENT_GATEWAYS = {
     textColor: "text-[color:var(--checkout-brand-accent)]",
     iconBg: "bg-[color:color-mix(in_srgb,var(--checkout-brand-accent)_12%,white)]",
   },
-  truelayer: {
-    id: "truelayer",
-    name: "Bank Transfer",
-    description: "Pay directly from your bank",
-    icon: Building2,
-    processingTime: "1-2 business days",
-    brandColor: "from-emerald-500 to-green-600",
-    bgSelected: "bg-emerald-50 border-emerald-300",
-    textColor: "text-emerald-700",
-    iconBg: "bg-emerald-100",
-  },
   worldpay: {
     id: "worldpay",
     name: "WorldPay",
@@ -68,14 +57,25 @@ const PAYMENT_GATEWAYS = {
     textColor: "text-pink-700",
     iconBg: "bg-pink-100",
   },
+  stripe_bank: {
+    id: "stripe_bank",
+    name: "Bank Transfer",
+    description: "Pay securely from your bank app. No card needed.",
+    icon: Building2,
+    processingTime: "In your bank app",
+    brandColor: "from-emerald-500 to-green-600",
+    bgSelected: "bg-emerald-50 border-emerald-300",
+    textColor: "text-emerald-700",
+    iconBg: "bg-emerald-100",
+  },
 } as const;
 
 const GATEWAY_PROMPT_NAMES: Record<string, string> = {
   stripe: "Stripe",
   paypal: "PayPal",
-  truelayer: "bank transfer",
   worldpay: "WorldPay",
   klarna: "Klarna",
+  stripe_bank: "Bank Transfer",
 };
 
 /** e.g. "Choose PayPal or Stripe to continue" from available cart gateways. */

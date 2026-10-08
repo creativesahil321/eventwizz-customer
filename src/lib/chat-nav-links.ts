@@ -24,7 +24,7 @@ const NAV_RULES: NavRule[] = [
   {
     id: "payment",
     pattern:
-      /\b(payment (gateway|settings|provider)|stripe|paypal|truelayer|connect payment|change payment|payment method)\b/i,
+      /\b(payment (gateway|settings|provider)|stripe|paypal|connect payment|change payment|payment method)\b/i,
     vendor: { href: "/vendor/payment-settings", label: "Open Payment Settings" },
     admin: { href: "/admin/settings", label: "Open Settings" },
     requiredPermission: "read-account",

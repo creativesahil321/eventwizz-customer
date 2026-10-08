@@ -1610,7 +1610,7 @@ export function isChatPayIntent(text: string): boolean {
 export function parseChatPaymentGatewaySlug(text: string): string | null {
   const n = normalize(text);
   if (/\bpaypal\b/.test(n)) return "paypal";
-  if (/\b(truelayer|bank transfer)\b/.test(n)) return "truelayer";
+  if (/\bbank transfer\b/.test(n)) return "stripe_bank";
   if (/\bklarna\b/.test(n)) return "klarna";
   if (/\bworldpay\b/.test(n)) return "worldpay";
   if (/\b(card|stripe|credit card|debit card)\b/.test(n)) return "stripe";

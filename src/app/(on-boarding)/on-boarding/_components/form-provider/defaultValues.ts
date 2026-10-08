@@ -166,14 +166,6 @@ export const defaultValues: OnboardingFormData = {
         status: undefined,
         account_id: "",
       },
-      truelayer: {
-        status: undefined,
-        account_id: "",
-        bank: {
-          bank_name: undefined,
-          account_masked: undefined,
-        },
-      },
       worldpay: {
         status: undefined,
         account_id: "",

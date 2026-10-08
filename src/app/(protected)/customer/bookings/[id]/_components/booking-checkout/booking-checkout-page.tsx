@@ -36,6 +36,10 @@ import type {
   RescheduleBookingPayload,
 } from "@/services/customer/bookings/type";
 import { toast } from "sonner";
+import {
+  isPaymentAlreadyProcessing,
+  PAYMENT_ALREADY_PROCESSING_MESSAGE,
+} from "@/lib/payment-already-processing";
 import { resolveBookingPayAllVisibility } from "./booking-payment-visibility";
 import { AddExtrasSection } from "./add-extras-panel";
 import {
@@ -280,6 +284,8 @@ export default function BookingCheckoutPage({
   const [selectedPaymentGatewayId, setSelectedPaymentGatewayId] = useState<
     number | null
   >(null);
+  const [paymentAlreadyProcessing, setPaymentAlreadyProcessing] =
+    useState(false);
 
   const availablePaymentGateways = useMemo(
     () => normalizeReschedulePaymentGateways(null, paymentGateways),
@@ -442,6 +448,7 @@ export default function BookingCheckoutPage({
   const paymentDate = dates.find((d) => d.id === paymentDateId);
 
   const handlePayForDate = (dateId: string) => {
+    if (paymentAlreadyProcessing) return;
     const date = dates.find((d) => d.id === dateId) as CheckoutDate | undefined;
     const pendingRequest =
       date?.reschedule_requests?.find((request) => request.unpaid_amount > 0) ??
@@ -454,6 +461,7 @@ export default function BookingCheckoutPage({
   };
 
   const handleRescheduleClick = (date: CheckoutDate) => {
+    if (paymentAlreadyProcessing) return;
     setSelectedDateForReschedule(date);
     setRescheduleModalOpen(true);
   };
@@ -464,6 +472,18 @@ export default function BookingCheckoutPage({
     }
 
     rescheduleMutation.mutate(payload, {
+      onError: (error) => {
+        if (!isPaymentAlreadyProcessing(error)) return;
+        setPaymentAlreadyProcessing(true);
+        setRescheduleModalOpen(false);
+        setPaymentModalOpen(false);
+        void queryClient.invalidateQueries({
+          queryKey: bookingsKeys.bookingDetails(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: bookingsKeys.lists(),
+        });
+      },
       onSuccess: (response) => {
         if (!response.status || !response.data) return;
 
@@ -491,6 +511,7 @@ export default function BookingCheckoutPage({
     date: CheckoutDate,
     request: BookingRescheduleRequest,
   ) => {
+    if (paymentAlreadyProcessing) return;
     setPaymentDateId(date.id);
     setRescheduleRequest(request);
     setPaymentModalOpen(true);
@@ -573,6 +594,18 @@ export default function BookingCheckoutPage({
 
     paymentMutation.mutate(payload, {
       onSuccess: handlePaymentApiSuccess,
+      onError: (error) => {
+        if (!isPaymentAlreadyProcessing(error)) return;
+        setPaymentAlreadyProcessing(true);
+        setPaymentModalOpen(false);
+        setRescheduleModalOpen(false);
+        void queryClient.invalidateQueries({
+          queryKey: bookingsKeys.bookingDetails(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: bookingsKeys.lists(),
+        });
+      },
     });
   };
 
@@ -844,7 +877,12 @@ export default function BookingCheckoutPage({
         )}
 
         {/* Desktop: full pay bar with gateway selector */}
-        {showPaymentFooter && (
+        {paymentAlreadyProcessing ? (
+          <div className="hidden border-t border-sky-200 bg-sky-50 px-4 py-4 text-sm text-sky-950 lg:block lg:rounded-b-xl">
+            {PAYMENT_ALREADY_PROCESSING_MESSAGE}
+          </div>
+        ) : null}
+        {showPaymentFooter && !paymentAlreadyProcessing && (
           <div className="hidden bg-foreground text-card p-4 sm:p-6 lg:block lg:p-8 lg:py-4 lg:rounded-b-xl">
             {payAllVisibility.showFooterPaymentControls &&
               availablePaymentGateways.length > 1 && (
@@ -942,8 +980,13 @@ export default function BookingCheckoutPage({
         )}
       </section>
 
+      {paymentAlreadyProcessing ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 lg:hidden">
+          {PAYMENT_ALREADY_PROCESSING_MESSAGE}
+        </div>
+      ) : null}
       {/* Mobile: compact sticky pay bar — no gateway selector (modal handles that) */}
-      {showPaymentFooter && (
+      {showPaymentFooter && !paymentAlreadyProcessing && (
         <div
           className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-foreground px-4 py-3 text-card lg:hidden"
           style={{

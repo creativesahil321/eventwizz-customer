@@ -14,6 +14,10 @@ import { fetchProfileData } from "@/app/(protected)/_shared/profile/_lib/queries
 import { backendProxyHeaders } from "@/lib/backend/backend-transport";
 import { restoreAdminAfterImpersonation } from "@/lib/auth/impersonation-session";
 import { logout } from "@/lib/auth/logout";
+import {
+  getLogoutInProgress,
+  setLogoutInProgress,
+} from "@/lib/auth/logout-state";
 import { toast } from "sonner";
 
 /**
@@ -251,16 +255,32 @@ export function useExitImpersonation() {
         throw new Error("No active impersonation session to exit.");
       }
 
-      try {
-        await impersonationService.exitImpersonation();
-      } catch {
-        console.warn(
-          "[Impersonation] Backend exit notification failed. Continuing with local restore."
-        );
-      }
+      // Suppress the api-client's 401 handler for the duration of the swap.
+      // The backend exit call invalidates the vendor's token the instant it
+      // returns, so any in-flight request still holding the vendor cookie
+      // will come back 401. Without this flag, that stray 401 races the exit
+      // flow and triggers a full logout — leaving the admin on /auth/login
+      // instead of back in their own session. Permission guards also hold
+      // off during this window. Reset in a `finally` for the error path;
+      // on success the hard navigation reloads the module anyway.
+      const alreadyInProgress = getLogoutInProgress();
+      setLogoutInProgress(true);
 
-      if (!(await restoreAdminAfterImpersonation())) {
-        throw new Error("Failed to restore admin session.");
+      try {
+        try {
+          await impersonationService.exitImpersonation();
+        } catch {
+          console.warn(
+            "[Impersonation] Backend exit notification failed. Continuing with local restore."
+          );
+        }
+
+        if (!(await restoreAdminAfterImpersonation())) {
+          throw new Error("Failed to restore admin session.");
+        }
+      } catch (err) {
+        if (!alreadyInProgress) setLogoutInProgress(false);
+        throw err;
       }
     },
 
