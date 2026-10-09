@@ -252,13 +252,18 @@ export function resolveCheckoutCtaState(
 
   // Missing gateway must NOT disable the CTA — on mobile the picker lives in
   // the summary drawer, and a greyed "Select payment method" looks broken.
+  // A pending hold must not be resumed while the cart on screen is invalid
+  // (e.g. seating edited after the hold was created).
   const disabled = input.hasPendingStripePayment
-    ? loading
+    ? loading || input.hasValidationErrors
     : loading || !input.hasPayableTotal || input.hasValidationErrors;
 
   let label: string;
   let mobileLabel: string;
-  if (input.hasPendingStripePayment && input.stripePaymentAmount != null) {
+  if (input.hasPendingStripePayment && input.hasValidationErrors && !loading) {
+    label = "Complete selections";
+    mobileLabel = "Complete selections";
+  } else if (input.hasPendingStripePayment && input.stripePaymentAmount != null) {
     label = `Complete payment · ${input.formatMoney(input.stripePaymentAmount)}`;
     // Keep amount; layout stacks full-width on mobile so this won't truncate.
     // Amount already shown in the sticky total row — keep the CTA short on phones.
