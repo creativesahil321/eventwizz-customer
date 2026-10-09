@@ -33,6 +33,7 @@ import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { useDomain } from "@/providers/domain-provider/domain-provider";
 import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
 import {
+  buildBankTransferCheckoutReturnUrl,
   buildStripeReturnUrl,
   confirmStripePaymentSuccess,
 } from "@/services/customer/checkout/checkout-payment";
@@ -141,6 +142,15 @@ interface FormBodyProps {
   onSubmit: () => void;
   onExpressConfirm: (event: StripeExpressCheckoutElementConfirmEvent) => void;
   variant?: "card" | "bank";
+  infoMessage?: string | null;
+  alternateGateways?: CheckoutGatewaySwitch[];
+  onSwitchGateway?: (gatewayId: number) => void;
+  isSwitchingGateway?: boolean;
+}
+
+export interface CheckoutGatewaySwitch {
+  id: number;
+  label: string;
 }
 
 function StripeFormBody({
@@ -155,6 +165,10 @@ function StripeFormBody({
   onSubmit,
   onExpressConfirm,
   variant = "card",
+  infoMessage,
+  alternateGateways,
+  onSwitchGateway,
+  isSwitchingGateway = false,
 }: FormBodyProps) {
   const { format: formatMoney } = useCurrencyFormat();
 
@@ -184,6 +198,12 @@ function StripeFormBody({
             size="md"
           />
         </div>
+      ) : null}
+
+      {infoMessage ? (
+        <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+          {infoMessage}
+        </p>
       ) : null}
 
       <div className="rounded-xl border border-[color:var(--checkout-border)] bg-[color:var(--checkout-muted)]/30 px-4 py-3.5">
@@ -299,7 +319,7 @@ function StripeFormBody({
         <Button
           type="button"
           onClick={onSubmit}
-          disabled={!isReady || isSubmitting}
+          disabled={!isReady || isSubmitting || isSwitchingGateway}
           className={cn(
             "checkout-stripe-pay-btn h-12 w-full rounded-xl border-0 text-sm font-bold shadow-md",
             "shadow-[oklch(0.208_0.042_265.755/0.2)]",
@@ -307,7 +327,12 @@ function StripeFormBody({
             "hover:!brightness-110 disabled:!opacity-55",
           )}
         >
-          {isSubmitting ? (
+          {isSwitchingGateway ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Switching...
+            </span>
+          ) : isSubmitting ? (
             <span className="inline-flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
               Processing secure payment...
@@ -343,6 +368,31 @@ function StripeFormBody({
         </div>
         )}
       </div>
+
+      {alternateGateways && alternateGateways.length > 0 && onSwitchGateway ? (
+        <div className="space-y-2 border-t border-[color:var(--checkout-border)] pt-4">
+          <p className="text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--checkout-muted-foreground)]">
+            Or pay another way
+          </p>
+          <div className="grid gap-2">
+            {alternateGateways.map((gateway) => (
+              <Button
+                key={gateway.id}
+                type="button"
+                variant="outline"
+                disabled={isSubmitting || isSwitchingGateway}
+                onClick={() => onSwitchGateway(gateway.id)}
+                className="h-11 w-full rounded-xl"
+              >
+                {isSwitchingGateway ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {gateway.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -358,6 +408,10 @@ interface FormProps {
   successReturnPath?: string;
   onPaymentComplete?: () => void;
   onClose: () => void;
+  infoMessage?: string | null;
+  alternateGateways?: CheckoutGatewaySwitch[];
+  onSwitchGateway?: (gatewayId: number) => void;
+  isSwitchingGateway?: boolean;
 }
 
 function PaymentIntentForm({
@@ -367,6 +421,10 @@ function PaymentIntentForm({
   successReturnPath,
   onPaymentComplete,
   onClose,
+  infoMessage,
+  alternateGateways,
+  onSwitchGateway,
+  isSwitchingGateway = false,
 }: FormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -457,7 +515,7 @@ function PaymentIntentForm({
   );
 
   const handleSubmit = async () => {
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || isSwitchingGateway) return;
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
@@ -477,6 +535,7 @@ function PaymentIntentForm({
   const handleExpressConfirm = async (
     event: StripeExpressCheckoutElementConfirmEvent,
   ) => {
+    if (isSwitchingGateway) return;
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
@@ -505,6 +564,10 @@ function PaymentIntentForm({
       onHasExpressCheckout={setHasExpressCheckout}
       onSubmit={handleSubmit}
       onExpressConfirm={handleExpressConfirm}
+      infoMessage={infoMessage}
+      alternateGateways={alternateGateways}
+      onSwitchGateway={onSwitchGateway}
+      isSwitchingGateway={isSwitchingGateway}
     />
   );
 }
@@ -520,6 +583,10 @@ function CheckoutSessionForm({
   successReturnPath,
   onPaymentComplete,
   onClose,
+  infoMessage,
+  alternateGateways,
+  onSwitchGateway,
+  isSwitchingGateway = false,
 }: FormProps) {
   const result = useCheckoutElements();
   const router = useRouter();
@@ -600,7 +667,7 @@ function CheckoutSessionForm({
   );
 
   const handleSubmit = async () => {
-    if (!checkout) return;
+    if (!checkout || isSwitchingGateway) return;
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
@@ -620,6 +687,7 @@ function CheckoutSessionForm({
   const handleExpressConfirm = async (
     event: StripeExpressCheckoutElementConfirmEvent,
   ) => {
+    if (isSwitchingGateway) return;
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
@@ -659,6 +727,10 @@ function CheckoutSessionForm({
       onHasExpressCheckout={setHasExpressCheckout}
       onSubmit={handleSubmit}
       onExpressConfirm={handleExpressConfirm}
+      infoMessage={infoMessage}
+      alternateGateways={alternateGateways}
+      onSwitchGateway={onSwitchGateway}
+      isSwitchingGateway={isSwitchingGateway}
     />
   );
 }
@@ -675,7 +747,10 @@ function BankTransferForm({
   session,
   merchantName,
   sessionSecondsLeft,
-  successReturnPath,
+  infoMessage,
+  alternateGateways,
+  onSwitchGateway,
+  isSwitchingGateway = false,
 }: FormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -684,13 +759,11 @@ function BankTransferForm({
   const [handedOff, setHandedOff] = useState(false);
 
   const handleSubmit = async () => {
-    if (!stripe || !elements || handedOff) return;
+    if (!stripe || !elements || handedOff || isSwitchingGateway) return;
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      const returnUrl = buildStripeReturnUrl(session, {
-        path: successReturnPath,
-      });
+      const returnUrl = buildBankTransferCheckoutReturnUrl(session);
       const { error } = await stripe.confirmPayment({
         elements,
         confirmParams: { return_url: returnUrl },
@@ -735,6 +808,10 @@ function BankTransferForm({
       onHasExpressCheckout={() => undefined}
       onSubmit={() => void handleSubmit()}
       onExpressConfirm={() => undefined}
+      infoMessage={infoMessage}
+      alternateGateways={alternateGateways}
+      onSwitchGateway={onSwitchGateway}
+      isSwitchingGateway={isSwitchingGateway}
     />
   );
 }
@@ -752,6 +829,10 @@ interface CheckoutStripePaymentModalProps {
   /** Override post-payment redirect path (default: /vendor/payment/success) */
   successReturnPath?: string;
   onPaymentComplete?: () => void;
+  infoMessage?: string | null;
+  alternateGateways?: CheckoutGatewaySwitch[];
+  onSwitchGateway?: (gatewayId: number) => void;
+  isSwitchingGateway?: boolean;
 }
 
 export default function CheckoutStripePaymentModal({
@@ -761,6 +842,10 @@ export default function CheckoutStripePaymentModal({
   sessionSecondsLeft = null,
   successReturnPath,
   onPaymentComplete,
+  infoMessage,
+  alternateGateways,
+  onSwitchGateway,
+  isSwitchingGateway = false,
 }: CheckoutStripePaymentModalProps) {
   const { settings } = useDomain();
   const merchantName = settings?.name || "EventWizz";
@@ -808,6 +893,10 @@ export default function CheckoutStripePaymentModal({
     successReturnPath,
     onPaymentComplete,
     onClose: () => onOpenChange(false),
+    infoMessage,
+    alternateGateways,
+    onSwitchGateway,
+    isSwitchingGateway,
   };
 
   return (

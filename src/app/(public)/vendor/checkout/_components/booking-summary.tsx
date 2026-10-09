@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import BookingSummarySkeleton from "./booking-summary-skeleton-loader";
 import {
   CreditCard,
@@ -46,7 +49,10 @@ import {
   useResumeCheckout,
   resolveCheckoutPaymentAction,
 } from "@/services/customer/checkout";
-import type { CheckoutStripePaymentSession } from "@/services/customer/checkout";
+import type {
+  CheckoutResponseData,
+  CheckoutStripePaymentSession,
+} from "@/services/customer/checkout";
 import { invalidateCustomerBookingsList } from "@/services/customer/bookings/query";
 import { buildCheckoutStripeSession, mergeStripePaymentSession } from "@/services/customer/checkout/checkout-payment";
 import { getStripePromise } from "@/lib/stripe/stripe-loader";
@@ -62,7 +68,18 @@ import { usePaymentGatewaySelection } from "@/store/payment-gateway-selection.st
 import PaymentGatewaySelector, {
   formatCheckoutGatewayContinuePrompt,
 } from "./payment-gateway-selector";
-import CheckoutStripePaymentModal from "./checkout-stripe-payment-modal";
+import CheckoutStripePaymentModal, {
+  type CheckoutGatewaySwitch,
+} from "./checkout-stripe-payment-modal";
+import {
+  BANK_TRANSFER_INCOMPLETE_MESSAGE,
+  BANK_TRANSFER_PROCESSING_MESSAGE,
+  beginBankTransferReturn,
+  consumeBankTransferPaidHandoff,
+  readBankReturnQuery,
+  subscribeBankTransferReturn,
+} from "../_lib/bank-transfer-return";
+import { vendorPaymentSuccessHref } from "@/app/(public)/vendor/payment/success/_lib/url";
 import { PaymentSessionCountdownPill } from "./payment-session-countdown-pill";
 import { usePaymentSessionCountdown, formatPaymentTimeRemainingVerbose } from "../_lib/use-payment-session-countdown";
 import { addCacheBusting } from "@/lib/image-utils";
@@ -96,6 +113,10 @@ import {
   countDatePurchases,
   sumPurchaseCounts,
 } from "../_lib/checkout-readiness";
+import {
+  selectHasPendingSeatingDraft,
+  useCheckoutSeatingDraftStore,
+} from "@/store/checkout-seating-draft.store";
 
 const checkoutPayButtonClass = (disabled: boolean) =>
   cn(
@@ -106,6 +127,23 @@ const checkoutPayButtonClass = (disabled: boolean) =>
   );
 
 type BookingSummaryProps = Record<string, never>;
+
+function checkoutGatewaySwitchLabel(slug: string): string | null {
+  switch (slug) {
+    case "stripe":
+      return "Card";
+    case "paypal":
+      return "PayPal";
+    case "stripe_bank":
+      return "Bank Transfer";
+    case "worldpay":
+      return "WorldPay";
+    case "klarna":
+      return "Klarna";
+    default:
+      return null;
+  }
+}
 
 export default function BookingSummary({}: BookingSummaryProps) {
   const { format: formatMoney } = useCurrencyFormat();
@@ -160,6 +198,14 @@ export default function BookingSummary({}: BookingSummaryProps) {
   const { selectedGateway, setSelectedGateway } = usePaymentGatewaySelection();
   const [paymentAlreadyProcessing, setPaymentAlreadyProcessing] =
     useState(false);
+  const [bankReturnPhase, setBankReturnPhase] = useState<
+    "idle" | "checking" | "processing"
+  >("idle");
+  const [bankTransferRetryNotice, setBankTransferRetryNotice] = useState(false);
+  const [isSwitchingGateway, setIsSwitchingGateway] = useState(false);
+  const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const processCheckoutMutation = useProcessCheckout();
   const resumeCheckoutMutation = useResumeCheckout();
   const queryClient = useQueryClient();
@@ -241,6 +287,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
   useEffect(() => {
     const bookingNumber = stripePaymentSession?.bookingNumber;
     if (!bookingNumber || stripePaymentSession.expiresAt) return;
+    if (readBankReturnQuery()) return;
 
     let cancelled = false;
     void (async () => {
@@ -507,8 +554,82 @@ export default function BookingSummary({}: BookingSummaryProps) {
     ],
   );
 
-  const { hasUnsavedEdits, hasValidationErrors, validationErrorMessage } =
-    checkoutReadiness;
+  const hasPendingSeatingDraft = useCheckoutSeatingDraftStore(
+    selectHasPendingSeatingDraft,
+  );
+  const { hasUnsavedEdits } = checkoutReadiness;
+  const hasValidationErrors =
+    checkoutReadiness.hasValidationErrors || hasPendingSeatingDraft;
+  const validationErrorMessage = hasPendingSeatingDraft
+    ? "Allocate every guest and tap Confirm seating before paying"
+    : checkoutReadiness.validationErrorMessage;
+
+  const applyResumedCheckout = useCallback(
+    (data: CheckoutResponseData) => {
+      const paymentAction = resolveCheckoutPaymentAction(data);
+      if (!paymentAction) {
+        throw new Error(
+          "Payment could not be started. Please try again or contact support.",
+        );
+      }
+
+      if (paymentAction.type === "stripe") {
+        useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
+        stripePaymentCompletedRef.current = false;
+        void getStripePromise(paymentAction.session.publishableKey);
+        setStripePaymentSession(
+          mergeStripePaymentSession(
+            useCheckoutPaymentUiStore.getState().stripePaymentSession,
+            paymentAction.session,
+          ),
+        );
+        const gateways = currentEventApiData?.payment_gateways as
+          | Array<{ id: number; slug: string }>
+          | undefined;
+        const match = gateways?.find(
+          (gateway) => gateway.slug === paymentAction.session.gateway,
+        );
+        if (match?.id) setSelectedGateway(String(match.id));
+        setIsStripePaymentOpen(true);
+        return;
+      }
+
+      useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
+      setIsStripePaymentOpen(false);
+      window.location.href = paymentAction.url;
+    },
+    [
+      currentEventApiData?.payment_gateways,
+      setSelectedGateway,
+      setStripePaymentSession,
+    ],
+  );
+
+  const handleResumeCheckoutFailure = useCallback(
+    (error: unknown) => {
+      if (isPaymentAlreadyProcessing(error)) {
+        setPaymentAlreadyProcessing(true);
+        setIsStripePaymentOpen(false);
+        setBankTransferRetryNotice(false);
+        queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+        void invalidateCustomerBookingsList(queryClient);
+        return;
+      }
+      if (error instanceof Error) {
+        handleCheckoutError(error);
+        return;
+      }
+      toast.error("Could not resume payment", {
+        description: "Please try again or contact support.",
+      });
+    },
+    [queryClient],
+  );
+
+  const applyResumedCheckoutRef = useRef(applyResumedCheckout);
+  applyResumedCheckoutRef.current = applyResumedCheckout;
+  const handleResumeCheckoutFailureRef = useRef(handleResumeCheckoutFailure);
+  handleResumeCheckoutFailureRef.current = handleResumeCheckoutFailure;
 
   const resumePendingPayment = useCallback(
     async (paymentGatewayId?: string | null) => {
@@ -547,31 +668,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
           throw new Error(response.message || "Could not resume payment");
         }
 
-        const paymentAction = resolveCheckoutPaymentAction(response.data);
-        if (!paymentAction) {
-          throw new Error(
-            "Payment could not be started. Please try again or contact support.",
-          );
-        }
-
-        if (paymentAction.type === "stripe") {
-          useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(true);
-          stripePaymentCompletedRef.current = false;
-          void getStripePromise(paymentAction.session.publishableKey);
-          setStripePaymentSession(
-            mergeStripePaymentSession(
-              stripePaymentSession,
-              paymentAction.session,
-            ),
-          );
-          setIsStripePaymentOpen(true);
-          return;
-        }
-
-        // Redirect gateway (PayPal, etc.) — leave Stripe modal/session behind.
-        useCheckoutPaymentUiStore.getState().setAwaitingStripePayment(false);
-        setIsStripePaymentOpen(false);
-        window.location.href = paymentAction.url;
+        applyResumedCheckout(response.data);
       } catch (error) {
         toast.dismiss("resume-payment");
         if (isPaymentAlreadyProcessing(error)) {
@@ -594,15 +691,100 @@ export default function BookingSummary({}: BookingSummaryProps) {
     [
       resumeCheckoutMutation,
       stripePaymentSession,
-      setStripePaymentSession,
+      applyResumedCheckout,
       currentEventApiData?.payment_gateways,
       queryClient,
     ],
   );
 
+  const switchPaymentGateway = useCallback(
+    async (gatewayId: number) => {
+      const bookingNumber =
+        useCheckoutPaymentUiStore.getState().stripePaymentSession
+          ?.bookingNumber;
+      if (!bookingNumber || gatewayId <= 0 || bankReturnPhase !== "idle") {
+        return;
+      }
+
+      setIsSwitchingGateway(true);
+      try {
+        const response = await resumeCheckoutMutation.mutateAsync({
+          booking_number: bookingNumber,
+          payment_gateway: gatewayId,
+        });
+        if (!response.status || !response.data) {
+          throw new Error(response.message || "Could not resume payment");
+        }
+        applyResumedCheckout(response.data);
+        setBankTransferRetryNotice(false);
+      } catch (error) {
+        handleResumeCheckoutFailure(error);
+      } finally {
+        setIsSwitchingGateway(false);
+      }
+    },
+    [
+      applyResumedCheckout,
+      bankReturnPhase,
+      handleResumeCheckoutFailure,
+      resumeCheckoutMutation,
+    ],
+  );
+
+  useEffect(() => {
+    const query = readBankReturnQuery();
+    if (!query) return;
+
+    let active = true;
+    const unsubscribe = subscribeBankTransferReturn((state) => {
+      if (!active || state.intent !== query.paymentIntent) return;
+
+      if (state.phase === "checking") {
+        setBankReturnPhase("checking");
+        return;
+      }
+      if (state.phase === "processing") {
+        setBankReturnPhase("processing");
+        setIsStripePaymentOpen(false);
+        return;
+      }
+      if (state.phase === "paid") {
+        if (!consumeBankTransferPaidHandoff()) return;
+        stripePaymentCompletedRef.current = true;
+        setBankReturnPhase("idle");
+        setIsStripePaymentOpen(false);
+        completePaymentSession(state.bookingNumber);
+        queryClient.invalidateQueries({ queryKey: ["cart-data"] });
+        void invalidateCustomerBookingsList(queryClient);
+        routerRef.current.push(vendorPaymentSuccessHref(state.bookingNumber));
+        return;
+      }
+      if (state.phase === "incomplete" && state.response?.data) {
+        setBankReturnPhase("idle");
+        setBankTransferRetryNotice(true);
+        try {
+          applyResumedCheckoutRef.current(state.response.data);
+        } catch (error) {
+          handleResumeCheckoutFailureRef.current(error);
+        }
+        return;
+      }
+      if (state.phase === "resume_error") {
+        setBankReturnPhase("idle");
+        handleResumeCheckoutFailureRef.current(state.error);
+      }
+    });
+
+    beginBankTransferReturn(query, routerRef.current);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [completePaymentSession, queryClient]);
+
   // Checkout handler
   const handleProceedToPayment = async () => {
-    if (paymentAlreadyProcessing) return;
+    if (paymentAlreadyProcessing || bankReturnPhase !== "idle") return;
     if (
       isProcessing ||
       processCheckoutMutation.isPending ||
@@ -901,6 +1083,48 @@ export default function BookingSummary({}: BookingSummaryProps) {
     void invalidateCustomerBookingsList(queryClient);
   }, [queryClient]);
 
+  const bankReturnLocksCheckout = bankReturnPhase !== "idle";
+
+  const alternateGateways = useMemo<CheckoutGatewaySwitch[]>(() => {
+    const currentSlug = stripePaymentSession?.gateway;
+    const gateways = currentEventApiData?.payment_gateways as
+      | Array<{ id: number; slug: string }>
+      | undefined;
+    if (!currentSlug || !Array.isArray(gateways)) return [];
+    return gateways.flatMap((gateway) => {
+      if (!gateway?.id || gateway.slug === currentSlug) return [];
+      const label = checkoutGatewaySwitchLabel(gateway.slug);
+      if (!label) return [];
+      return [{ id: gateway.id, label }];
+    });
+  }, [currentEventApiData?.payment_gateways, stripePaymentSession?.gateway]);
+
+  const checkoutPaymentLock =
+    bankReturnPhase === "checking" ? (
+      <Skeleton className="h-24 w-full rounded-xl" />
+    ) : bankReturnPhase === "processing" ? (
+      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        <p>{BANK_TRANSFER_PROCESSING_MESSAGE}</p>
+        <Link
+          href="/customer/bookings"
+          className="mt-3 inline-flex font-semibold underline underline-offset-2"
+        >
+          View my bookings
+        </Link>
+      </div>
+    ) : paymentAlreadyProcessing ? (
+      <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        {PAYMENT_ALREADY_PROCESSING_MESSAGE}
+      </p>
+    ) : null;
+
+  const bankTransferRetryBanner =
+    bankTransferRetryNotice && !isStripePaymentOpen && !bankReturnLocksCheckout ? (
+      <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        {BANK_TRANSFER_INCOMPLETE_MESSAGE}
+      </p>
+    ) : null;
+
   const stripePaymentModal = (
     <CheckoutStripePaymentModal
       open={isStripePaymentOpen}
@@ -925,6 +1149,12 @@ export default function BookingSummary({}: BookingSummaryProps) {
       }}
       session={stripePaymentSession}
       sessionSecondsLeft={sessionSecondsLeft}
+      infoMessage={
+        bankTransferRetryNotice ? BANK_TRANSFER_INCOMPLETE_MESSAGE : null
+      }
+      alternateGateways={alternateGateways}
+      onSwitchGateway={(gatewayId) => void switchPaymentGateway(gatewayId)}
+      isSwitchingGateway={isSwitchingGateway}
       onPaymentComplete={() => {
         stripePaymentCompletedRef.current = true;
         // completePaymentSession: clears session + removes sessionStorage key +
@@ -1215,11 +1445,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
             </span>{" "}
             is reserved. Complete payment to confirm your booking.
           </p>
-          {paymentAlreadyProcessing ? (
-            <p className="mt-4 text-sm text-[color:var(--checkout-foreground)]">
-              {PAYMENT_ALREADY_PROCESSING_MESSAGE}
-            </p>
-          ) : (
+          {checkoutPaymentLock ?? bankTransferRetryBanner}
+          {checkoutPaymentLock ? null : (
           <Button
             type="button"
             onClick={() => void resumePendingPayment(selectedGateway)}
@@ -1321,10 +1548,16 @@ export default function BookingSummary({}: BookingSummaryProps) {
   // Must be a render fn (not an inner component) so timer ticks
   // re-render without remounting PaymentGatewaySelector every second.
   // ──────────────────────────────────────────────
-  const renderPaymentMethodSection = () =>
-    currentEventApiData?.payment_gateways &&
-    Array.isArray(currentEventApiData.payment_gateways) &&
-    currentEventApiData.payment_gateways.length > 0 ? (
+  const renderPaymentMethodSection = () => {
+    if (bankReturnLocksCheckout) return null;
+    if (
+      !currentEventApiData?.payment_gateways ||
+      !Array.isArray(currentEventApiData.payment_gateways) ||
+      currentEventApiData.payment_gateways.length === 0
+    ) {
+      return null;
+    }
+    return (
       <>
         <PaymentGatewaySelector
           availableGateways={
@@ -1345,7 +1578,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
         />
         <Separator className="bg-gray-100" />
       </>
-    ) : null;
+    );
+  };
 
   const renderOrderSummaryContent = (options?: {
     /** Mobile sticky strip already shows the session timer — skip the card copy. */
@@ -1357,7 +1591,7 @@ export default function BookingSummary({}: BookingSummaryProps) {
       {!options?.omitSessionBanners ? (
         <>
           {renderExpiredPaymentBanner("card")}
-          {renderPendingPaymentBanner("card")}
+          {bankReturnLocksCheckout ? null : renderPendingPaymentBanner("card")}
         </>
       ) : null}
 
@@ -1570,12 +1804,11 @@ export default function BookingSummary({}: BookingSummaryProps) {
           </p>
         </div>
       ) : null}
-      {availableDates.length > 0 && paymentAlreadyProcessing ? (
-        <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-          {PAYMENT_ALREADY_PROCESSING_MESSAGE}
-        </p>
-      ) : null}
-      {availableDates.length > 0 && !paymentAlreadyProcessing && (
+      {availableDates.length > 0 ? checkoutPaymentLock : null}
+      {availableDates.length > 0 && !checkoutPaymentLock
+        ? bankTransferRetryBanner
+        : null}
+      {availableDates.length > 0 && !checkoutPaymentLock && (
         <div className="hidden lg:block">
           <Button
             size="lg"
@@ -1700,7 +1933,9 @@ export default function BookingSummary({}: BookingSummaryProps) {
         <div className="lg:hidden">
           <CheckoutMobileStickyBar>
             {renderExpiredPaymentBanner("mobile-sticky")}
-            {renderPendingPaymentBanner("mobile-sticky")}
+            {bankReturnLocksCheckout
+              ? null
+              : renderPendingPaymentBanner("mobile-sticky")}
 
             <div className="flex flex-col gap-2.5 px-4 pt-3 pb-[max(0.75rem,var(--checkout-mobile-safe-bottom))]">
               <button
@@ -1742,11 +1977,8 @@ export default function BookingSummary({}: BookingSummaryProps) {
                 )}
               </button>
 
-              {paymentAlreadyProcessing ? (
-                <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-                  {PAYMENT_ALREADY_PROCESSING_MESSAGE}
-                </p>
-              ) : (
+              {checkoutPaymentLock ?? bankTransferRetryBanner}
+              {checkoutPaymentLock ? null : (
               <Button
                 onClick={handleCheckoutCtaClick}
                 disabled={ctaState.disabled}

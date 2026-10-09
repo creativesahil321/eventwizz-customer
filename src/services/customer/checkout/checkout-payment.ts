@@ -151,6 +151,20 @@ export function resolveCheckoutPaymentAction(
   return null;
 }
 
+/** Bank Transfer returns to checkout. Card keeps `buildStripeReturnUrl`. */
+export function buildBankTransferCheckoutReturnUrl(
+  session: CheckoutStripePaymentSession,
+): string {
+  const path = window.location.pathname.startsWith("/vendor/checkout")
+    ? "/vendor/checkout"
+    : "/checkout";
+  const url = new URL(path, window.location.origin);
+  url.searchParams.set("booking_number", session.bookingNumber);
+  url.searchParams.set("booking_id", String(session.bookingId));
+  url.searchParams.set("bank_return", "1");
+  return url.toString();
+}
+
 export function buildStripeReturnUrl(
   session: CheckoutStripePaymentSession,
   options?: { path?: string },

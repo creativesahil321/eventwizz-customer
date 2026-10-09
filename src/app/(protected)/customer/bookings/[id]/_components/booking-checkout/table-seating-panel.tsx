@@ -31,6 +31,8 @@ export interface TableSeatingSnapshot {
   tableItemCount: number;
   /** Draft allocation total — used for progress before Confirm seating. */
   draftGuestTotal: number;
+  /** Per-table steppers are open; saving waits until the user is done. */
+  isAdjusting?: boolean;
 }
 
 interface TableSeatingPanelProps {
@@ -296,6 +298,8 @@ export function TableSeatingPanel({
     ? activeAllocation.filter((count) => count > 0).length
     : 0;
 
+  const isAdjustingTables = isAdjusting && tableQuantity > 1;
+
   useEffect(() => {
     onStateChange?.({
       groupSize: effectiveGroupSize,
@@ -304,11 +308,13 @@ export function TableSeatingPanel({
       tableTotal,
       tableItemCount,
       draftGuestTotal,
+      isAdjusting: isAdjustingTables,
     });
   }, [
     activeAllocation,
     draftGuestTotal,
     effectiveGroupSize,
+    isAdjustingTables,
     onStateChange,
     seatingConfirmed,
     tableItemCount,
@@ -374,6 +380,7 @@ export function TableSeatingPanel({
     }
 
     setSeatingConfirmed(true);
+    setIsAdjusting(false);
     toast.success("Seating ready. Select Add to booking to save.");
   };
 

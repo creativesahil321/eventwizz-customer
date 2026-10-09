@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { EditableItem, useCartEditStore } from "@/store/cart-edit.store";
+import { useCheckoutSeatingDraftStore } from "@/store/checkout-seating-draft.store";
 import {
   autoArrangeGuests,
   validateAllocation,
@@ -199,13 +200,31 @@ export default function InlineTableAllocation({
   };
 
   const showConfirmButton =
-    validation.isValid && !isStoreConfirmed && !isSavingSeating;
+    validation.isValid && (!isStoreConfirmed || isDirty) && !isSavingSeating;
 
   // Splitting guests only makes sense across several tables.
   const canAdjustTables = table.quantity > 1;
   // An invalid split must stay fixable, so open the controls automatically.
   const showTableControls =
     canAdjustTables && (isAdjusting || !validation.isValid);
+
+  // Payment stays blocked until the seating on screen is valid and confirmed.
+  const isSeatingDraftPending =
+    table.quantity > 0 &&
+    ((canAdjustTables && isAdjusting) || isDirty || !validation.isValid);
+  const setSeatingDraftPending = useCheckoutSeatingDraftStore(
+    (state) => state.setSeatingDraftPending,
+  );
+  const seatingDraftKey = `${eventSlug}|${date}|${table.id}`;
+
+  useEffect(() => {
+    setSeatingDraftPending(seatingDraftKey, isSeatingDraftPending);
+  }, [seatingDraftKey, isSeatingDraftPending, setSeatingDraftPending]);
+
+  useEffect(
+    () => () => setSeatingDraftPending(seatingDraftKey, false),
+    [seatingDraftKey, setSeatingDraftPending],
+  );
 
   const handleConfirmSeating = async () => {
     if (!validation.isValid) {
@@ -232,6 +251,7 @@ export default function InlineTableAllocation({
         }
       }
 
+      setIsAdjusting(false);
       toast.success("Seating confirmed");
     } catch (error) {
       console.error("Failed to save seating:", error);

@@ -613,6 +613,7 @@ function AddExtrasHeader({
   pendingSummaryLabel,
   pendingTotalFormatted,
   isSaving,
+  saveBlockedReason,
   onSave,
 }: {
   open: boolean;
@@ -620,6 +621,8 @@ function AddExtrasHeader({
   pendingSummaryLabel: string | null;
   pendingTotalFormatted: string;
   isSaving: boolean;
+  /** Seating still being adjusted / unconfirmed — save stays disabled. */
+  saveBlockedReason: string | null;
   onSave: () => void;
 }) {
   return (
@@ -664,12 +667,18 @@ function AddExtrasHeader({
               color: "var(--color-primary-foreground, #fff)",
             }}
             onClick={onSave}
-            disabled={isSaving}
+            disabled={isSaving || Boolean(saveBlockedReason)}
+            title={saveBlockedReason ?? undefined}
           >
             {isSaving ? "Adding…" : "Add to booking"}
           </button>
         </div>
       )}
+      {pendingSummaryLabel && saveBlockedReason ? (
+        <p className="text-[11px] leading-snug text-amber-700">
+          {saveBlockedReason}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1814,6 +1823,12 @@ export function AddExtrasSection({
 
   const pendingTotalFormatted = formatCurrency(pendingTotal);
   const tableAccent = kindAccentStyle("table");
+  const seatingBlocksSave =
+    Boolean(tableSeating.isAdjusting) ||
+    (tableConfig !== null &&
+      !tableSeating.seatingConfirmed &&
+      tableSeating.draftGuestTotal > 0) ||
+    (existingFill.totalAdded > 0 && !existingSeatingConfirmed);
 
   return (
     <div className="border-t border-dashed border-border">
@@ -1823,6 +1838,11 @@ export function AddExtrasSection({
         pendingSummaryLabel={pendingSummaryLabel}
         pendingTotalFormatted={pendingTotalFormatted}
         isSaving={isSavingAddOns}
+        saveBlockedReason={
+          seatingBlocksSave
+            ? "Allocate every guest and tap Confirm seating to continue"
+            : null
+        }
         onSave={handleSave}
       />
 
